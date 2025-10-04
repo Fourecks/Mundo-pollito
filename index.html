@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lista de Tareas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: 'var(--color-primary)',
+                light: 'var(--color-primary-light)',
+                dark: 'var(--color-primary-dark)',
+              },
+              secondary: {
+                DEFAULT: 'var(--color-secondary)',
+                light: 'var(--color-secondary-light)',
+                dark: 'var(--color-secondary-dark)',
+                lighter: 'var(--color-secondary-lighter)',
+              },
+            }
+          }
+        }
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+      :root {
+        --color-primary: #F472B6; /* pink-400 */
+        --color-primary-light: #FBCFE8; /* pink-200 */
+        --color-primary-dark: #EC4899; /* pink-500 */
+
+        --color-secondary: #FBBF24; /* amber-400 */
+        --color-secondary-light: #FDE68A; /* amber-200 */
+        --color-secondary-dark: #F59E0B; /* amber-500 */
+        --color-secondary-lighter: #FEF3C7; /* amber-100 */
+      }
+
+      html.dark {
+        --color-primary: #F472B6; /* pink-400 */
+        --color-primary-light: #be185d; /* pink-700 */
+        --color-primary-dark: #fda4af; /* pink-300 */
+        
+        --color-secondary: #F59E0B; /* amber-500 */
+        --color-secondary-light: #b45309; /* amber-700 */
+        --color-secondary-dark: #FCD34D; /* amber-300 */
+        --color-secondary-lighter: #451a03; /* amber-950 */
+      }
+      
+      body {
+        font-family: 'Fredoka', sans-serif;
+      }
+      /* Light scrollbar (default) */
+      .custom-scrollbar {
+        scrollbar-width: thin; /* For Firefox */
+        scrollbar-color: var(--color-primary) rgba(254, 243, 199, 0.5); /* For Firefox */
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(254, 243, 199, 0.5); /* bg-yellow-100/50 */
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: var(--color-primary);
+        border-radius: 10px;
+      }
+
+      /* Dark scrollbar */
+      html.dark .custom-scrollbar {
+        scrollbar-color: #4b5563 #1f2937; /* For Firefox */
+      }
+      html.dark .custom-scrollbar::-webkit-scrollbar-track {
+        background: #1f2937; /* gray-800 */
+      }
+      html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #4b5563; /* gray-600 */
+      }
+      html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #6b7280; /* gray-500 */
+      }
+
+      @keyframes pop-in {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      .animate-pop-in {
+        animation: pop-in 0.3s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+      }
+      
+      @keyframes fade-in {
+        from { opacity: 0; transform: scale(0.98); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+      }
+
+      /* Animation for deploying from bottom-center */
+      @keyframes deploy-from-bottom {
+        from {
+          opacity: 0;
+          transform: translateY(45vh) scale(0.6);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      .animate-deploy {
+        animation: deploy-from-bottom 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+
+      @keyframes walk-cycle {
+        0% { transform: translateX(-50px) scaleX(1); }
+        49% { transform: translateX(50px) scaleX(1); }
+        50% { transform: translateX(50px) scaleX(-1); }
+        99% { transform: translateX(-50px) scaleX(-1); }
+        100% { transform: translateX(-50px) scaleX(1); }
+      }
+      .animate-walk-cycle {
+        animation: walk-cycle 3s ease-in-out infinite;
+      }
+      @keyframes shadow-cycle {
+        0%, 100% { transform: scale(1.1, 1); opacity: 0.1; }
+        50% { transform: scale(0.9, 1); opacity: 0.05; }
+      }
+      .animate-shadow-cycle {
+        animation: shadow-cycle 1.5s ease-in-out infinite;
+      }
+      
+      /* DEPRECATED Card flip animation styles - will be removed later */
+      .perspective-1000 { perspective: 1000px; }
+      .transform-style-3d { transform-style: preserve-3d; }
+      .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+      .transform-rotate-y-180 { transform: rotateY(180deg); }
+
+      /* Mobile Landscape Game Mode */
+      @media (orientation: landscape) and (max-width: 1023px) {
+          body.landscape-game-mode .mobile-nav,
+          body.landscape-game-mode .mobile-ai-button {
+              display: none !important;
+          }
+          body.landscape-game-mode .puzzle-game-layout {
+              flex-direction: row;
+              height: 100%;
+          }
+          body.landscape-game-mode .puzzle-game-layout > .puzzle-board-container {
+              height: calc(100% - 2rem);
+              width: auto;
+              max-width: none;
+          }
+           body.landscape-game-mode .puzzle-game-layout > .puzzle-bank-container {
+              height: calc(100% - 2rem);
+              width: 12rem;
+          }
+          body.landscape-game-mode .memory-grid-container {
+            width: 80vh; /* Make grid wider based on height */
+            max-width: 100%;
+          }
+          body.landscape-game-mode .artsteps-viewer-container header {
+            display: none;
+          }
+          body.landscape-game-mode .artsteps-viewer-container .flex-grow {
+            height: 100vh;
+          }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+    <script src="https://accounts.google.com/gsi/client" async></script>
+    <script src="https://apis.google.com/js/api.js" async></script>
+  </body>
+</html>
