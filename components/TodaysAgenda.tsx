@@ -46,10 +46,10 @@ const AgendaItem: React.FC<AgendaItemProps> = ({ task, onToggleTask, onToggleSub
           </label>
         </div>
         <div className="flex-grow min-w-0 cursor-pointer" onClick={() => onToggleTask(task.id)}>
-          {task.startTime ? (
+          {task.start_time ? (
             <span className={`font-semibold text-xs flex items-center gap-1 ${task.completed ? 'text-gray-400 dark:text-gray-500' : 'text-pink-600 dark:text-pink-400'}`}>
               <ClockIcon className="h-3 w-3" />
-              {formatTime(task.startTime)}
+              {formatTime(task.start_time)}
             </span>
           ) : (
             <span className="text-xs text-gray-400 dark:text-gray-500 italic">Sin hora</span>
@@ -180,7 +180,7 @@ interface TodaysAgendaProps {
   onToggleSubtask: (taskId: number, subtaskId: number) => void;
   quickNotes: QuickNote[];
   onAddQuickNote: (text: string) => void;
-  onDeleteQuickNote: (id: string) => void;
+  onDeleteQuickNote: (id: number) => void;
   onClearAllQuickNotes: () => void;
 }
 

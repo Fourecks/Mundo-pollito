@@ -5,7 +5,6 @@ import NotesIcon from './icons/NotesIcon';
 import GalleryIcon from './icons/GalleryIcon';
 import MoreIcon from './icons/MoreIcon';
 import GameIcon from './icons/GameIcon';
-import StickyNoteIcon from './icons/StickyNoteIcon';
 
 interface MobileNavProps {
   activeTab: string;

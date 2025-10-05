@@ -20,36 +20,42 @@ export type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'biweekly' | 'mo
 export interface RecurrenceRule {
   frequency: RecurrenceFrequency;
   customDays?: number[]; // For custom frequency, stores selected days (e.g., day of week or day of month)
+  id?: string; // A unique ID for a series of recurring tasks
+  sourceId?: number; // The ID of the task that generated this one
 }
 
 export interface Todo {
   id: number;
+  user_id?: string;
+  created_at?: string;
   text: string;
   completed: boolean;
   priority: Priority;
-  dueDate?: string; // Represents the start date of the task
-  startTime?: string; // e.g., "14:00"
-  endTime?: string;   // e.g., "15:30"
+  due_date?: string; // Represents the start date of the task
+  start_time?: string; // e.g., "14:00"
+  end_time?: string;   // e.g., "15:30"
   notes?: string;
   subtasks?: Subtask[];
   recurrence?: RecurrenceRule;
-  reminderOffset?: 0 | 10 | 30 | 60; // In minutes before startTime
-  notificationSent?: boolean;
-  recurrenceId?: string; // A unique ID for a series of recurring tasks
-  recurrenceSourceId?: number; // The ID of the task that generated this one
+  reminder_offset?: 0 | 10 | 30 | 60; // In minutes before start_time
+  notification_sent?: boolean;
 }
 
 export interface Note {
-  id: string;
+  id: number;
+  user_id: string;
+  folder_id: number;
   title: string;
   content: string;
-  createdAt: string;
-  updatedAt:string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Folder {
-  id: string;
+  id: number;
+  user_id: string;
   name: string;
+  created_at: string;
   notes: Note[];
 }
 
@@ -67,8 +73,10 @@ export interface GalleryImage {
 }
 
 export interface QuickNote {
-  id: string;
+  id: number;
+  user_id: string;
   text: string;
+  created_at: string;
 }
 
 // FIX: Add and export the `EncouragementNote` type to fix missing export error.
@@ -87,6 +95,15 @@ export interface AIConversationTurn {
   sources?: any[];
 }
 
+export interface AIConversationHistoryItem {
+  id: number;
+  created_at: string;
+  mode: 'normal' | 'comfort';
+  title: string;
+  conversation_data: AIConversationTurn[];
+}
+
+
 export interface AISettings {
     customInstructions?: string;
 }
@@ -99,20 +116,26 @@ export interface BrowserSession {
 
 
 export interface Playlist {
-  id: string; // YouTube Video ID/Playlist ID or Spotify ID
+  id: number;
+  user_id: string;
+  source_id: string; // YouTube Video ID/Playlist ID or Spotify ID
   name: string;
-  isFavorite?: boolean;
+  is_favorite?: boolean;
   type: 'video' | 'playlist' | 'track' | 'album';
   platform: 'youtube' | 'spotify';
-  uuid: string;
-  thumbnailUrl?: string;
-  // FIX: Add optional 'queue' property to support passing the music queue to player components.
+  thumbnail_url?: string;
+  created_at: string;
   queue?: Playlist[];
 }
 
 export interface ThemeColors {
   primary: string;
   secondary: string;
+}
+
+export interface SupabaseUser {
+  id: string;
+  email?: string;
 }
 
 // FIX: Centralized YouTube IFrame API type definitions to fix duplicate declaration errors.
@@ -152,5 +175,8 @@ declare global {
     // FIX: Add google and gapi to the Window interface to resolve TypeScript errors in App.tsx.
     google: any;
     gapi: any;
+    supabase: {
+      createClient: (url: string, key: string) => any;
+    };
   }
 }

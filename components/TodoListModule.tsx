@@ -98,11 +98,11 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
         } else if (sortBy === 'dueDate') {
             todosCopy.sort((a, b) => {
                 if (a.completed !== b.completed) return a.completed ? 1 : -1;
-                if (!a.dueDate && b.dueDate) return 1;
-                if (a.dueDate && !b.dueDate) return -1;
-                if (!a.dueDate && !b.dueDate) return a.id - b.id;
+                if (!a.due_date && b.due_date) return 1;
+                if (a.due_date && !b.due_date) return -1;
+                if (!a.due_date && !b.due_date) return a.id - b.id;
                 
-                const dateDiff = new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime();
+                const dateDiff = new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime();
                 if (dateDiff !== 0) return dateDiff;
                 
                 return a.id - b.id;

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Folder, Note } from '../types';
 import PlusIcon from './icons/PlusIcon';
@@ -15,7 +13,12 @@ import MobileHeader from './MobileHeader';
 
 interface NotesSectionProps {
   folders: Folder[];
-  setFolders: React.Dispatch<React.SetStateAction<Folder[]>>;
+  onAddFolder: (name: string) => Promise<Folder | null>;
+  onUpdateFolder: (id: number, name: string) => Promise<void>;
+  onDeleteFolder: (id: number) => Promise<void>;
+  onAddNote: (folderId: number) => Promise<Note | null>;
+  onUpdateNote: (note: Note) => Promise<void>;
+  onDeleteNote: (noteId: number, folderId: number) => Promise<void>;
   isMobile?: boolean;
 }
 
@@ -34,11 +37,20 @@ const formatDate = (isoString: string) => {
     return new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 };
 
-const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobile = false }) => {
-    const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
-    const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+const NotesSection: React.FC<NotesSectionProps> = ({ 
+    folders, 
+    onAddFolder, 
+    onUpdateFolder,
+    onDeleteFolder,
+    onAddNote,
+    onUpdateNote,
+    onDeleteNote,
+    isMobile = false 
+}) => {
+    const [activeFolderId, setActiveFolderId] = useState<number | null>(null);
+    const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
     const [draftNote, setDraftNote] = useState<Note | null>(null);
-    const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+    const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
     const [editingFolderName, setEditingFolderName] = useState('');
     const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
     const [isAiLoading, setIsAiLoading] = useState(false);
@@ -100,12 +112,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
 
     const handleSaveNote = useCallback((noteToSave: Note) => {
         if (!activeFolderId || !noteToSave) return;
-        setFolders(prevFolders => prevFolders.map(f =>
-            f.id === activeFolderId
-                ? { ...f, notes: f.notes.map(n => n.id === noteToSave.id ? { ...noteToSave, updatedAt: new Date().toISOString() } : n).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) }
-                : f
-        ));
-    }, [activeFolderId, setFolders]);
+        onUpdateNote(noteToSave);
+    }, [activeFolderId, onUpdateNote]);
 
     useEffect(() => {
         if (draftNote) {
@@ -134,55 +142,57 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
         if (isMobile) setMobileView('editor');
     };
     
-    const handleSelectFolder = (folderId: string) => {
+    const handleSelectFolder = (folderId: number) => {
         setActiveFolderId(folderId);
         setActiveNoteId(null);
         setDraftNote(null);
         if(isMobile) setMobileView('list');
     };
 
-    const handleAddFolder = () => {
-        const newFolder: Folder = { id: `folder-${Date.now()}`, name: "Nueva Carpeta", notes: [] };
-        setFolders(prev => [newFolder, ...prev]);
-        setActiveFolderId(newFolder.id);
-        setEditingFolderId(newFolder.id);
-        setEditingFolderName(newFolder.name);
-        setActiveNoteId(null);
-        setDraftNote(null);
-        if (isMobile) setMobileView('list');
+    const handleAddFolderClick = async () => {
+        const newFolder = await onAddFolder("Nueva Carpeta");
+        if(newFolder) {
+            setActiveFolderId(newFolder.id);
+            setEditingFolderId(newFolder.id);
+            setEditingFolderName(newFolder.name);
+            setActiveNoteId(null);
+            setDraftNote(null);
+            if (isMobile) setMobileView('list');
+        }
     };
 
     const handleRenameFolder = () => {
         if (!editingFolderId) return;
-        setFolders(prev => prev.map(f => f.id === editingFolderId ? { ...f, name: editingFolderName.trim() || "Carpeta sin nombre" } : f));
+        onUpdateFolder(editingFolderId, editingFolderName.trim() || "Carpeta sin nombre");
         setEditingFolderId(null);
     };
     
     const closeConfirmModal = () => setConfirmModalState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-    const handleDeleteFolder = (folderId: string, folderName: string) => {
+    const handleDeleteFolderClick = (folderId: number, folderName: string) => {
         setConfirmModalState({
             isOpen: true, title: 'Eliminar Carpeta', message: `¿Seguro que quieres eliminar la carpeta "${folderName}" y todas sus notas? Esta acción no se puede deshacer.`,
-            onConfirm: () => { setFolders(prev => prev.filter(f => f.id !== folderId)); closeConfirmModal(); }
+            onConfirm: () => { onDeleteFolder(folderId); closeConfirmModal(); }
         });
     };
 
-    const handleAddNote = () => {
+    const handleAddNoteClick = async () => {
         if (!activeFolderId) return;
-        const newNote: Note = { id: `note-${Date.now()}`, title: "", content: "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-        setFolders(prev => prev.map(f => f.id === activeFolderId ? { ...f, notes: [newNote, ...f.notes] } : f));
-        setActiveNoteId(newNote.id);
-        setDraftNote(newNote);
-        if (isMobile) setMobileView('editor');
-        setTimeout(() => titleInputRef.current?.focus(), 0);
+        const newNote = await onAddNote(activeFolderId);
+        if (newNote) {
+            setActiveNoteId(newNote.id);
+            setDraftNote(newNote);
+            if (isMobile) setMobileView('editor');
+            setTimeout(() => titleInputRef.current?.focus(), 0);
+        }
     };
 
-    const handleDeleteNote = (noteId: string, noteTitle: string) => {
+    const handleDeleteNoteClick = (noteId: number, noteTitle: string) => {
         if (!activeFolderId) return;
         const folderId = activeFolderId;
         setConfirmModalState({
             isOpen: true, title: 'Eliminar Nota', message: `¿Seguro que quieres eliminar la nota "${noteTitle || 'Nota sin título'}"?`,
-            onConfirm: () => { setFolders(prev => prev.map(f => f.id === folderId ? { ...f, notes: f.notes.filter(n => n.id !== noteId) } : f)); closeConfirmModal(); }
+            onConfirm: () => { onDeleteNote(noteId, folderId); closeConfirmModal(); }
         });
     };
     
@@ -229,7 +239,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
                 newContent = aiText;
             }
             
-            setDraftNote(prev => prev ? { ...prev, content: newContent, updatedAt: new Date().toISOString() } : null);
+            setDraftNote(prev => prev ? { ...prev, content: newContent, updated_at: new Date().toISOString() } : null);
         } catch (error) {
             console.error("Notes AI Error:", error);
             setDraftNote(prev => prev ? { ...prev, content: prev.content + "\n\n---\n¡Pío! Lo siento pollito, no pude completar esa tarea. Mis circuitos se cruzaron." } : null);
@@ -239,7 +249,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
     };
 
     const activeFolder = folders.find(f => f.id === activeFolderId);
-    const sortedNotes = activeFolder?.notes.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) || [];
+    const sortedNotes = activeFolder?.notes.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()) || [];
     
     const aiActions = [
         { id: 'continue', label: 'Continuar escritura', disabled: !draftNote?.content, tooltip: '' },
@@ -254,7 +264,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
                 {/* List View */}
                 <div className={`absolute inset-0 transition-transform duration-300 ease-in-out flex flex-col bg-transparent ${mobileView === 'editor' ? '-translate-x-full' : 'translate-x-0'}`}>
                     <MobileHeader title="Notas">
-                        <button onClick={handleAddFolder} className="p-2 rounded-full hover:bg-secondary-lighter/50 dark:hover:bg-gray-700/50"><PlusIcon /></button>
+                        <button onClick={handleAddFolderClick} className="p-2 rounded-full hover:bg-secondary-lighter/50 dark:hover:bg-gray-700/50"><PlusIcon /></button>
                     </MobileHeader>
                      <div className="overflow-y-auto custom-scrollbar p-2">
                         {folders.map(folder => (
@@ -267,14 +277,14 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
                      </div>
                      <div className="p-2 flex justify-between items-center border-y border-secondary-light/30 dark:border-gray-700 flex-shrink-0">
                         <h2 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase tracking-wider pl-1">Notas</h2>
-                        <button onClick={handleAddNote} disabled={!activeFolderId} className="p-2 rounded-full hover:bg-secondary-lighter/50 dark:hover:bg-gray-700/50 disabled:opacity-50"><PlusIcon /></button>
+                        <button onClick={handleAddNoteClick} disabled={!activeFolderId} className="p-2 rounded-full hover:bg-secondary-lighter/50 dark:hover:bg-gray-700/50 disabled:opacity-50"><PlusIcon /></button>
                     </div>
                      <div className="flex-grow overflow-y-auto custom-scrollbar space-y-2 p-2">
                         {activeFolder && sortedNotes.map(note => (
                             <button key={note.id} onClick={() => selectNote(note)} className={`w-full text-left p-3 rounded-xl transition-all duration-200 bg-white/80 dark:bg-gray-700/70 shadow-sm hover:shadow-md hover:-translate-y-0.5`}>
                                 <h4 className={`font-semibold text-sm truncate text-primary-dark dark:text-primary`}>{note.title || "Nueva Nota"}</h4>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">{note.content || "Sin contenido adicional"}</p>
-                                <p className="text-right text-xs text-gray-400 dark:text-gray-500 mt-2">{formatDate(note.updatedAt)}</p>
+                                <p className="text-right text-xs text-gray-400 dark:text-gray-500 mt-2">{formatDate(note.updated_at)}</p>
                             </button>
                         ))}
                     </div>
@@ -287,7 +297,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
                            <MobileHeader title="">
                                 <button onClick={() => setMobileView('list')} className="p-2 -ml-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
                                 <div className="flex-grow"></div>
-                                <button onClick={() => handleDeleteNote(draftNote.id, draftNote.title)} aria-label="Eliminar nota" className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400 transition-colors"><TrashIcon /></button>
+                                <button onClick={() => handleDeleteNoteClick(draftNote.id, draftNote.title)} aria-label="Eliminar nota" className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400 transition-colors"><TrashIcon /></button>
                            </MobileHeader>
                             <div className="flex-grow flex flex-col p-4 overflow-y-auto custom-scrollbar">
                                 <input ref={titleInputRef} type="text" value={draftNote.title} onChange={e => setDraftNote(prev => prev ? { ...prev, title: e.target.value } : null)} placeholder="Título..." className="text-2xl font-bold bg-transparent focus:outline-none mb-4 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500" />
@@ -325,7 +335,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
             <aside className={`w-full md:w-[250px] flex-shrink-0 bg-secondary-lighter/60 md:bg-black/5 dark:bg-gray-900/60 md:dark:bg-black/20 backdrop-blur-sm flex-col h-full border-r border-secondary-light/30 dark:border-gray-700/50 flex`}>
                 <div className="p-3 flex justify-between items-center border-b border-secondary-light/30 dark:border-gray-700/50 flex-shrink-0">
                     <h2 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase tracking-wider">Carpetas</h2>
-                    <button onClick={handleAddFolder} className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-secondary-light dark:hover:bg-gray-700 hover:text-secondary-dark transition-colors"><PlusIcon /></button>
+                    <button onClick={handleAddFolderClick} className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-secondary-light dark:hover:bg-gray-700 hover:text-secondary-dark transition-colors"><PlusIcon /></button>
                 </div>
                 <div className="overflow-y-auto custom-scrollbar space-y-1 p-2 flex-shrink-0">
                     {folders.map(folder => (
@@ -337,15 +347,15 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
                                     <FolderIcon /> <span className="truncate">{folder.name}</span>
                                 </button>
                             )}
-                            {folders.length > 1 && editingFolderId !== folder.id && (
-                                <button onClick={() => handleDeleteFolder(folder.id, folder.name)} aria-label={`Eliminar ${folder.name}`} className="absolute top-1/2 -translate-y-1/2 right-2 p-1 rounded-full text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon className="h-4 w-4" /></button>
+                            {editingFolderId !== folder.id && (
+                                <button onClick={() => handleDeleteFolderClick(folder.id, folder.name)} aria-label={`Eliminar ${folder.name}`} className="absolute top-1/2 -translate-y-1/2 right-2 p-1 rounded-full text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon className="h-4 w-4" /></button>
                             )}
                         </div>
                     ))}
                 </div>
                 <div className="mt-auto p-3 flex justify-between items-center border-y border-secondary-light/30 dark:border-gray-700/50 flex-shrink-0">
                     <h2 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase tracking-wider">Notas</h2>
-                    <button onClick={handleAddNote} disabled={!activeFolderId} className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-secondary-light dark:hover:bg-gray-700 hover:text-secondary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><PlusIcon /></button>
+                    <button onClick={handleAddNoteClick} disabled={!activeFolderId} className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-secondary-light dark:hover:bg-gray-700 hover:text-secondary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><PlusIcon /></button>
                 </div>
                 <div className="flex-grow overflow-y-auto custom-scrollbar space-y-1 p-2">
                     {activeFolder && sortedNotes.map(note => (
@@ -379,13 +389,13 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
                                     </div>
                                 )}
                             </div>
-                            <button onClick={() => handleDeleteNote(draftNote.id, draftNote.title)} aria-label="Eliminar nota" className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400 transition-colors"><TrashIcon /></button>
+                            <button onClick={() => handleDeleteNoteClick(draftNote.id, draftNote.title)} aria-label="Eliminar nota" className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 dark:hover:text-red-400 transition-colors"><TrashIcon /></button>
                         </header>
                         <div className="flex-grow flex flex-col p-4 overflow-y-auto custom-scrollbar">
                             <textarea value={draftNote.content} onChange={e => setDraftNote(prev => prev ? { ...prev, content: e.target.value } : null)} placeholder="Escribe lo que quieras..." className="flex-grow bg-transparent focus:outline-none resize-none text-gray-700 dark:text-gray-300 leading-relaxed" />
                         </div>
                         <footer className="flex-shrink-0 p-2 text-xs text-right text-gray-500 dark:text-gray-400">
-                            Editado: {formatDate(draftNote.updatedAt)} | Caracteres: {draftNote.content.length}
+                            Editado: {formatDate(draftNote.updated_at)} | Caracteres: {draftNote.content.length}
                         </footer>
                     </>
                 ) : (
@@ -401,5 +411,4 @@ const NotesSection: React.FC<NotesSectionProps> = ({ folders, setFolders, isMobi
     );
 };
 
-// FIX: Added default export.
 export default NotesSection;

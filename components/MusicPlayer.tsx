@@ -11,21 +11,23 @@ import ConfirmationModal from './ConfirmationModal';
 interface MusicPlayerProps {
   onSelectTrack: (track: Playlist, queue: Playlist[]) => void;
   playlists: Playlist[];
-  onUpdatePlaylists: (updater: React.SetStateAction<Playlist[]>) => void;
-  onDeletePlaylist: (uuid: string) => void;
+  onAddPlaylist: (playlist: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  onUpdatePlaylist: (playlist: Playlist) => Promise<void>;
+  onDeletePlaylist: (id: number) => Promise<void>;
   onClose: () => void;
 }
 
 const MusicPlayer: React.FC<MusicPlayerProps> = ({ 
   onSelectTrack, 
   playlists, 
-  onUpdatePlaylists,
+  onAddPlaylist,
+  onUpdatePlaylist,
   onDeletePlaylist,
   onClose
 }) => {
   const [view, setView] = useState<'all' | 'favorites'>('all');
   const [platform, setPlatform] = useState<'youtube' | 'spotify'>('youtube');
-  const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [newPlaylistUrl, setNewPlaylistUrl] = useState('');
@@ -143,93 +145,60 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     }
     
     setIsSaving(true);
-    let newEntry: Playlist | null = null;
+    let newEntry: Omit<Playlist, 'id' | 'user_id' | 'created_at'> | null = null;
     let thumbnailUrl: string | undefined = undefined;
     let fetchedTitle: string | undefined = undefined;
+
+    try {
+        const response = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(newPlaylistUrl)}`);
+        if (response.ok) {
+            const microlinkData = await response.json();
+            if (microlinkData.status === 'success') {
+                thumbnailUrl = microlinkData.data.image?.url;
+                fetchedTitle = microlinkData.data.title;
+            } else {
+                console.warn(`Microlink API returned error for ${newPlaylistUrl}`, microlinkData);
+            }
+        } else {
+            console.warn(`Could not fetch metadata from Microlink for ${newPlaylistUrl}`);
+        }
+    } catch (e) {
+        console.error("Error fetching metadata from Microlink", e);
+    }
+    
+    const finalName = newPlaylistName.trim() || fetchedTitle;
+    if (!finalName) {
+         setFormError("No se pudo obtener el nombre. Por favor, añádelo manualmente.");
+         setIsSaving(false);
+         return;
+    }
 
     try {
         if (platform === 'youtube') {
             const { videoId, playlistId } = parseYouTubeUrl(newPlaylistUrl);
             if (!videoId && !playlistId) {
                 setFormError("Enlace de YouTube no válido.");
-                setIsSaving(false);
-                return;
+                setIsSaving(false); return;
             }
-            
-            try {
-                const response = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(newPlaylistUrl)}`);
-                if (response.ok) {
-                    const microlinkData = await response.json();
-                    if (microlinkData.status === 'success') {
-                       thumbnailUrl = microlinkData.data.image?.url;
-                       fetchedTitle = microlinkData.data.title;
-                    } else {
-                       console.warn(`Microlink API returned error for ${newPlaylistUrl}`, microlinkData);
-                    }
-                } else {
-                    console.warn(`Could not fetch metadata from Microlink for ${newPlaylistUrl}`);
-                }
-            } catch (e) {
-                console.error("Error fetching metadata from Microlink", e);
-            }
-
-            if (videoId && !thumbnailUrl) {
-                thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-            }
-
-            const finalName = newPlaylistName.trim() || fetchedTitle;
-            if (!finalName) {
-                 setFormError("No se pudo obtener el nombre. Por favor, añádelo manualmente.");
-                 setIsSaving(false);
-                 return;
-            }
-
+            if (videoId && !thumbnailUrl) thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
             newEntry = {
-                id: playlistId || videoId!, name: finalName, isFavorite: false,
-                type: playlistId ? 'playlist' : 'video',
-                platform: 'youtube', uuid: `item-${Date.now()}`,
-                thumbnailUrl
+                source_id: playlistId || videoId!, name: finalName, is_favorite: false,
+                type: playlistId ? 'playlist' : 'video', platform: 'youtube', thumbnail_url: thumbnailUrl
             };
-        } else { // Spotify
+        } else if (platform === 'spotify') {
             const { type, id } = parseSpotifyUrl(newPlaylistUrl);
             if (!type || !id) {
                 setFormError("Enlace de Spotify no válido (track, album, o playlist).");
-                setIsSaving(false);
-                return;
+                setIsSaving(false); return;
             }
-            try {
-                const response = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(newPlaylistUrl)}`);
-                if (response.ok) {
-                    const microlinkData = await response.json();
-                    if (microlinkData.status === 'success') {
-                        thumbnailUrl = microlinkData.data.image?.url;
-                        fetchedTitle = microlinkData.data.title;
-                    } else {
-                        console.warn(`Microlink API returned error for ${newPlaylistUrl}`, microlinkData);
-                    }
-                } else {
-                     console.warn(`Could not fetch metadata from Microlink for ${newPlaylistUrl}`);
-                }
-            } catch (e) {
-                console.error("Error fetching metadata from Microlink", e);
-            }
-
-            const finalName = newPlaylistName.trim() || fetchedTitle;
-            if (!finalName) {
-                 setFormError("No se pudo obtener el nombre. Por favor, añádelo manualmente.");
-                 setIsSaving(false);
-                 return;
-            }
-
             newEntry = {
-                id, name: finalName, isFavorite: false, type,
-                platform: 'spotify', uuid: `item-${Date.now()}`,
-                thumbnailUrl
+                source_id: id, name: finalName, is_favorite: false, type,
+                platform: 'spotify', thumbnail_url: thumbnailUrl
             };
         }
 
         if (newEntry) {
-            onUpdatePlaylists(prev => [...prev, newEntry!]);
+            await onAddPlaylist(newEntry);
             handleCancelAdd();
         }
     } catch (error) {
@@ -241,8 +210,8 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   };
 
 
-  const handleToggleFavorite = (uuid: string) => {
-    onUpdatePlaylists(prev => prev.map(p => p.uuid === uuid ? { ...p, isFavorite: !p.isFavorite } : p));
+  const handleToggleFavorite = (playlist: Playlist) => {
+    onUpdatePlaylist({ ...playlist, is_favorite: !playlist.is_favorite });
     setMenuOpenFor(null);
   };
   
@@ -251,9 +220,9 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     setMenuOpenFor(null);
   };
   
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (playlistToDelete) {
-      onDeletePlaylist(playlistToDelete.uuid);
+      await onDeletePlaylist(playlistToDelete.id);
       setPlaylistToDelete(null);
     }
   };
@@ -262,7 +231,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     setPlaylistToDelete(null);
   };
   
-  const filteredPlaylists = (view === 'favorites' ? playlists.filter(p => p.isFavorite) : playlists)
+  const filteredPlaylists = (view === 'favorites' ? playlists.filter(p => p.is_favorite) : playlists)
     .filter(p => p.platform === platform);
 
 
@@ -314,11 +283,11 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
           {filteredPlaylists.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
               {filteredPlaylists.map(playlist => (
-                <div key={playlist.uuid} className="group">
+                <div key={playlist.id} className="group">
                   <button onClick={() => onSelectTrack(playlist, filteredPlaylists)} className="text-left w-full transform hover:-translate-y-1 transition-transform duration-200">
                     <div className="rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow duration-200 aspect-square bg-primary-light">
-                      {playlist.thumbnailUrl ? (
-                         <img src={playlist.thumbnailUrl} alt={playlist.name} className="w-full h-full object-cover" />
+                      {playlist.thumbnail_url ? (
+                         <img src={playlist.thumbnail_url} alt={playlist.name} className="w-full h-full object-cover" />
                       ) : (
                          <div className="w-full h-full flex items-center justify-center text-white p-4">
                             <MusicIcon />
@@ -329,16 +298,16 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
                   <div className="flex items-start justify-between mt-2">
                      <div className="flex-grow min-w-0">
                         <h3 className="font-bold truncate text-sm sm:text-base">{playlist.name}</h3>
-                        {playlist.isFavorite && <p className="text-xs text-secondary-dark font-semibold">Favorito</p>}
+                        {playlist.is_favorite && <p className="text-xs text-secondary-dark font-semibold">Favorito</p>}
                      </div>
                      <div className="relative flex-shrink-0">
-                        <button onClick={() => setMenuOpenFor(playlist.uuid)} className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200">
+                        <button onClick={() => setMenuOpenFor(playlist.id)} className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200">
                             <DotsVerticalIcon />
                         </button>
-                        {menuOpenFor === playlist.uuid && (
+                        {menuOpenFor === playlist.id && (
                              <div ref={menuRef} className="absolute right-0 mt-1 w-48 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-xl z-10 animate-pop-in origin-top-right">
-                                <button onClick={() => handleToggleFavorite(playlist.uuid)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700 flex items-center gap-2">
-                                    <StarIcon filled={!!playlist.isFavorite} className="h-4 w-4" /> {playlist.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                                <button onClick={() => handleToggleFavorite(playlist)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700 flex items-center gap-2">
+                                    <StarIcon filled={!!playlist.is_favorite} className="h-4 w-4" /> {playlist.is_favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                                 </button>
                                 <button onClick={() => handleDeleteClick(playlist)} className="w-full text-left px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40 flex items-center gap-2">
                                     <TrashIcon className="h-4 w-4" /> Eliminar
@@ -352,7 +321,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
             </div>
           ) : (
             <div className="text-center text-gray-500 dark:text-gray-400 pt-10">
-                <p className="font-medium">{view === 'favorites' ? `No tienes favoritos de ${platform === 'youtube' ? 'YouTube' : 'Spotify'}.` : 'No hay nada aquí.'}</p>
+                <p className="font-medium">{view === 'favorites' ? `No tienes favoritos de ${platform}.` : 'No hay nada aquí.'}</p>
                 <p className="text-sm">¡Agrega música para empezar!</p>
             </div>
           )}
@@ -361,7 +330,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
         {showAddForm && (
             <div className="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-20 flex items-center justify-center p-6 animate-pop-in">
                 <div className="bg-white/95 dark:bg-gray-800/95 rounded-2xl shadow-xl p-6 w-full max-w-sm">
-                    <h3 className="font-bold text-lg text-primary-dark dark:text-primary mb-4 text-center">Agregar a {platform === 'youtube' ? 'YouTube' : 'Spotify'}</h3>
+                    <h3 className="font-bold text-lg text-primary-dark dark:text-primary mb-4 text-center">Agregar a {platform}</h3>
                     <div className="space-y-3">
                         <input 
                             type="text" 
@@ -374,7 +343,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
                             type="text" 
                             value={newPlaylistUrl} 
                             onChange={e => { setNewPlaylistUrl(e.target.value); setFormError(null); }} 
-                            placeholder={platform === 'youtube' ? "Enlace de YouTube (video o playlist)" : "Enlace de Spotify (track, album, playlist)"}
+                            placeholder={`Enlace de ${platform}`}
                             className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300" 
                         />
                     </div>

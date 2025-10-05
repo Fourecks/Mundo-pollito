@@ -64,7 +64,7 @@ const MobileMusicPlayer: React.FC<MobileMusicPlayerProps> = ({ track, queue, onS
         const handleAutoNext = () => {
             const { track: currentTrack, queue: currentQueue, onSelectTrack: currentOnSelectTrack } = latestState.current;
             if (!currentTrack || currentQueue.length <= 1) return;
-            const currentIndex = currentQueue.findIndex(t => t.uuid === currentTrack.uuid);
+            const currentIndex = currentQueue.findIndex(t => t.id === currentTrack.id);
             const nextIndex = (currentIndex + 1) % currentQueue.length;
             currentOnSelectTrack(currentQueue[nextIndex], currentQueue);
         };
@@ -77,7 +77,7 @@ const MobileMusicPlayer: React.FC<MobileMusicPlayerProps> = ({ track, queue, onS
 
         const onPlayerReady = (event: { target: YT.Player }) => {
             if (latestState.current.track) {
-                event.target.loadVideoById(latestState.current.track.id);
+                event.target.loadVideoById(latestState.current.track.source_id);
             }
         };
         
@@ -102,7 +102,7 @@ const MobileMusicPlayer: React.FC<MobileMusicPlayerProps> = ({ track, queue, onS
             }
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
-    }, [track?.uuid, track?.platform, isExpanded]);
+    }, [track?.id, track?.platform, isExpanded]);
 
     // Update title, duration, and progress
     useEffect(() => {
@@ -143,8 +143,8 @@ const MobileMusicPlayer: React.FC<MobileMusicPlayerProps> = ({ track, queue, onS
         isPlaying ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
     };
 
-    const handleNext = () => onSelectTrack(queue[(queue.findIndex(t => t.uuid === track.uuid) + 1) % queue.length], queue);
-    const handlePrev = () => onSelectTrack(queue[(queue.findIndex(t => t.uuid === track.uuid) - 1 + queue.length) % queue.length], queue);
+    const handleNext = () => onSelectTrack(queue[(queue.findIndex(t => t.id === track.id) + 1) % queue.length], queue);
+    const handlePrev = () => onSelectTrack(queue[(queue.findIndex(t => t.id === track.id) - 1 + queue.length) % queue.length], queue);
 
     const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
     
@@ -153,7 +153,7 @@ const MobileMusicPlayer: React.FC<MobileMusicPlayerProps> = ({ track, queue, onS
             {/* Mini Player */}
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl p-2 shadow-lg" onClick={() => setIsExpanded(true)}>
                 <div className="flex items-center gap-3">
-                    <img src={track.thumbnailUrl} alt={track.name} className="w-10 h-10 rounded-md flex-shrink-0" />
+                    <img src={track.thumbnail_url} alt={track.name} className="w-10 h-10 rounded-md flex-shrink-0" />
                     <div className="flex-grow min-w-0">
                         <p className="font-bold text-sm truncate text-gray-800 dark:text-gray-200">{videoTitle || track.name}</p>
                         <div className="h-1 bg-yellow-200/80 dark:bg-gray-700/80 rounded-full mt-1">

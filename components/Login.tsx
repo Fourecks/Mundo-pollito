@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ChickenIcon from './ChickenIcon';
+import { supabase } from '../supabaseClient';
 
 interface LoginProps {
     onLogin: (username: string) => void;
@@ -9,19 +10,30 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setLoading(true);
 
-        const lowerUsername = username.toLowerCase();
+        // IMPORTANTE: Para que esto funcione, debes crear los usuarios en Supabase.
+        // Ve a Authentication > Users y crea usuarios con los correos:
+        // - suly@pollito.app
+        // - sito@pollito.app
+        // Y la contraseña "pollito123" (o una más segura que elijas).
+        const email = `${username.toLowerCase()}@pollito.app`;
 
-        if ((lowerUsername === 'suly' || lowerUsername === 'sito') && password.toLowerCase() === 'pollito') {
-            const correctCaseUsername = lowerUsername.charAt(0).toUpperCase() + lowerUsername.slice(1);
-            onLogin(correctCaseUsername);
-        } else {
+        const { error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password,
+        });
+
+        if (error) {
             setError('Usuario o contraseña incorrectos.');
         }
+        // El inicio de sesión exitoso es manejado por el listener onAuthStateChange en App.tsx
+        setLoading(false);
     };
 
     return (
@@ -62,9 +74,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
                     <button
                         type="submit"
-                        className="w-full mt-6 bg-primary text-white font-bold rounded-full px-8 py-3 shadow-md hover:bg-primary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                        disabled={loading}
+                        className="w-full mt-6 bg-primary text-white font-bold rounded-full px-8 py-3 shadow-md hover:bg-primary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:bg-primary-light disabled:cursor-wait"
                     >
-                        Entrar
+                        {loading ? 'Entrando...' : 'Entrar'}
                     </button>
                 </form>
             </div>

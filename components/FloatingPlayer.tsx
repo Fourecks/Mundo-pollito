@@ -57,7 +57,8 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
             const { track: currentTrack, queue: currentQueue, isShuffle: currentShuffle, onSelectTrack: currentOnSelectTrack } = latestState.current;
             if (currentTrack.type === 'playlist' || currentQueue.length <= 1) return;
             
-            const currentIndex = currentQueue.findIndex(t => t.uuid === currentTrack.uuid);
+            // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
+            const currentIndex = currentQueue.findIndex(t => t.id === currentTrack.id);
             let nextIndex;
 
             if (currentShuffle) {
@@ -99,9 +100,11 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
             const player = event.target;
             const { track: currentTrack } = latestState.current;
              if (currentTrack.type === 'playlist') {
-                player.loadPlaylist({ list: currentTrack.id, listType: 'playlist' });
+                // FIX: Type 'number' is not assignable to type 'string'. Use 'source_id' instead of 'id'.
+                player.loadPlaylist({ list: currentTrack.source_id, listType: 'playlist' });
             } else {
-                player.loadVideoById(currentTrack.id);
+                // FIX: Argument of type 'number' is not assignable to parameter of type 'string'. Use 'source_id' instead of 'id'.
+                player.loadVideoById(currentTrack.source_id);
             }
             player.setVolume(volume);
             if (isMuted) player.mute(); else player.unMute();
@@ -130,7 +133,8 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
             }
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
-    }, [track.uuid]);
+    // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
+    }, [track.id]);
 
     const handlePlayPause = () => {
         if (!playerRef.current) return;
@@ -143,7 +147,8 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
         const { track: currentTrack, queue: currentQueue, onSelectTrack: currentOnSelectTrack } = latestState.current;
         if (currentTrack.type === 'playlist' && playerRef.current) playerRef.current.nextVideo();
         else {
-            const currentIndex = currentQueue.findIndex(t => t.uuid === currentTrack.uuid);
+            // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
+            const currentIndex = currentQueue.findIndex(t => t.id === currentTrack.id);
             const nextIndex = (currentIndex + 1) % currentQueue.length;
             currentOnSelectTrack(currentQueue[nextIndex], currentQueue);
         }
@@ -153,7 +158,8 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
         const { track: currentTrack, queue: currentQueue, onSelectTrack: currentOnSelectTrack } = latestState.current;
         if (currentTrack.type === 'playlist' && playerRef.current) playerRef.current.previousVideo();
         else {
-            const currentIndex = currentQueue.findIndex(t => t.uuid === currentTrack.uuid);
+            // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
+            const currentIndex = currentQueue.findIndex(t => t.id === currentTrack.id);
             const prevIndex = (currentIndex - 1 + currentQueue.length) % currentQueue.length;
             currentOnSelectTrack(currentQueue[prevIndex], currentQueue);
         }
@@ -216,7 +222,8 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
                             <div className="flex items-center justify-between">
                                 <p className="font-bold text-gray-800 dark:text-gray-200 text-sm truncate">{videoTitle}</p>
                                 <div className="flex items-center flex-shrink-0 pl-2">
-                                     <a href={`https://www.youtube.com/watch?v=${track.id}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 dark:text-gray-500 hover:text-pink-500 dark:hover:text-pink-400 flex-shrink-0">
+                                     {/* FIX: Use source_id for the youtube link. */}
+                                     <a href={`https://www.youtube.com/watch?v=${track.source_id}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 dark:text-gray-500 hover:text-pink-500 dark:hover:text-pink-400 flex-shrink-0">
                                         <ExternalLinkIcon />
                                     </a>
                                     <button onClick={() => setIsMinimized(true)} className="p-1 text-gray-500 dark:text-gray-400 hover:text-pink-500 dark:hover:text-pink-400">

@@ -32,6 +32,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
       :root {
         --color-primary: #F472B6; /* pink-400 */
@@ -188,7 +189,8 @@
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "react": "https://aistudiocdn.com/react@^19.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0"
   }
 }
 </script>
@@ -198,5 +200,33 @@
     <script type="module" src="/index.tsx"></script>
     <script src="https://accounts.google.com/gsi/client" async></script>
     <script src="https://apis.google.com/js/api.js" async></script>
+    <script>
+      const registerServiceWorker = () => {
+        // Service Workers cannot be registered from a 'blob:' URL, which is used
+        // by this editor environment. This check prevents the registration error
+        // in the editor while allowing it to work in a standard browser.
+        if (window.location.protocol === 'blob:') {
+          console.warn('Advertencia: Las notificaciones push están deshabilitadas en esta vista previa. Funcionarán correctamente al abrir la app en un navegador normal o en un teléfono.');
+          return;
+        }
+
+        if ('serviceWorker' in navigator) {
+          const swUrl = `${window.location.origin}/sw.js`;
+          navigator.serviceWorker.register(swUrl).then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }).catch(err => {
+            console.error('ServiceWorker registration failed: ', err);
+          });
+        }
+      };
+
+      // Wait until the entire page is loaded to register the Service Worker.
+      // This is the most reliable method to avoid the "invalid state" error.
+      if (document.readyState === 'complete') {
+        registerServiceWorker();
+      } else {
+        window.addEventListener('load', registerServiceWorker);
+      }
+    </script>
   </body>
 </html>

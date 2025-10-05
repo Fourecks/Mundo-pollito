@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Todo, Subtask, Priority, RecurrenceRule } from '../types';
 import CloseIcon from './icons/CloseIcon';
@@ -45,11 +46,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const [text, setText] = useState('');
     const [notes, setNotes] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
-    const [reminderOffset, setReminderOffset] = useState<Todo['reminderOffset']>(0);
+    const [reminderOffset, setReminderOffset] = useState<Todo['reminder_offset']>(0);
     const [recurrence, setRecurrence] = useState<RecurrenceRule>({ frequency: 'none', customDays: [] });
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
     const [newSubtaskText, setNewSubtaskText] = useState('');
-    const [dueDate, setDueDate] = useState('');
+    const [due_date, setDueDate] = useState('');
     const [completed, setCompleted] = useState(false);
 
     const [startTimeParts, setStartTimeParts] = useState(from24h(''));
@@ -61,12 +62,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             setText(todo.text || '');
             setNotes(todo.notes || '');
             setPriority(todo.priority || 'medium');
-            setReminderOffset(todo.reminderOffset || 0);
+            setReminderOffset(todo.reminder_offset || 0);
             setRecurrence(todo.recurrence || { frequency: 'none', customDays: [] });
             setSubtasks(todo.subtasks || []);
-            setStartTimeParts(from24h(todo.startTime || ''));
-            setEndTimeParts(from24h(todo.endTime || ''));
-            setDueDate(todo.dueDate || '');
+            setStartTimeParts(from24h(todo.start_time || ''));
+            setEndTimeParts(from24h(todo.end_time || ''));
+            setDueDate(todo.due_date || '');
             setCompleted(todo.completed || false);
         }
     }, [todo]);
@@ -88,15 +89,15 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             ...todo,
             text,
             notes,
-            dueDate,
+            due_date,
             completed,
-            startTime: finalStartTime,
-            endTime: finalEndTime,
+            start_time: finalStartTime,
+            end_time: finalEndTime,
             priority,
-            reminderOffset,
+            reminder_offset: reminderOffset,
             recurrence,
             subtasks,
-            notificationSent: todo.reminderOffset !== reminderOffset ? false : todo.notificationSent
+            notification_sent: todo.reminder_offset !== reminderOffset ? false : todo.notification_sent
         });
         onClose();
     };
@@ -208,7 +209,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                                 value={newSubtaskText}
                                 onChange={e => setNewSubtaskText(e.target.value)}
                                 placeholder="Añadir nueva sub-tarea"
-                                className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 transition-colors text-sm"
+                                className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-100 border-2 border-yellow-200 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 transition-colors text-sm"
                             />
                             <button type="submit" className="bg-pink-400 text-white p-2 rounded-lg hover:bg-pink-500 transition-colors flex-shrink-0">
                                 <PlusIcon />
@@ -236,7 +237,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                     <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 space-y-3">
                          <div>
                             <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><CalendarIcon className="h-4 w-4" /> Fecha</label>
-                            <input type="date" id="due-date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
+                            <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
                         </div>
                         <div>
                             <label className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><ClockIcon className="h-4 w-4" /> Hora de Inicio</label>
@@ -265,7 +266,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         </div>
                         <div>
                             <label htmlFor="reminder" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><BellIcon className="h-4 w-4"/> Recordatorio</label>
-                            <select id="reminder" value={reminderOffset} onChange={e => setReminderOffset(Number(e.target.value) as Todo['reminderOffset'])} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm appearance-none">
+                            <select id="reminder" value={reminderOffset} onChange={e => setReminderOffset(Number(e.target.value) as Todo['reminder_offset'])} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm appearance-none">
                                 <option value="0">Nunca</option>
                                 <option value="10">10 min antes</option>
                                 <option value="30">30 min antes</option>
@@ -274,7 +275,18 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         </div>
                          <div>
                             <label htmlFor="recurrence" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><RefreshIcon className="h-4 w-4"/> Repetir</label>
-                            <select id="recurrence" value={recurrence.frequency} onChange={e => setRecurrence({ ...recurrence, frequency: e.target.value as RecurrenceRule['frequency'] })} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm appearance-none">
+                            <select 
+                                id="recurrence" 
+                                value={recurrence.frequency} 
+                                onChange={e => {
+                                    const newFrequency = e.target.value as RecurrenceRule['frequency'];
+                                    setRecurrence(currentRecurrence => ({
+                                        frequency: newFrequency,
+                                        customDays: newFrequency === 'custom' ? (currentRecurrence.customDays || []) : []
+                                    }));
+                                }} 
+                                className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm appearance-none"
+                            >
                                 <option value="none">Nunca</option>
                                 <option value="daily">Diariamente</option>
                                 <option value="weekly">Semanalmente</option>

@@ -22,7 +22,7 @@ const formatDateKey = (date: Date): string => {
 };
 
 const formatDueDate = (todo: Todo): string => {
-    if (!todo.dueDate) return '';
+    if (!todo.due_date) return '';
     
     const todayKey = formatDateKey(new Date());
     const tomorrowDate = new Date();
@@ -37,17 +37,17 @@ const formatDueDate = (todo: Todo): string => {
     };
 
     let timeString = '';
-    if (todo.startTime && todo.endTime) {
-        timeString = `${formatTime(todo.startTime)} - ${formatTime(todo.endTime)}`;
-    } else if (todo.startTime) {
-        timeString = formatTime(todo.startTime);
+    if (todo.start_time && todo.end_time) {
+        timeString = `${formatTime(todo.start_time)} - ${formatTime(todo.end_time)}`;
+    } else if (todo.start_time) {
+        timeString = formatTime(todo.start_time);
     }
     
     let dateString;
-    if (todo.dueDate === todayKey) dateString = `Hoy`;
-    else if (todo.dueDate === tomorrowKey) dateString = `Mañana`;
+    if (todo.due_date === todayKey) dateString = `Hoy`;
+    else if (todo.due_date === tomorrowKey) dateString = `Mañana`;
     else {
-        const [year, month, day] = todo.dueDate.split('-').map(Number);
+        const [year, month, day] = todo.due_date.split('-').map(Number);
         const date = new Date(Date.UTC(year, month - 1, day));
         dateString = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
     }
@@ -116,7 +116,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
         
         {/* Right side controls */}
         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-            {todo.dueDate && (
+            {todo.due_date && (
                 <span className="text-xs font-medium text-primary-dark dark:text-primary bg-primary-light/50 dark:bg-primary/20 px-2 py-0.5 rounded-full whitespace-nowrap hidden sm:inline">
                     {formatDueDate(todo)}
                 </span>

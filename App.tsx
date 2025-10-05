@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 // FIX: Import BrowserSession type to resolve 'Cannot find name' errors.
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, AIConversationHistoryItem } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -36,6 +36,7 @@ import PaletteIcon from './components/icons/PaletteIcon';
 import CustomizationPanel from './components/CustomizationPanel';
 import ChevronRightIcon from './components/icons/ChevronRightIcon';
 import GamesHub from './components/GamesHub';
+import { supabase } from './supabaseClient';
 
 // --- Google Drive Configuration ---
 // Placed at the top level to be accessible by both Desktop and Mobile components.
@@ -50,95 +51,96 @@ const formatDateKey = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
-const generateRecurringTasks = (sourceTodo: Todo, currentTodos: { [key: string]: Todo[] }): { [key: string]: Todo[] } => {
-    if (!sourceTodo.recurrence || sourceTodo.recurrence.frequency === 'none' || !sourceTodo.dueDate) {
+const generateRecurringTasks = async (sourceTodo: Todo, currentTodos: { [key: string]: Todo[] }): Promise<{ [key: string]: Todo[] }> => {
+    if (!sourceTodo.recurrence || sourceTodo.recurrence.frequency === 'none' || !sourceTodo.due_date) {
         return currentTodos;
     }
 
-    const newAllTodos = JSON.parse(JSON.stringify(currentTodos));
+    const allTasksFlat: Todo[] = Object.values(currentTodos).flat() as Todo[];
     const { frequency, customDays } = sourceTodo.recurrence;
-    const recurrenceId = sourceTodo.recurrenceId!;
+    const recurrenceId = sourceTodo.recurrence.id!;
 
-    let lastDueDate = new Date(sourceTodo.dueDate + 'T00:00:00Z');
-    let lastTaskId = sourceTodo.id;
+    // 1. Calculate all potential future dates
+    let lastDueDate = new Date(sourceTodo.due_date + 'T00:00:00Z');
     const limitDate = new Date();
-    limitDate.setDate(limitDate.getDate() + 90); // Generate for the next 90 days
+    switch (frequency) {
+        case 'daily': limitDate.setMonth(limitDate.getMonth() + 1); break;
+        case 'weekly': case 'biweekly': case 'custom': limitDate.setMonth(limitDate.getMonth() + 3); break;
+        case 'monthly': limitDate.setMonth(limitDate.getMonth() + 6); break;
+        default: limitDate.setDate(limitDate.getDate() + 90);
+    }
 
-    while (lastDueDate < limitDate) {
+    const potentialDates: Date[] = [];
+    let loopGuard = 0; // Prevent infinite loops
+    while (lastDueDate < limitDate && loopGuard < 365) {
         let nextDueDate: Date | null = new Date(lastDueDate.valueOf());
-        let found = false;
+        let foundNext = false;
 
         switch (frequency) {
-            case 'daily':
-                nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 1);
-                found = true;
-                break;
-            case 'weekly':
-                nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 7);
-                found = true;
-                break;
-            case 'biweekly':
-                nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 14);
-                found = true;
-                break;
-            case 'monthly':
-                nextDueDate.setUTCMonth(nextDueDate.getUTCMonth() + 1);
-                found = true;
-                break;
+            case 'daily': nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 1); foundNext = true; break;
+            case 'weekly': nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 7); foundNext = true; break;
+            case 'biweekly': nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 14); foundNext = true; break;
+            case 'monthly': nextDueDate.setUTCMonth(nextDueDate.getUTCMonth() + 1); foundNext = true; break;
             case 'custom': {
-                if (!customDays || customDays.length === 0) {
-                    nextDueDate = null;
-                    break;
-                }
+                if (!customDays || customDays.length === 0) { nextDueDate = null; break; }
                 const sortedCustomDays = [...customDays].sort((a,b) => a - b);
                 const lastDayOfWeek = lastDueDate.getUTCDay();
-                
                 let daysToAdd = Infinity;
-                for (const customDay of sortedCustomDays) {
-                    if(customDay > lastDayOfWeek) {
-                        daysToAdd = customDay - lastDayOfWeek;
-                        break;
-                    }
-                }
-                if(daysToAdd === Infinity) { // Wrap to next week
-                    daysToAdd = (7 - lastDayOfWeek) + sortedCustomDays[0];
-                }
-
+                for (const customDay of sortedCustomDays) { if(customDay > lastDayOfWeek) { daysToAdd = customDay - lastDayOfWeek; break; } }
+                if(daysToAdd === Infinity) { daysToAdd = (7 - lastDayOfWeek) + sortedCustomDays[0]; }
                 nextDueDate.setUTCDate(lastDueDate.getUTCDate() + daysToAdd);
-                found = true;
+                foundNext = true;
                 break;
             }
-            default:
-               nextDueDate = null;
+            default: nextDueDate = null;
         }
         
-        if (found && nextDueDate) {
-            const newDateKey = nextDueDate.toISOString().split('T')[0];
-            const alreadyExists = (newAllTodos[newDateKey] || []).some(t => t.recurrenceId === recurrenceId);
-            
-            if(alreadyExists) {
-                lastDueDate = nextDueDate;
-                continue;
-            }
-
-            const newTodo: Todo = {
-                ...sourceTodo,
-                id: Date.now() + Math.random(),
-                completed: false,
-                notificationSent: false,
-                dueDate: newDateKey,
-                subtasks: sourceTodo.subtasks?.map(st => ({ ...st, id: Date.now() + Math.random(), completed: false })),
-                recurrenceId: recurrenceId,
-                recurrenceSourceId: lastTaskId,
-            };
-
-            newAllTodos[newDateKey] = [...(newAllTodos[newDateKey] || []), newTodo];
+        if (foundNext && nextDueDate) {
+            potentialDates.push(nextDueDate);
             lastDueDate = nextDueDate;
-            lastTaskId = newTodo.id;
         } else {
             break;
         }
+        loopGuard++;
     }
+
+    // 2. Filter out dates that already exist
+    const existingDates = new Set(allTasksFlat.filter(t => t.recurrence?.id === recurrenceId).map(t => t.due_date).filter(Boolean) as string[]);
+    const datesToCreate = potentialDates.filter(d => !existingDates.has(d.toISOString().split('T')[0]));
+
+    if (datesToCreate.length === 0) { return currentTodos; }
+
+    // 3. Build payloads for batch insert
+    const { id, subtasks, user_id, ...payload } = sourceTodo;
+    const newTodosPayloads = datesToCreate.map(date => ({
+        ...payload,
+        completed: false,
+        notification_sent: false,
+        due_date: date.toISOString().split('T')[0],
+        user_id: sourceTodo.user_id,
+        recurrence: { ...sourceTodo.recurrence, sourceId: sourceTodo.id },
+    }));
+
+    // 4. Batch insert into Supabase
+    const { data: newTodos, error } = await supabase.from('todos').insert(newTodosPayloads).select();
+    if (error || !newTodos) { console.error("Error batch creating recurring tasks:", error); return currentTodos; }
+
+    if (sourceTodo.subtasks && sourceTodo.subtasks.length > 0) {
+        const newSubtasksPayloads = newTodos.flatMap(newTodo => sourceTodo.subtasks!.map(st => ({ text: st.text, completed: false, todo_id: newTodo.id })));
+        await supabase.from('subtasks').insert(newSubtasksPayloads);
+    }
+
+    // 5. Add new todos to a copy of the state
+    let newAllTodos = JSON.parse(JSON.stringify(currentTodos));
+    const subtasksTemplate = sourceTodo.subtasks?.map(st => ({...st, id: 0, completed: false})) || [];
+
+    newTodos.forEach(newTodo => {
+        const dateKey = newTodo.due_date!;
+        if (!newAllTodos[dateKey]) { newAllTodos[dateKey] = []; }
+        const newTodoWithSubtasks = { ...newTodo, subtasks: subtasksTemplate.map(st => ({...st, id: Math.random()})) };
+        newAllTodos[dateKey].push(newTodoWithSubtasks);
+    });
+
     return newAllTodos;
 };
 
@@ -177,7 +179,7 @@ const useMediaQuery = (query: string) => {
 };
 
 interface AppProps {
-  currentUser: string;
+  currentUser: SupabaseUser;
   onLogout: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
@@ -187,7 +189,7 @@ interface AppProps {
 }
 
 const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors }) => {
-  const getUserKey = useCallback((key: string) => `${currentUser}_${key}`, [currentUser]);
+  const getUserKey = useCallback((key: string) => `${currentUser.email}_${key}`, [currentUser]);
 
   const [allTodos, setAllTodos] = useState<{ [key: string]: Todo[] }>({});
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -217,7 +219,6 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   });
   const [activePomodoro, setActivePomodoro] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
   const [browserSession, setBrowserSession] = useState<BrowserSession>({});
   const [particleType, setParticleType] = useState<ParticleType>('none');
@@ -243,45 +244,119 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   const datesWithTasks = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0)), [allTodos]);
   const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
   const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
-  const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.startTime || '23:59').localeCompare(b.startTime || '23:59')), [allTodos]);
+  const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
 
   // DB and LocalStorage Initialization
   useEffect(() => {
     const initApp = async () => {
       try {
-        await initDB(currentUser);
+        await initDB(currentUser.email!);
         
-        // Load from LocalStorage
-        const storedTodos = localStorage.getItem(getUserKey('allTodos'));
-        const storedFolders = localStorage.getItem(getUserKey('folders'));
-        const storedPlaylists = localStorage.getItem(getUserKey('playlists'));
-        const storedPomodoro = localStorage.getItem(getUserKey('pomodoroState'));
-        const storedWindows = localStorage.getItem(getUserKey('windowStates'));
-        const storedOpenWindows = localStorage.getItem(getUserKey('openWindows'));
-        const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
-        const storedQuickNotes = localStorage.getItem(getUserKey('quickNotes'));
-        const storedBrowserSession = localStorage.getItem(getUserKey('browserSession'));
-        const storedAmbience = localStorage.getItem(getUserKey('ambience'));
+        // Load Todos from Supabase
+        const { data: todosData, error: todosError } = await supabase.from('todos').select('*, subtasks(*)');
+        if (todosError) throw todosError;
+        
+        let finalTodos = {};
 
-        if (storedTodos) setAllTodos(JSON.parse(storedTodos));
-        if (storedFolders) setFolders(JSON.parse(storedFolders));
-        else setFolders([{ id: 'folder-default', name: 'Mis Notas', notes: [] }]);
-        if (storedPlaylists) setPlaylists(JSON.parse(storedPlaylists));
-        if (storedPomodoro) setPomodoroState(s => ({...s, ...JSON.parse(storedPomodoro)}));
-        if (storedWindows) setWindowStates(JSON.parse(storedWindows));
-        if (storedOpenWindows) setOpenWindows(JSON.parse(storedOpenWindows));
-        if(storedQuickNotes) setQuickNotes(JSON.parse(storedQuickNotes));
-        if(storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
-        if(storedAmbience) {
-            const { particles, sound } = JSON.parse(storedAmbience);
-            setParticleType(particles);
-            setAmbientSound(sound);
+        if (todosData) {
+            const groupedTodos = todosData.reduce((acc, todo) => {
+                const dateKey = todo.due_date;
+                if (!dateKey) return acc;
+                if (!acc[dateKey]) acc[dateKey] = [];
+                acc[dateKey].push({ ...todo, subtasks: todo.subtasks || [] });
+                return acc;
+            }, {} as { [key: string]: Todo[] });
+            
+            // --- Prune old tasks (completed or pending) in batches ---
+            const cutoffDate = new Date();
+            cutoffDate.setMonth(cutoffDate.getMonth() - 3);
+            const cutoffDateString = cutoffDate.toISOString().split('T')[0];
+            const cutoffDateISO = cutoffDate.toISOString();
+
+            const allTasksFlat: Todo[] = Object.values(groupedTodos).flat() as Todo[];
+            const oldTaskIds = allTasksFlat
+                .filter(task => {
+                    const isOldAndCompleted = task.completed && task.due_date && task.due_date < cutoffDateString;
+                    const isOldAndPending = !task.completed && task.created_at && task.created_at < cutoffDateISO;
+                    return isOldAndCompleted || isOldAndPending;
+                })
+                .map(task => task.id);
+
+            let prunedGroupedTodos = { ...groupedTodos };
+
+            if (oldTaskIds.length > 0) {
+                const CHUNK_SIZE = 50; 
+                for (let i = 0; i < oldTaskIds.length; i += CHUNK_SIZE) {
+                    const chunk = oldTaskIds.slice(i, i + CHUNK_SIZE);
+                    
+                    const { error: subtaskDeleteError } = await supabase.from('subtasks').delete().in('todo_id', chunk);
+                    
+                    if (subtaskDeleteError) {
+                        console.error("Error pruning a chunk of old subtasks, skipping this chunk:", subtaskDeleteError);
+                        continue; 
+                    }
+
+                    const { error: deleteError } = await supabase.from('todos').delete().in('id', chunk);
+
+                    if (!deleteError) {
+                        const chunkIdSet = new Set(chunk);
+                        for (const dateKey in prunedGroupedTodos) {
+                            prunedGroupedTodos[dateKey] = prunedGroupedTodos[dateKey].filter(t => !chunkIdSet.has(t.id));
+                            if (prunedGroupedTodos[dateKey].length === 0) {
+                                delete prunedGroupedTodos[dateKey];
+                            }
+                        }
+                    } else {
+                        console.error("Error pruning a chunk of old todos from Supabase:", deleteError);
+                    }
+                }
+                finalTodos = prunedGroupedTodos;
+            } else {
+                finalTodos = groupedTodos;
+            }
+        }
+        setAllTodos(finalTodos);
+
+        // Load Folders & Notes from Supabase
+        const { data: foldersData, error: foldersError } = await supabase.from('folders').select('*');
+        if (foldersError) throw foldersError;
+        const { data: notesData, error: notesError } = await supabase.from('notes').select('*');
+        if (notesError) throw notesError;
+
+        if (foldersData && notesData) {
+            const foldersWithNotes = foldersData.map(folder => ({
+                ...folder,
+                notes: notesData.filter(note => note.folder_id === folder.id)
+            })).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            setFolders(foldersWithNotes);
+        } else if (foldersData?.length === 0) {
+            const { data: newFolder } = await supabase.from('folders').insert({ name: 'Mis Notas', user_id: currentUser.id }).select().single();
+            if (newFolder) setFolders([{ ...newFolder, notes: [] }]);
+        }
+
+        // Load Playlists from Supabase
+        const { data: playlistsData, error: playlistsError } = await supabase.from('playlists').select('*');
+        if (playlistsError) throw playlistsError;
+        if (playlistsData) {
+            setPlaylists(playlistsData);
         }
         
-        // Active background will now be set after loading from GDrive
-        
-        setNotificationPermission(Notification.permission);
+        // Load Quick Notes from Supabase
+        const { data: quickNotesData, error: quickNotesError } = await supabase.from('quick_notes').select('*').order('created_at', { ascending: false });
+        if (quickNotesError) throw quickNotesError;
+        if (quickNotesData) {
+            setQuickNotes(quickNotesData);
+        }
 
+        // Load from LocalStorage (for non-db items)
+        const storedWindows = localStorage.getItem(getUserKey('windowStates'));
+        const storedOpenWindows = localStorage.getItem(getUserKey('openWindows'));
+        const storedBrowserSession = localStorage.getItem(getUserKey('browserSession'));
+
+        if (storedWindows) setWindowStates(JSON.parse(storedWindows));
+        if (storedOpenWindows) setOpenWindows(JSON.parse(storedOpenWindows));
+        if(storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
+        
       } catch (error) {
         console.error("Failed to initialize app state:", error);
       } finally {
@@ -292,16 +367,9 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   }, [currentUser, getUserKey]);
   
   // Persistance Effects
-  useEffect(() => { if (initialized) localStorage.setItem(getUserKey('allTodos'), JSON.stringify(allTodos)); }, [allTodos, initialized, getUserKey]);
-  useEffect(() => { if (initialized) localStorage.setItem(getUserKey('folders'), JSON.stringify(folders)); }, [folders, initialized, getUserKey]);
-  useEffect(() => { if (initialized) localStorage.setItem(getUserKey('playlists'), JSON.stringify(playlists)); }, [playlists, initialized, getUserKey]);
-  useEffect(() => { if (initialized) localStorage.setItem(getUserKey('pomodoroState'), JSON.stringify(pomodoroState)); }, [pomodoroState, initialized, getUserKey]);
   useEffect(() => { if (initialized) localStorage.setItem(getUserKey('windowStates'), JSON.stringify(windowStates)); }, [windowStates, initialized, getUserKey]);
   useEffect(() => { if (initialized) localStorage.setItem(getUserKey('openWindows'), JSON.stringify(openWindows)); }, [openWindows, initialized, getUserKey]);
-  useEffect(() => { if (initialized) localStorage.setItem(getUserKey('activeBackgroundId'), activeBackground?.id || ''); }, [activeBackground, initialized, getUserKey]);
-  useEffect(() => { if (initialized) localStorage.setItem(getUserKey('quickNotes'), JSON.stringify(quickNotes)); }, [quickNotes, initialized, getUserKey]);
   useEffect(() => { if (initialized) localStorage.setItem(getUserKey('browserSession'), JSON.stringify(browserSession)); }, [browserSession, initialized, getUserKey]);
-  useEffect(() => { if (initialized) localStorage.setItem(getUserKey('ambience'), JSON.stringify({ particles: particleType, sound: ambientSound })); }, [particleType, ambientSound, initialized, getUserKey]);
   
   // Google API Initialization (ROBUST)
   useEffect(() => {
@@ -357,7 +425,8 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
       pomodoroAudioRef.current?.play();
       const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
       const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
-      if (notificationPermission === 'granted') {
+      // Local notification for Pomodoro still makes sense as it's an immediate feedback loop.
+      if (Notification.permission === 'granted') {
           new Notification('Pomodoro Terminado', { body: message, icon: '/favicon.ico' });
       }
       setPomodoroState(s => ({
@@ -368,41 +437,7 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
       }));
     }
     return () => clearInterval(timer);
-  }, [pomodoroState.isActive, pomodoroState.timeLeft, notificationPermission, pomodoroState.mode, pomodoroState.durations]);
-
-  // Task Reminder Effect
-  useEffect(() => {
-    const checkReminders = () => {
-        if (notificationPermission !== 'granted') return;
-
-        const now = new Date();
-        const upcomingLimit = new Date(now.getTime() + 60 * 1000); // Check for tasks in the next minute
-
-        // FIX: Explicitly type `task` as `Todo` to resolve type inference issues with `Object.values(...).flat()`.
-        Object.values(allTodos).flat().forEach((task: Todo) => {
-            if (task.completed || task.notificationSent || !task.dueDate || !task.startTime || !task.reminderOffset) return;
-            
-            const taskDateTime = new Date(`${task.dueDate}T${task.startTime}`);
-            const reminderTime = new Date(taskDateTime.getTime() - task.reminderOffset * 60 * 1000);
-
-            if (reminderTime > now && reminderTime <= upcomingLimit) {
-                new Notification('Recordatorio de Tarea', {
-                    body: `"${task.text}" comienza en ${task.reminderOffset} minutos.`,
-                    icon: '/favicon.ico',
-                    tag: `task-${task.id}`
-                });
-                // Mark as sent
-                const dateKey = task.dueDate;
-                setAllTodos(prev => ({
-                    ...prev,
-                    [dateKey]: (prev[dateKey] || []).map(t => t.id === task.id ? { ...t, notificationSent: true } : t)
-                }));
-            }
-        });
-    };
-    const interval = setInterval(checkReminders, 30 * 1000); // Check every 30 seconds
-    return () => clearInterval(interval);
-  }, [allTodos, notificationPermission]);
+  }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations]);
 
   // Ambient Sound Effect
   useEffect(() => {
@@ -505,11 +540,12 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
       const newBgs = await Promise.all(bgPromises);
       setUserBackgrounds(newBgs);
 
-      const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
-      if (storedActiveBgId) {
-        const active = newBgs.find(bg => bg.id === storedActiveBgId);
-        if (active) setActiveBackground(active);
-      }
+      // We no longer get this from local storage, it will be loaded from DB settings
+      // const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
+      // if (storedActiveBgId) {
+      //   const active = newBgs.find(bg => bg.id === storedActiveBgId);
+      //   if (active) setActiveBackground(active);
+      // }
     } catch (e) {
       console.error("Error loading backgrounds from Drive", e);
     } finally {
@@ -518,7 +554,7 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   }, [getUserKey]);
 
 
-  const handleAuthClick = useCallback(() => {
+  const handleAuthClick = useCallback(async () => {
     if (!tokenClient.current) {
         alert("La configuración para Google Drive está incompleta. Por favor, añade tu ID de cliente en el archivo App.tsx.");
         return;
@@ -583,74 +619,116 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   };
 
 
-  // Handlers
-  const handleAddTodo = (text: string) => {
+  // --- TODO Handlers ---
+  const handleAddTodo = async (text: string) => {
     const dateKey = formatDateKey(selectedDate);
-    const newTodo: Todo = {
-        id: Date.now(),
+    const newTodoPayload = {
         text,
-        completed: false,
-        priority: 'medium',
-        dueDate: dateKey,
+        priority: 'medium' as 'medium',
+        due_date: dateKey,
+        user_id: currentUser.id,
     };
+
+    const { data: newTodo, error } = await supabase.from('todos').insert(newTodoPayload).select().single();
+    if (error) {
+        console.error("Error adding todo:", error);
+        return;
+    }
+    
     setAllTodos(prev => ({
         ...prev,
-        [dateKey]: [...(prev[dateKey] || []), newTodo]
+        [dateKey]: [...(prev[dateKey] || []), { ...newTodo, subtasks: [] }]
     }));
   };
 
-  const handleUpdateTodo = (updatedTodo: Todo) => {
-    if (!updatedTodo.dueDate) return;
-    const dateKey = updatedTodo.dueDate;
+  const handleUpdateTodo = async (updatedTodo: Todo) => {
+    let todoToSave = { ...updatedTodo };
 
-    let newAllTodos = { ...allTodos };
+    if (todoToSave.recurrence && todoToSave.recurrence.frequency !== 'none') {
+        if (!todoToSave.recurrence.id) {
+            todoToSave.recurrence.id = `recurrence-${Date.now()}`;
+        }
+    }
+    if (todoToSave.recurrence?.frequency === 'none') {
+        delete todoToSave.recurrence.id;
+        delete todoToSave.recurrence.sourceId;
+    }
+
+    const { subtasks, user_id, ...payloadForSupabase } = todoToSave;
+
+    const { error: todoError } = await supabase.from('todos').update(payloadForSupabase).eq('id', todoToSave.id);
+    if (todoError) console.error("Error updating todo:", todoError);
+
+    await supabase.from('subtasks').delete().eq('todo_id', todoToSave.id);
+    if (subtasks && subtasks.length > 0) {
+        const { error: subtaskError } = await supabase.from('subtasks').insert(subtasks.map(st => ({ text: st.text, completed: st.completed, todo_id: todoToSave.id })));
+        if (subtaskError) console.error("Error inserting subtasks:", subtaskError);
+    }
     
-    // Remove from old date if changed
+    let newAllTodos = JSON.parse(JSON.stringify(allTodos));
     let oldDateKey: string | null = null;
-    for (const key in allTodos) {
-        if(allTodos[key].some(t => t.id === updatedTodo.id)) {
+    let originalTask: Todo | null = null;
+    for (const key in newAllTodos) {
+        const task = newAllTodos[key].find((t: Todo) => t.id === todoToSave.id);
+        if (task) {
             oldDateKey = key;
+            originalTask = task;
             break;
         }
     }
-    if(oldDateKey && oldDateKey !== dateKey) {
-       newAllTodos[oldDateKey] = (newAllTodos[oldDateKey] || []).filter(t => t.id !== updatedTodo.id);
+
+    if (originalTask?.recurrence?.id) {
+            for (const dateKey in newAllTodos) {
+            newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => {
+                if (t.recurrence?.id !== originalTask!.recurrence!.id) return true;
+                if (t.id === todoToSave.id) return true;
+                if (t.due_date && originalTask!.due_date && t.due_date <= originalTask!.due_date) return true;
+                return false;
+            });
+        }
     }
     
-    // Update or add in new date
-    const dateTasks = newAllTodos[dateKey] || [];
-    const taskIndex = dateTasks.findIndex(t => t.id === updatedTodo.id);
+    if(oldDateKey && oldDateKey !== todoToSave.due_date && newAllTodos[oldDateKey]) {
+        newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t: Todo) => t.id !== todoToSave.id);
+    }
+    
+    const newDateKey = todoToSave.due_date!;
+    const dateTasks = newAllTodos[newDateKey] || [];
+    const taskIndex = dateTasks.findIndex((t: Todo) => t.id === todoToSave.id);
     if(taskIndex > -1) {
-        dateTasks[taskIndex] = updatedTodo;
-        newAllTodos[dateKey] = [...dateTasks];
+        dateTasks[taskIndex] = todoToSave;
     } else {
-        newAllTodos[dateKey] = [...dateTasks, updatedTodo];
+        dateTasks.push(todoToSave);
     }
+    newAllTodos[newDateKey] = [...dateTasks];
     
-    // Check if recurrence was added
-    if (updatedTodo.recurrence && updatedTodo.recurrence.frequency !== 'none' && !updatedTodo.recurrenceId) {
-        updatedTodo.recurrenceId = `recur-${Date.now()}`;
-        newAllTodos = generateRecurringTasks(updatedTodo, newAllTodos);
+    if (todoToSave.recurrence && todoToSave.recurrence.frequency !== 'none') {
+        newAllTodos = await generateRecurringTasks(todoToSave, newAllTodos);
     }
     
     setAllTodos(newAllTodos);
     setTaskToEdit(null);
   };
 
-  const handleToggleTodo = (id: number) => {
+ const handleToggleTodo = async (id: number) => {
     const dateKey = formatDateKey(selectedDate);
     const todosForDay = allTodos[dateKey] || [];
     const targetTodo = todosForDay.find(t => t.id === id);
     if (!targetTodo) return;
-  
+
     const newCompletedState = !targetTodo.completed;
-    
+
+    await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id);
+    if (targetTodo.subtasks && targetTodo.subtasks.length > 0) {
+        await supabase.from('subtasks').update({ completed: newCompletedState }).eq('todo_id', id);
+    }
+
     const allWereCompletedBefore = todosForDay.length > 0 && todosForDay.every(t => t.completed);
-    
+
     const newTodosForDay = todosForDay.map(t =>
         t.id === id ? { ...t, completed: newCompletedState, subtasks: t.subtasks?.map(st => ({...st, completed: newCompletedState})) } : t
     );
-    
+
     const allJustCompleted = newTodosForDay.length > 0 && newTodosForDay.every(t => t.completed);
 
     if (allJustCompleted && !allWereCompletedBefore) {
@@ -659,35 +737,47 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
         triggerConfetti();
     }
 
-    let newAllTodos = { ...allTodos, [dateKey]: newTodosForDay };
-    const updatedTodo = newTodosForDay.find(t => t.id === id);
-    
-    if (newCompletedState && updatedTodo?.recurrence?.frequency !== 'none' && updatedTodo.recurrenceId) {
-       newAllTodos = generateRecurringTasks(updatedTodo, newAllTodos);
+    let finalAllTodos = { ...allTodos, [dateKey]: newTodosForDay };
+
+    if (newCompletedState && targetTodo.recurrence && targetTodo.recurrence.frequency !== 'none') {
+        const sourceTodoWithId = { ...targetTodo };
+        if (!sourceTodoWithId.recurrence.id) {
+            sourceTodoWithId.recurrence = {...sourceTodoWithId.recurrence, id: `recurrence-${sourceTodoWithId.id}`};
+        }
+        finalAllTodos = await generateRecurringTasks(sourceTodoWithId, finalAllTodos);
     }
 
-    setAllTodos(newAllTodos);
-  };
+    setAllTodos(finalAllTodos);
+};
   
-  const handleToggleSubtask = (taskId: number, subtaskId: number) => {
+  const handleToggleSubtask = async (taskId: number, subtaskId: number) => {
       const dateKey = formatDateKey(selectedDate);
       const oldTodosForDay = allTodos[dateKey] || [];
+      const task = oldTodosForDay.find(t => t.id === taskId);
+      const subtask = task?.subtasks?.find(st => st.id === subtaskId);
+      if (!task || !subtask) return;
+
+      const newCompletedState = !subtask.completed;
+      await supabase.from('subtasks').update({ completed: newCompletedState }).eq('id', subtaskId);
 
       const allWereCompletedBefore = oldTodosForDay.length > 0 && oldTodosForDay.every(t => t.completed);
 
-      const newTodosForDay = oldTodosForDay.map(task => {
-          if (task.id === taskId) {
-              const newSubtasks = task.subtasks?.map(st => 
-                  st.id === subtaskId ? { ...st, completed: !st.completed } : st
-              );
-              if (newSubtasks) {
-                  const allSubtasksCompleted = newSubtasks.every(st => st.completed);
-                  return { ...task, subtasks: newSubtasks, completed: allSubtasksCompleted };
-              }
+      let parentCompleted = task.completed;
+      const newSubtasks = task.subtasks?.map(st => 
+          st.id === subtaskId ? { ...st, completed: newCompletedState } : st
+      );
+      if(newSubtasks) {
+          const allSubtasksCompleted = newSubtasks.every(st => st.completed);
+          if (allSubtasksCompleted !== task.completed) {
+            parentCompleted = allSubtasksCompleted;
+            await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId);
           }
-          return task;
-      });
+      }
 
+      const newTodosForDay = oldTodosForDay.map(t => 
+          t.id === taskId ? { ...t, subtasks: newSubtasks, completed: parentCompleted } : t
+      );
+      
       const allJustCompleted = newTodosForDay.length > 0 && newTodosForDay.every(t => t.completed);
 
       if (allJustCompleted && !allWereCompletedBefore) {
@@ -699,20 +789,152 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
       setAllTodos(prev => ({ ...prev, [dateKey]: newTodosForDay }));
   };
 
-  const handleDeleteTodo = (id: number) => {
-    let newAllTodos = { ...allTodos };
-    let found = false;
-    for (const dateKey in newAllTodos) {
-      const initialLength = newAllTodos[dateKey].length;
-      newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => t.id !== id);
-      if (newAllTodos[dateKey].length < initialLength) {
-        found = true;
-        break;
-      }
+  const handleDeleteTodo = async (id: number) => {
+    const allTasksFlat: Todo[] = Object.values(allTodos).flat() as Todo[];
+    const taskToDelete = allTasksFlat.find(t => t.id === id);
+    if (!taskToDelete) return;
+
+    try {
+        let idsToDelete: number[] = [id];
+
+        if (taskToDelete.recurrence?.id && taskToDelete.due_date) {
+            const recurrenceId = taskToDelete.recurrence.id;
+            const startDate = taskToDelete.due_date;
+
+            const { data: futureTasks, error: fetchError } = await supabase
+                .from('todos')
+                .select('id')
+                .eq('user_id', currentUser.id)
+                .eq('recurrence->>id', recurrenceId)
+                .gte('due_date', startDate);
+
+            if (fetchError) throw fetchError;
+            if (futureTasks) {
+                idsToDelete = [...new Set([...idsToDelete, ...futureTasks.map(t => t.id)])];
+            }
+        }
+
+        if (idsToDelete.length > 0) {
+            const { error: subtaskError } = await supabase.from('subtasks').delete().in('todo_id', idsToDelete);
+            if (subtaskError) throw subtaskError;
+            
+            const { error: todoError } = await supabase.from('todos').delete().in('id', idsToDelete);
+            if (todoError) throw todoError;
+        }
+
+        setAllTodos(prevAllTodos => {
+            const newAllTodos = JSON.parse(JSON.stringify(prevAllTodos));
+            const deleteIdSet = new Set(idsToDelete);
+            for (const dateKey in newAllTodos) {
+                newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => !deleteIdSet.has(t.id));
+                if (newAllTodos[dateKey].length === 0) {
+                    delete newAllTodos[dateKey];
+                }
+            }
+            return newAllTodos;
+        });
+
+    } catch (error: any) {
+        console.error("Error deleting todo series from client:", error);
+        alert(`Error al eliminar la tarea: ${error.message}\n\nLos datos pueden estar desincronizados. Por favor, recarga la página.`);
     }
-    if(found) setAllTodos(newAllTodos);
   };
 
+  // --- Notes Handlers ---
+  const handleAddFolder = async (name: string) => {
+    const { data: newFolder, error } = await supabase.from('folders').insert({ name, user_id: currentUser.id }).select().single();
+    if (error) { console.error("Error adding folder:", error); return null; }
+    setFolders(prev => [{...newFolder, notes: []}, ...prev]);
+    return newFolder;
+  };
+
+  const handleUpdateFolder = async (folderId: number, name: string) => {
+    const { error } = await supabase.from('folders').update({ name }).eq('id', folderId);
+    if (error) { console.error("Error updating folder:", error); return; }
+    setFolders(prev => prev.map(f => f.id === folderId ? {...f, name} : f));
+  };
+  
+  const handleDeleteFolder = async (folderId: number) => {
+    // First, delete all notes within the folder to satisfy foreign key constraints.
+    const { error: notesError } = await supabase.from('notes').delete().eq('folder_id', folderId);
+    if (notesError) {
+        console.error("Error deleting notes in folder:", notesError);
+        alert(`Error al eliminar las notas: ${notesError.message}`);
+        return;
+    }
+
+    // Then, delete the folder itself.
+    const { error: folderError } = await supabase.from('folders').delete().eq('id', folderId);
+    if (folderError) {
+        console.error("Error deleting folder:", folderError);
+        alert(`Error al eliminar la carpeta: ${folderError.message}`);
+        return;
+    }
+
+    // Only update UI after successful deletion from the database.
+    setFolders(prev => prev.filter(f => f.id !== folderId));
+  };
+  
+  const handleAddNote = async (folderId: number) => {
+    const { data: newNote, error } = await supabase.from('notes').insert({ folder_id: folderId, user_id: currentUser.id, title: "", content: "" }).select().single();
+    if (error) { console.error("Error adding note:", error); return null; }
+    setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: [newNote, ...f.notes]} : f));
+    return newNote;
+  };
+  
+  const handleUpdateNote = async (note: Note) => {
+    const { error } = await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id);
+    if (error) { console.error("Error updating note:", error); return; }
+    setFolders(prev => prev.map(f => 
+      f.id === note.folder_id 
+        ? {...f, notes: f.notes.map(n => n.id === note.id ? note : n).sort((a,b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())} 
+        : f
+    ));
+  };
+
+  const handleDeleteNote = async (noteId: number, folderId: number) => {
+      const { error } = await supabase.from('notes').delete().eq('id', noteId);
+      if (error) { 
+        console.error("Error deleting note:", error); 
+        alert(`Error al eliminar la nota: ${error.message}`);
+        return; 
+      }
+      setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: f.notes.filter(n => n.id !== noteId)} : f));
+  };
+  
+  // --- Playlist Handlers ---
+  const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => {
+    const { data: newPlaylist, error } = await supabase.from('playlists').insert({ ...playlistData, user_id: currentUser.id }).select().single();
+    if (error) {
+        console.error("Error adding playlist:", error);
+        alert(`Error al guardar la playlist: ${error.message}`);
+        return;
+    }
+    setPlaylists(prev => [...prev, newPlaylist]);
+  };
+
+  const handleUpdatePlaylist = async (playlist: Playlist) => {
+    const { error } = await supabase.from('playlists').update(playlist).eq('id', playlist.id);
+    if (error) {
+        console.error("Error updating playlist:", error);
+        alert(`Error al actualizar la playlist: ${error.message}`);
+        return;
+    }
+    setPlaylists(prev => prev.map(p => p.id === playlist.id ? playlist : p));
+  };
+  
+  const handleDeletePlaylist = async (playlistId: number) => {
+    const { error } = await supabase.from('playlists').delete().eq('id', playlistId);
+    if (error) {
+        console.error("Error deleting playlist:", error);
+        alert(`Error al eliminar la playlist: ${error.message}`);
+        return;
+    }
+    setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+  };
+
+
+  // --- Windowing and Misc Handlers ---
   const toggleWindow = (windowType: WindowType) => {
     setOpenWindows(open => 
       open.includes(windowType) 
@@ -737,18 +959,10 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   const handlePomodoroToggle = () => {
     setPomodoroState(s => {
       const isStarting = !s.isActive;
-      
-      // If starting for the first time in the session, show the background timer automatically.
       if (isStarting && !pomodoroStartedRef.current) {
         pomodoroStartedRef.current = true;
-        return {
-          ...s,
-          isActive: true,
-          showBackgroundTimer: true,
-        };
+        return { ...s, isActive: true, showBackgroundTimer: true };
       }
-      
-      // Otherwise, just toggle the active state.
       return { ...s, isActive: isStarting };
     });
   };
@@ -829,14 +1043,46 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   };
   
   // Quick Notes handlers
-  const handleAddQuickNote = (text: string) => setQuickNotes(prev => [...prev, { id: `qn-${Date.now()}`, text }]);
-  const handleDeleteQuickNote = (id: string) => setQuickNotes(prev => prev.filter(qn => qn.id !== id));
-  const handleClearAllQuickNotes = () => setQuickNotes([]);
+  const handleAddQuickNote = async (text: string) => {
+    const { data: newNote, error } = await supabase.from('quick_notes').insert({ text, user_id: currentUser.id }).select().single();
+    if (error) {
+        console.error("Error adding quick note:", error);
+        alert(`Error al guardar la nota: ${error.message}`);
+        return;
+    }
+    setQuickNotes(prev => [newNote, ...prev]);
+  };
+
+  const handleDeleteQuickNote = async (id: number) => {
+    const { error } = await supabase.from('quick_notes').delete().eq('id', id);
+    if (error) {
+        console.error("Error deleting quick note:", error);
+        alert(`Error al eliminar la nota: ${error.message}`);
+        return;
+    }
+    setQuickNotes(prev => prev.filter(qn => qn.id !== id));
+  };
+
+  const handleClearAllQuickNotes = async () => {
+    const noteIdsToDelete = quickNotes.map(note => note.id);
+    if (noteIdsToDelete.length === 0) return;
+
+    const { error } = await supabase.from('quick_notes').delete().in('id', noteIdsToDelete);
+    if (error) {
+        console.error("Error clearing all quick notes:", error);
+        alert(`Error al limpiar las notas: ${error.message}`);
+        return;
+    }
+    setQuickNotes([]);
+  };
 
 
   if (!initialized) {
     return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando pollito...</p></div>;
   }
+  
+  const userName = currentUser.email!.split('@')[0];
+  const capitalizedUserName = userName.charAt(0).toUpperCase() + userName.slice(1);
 
   return (
     <div className="h-screen w-screen text-gray-800 dark:text-gray-100 font-sans overflow-hidden">
@@ -869,10 +1115,7 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
             >
               <PaletteIcon />
             </button>
-          <NotificationManager 
-              permission={notificationPermission}
-              requestPermission={async () => setNotificationPermission(await Notification.requestPermission())}
-          />
+          <NotificationManager />
         </div>
       </header>
 
@@ -903,7 +1146,7 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
       />
       
       <div className={`fixed top-4 left-4 z-30 w-64 space-y-4 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block`}>
-          <Greeting name={currentUser} />
+          <Greeting name={capitalizedUserName} />
           <BibleVerse />
           <TodaysAgenda 
             tasks={todayAgendaTasks} 
@@ -944,7 +1187,15 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
           )}
           {openWindows.includes('notes') && (
               <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas del Pollito" isDraggable isResizable zIndex={focusedWindow === 'notes' ? 50 : 40} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStates.notes} onStateChange={s => setWindowStates(ws => ({...ws, notes: s}))}>
-                  <NotesSection folders={folders} setFolders={setFolders} />
+                  <NotesSection 
+                    folders={folders} 
+                    onAddFolder={handleAddFolder}
+                    onUpdateFolder={handleUpdateFolder}
+                    onDeleteFolder={handleDeleteFolder}
+                    onAddNote={handleAddNote}
+                    onUpdateNote={handleUpdateNote}
+                    onDeleteNote={handleDeleteNote}
+                  />
               </ModalWindow>
           )}
           {openWindows.includes('gallery') && (
@@ -980,12 +1231,19 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
           )}
            {openWindows.includes('music') && (
               <ModalWindow isOpen onClose={() => toggleWindow('music')} frameless isDraggable isResizable zIndex={focusedWindow === 'music' ? 50 : 40} onFocus={() => bringToFront('music')} className="w-[600px] h-[450px]" windowState={windowStates.music} onStateChange={s => setWindowStates(ws => ({...ws, music: s}))}>
-                  <MusicPlayer playlists={playlists} onUpdatePlaylists={setPlaylists} onDeletePlaylist={uuid => setPlaylists(p => p.filter(item => item.uuid !== uuid))} onSelectTrack={handleSelectTrack} onClose={() => toggleWindow('music')} />
+                  <MusicPlayer 
+                    playlists={playlists} 
+                    onAddPlaylist={handleAddPlaylist}
+                    onUpdatePlaylist={handleUpdatePlaylist}
+                    onDeletePlaylist={handleDeletePlaylist} 
+                    onSelectTrack={handleSelectTrack} 
+                    onClose={() => toggleWindow('music')} 
+                  />
               </ModalWindow>
           )}
           {openWindows.includes('browser') && (
               <ModalWindow isOpen onClose={() => toggleWindow('browser')} title="IA Pollito" isDraggable isResizable zIndex={focusedWindow === 'browser' ? 50 : 40} onFocus={() => bringToFront('browser')} className="w-full max-w-xl h-[85vh]" windowState={windowStates.browser} onStateChange={s => setWindowStates(ws => ({...ws, browser: s}))}>
-                  <Browser session={browserSession} setSession={setBrowserSession} />
+                  <Browser session={browserSession} setSession={setBrowserSession} currentUser={currentUser} />
               </ModalWindow>
           )}
           {openWindows.includes('games') && (
@@ -997,7 +1255,7 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
             >
               <GamesHub
                 galleryImages={galleryImages}
-                currentUser={currentUser}
+                currentUser={capitalizedUserName}
               />
             </ModalWindow>
           )}
@@ -1022,7 +1280,6 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
 };
 
 const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors }) => {
-    const getUserKey = useCallback((key: string) => `${currentUser}_${key}`, [currentUser]);
     const [activeTab, setActiveTab] = useState('home');
 
     // All state hooks from DesktopApp need to be duplicated here
@@ -1047,7 +1304,6 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
         backgroundTimerOpacity: 50,
     });
     const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
-    const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
     const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
     const [browserSession, setBrowserSession] = useState<BrowserSession>({});
     const [particleType, setParticleType] = useState<ParticleType>('none');
@@ -1071,45 +1327,118 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
     const datesWithTasks = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0)), [allTodos]);
     const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
     const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
-    const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.startTime || '23:59').localeCompare(b.startTime || '23:59')), [allTodos]);
+    const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
     
     // Initialization and persistence effects (copied from DesktopApp)
     useEffect(() => {
         const initApp = async () => {
-            await initDB(currentUser);
-            const storedTodos = localStorage.getItem(getUserKey('allTodos'));
-            if (storedTodos) setAllTodos(JSON.parse(storedTodos));
-            const storedFolders = localStorage.getItem(getUserKey('folders'));
-            if (storedFolders) setFolders(JSON.parse(storedFolders)); else setFolders([{ id: 'folder-default', name: 'Mis Notas', notes: [] }]);
-            const storedPlaylists = localStorage.getItem(getUserKey('playlists'));
-            if (storedPlaylists) setPlaylists(JSON.parse(storedPlaylists));
-            const storedPomodoro = localStorage.getItem(getUserKey('pomodoroState'));
-            if (storedPomodoro) setPomodoroState(s => ({...s, ...JSON.parse(storedPomodoro)}));
-            const storedQuickNotes = localStorage.getItem(getUserKey('quickNotes'));
-            if(storedQuickNotes) setQuickNotes(JSON.parse(storedQuickNotes));
-            const storedBrowserSession = localStorage.getItem(getUserKey('browserSession'));
-            if(storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
-            const storedAmbience = localStorage.getItem(getUserKey('ambience'));
-            if(storedAmbience) {
-                const { particles, sound } = JSON.parse(storedAmbience);
-                setParticleType(particles);
-                setAmbientSound(sound);
-            }
+            await initDB(currentUser.email!);
+
+             // Load Todos from Supabase
+            const { data: todosData, error: todosError } = await supabase.from('todos').select('*, subtasks(*)');
+            if (todosError) throw todosError;
             
-            setNotificationPermission(Notification.permission);
+            let finalTodos = {};
+
+            if (todosData) {
+                const groupedTodos = todosData.reduce((acc, todo) => {
+                    const dateKey = todo.due_date;
+                    if (!dateKey) return acc;
+                    if (!acc[dateKey]) acc[dateKey] = [];
+                    acc[dateKey].push({ ...todo, subtasks: todo.subtasks || [] });
+                    return acc;
+                }, {} as { [key: string]: Todo[] });
+
+                // --- Prune old tasks (completed or pending) in batches ---
+                const cutoffDate = new Date();
+                cutoffDate.setMonth(cutoffDate.getMonth() - 3);
+                const cutoffDateString = cutoffDate.toISOString().split('T')[0];
+                const cutoffDateISO = cutoffDate.toISOString();
+
+                const allTasksFlat: Todo[] = Object.values(groupedTodos).flat() as Todo[];
+                const oldTaskIds = allTasksFlat
+                    .filter(task => {
+                        const isOldAndCompleted = task.completed && task.due_date && task.due_date < cutoffDateString;
+                        const isOldAndPending = !task.completed && task.created_at && task.created_at < cutoffDateISO;
+                        return isOldAndCompleted || isOldAndPending;
+                    })
+                    .map(task => task.id);
+
+                let prunedGroupedTodos = { ...groupedTodos };
+
+                if (oldTaskIds.length > 0) {
+                    const CHUNK_SIZE = 50;
+                    for (let i = 0; i < oldTaskIds.length; i += CHUNK_SIZE) {
+                        const chunk = oldTaskIds.slice(i, i + CHUNK_SIZE);
+                        
+                        const { error: subtaskDeleteError } = await supabase.from('subtasks').delete().in('todo_id', chunk);
+                        
+                        if (subtaskDeleteError) {
+                            console.error("Error pruning a chunk of old subtasks, skipping this chunk:", subtaskDeleteError);
+                            continue; 
+                        }
+
+                        const { error: deleteError } = await supabase.from('todos').delete().in('id', chunk);
+
+                        if (!deleteError) {
+                            const chunkIdSet = new Set(chunk);
+                            for (const dateKey in prunedGroupedTodos) {
+                                prunedGroupedTodos[dateKey] = prunedGroupedTodos[dateKey].filter(t => !chunkIdSet.has(t.id));
+                                if (prunedGroupedTodos[dateKey].length === 0) {
+                                    delete prunedGroupedTodos[dateKey];
+                                }
+                            }
+                        } else {
+                            console.error("Error pruning a chunk of old todos from Supabase:", deleteError);
+                        }
+                    }
+                    finalTodos = prunedGroupedTodos;
+                } else {
+                    finalTodos = groupedTodos;
+                }
+            }
+            setAllTodos(finalTodos);
+
+            // Load Folders & Notes from Supabase
+            const { data: foldersData, error: foldersError } = await supabase.from('folders').select('*');
+            if (foldersError) throw foldersError;
+            const { data: notesData, error: notesError } = await supabase.from('notes').select('*');
+            if (notesError) throw notesError;
+
+            if (foldersData && notesData) {
+                const foldersWithNotes = foldersData.map(folder => ({
+                    ...folder,
+                    notes: notesData.filter(note => note.folder_id === folder.id)
+                })).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                setFolders(foldersWithNotes);
+            } else if (foldersData?.length === 0) {
+                const { data: newFolder } = await supabase.from('folders').insert({ name: 'Mis Notas', user_id: currentUser.id }).select().single();
+                if (newFolder) setFolders([{ ...newFolder, notes: [] }]);
+            }
+
+            // Load Playlists from Supabase
+            const { data: playlistsData, error: playlistsError } = await supabase.from('playlists').select('*');
+            if (playlistsError) throw playlistsError;
+            if (playlistsData) {
+                setPlaylists(playlistsData);
+            }
+
+            // Load Quick Notes from Supabase
+            const { data: quickNotesData, error: quickNotesError } = await supabase.from('quick_notes').select('*').order('created_at', { ascending: false });
+            if (quickNotesError) throw quickNotesError;
+            if (quickNotesData) {
+                setQuickNotes(quickNotesData);
+            }
+
+            const storedBrowserSession = localStorage.getItem(`${currentUser.email}_browserSession`);
+            if(storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
+            
             setInitialized(true);
         };
         initApp();
-    }, [currentUser, getUserKey]);
+    }, [currentUser]);
 
-    useEffect(() => { if (initialized) localStorage.setItem(getUserKey('allTodos'), JSON.stringify(allTodos)); }, [allTodos, initialized, getUserKey]);
-    useEffect(() => { if (initialized) localStorage.setItem(getUserKey('folders'), JSON.stringify(folders)); }, [folders, initialized, getUserKey]);
-    useEffect(() => { if (initialized) localStorage.setItem(getUserKey('playlists'), JSON.stringify(playlists)); }, [playlists, initialized, getUserKey]);
-    useEffect(() => { if (initialized) localStorage.setItem(getUserKey('pomodoroState'), JSON.stringify(pomodoroState)); }, [pomodoroState, initialized, getUserKey]);
-    useEffect(() => { if (initialized) localStorage.setItem(getUserKey('activeBackgroundId'), activeBackground?.id || ''); }, [activeBackground, initialized, getUserKey]);
-    useEffect(() => { if (initialized) localStorage.setItem(getUserKey('quickNotes'), JSON.stringify(quickNotes)); }, [quickNotes, initialized, getUserKey]);
-    useEffect(() => { if (initialized) localStorage.setItem(getUserKey('browserSession'), JSON.stringify(browserSession)); }, [browserSession, initialized, getUserKey]);
-    useEffect(() => { if (initialized) localStorage.setItem(getUserKey('ambience'), JSON.stringify({ particles: particleType, sound: ambientSound })); }, [particleType, ambientSound, initialized, getUserKey]);
+    useEffect(() => { if (initialized) localStorage.setItem(`${currentUser.email}_browserSession`, JSON.stringify(browserSession)); }, [browserSession, initialized, currentUser]);
     
     // Google API Initialization (ROBUST)
     useEffect(() => {
@@ -1137,7 +1466,6 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
 
     useEffect(() => {
         if (gapiReady && gisReady) {
-            // FIX: This comparison appears to be unintentional because the types have no overlap.
             if (!CLIENT_ID) {
                 console.warn('Google Client ID is missing. Google Drive features will be disabled.');
             } else {
@@ -1162,13 +1490,13 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
         } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
           pomodoroAudioRef.current?.play();
           const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
-          if (notificationPermission === 'granted') {
+          if (Notification.permission === 'granted') {
               new Notification('Pomodoro Terminado');
           }
           setPomodoroState(s => ({ ...s, mode: newMode, timeLeft: s.durations[newMode], isActive: true }));
         }
         return () => clearInterval(timer);
-    }, [pomodoroState.isActive, pomodoroState.timeLeft, notificationPermission, pomodoroState.mode, pomodoroState.durations]);
+    }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations]);
 
     useEffect(() => {
         const audio = ambientAudioRef.current;
@@ -1192,7 +1520,6 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
     // --- Google Drive Handlers ---
     const findOrCreateAppFolder = useCallback(async () => {
         try {
-            // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
             const response = await window.gapi.client.drive.files.list({
                 q: `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`,
                 fields: 'files(id)',
@@ -1200,12 +1527,10 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
             if (response.result.files && response.result.files.length > 0) {
                 appFolderId.current = response.result.files[0].id!;
             } else {
-                // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
                 const createResponse = await window.gapi.client.drive.files.create({
-                    // @ts-ignore
                     resource: { name: APP_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' },
                     fields: 'id',
-                });
+                } as any);
                 appFolderId.current = createResponse.result.id!;
             }
         } catch (e) { console.error("Error finding/creating app folder", e); }
@@ -1215,14 +1540,12 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
         if (!appFolderId.current) return;
         setGalleryIsLoading(true);
         try {
-            // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
             const response = await window.gapi.client.drive.files.list({
                 q: `'${appFolderId.current}' in parents and mimeType contains 'image/' and (not appProperties has { key='type' and value='background' }) and trashed=false`,
                 fields: 'files(id)',
             });
             const files = response.result.files || [];
             const imagePromises = files.map(async (file) => {
-                // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
                 const fileResponse = await window.gapi.client.drive.files.get({ fileId: file.id!, alt: 'media' });
                 const blob = new Blob([fileResponse.body], { type: fileResponse.headers['Content-Type'] });
                 return { id: file.id!, url: URL.createObjectURL(blob) };
@@ -1258,20 +1581,14 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
       });
       const newBgs = await Promise.all(bgPromises);
       setUserBackgrounds(newBgs);
-
-      const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
-      if (storedActiveBgId) {
-        const active = newBgs.find(bg => bg.id === storedActiveBgId);
-        if (active) setActiveBackground(active);
-      }
     } catch (e) {
       console.error("Error loading backgrounds from Drive", e);
     } finally {
       setBackgroundsAreLoading(false);
     }
-  }, [getUserKey]);
+  }, []);
 
-    const handleAuthClick = useCallback(() => {
+    const handleAuthClick = useCallback(async () => {
         if (!tokenClient.current) {
             alert("La configuración para Google Drive está incompleta. Por favor, añade tu ID de cliente en el archivo App.tsx.");
             return;
@@ -1293,54 +1610,136 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
     }, [gdriveToken, findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive]);
 
     // Handlers (copied & adapted)
-    const handleAddTodo = (text: string) => {
+    const handleAddTodo = async (text: string) => {
         const dateKey = formatDateKey(selectedDate);
-        const newTodo: Todo = { id: Date.now(), text, completed: false, priority: 'medium', dueDate: dateKey };
-        setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), newTodo] }));
+        const newTodoPayload = { text, priority: 'medium' as 'medium', due_date: dateKey, user_id: currentUser.id };
+        const { data: newTodo, error } = await supabase.from('todos').insert(newTodoPayload).select().single();
+        if (error) { console.error("Error adding todo:", error); return; }
+        setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), { ...newTodo, subtasks: [] }] }));
     };
 
-    const handleUpdateTodo = (updatedTodo: Todo) => {
-        if (!updatedTodo.dueDate) return;
-        const dateKey = updatedTodo.dueDate;
-        let newAllTodos = { ...allTodos };
-        let oldDateKey: string | null = null;
-        for (const key in allTodos) if(allTodos[key].some(t => t.id === updatedTodo.id)) { oldDateKey = key; break; }
-        if(oldDateKey && oldDateKey !== dateKey) newAllTodos[oldDateKey] = (newAllTodos[oldDateKey] || []).filter(t => t.id !== updatedTodo.id);
-        const dateTasks = newAllTodos[dateKey] || [];
-        const taskIndex = dateTasks.findIndex(t => t.id === updatedTodo.id);
-        if(taskIndex > -1) { dateTasks[taskIndex] = updatedTodo; newAllTodos[dateKey] = [...dateTasks]; }
-        else { newAllTodos[dateKey] = [...dateTasks, updatedTodo]; }
-        if (updatedTodo.recurrence && updatedTodo.recurrence.frequency !== 'none' && !updatedTodo.recurrenceId) {
-            updatedTodo.recurrenceId = `recur-${Date.now()}`;
-            newAllTodos = generateRecurringTasks(updatedTodo, newAllTodos);
+    const handleUpdateTodo = async (updatedTodo: Todo) => {
+        let todoToSave = { ...updatedTodo };
+
+        if (todoToSave.recurrence && todoToSave.recurrence.frequency !== 'none') {
+            if (!todoToSave.recurrence.id) {
+                todoToSave.recurrence.id = `recurrence-${Date.now()}`;
+            }
         }
+        if (todoToSave.recurrence?.frequency === 'none') {
+            delete todoToSave.recurrence.id;
+            delete todoToSave.recurrence.sourceId;
+        }
+
+        const { subtasks, user_id, ...payloadForSupabase } = todoToSave;
+
+        const { error: todoError } = await supabase.from('todos').update(payloadForSupabase).eq('id', todoToSave.id);
+        if (todoError) console.error("Error updating todo:", todoError);
+
+        await supabase.from('subtasks').delete().eq('todo_id', todoToSave.id);
+        if (subtasks && subtasks.length > 0) {
+            const { error: subtaskError } = await supabase.from('subtasks').insert(subtasks.map(st => ({ text: st.text, completed: st.completed, todo_id: todoToSave.id })));
+            if (subtaskError) console.error("Error inserting subtasks:", subtaskError);
+        }
+        
+        let newAllTodos = JSON.parse(JSON.stringify(allTodos));
+        let oldDateKey: string | null = null;
+        let originalTask: Todo | null = null;
+        for (const key in newAllTodos) {
+            const task = newAllTodos[key].find((t: Todo) => t.id === todoToSave.id);
+            if (task) {
+                oldDateKey = key;
+                originalTask = task;
+                break;
+            }
+        }
+
+        if (originalTask?.recurrence?.id) {
+             for (const dateKey in newAllTodos) {
+                newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => {
+                    if (t.recurrence?.id !== originalTask!.recurrence!.id) return true;
+                    if (t.id === todoToSave.id) return true;
+                    if (t.due_date && originalTask!.due_date && t.due_date <= originalTask!.due_date) return true;
+                    return false;
+                });
+            }
+        }
+        
+        if(oldDateKey && oldDateKey !== todoToSave.due_date && newAllTodos[oldDateKey]) {
+            newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t: Todo) => t.id !== todoToSave.id);
+        }
+        
+        const newDateKey = todoToSave.due_date!;
+        const dateTasks = newAllTodos[newDateKey] || [];
+        const taskIndex = dateTasks.findIndex((t: Todo) => t.id === todoToSave.id);
+        if(taskIndex > -1) {
+            dateTasks[taskIndex] = todoToSave;
+        } else {
+            dateTasks.push(todoToSave);
+        }
+        newAllTodos[newDateKey] = [...dateTasks];
+        
+        if (todoToSave.recurrence && todoToSave.recurrence.frequency !== 'none') {
+            newAllTodos = await generateRecurringTasks(todoToSave, newAllTodos);
+        }
+        
         setAllTodos(newAllTodos);
         setTaskToEdit(null);
     };
-    const handleToggleTodo = (id: number) => {
+
+    const handleToggleTodo = async (id: number) => {
         const dateKey = formatDateKey(selectedDate);
         const todosForDay = allTodos[dateKey] || [];
-        const newTodosForDay = todosForDay.map(t => t.id === id ? { ...t, completed: !t.completed, subtasks: t.subtasks?.map(st => ({...st, completed: !t.completed})) } : t);
-        if (newTodosForDay.length > 0 && newTodosForDay.every(t => t.completed) && !(todosForDay.every(t => t.completed))) {
+        const targetTodo = todosForDay.find(t => t.id === id);
+        if (!targetTodo) return;
+
+        const newCompletedState = !targetTodo.completed;
+        await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id);
+        if (targetTodo.subtasks && targetTodo.subtasks.length > 0) {
+            await supabase.from('subtasks').update({ completed: newCompletedState }).eq('todo_id', id);
+        }
+        
+        const allWereCompletedBefore = todosForDay.length > 0 && todosForDay.every(t => t.completed);
+        const newTodosForDay = todosForDay.map(t => t.id === id ? { ...t, completed: newCompletedState, subtasks: t.subtasks?.map(st => ({...st, completed: newCompletedState})) } : t);
+        
+        if (newTodosForDay.length > 0 && newTodosForDay.every(t => t.completed) && !allWereCompletedBefore) {
             setCompletionQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
             setShowCompletionModal(true);
             triggerConfetti();
         }
-        setAllTodos(prev => ({ ...prev, [dateKey]: newTodosForDay }));
+
+        let finalAllTodos = { ...allTodos, [dateKey]: newTodosForDay };
+        if (newCompletedState && targetTodo.recurrence && targetTodo.recurrence.frequency !== 'none') {
+            const sourceTodoWithId = { ...targetTodo };
+            if (!sourceTodoWithId.recurrence.id) {
+                sourceTodoWithId.recurrence = {...sourceTodoWithId.recurrence, id: `recurrence-${sourceTodoWithId.id}`};
+            }
+            finalAllTodos = await generateRecurringTasks(sourceTodoWithId, finalAllTodos);
+        }
+        setAllTodos(finalAllTodos);
     };
-     const handleToggleSubtask = (taskId: number, subtaskId: number) => {
+
+    const handleToggleSubtask = async (taskId: number, subtaskId: number) => {
       const dateKey = formatDateKey(selectedDate);
       const oldTodosForDay = allTodos[dateKey] || [];
-      const newTodosForDay = oldTodosForDay.map(task => {
-          if (task.id === taskId) {
-              const newSubtasks = task.subtasks?.map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st);
-              if (newSubtasks) {
-                  const allSubtasksCompleted = newSubtasks.every(st => st.completed);
-                  return { ...task, subtasks: newSubtasks, completed: allSubtasksCompleted };
-              }
+      const task = oldTodosForDay.find(t => t.id === taskId);
+      const subtask = task?.subtasks?.find(st => st.id === subtaskId);
+      if (!task || !subtask) return;
+
+      const newCompletedState = !subtask.completed;
+      await supabase.from('subtasks').update({ completed: newCompletedState }).eq('id', subtaskId);
+
+      let parentCompleted = task.completed;
+      const newSubtasks = task.subtasks?.map(st => st.id === subtaskId ? { ...st, completed: newCompletedState } : st);
+      if (newSubtasks) {
+          const allSubtasksCompleted = newSubtasks.every(st => st.completed);
+          if (allSubtasksCompleted !== task.completed) {
+            parentCompleted = allSubtasksCompleted;
+            await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId);
           }
-          return task;
-      });
+      }
+
+      const newTodosForDay = oldTodosForDay.map(t => t.id === taskId ? { ...t, subtasks: newSubtasks, completed: parentCompleted } : t);
       if (newTodosForDay.length > 0 && newTodosForDay.every(t => t.completed) && !(oldTodosForDay.every(t => t.completed))) {
           setCompletionQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
           setShowCompletionModal(true);
@@ -1348,89 +1747,177 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
       }
       setAllTodos(prev => ({ ...prev, [dateKey]: newTodosForDay }));
     };
-    const handleDeleteTodo = (id: number) => {
-        let newAllTodos = { ...allTodos };
-        for (const dateKey in newAllTodos) {
-            newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => t.id !== id);
+
+    const handleDeleteTodo = async (id: number) => {
+        const allTasksFlat: Todo[] = Object.values(allTodos).flat() as Todo[];
+        const taskToDelete = allTasksFlat.find(t => t.id === id);
+        if (!taskToDelete) return;
+
+        try {
+            let idsToDelete: number[] = [id];
+
+            if (taskToDelete.recurrence?.id && taskToDelete.due_date) {
+                const recurrenceId = taskToDelete.recurrence.id;
+                const startDate = taskToDelete.due_date;
+
+                const { data: futureTasks, error: fetchError } = await supabase
+                    .from('todos')
+                    .select('id')
+                    .eq('user_id', currentUser.id)
+                    .eq('recurrence->>id', recurrenceId)
+                    .gte('due_date', startDate);
+
+                if (fetchError) throw fetchError;
+                if (futureTasks) {
+                    idsToDelete = [...new Set([...idsToDelete, ...futureTasks.map(t => t.id)])];
+                }
+            }
+
+            if (idsToDelete.length > 0) {
+                const { error: subtaskError } = await supabase.from('subtasks').delete().in('todo_id', idsToDelete);
+                if (subtaskError) throw subtaskError;
+                
+                const { error: todoError } = await supabase.from('todos').delete().in('id', idsToDelete);
+                if (todoError) throw todoError;
+            }
+
+            setAllTodos(prevAllTodos => {
+                const newAllTodos = JSON.parse(JSON.stringify(prevAllTodos));
+                const deleteIdSet = new Set(idsToDelete);
+                for (const dateKey in newAllTodos) {
+                    newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => !deleteIdSet.has(t.id));
+                    if (newAllTodos[dateKey].length === 0) {
+                        delete newAllTodos[dateKey];
+                    }
+                }
+                return newAllTodos;
+            });
+
+        } catch (error: any) {
+            console.error("Error deleting todo series from client:", error);
+            alert(`Error al eliminar la tarea: ${error.message}\n\nLos datos pueden estar desincronizados. Por favor, recarga la página.`);
         }
-        setAllTodos(newAllTodos);
     };
+
+    // --- Notes Handlers ---
+    const handleAddFolder = async (name: string) => {
+        const { data: newFolder, error } = await supabase.from('folders').insert({ name, user_id: currentUser.id }).select().single();
+        if (error) { console.error("Error adding folder:", error); return null; }
+        setFolders(prev => [{...newFolder, notes: []}, ...prev]);
+        return newFolder;
+    };
+
+    const handleUpdateFolder = async (folderId: number, name: string) => {
+        const { error } = await supabase.from('folders').update({ name }).eq('id', folderId);
+        if (error) { console.error("Error updating folder:", error); return; }
+        setFolders(prev => prev.map(f => f.id === folderId ? {...f, name} : f));
+    };
+    
+    const handleDeleteFolder = async (folderId: number) => {
+        const { error: notesError } = await supabase.from('notes').delete().eq('folder_id', folderId);
+        if (notesError) {
+            console.error("Error deleting notes in folder:", notesError);
+            alert(`Error al eliminar las notas: ${notesError.message}`);
+            return;
+        }
+
+        const { error: folderError } = await supabase.from('folders').delete().eq('id', folderId);
+        if (folderError) {
+            console.error("Error deleting folder:", folderError);
+            alert(`Error al eliminar la carpeta: ${folderError.message}`);
+            return;
+        }
+        setFolders(prev => prev.filter(f => f.id !== folderId));
+    };
+    
+    const handleAddNote = async (folderId: number) => {
+        const { data: newNote, error } = await supabase.from('notes').insert({ folder_id: folderId, user_id: currentUser.id, title: "", content: "" }).select().single();
+        if (error) { console.error("Error adding note:", error); return null; }
+        setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: [newNote, ...f.notes]} : f));
+        return newNote;
+    };
+    
+    const handleUpdateNote = async (note: Note) => {
+        const { error } = await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id);
+        if (error) { console.error("Error updating note:", error); return; }
+        setFolders(prev => prev.map(f => 
+        f.id === note.folder_id 
+            ? {...f, notes: f.notes.map(n => n.id === note.id ? note : n).sort((a,b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())} 
+            : f
+        ));
+    };
+
+    const handleDeleteNote = async (noteId: number, folderId: number) => {
+        const { error } = await supabase.from('notes').delete().eq('id', noteId);
+        if (error) { 
+            console.error("Error deleting note:", error);
+            alert(`Error al eliminar la nota: ${error.message}`);
+            return; 
+        }
+        setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: f.notes.filter(n => n.id !== noteId)} : f));
+    };
+
+    // --- Playlist Handlers ---
+    const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => {
+        const { data: newPlaylist, error } = await supabase.from('playlists').insert({ ...playlistData, user_id: currentUser.id }).select().single();
+        if (error) { console.error("Error adding playlist:", error); return; }
+        setPlaylists(prev => [...prev, newPlaylist]);
+    };
+
+    const handleUpdatePlaylist = async (playlist: Playlist) => {
+        const { error } = await supabase.from('playlists').update(playlist).eq('id', playlist.id);
+        if (error) { console.error("Error updating playlist:", error); return; }
+        setPlaylists(prev => prev.map(p => p.id === playlist.id ? playlist : p));
+    };
+    
+    const handleDeletePlaylist = async (playlistId: number) => {
+        const { error } = await supabase.from('playlists').delete().eq('id', playlistId);
+        if (error) { console.error("Error deleting playlist:", error); return; }
+        setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+    };
+
+
     const handleSelectTrack = (track: Playlist, queue: Playlist[]) => {
       if(track.platform === 'youtube') { setActiveTrack({ ...track, queue }); if(activeSpotifyTrack) setActiveSpotifyTrack(null); }
       else { setActiveSpotifyTrack({ ...track, queue }); if(activeTrack) setActiveTrack(null); }
     };
+
     const handlePomodoroToggle = () => setPomodoroState(s => ({ ...s, isActive: !s.isActive }));
+
     const handleAddBackground = async (file: File) => {
         if (!appFolderId.current || !gdriveToken) return;
-        const metadata = {
-            name: file.name,
-            mimeType: file.type,
-            parents: [appFolderId.current],
-            appProperties: {
-                type: 'background',
-                isFavorite: 'false',
-            },
-        };
+        const metadata = { name: file.name, mimeType: file.type, parents: [appFolderId.current], appProperties: { type: 'background', isFavorite: 'false' } };
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
         form.append('file', file);
-
         try {
-            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                method: 'POST',
-                headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }),
-                body: form,
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error("Google Drive Upload Error:", errorData);
-                alert("¡Uy! Hubo un problema al subir tu fondo a Google Drive.");
-                return;
-            }
-
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }), body: form });
+            if (!response.ok) { throw new Error(await response.text()); }
             const newFile = await response.json();
-            const newBg: Background = {
-                id: newFile.id,
-                name: file.name,
-                url: URL.createObjectURL(file),
-                type: file.type.startsWith('video') ? 'video' : 'image',
-                isFavorite: false,
-            };
+            const newBg: Background = { id: newFile.id, name: file.name, url: URL.createObjectURL(file), type: file.type.startsWith('video') ? 'video' : 'image', isFavorite: false };
             setUserBackgrounds(prev => [...prev, newBg]);
             setActiveBackground(newBg);
         } catch (e) { console.error("Error uploading background to Drive", e); }
     };
+    
     const handleDeleteBackground = async (id: string) => {
         try {
             await window.gapi.client.drive.files.delete({ fileId: id });
-            setUserBackgrounds(prev => prev.filter(bg => {
-                if (bg.id === id) {
-                    URL.revokeObjectURL(bg.url);
-                    return false;
-                }
-                return true;
-            }));
-            if (activeBackground?.id === id) {
-                setActiveBackground(null);
-            }
+            setUserBackgrounds(prev => prev.filter(bg => { if (bg.id === id) { URL.revokeObjectURL(bg.url); return false; } return true; }));
+            if (activeBackground?.id === id) setActiveBackground(null);
         } catch (e) { console.error("Error deleting background from Drive", e); }
     };
+
     const handleToggleFavoriteBackground = async (id: string) => {
         const bg = userBackgrounds.find(b => b.id === id);
         if (!bg || !gdriveToken) return;
         const newFavState = !bg.isFavorite;
         try {
-            await window.gapi.client.drive.files.update({
-                fileId: id,
-                // @ts-ignore
-                resource: {
-                    appProperties: { isFavorite: String(newFavState) }
-                }
-            });
+            await window.gapi.client.drive.files.update({ fileId: id, resource: { appProperties: { isFavorite: String(newFavState) } } as any });
             setUserBackgrounds(bgs => bgs.map(b => b.id === id ? {...b, isFavorite: newFavState} : b));
         } catch (e) { console.error("Error updating favorite state in Drive", e); }
     };
+
     const handleAddGalleryImages = async (files: File[]) => {
       if (!appFolderId.current || !gdriveToken) return;
       for (const file of files) {
@@ -1438,43 +1925,56 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify({ name: file.name, mimeType: file.type, parents: [appFolderId.current] })], { type: 'application/json' }));
             form.append('file', file);
-            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                method: 'POST',
-                headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }),
-                body: form,
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error("Google Drive Upload Error:", errorData);
-                alert("¡Uy! Hubo un problema al subir tu imagen a Google Drive.");
-                continue;
-            }
-
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }), body: form });
+            if (!response.ok) { throw new Error(await response.text()); }
             const newFile = await response.json();
             setGalleryImages(prev => [{ id: newFile.id, url: URL.createObjectURL(file) }, ...prev]);
-        } catch(e) {
-            console.error("Error processing file upload:", e);
-            alert(`Hubo un error al procesar el archivo ${file.name}.`);
-        }
+        } catch(e) { console.error("Error processing file upload:", e); }
       }
     };
+
     const handleDeleteGalleryImage = async (id: string) => {
       try {
-          // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
           await window.gapi.client.drive.files.delete({ fileId: id });
-          setGalleryImages(prev => prev.filter(img => {
-              if (img.id === id) {
-                  URL.revokeObjectURL(img.url);
-                  return false;
-              }
-              return true;
-          }));
+          setGalleryImages(prev => prev.filter(img => { if (img.id === id) { URL.revokeObjectURL(img.url); return false; } return true; }));
       } catch (e) { console.error("Error deleting file from Drive", e); }
     };
-    const handleAddQuickNote = (text: string) => setQuickNotes(prev => [...prev, { id: `qn-${Date.now()}`, text }]);
-    const handleDeleteQuickNote = (id: string) => setQuickNotes(prev => prev.filter(qn => qn.id !== id));
-    const handleClearAllQuickNotes = () => setQuickNotes([]);
+
+    const handleAddQuickNote = async (text: string) => {
+        const { data: newNote, error } = await supabase.from('quick_notes').insert({ text, user_id: currentUser.id }).select().single();
+        if (error) {
+            console.error("Error adding quick note:", error);
+            alert(`Error al guardar la nota: ${error.message}`);
+            return;
+        }
+        setQuickNotes(prev => [newNote, ...prev]);
+    };
+
+    const handleDeleteQuickNote = async (id: number) => {
+        const { error } = await supabase.from('quick_notes').delete().eq('id', id);
+        if (error) {
+            console.error("Error deleting quick note:", error);
+            alert(`Error al eliminar la nota: ${error.message}`);
+            return;
+        }
+        setQuickNotes(prev => prev.filter(qn => qn.id !== id));
+    };
+
+    const handleClearAllQuickNotes = async () => {
+        const noteIdsToDelete = quickNotes.map(note => note.id);
+        if (noteIdsToDelete.length === 0) return;
+
+        const { error } = await supabase.from('quick_notes').delete().in('id', noteIdsToDelete);
+        if (error) {
+            console.error("Error clearing all quick notes:", error);
+            alert(`Error al limpiar las notas: ${error.message}`);
+            return;
+        }
+        setQuickNotes([]);
+    };
+
+    const userName = currentUser.email!.split('@')[0];
+    const capitalizedUserName = userName.charAt(0).toUpperCase() + userName.slice(1);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -1483,7 +1983,7 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
                     <>
                         <MobileHeader title="Hoy" />
                         <div className="p-4 space-y-3">
-                            <Greeting name={currentUser} />
+                            <Greeting name={capitalizedUserName} />
                              <MobilePomodoroWidget
                                 timeLeft={pomodoroState.timeLeft}
                                 isActive={pomodoroState.isActive}
@@ -1525,7 +2025,16 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
             case 'notes':
                 return (
                     <div className="h-full">
-                      <NotesSection isMobile={true} folders={folders} setFolders={setFolders} />
+                      <NotesSection 
+                        isMobile={true} 
+                        folders={folders} 
+                        onAddFolder={handleAddFolder}
+                        onUpdateFolder={handleUpdateFolder}
+                        onDeleteFolder={handleDeleteFolder}
+                        onAddNote={handleAddNote}
+                        onUpdateNote={handleUpdateNote}
+                        onDeleteNote={handleDeleteNote}
+                      />
                     </div>
                 );
             case 'gallery':
@@ -1551,7 +2060,7 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
                         <GamesHub
                             galleryImages={galleryImages}
                             isMobile={true}
-                            currentUser={currentUser}
+                            currentUser={capitalizedUserName}
                         />
                     </div>
                 );
@@ -1575,7 +2084,7 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
                             </div>
                             <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg flex justify-between items-center">
                                 <h3 className="font-bold text-primary-dark dark:text-primary">Notificaciones</h3>
-                                <NotificationManager permission={notificationPermission} requestPermission={async () => setNotificationPermission(await Notification.requestPermission())} />
+                                <NotificationManager />
                             </div>
                              <button onClick={onLogout} className="w-full mt-4 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
                                 <LogoutIcon />
@@ -1655,7 +2164,7 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
             
             {isAiBrowserOpen && (
                 <div className="fixed inset-0 bg-secondary-lighter/90 dark:bg-gray-900 z-[100] animate-deploy">
-                    <Browser session={browserSession} setSession={setBrowserSession} onClose={() => setIsAiBrowserOpen(false)} />
+                    <Browser session={browserSession} setSession={setBrowserSession} onClose={() => setIsAiBrowserOpen(false)} currentUser={currentUser} />
                 </div>
             )}
 
@@ -1720,14 +2229,113 @@ const adjustBrightness = (hex: string, percent: number) => {
 
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<string | null>(() => localStorage.getItem('lively_todo_user'));
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
-  });
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [themeColors, setThemeColors] = useState<ThemeColors>(DEFAULT_COLORS);
   const isMobile = useMediaQuery('(max-width: 767px)');
+  
+  const settingsSaveTimeout = useRef<number | null>(null);
+  const [initialized, setInitialized] = useState(false);
+  const [activeBackground, setActiveBackground] = useState<Background | null>(null);
+  const [particleType, setParticleType] = useState<ParticleType>('none');
+  const [ambientSound, setAmbientSound] = useState<{ type: AmbientSoundType; volume: number }>({ type: 'none', volume: 0.5 });
+  const [pomodoroState, setPomodoroState] = useState({
+      timeLeft: 25 * 60,
+      isActive: false,
+      mode: 'work' as 'work' | 'break',
+      durations: { work: 25 * 60, break: 5 * 60 },
+      showBackgroundTimer: false,
+      backgroundTimerOpacity: 50,
+  });
 
-  const getUserKey = useCallback((key: string) => `${currentUser}_${key}`, [currentUser]);
+
+  useEffect(() => {
+    const getSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+    };
+    getSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load all settings from Supabase on user login
+  useEffect(() => {
+    if (!user) {
+        setLoading(false);
+        return;
+    };
+
+    const loadSettings = async () => {
+      const { data, error } = await supabase.from('site_settings').select('*').single();
+      
+      if (data) {
+        setTheme(data.theme_mode || 'light');
+        setThemeColors(data.theme_colors || DEFAULT_COLORS);
+        setParticleType(data.particle_type || 'none');
+        setAmbientSound(data.ambient_sound || { type: 'none', volume: 0.5 });
+        setPomodoroState(prev => ({ ...prev, ...(data.pomodoro_config || {}) }));
+        // active_background_id will be handled by the background loading effect
+      } else if (!error) {
+        // No settings found, create initial row with defaults
+        await supabase.from('site_settings').insert({ 
+            user_id: user.id,
+            theme_mode: 'light',
+            theme_colors: DEFAULT_COLORS,
+            pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: pomodoroState.backgroundTimerOpacity, showBackgroundTimer: pomodoroState.showBackgroundTimer }
+        });
+      }
+      setInitialized(true);
+      setLoading(false);
+    };
+
+    loadSettings();
+
+  }, [user]);
+
+
+  // Debounced save settings to Supabase
+  useEffect(() => {
+    if (!initialized || !user) return;
+
+    if (settingsSaveTimeout.current) {
+        clearTimeout(settingsSaveTimeout.current);
+    }
+
+    settingsSaveTimeout.current = window.setTimeout(async () => {
+        const settingsPayload = {
+            user_id: user.id,
+            theme_mode: theme,
+            theme_colors: themeColors,
+            active_background_id: activeBackground?.id || null,
+            particle_type: particleType,
+            ambient_sound: ambientSound,
+            pomodoro_config: {
+                durations: pomodoroState.durations,
+                backgroundTimerOpacity: pomodoroState.backgroundTimerOpacity,
+                showBackgroundTimer: pomodoroState.showBackgroundTimer
+            }
+        };
+
+        const { error } = await supabase.from('site_settings').upsert(settingsPayload, { onConflict: 'user_id' });
+        if (error) {
+            console.error("Error saving site settings:", error);
+        }
+    }, 1500); // Wait 1.5 seconds after the last change to save
+
+    return () => {
+        if (settingsSaveTimeout.current) {
+            clearTimeout(settingsSaveTimeout.current);
+        }
+    };
+  }, [theme, themeColors, activeBackground, particleType, ambientSound, pomodoroState, initialized, user]);
+
 
   // Handle dark/light mode switching
   useEffect(() => {
@@ -1736,10 +2344,9 @@ const App: React.FC = () => {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem('theme', theme);
   }, [theme]);
   
-  // Handle custom color loading and application
+  // Handle custom color application
   useEffect(() => {
     const root = document.documentElement;
     const { primary, secondary } = themeColors;
@@ -1755,23 +2362,7 @@ const App: React.FC = () => {
     root.style.setProperty('--color-secondary-light', isDark ? adjustBrightness(secondary, -25) : adjustBrightness(secondary, 25));
     root.style.setProperty('--color-secondary-dark', isDark ? adjustBrightness(secondary, 15) : adjustBrightness(secondary, -15));
     root.style.setProperty('--color-secondary-lighter', isDark ? adjustBrightness(secondary, -50) : adjustBrightness(secondary, 60));
-
-    if(currentUser){
-      localStorage.setItem(getUserKey('themeColors'), JSON.stringify(themeColors));
-    }
-  }, [themeColors, theme, currentUser, getUserKey]);
-
-  // Load custom colors on user login
-  useEffect(() => {
-    if(currentUser){
-      const savedColors = localStorage.getItem(getUserKey('themeColors'));
-      if (savedColors) {
-        setThemeColors(JSON.parse(savedColors));
-      } else {
-        setThemeColors(DEFAULT_COLORS);
-      }
-    }
-  }, [currentUser, getUserKey]);
+  }, [themeColors, theme]);
 
 
   const toggleTheme = () => {
@@ -1784,50 +2375,59 @@ const App: React.FC = () => {
 
   const handleResetThemeColors = () => {
     setThemeColors(DEFAULT_COLORS);
-    if(currentUser){
-      localStorage.removeItem(getUserKey('themeColors'));
-    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+  
+  if (loading) {
+     return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando pollito...</p></div>;
+  }
+
+  if (!user) {
+    return <Login onLogin={() => {}} />;
   }
   
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'lively_todo_user') {
-            setCurrentUser(localStorage.getItem('lively_todo_user'));
-        }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  const handleLogin = (username: string) => {
-    localStorage.setItem('lively_todo_user', username);
-    setCurrentUser(username);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('lively_todo_user');
-    setCurrentUser(null);
-  };
-
-  if (!currentUser) {
-    return <Login onLogin={handleLogin} />;
-  }
-
+  // Pass down all states to the correct App component
   const appProps = {
-      currentUser,
+      currentUser: user,
       onLogout: handleLogout,
       theme,
       toggleTheme,
       themeColors,
       onThemeColorChange: handleThemeColorChange,
       onResetThemeColors: handleResetThemeColors,
+      // Pass down all the other states
+      activeBackground,
+      setActiveBackground,
+      particleType,
+      setParticleType,
+      ambientSound,
+      setAmbientSound,
+      pomodoroState,
+      setPomodoroState
   };
+  
+  const commonAppProps = {
+      ...appProps,
+      // Remove props that are now managed inside Desktop/Mobile App
+      // These are passed to the wrapper, but the actual app components will need
+      // their own internal state management for things not in the settings table
+  };
+  
 
   if (isMobile) {
-    return <MobileApp {...appProps} />;
+    // MobileApp needs its props adapted
+    const mobileSpecificProps = { ...appProps };
+    // We pass all settings states down to mobile
+    return <MobileApp {...mobileSpecificProps} />;
   }
-
-  return <DesktopApp {...appProps} />;
+  
+  // DesktopApp needs its props adapted
+  const desktopSpecificProps = { ...appProps };
+  // We pass all settings states down to desktop
+  return <DesktopApp {...desktopSpecificProps} />;
 };
 
 export default App;
