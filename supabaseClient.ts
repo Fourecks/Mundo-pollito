@@ -2,8 +2,26 @@
 // que se carga a través de la etiqueta <script> en index.html.
 const { createClient } = window.supabase;
 
-const supabaseUrl = 'https://pbtdzkpympdfemnejpwj.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidGR6a3B5bXBkZmVtbmVqcHdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MzYyMTYsImV4cCI6MjA3NTExMjIxNn0.VsHBuGnmV3T0hJ5sSO6vYlckONHO9IIQmTTjb_S_pBg';
+const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || (process.env as any).VITE_SUPABASE_URL;
+const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (process.env as any).VITE_SUPABASE_ANON_KEY;
+
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  const errorDiv = document.createElement('div');
+  errorDiv.style.position = 'fixed';
+  errorDiv.style.top = '0';
+  errorDiv.style.left = '0';
+  errorDiv.style.width = '100%';
+  errorDiv.style.padding = '1rem';
+  errorDiv.style.backgroundColor = 'red';
+  errorDiv.style.color = 'white';
+  errorDiv.style.textAlign = 'center';
+  errorDiv.style.zIndex = '99999';
+  errorDiv.innerText = 'Error: Las variables de entorno de Supabase (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) no están configuradas. La aplicación no puede funcionar.';
+  document.body.prepend(errorDiv);
+  throw new Error("Supabase URL and Anon Key must be provided in environment variables.");
+}
+
 
 // Crea y exporta el cliente de Supabase.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

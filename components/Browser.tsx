@@ -129,7 +129,6 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
 
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-            // FIX: Updated prompt to use `contents` for consistency with other API calls.
             const prompt = `¡Pío, pío! Pollito, por favor resume esta página web para mí en un par de párrafos amigables, como si se lo explicaras a un amigo: ${urlToSummarize}. Mantén tu personalidad de pollito alegre y dirígete a mí como 'pollito'.`;
             
             const response = await ai.models.generateContent({

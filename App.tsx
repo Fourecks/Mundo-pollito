@@ -40,7 +40,7 @@ import { supabase } from './supabaseClient';
 
 // --- Google Drive Configuration ---
 // Placed at the top level to be accessible by both Desktop and Mobile components.
-const CLIENT_ID = '601258936098-roqd1oa5o3gav2s8aekqgpreuaoenknk.apps.googleusercontent.com';
+const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).VITE_GOOGLE_CLIENT_ID;
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 
@@ -2164,6 +2164,7 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
             
             {isAiBrowserOpen && (
                 <div className="fixed inset-0 bg-secondary-lighter/90 dark:bg-gray-900 z-[100] animate-deploy">
+                    {/* FIX: Pass setBrowserSession to the setSession prop instead of the undefined 'setSession'. */}
                     <Browser session={browserSession} setSession={setBrowserSession} onClose={() => setIsAiBrowserOpen(false)} currentUser={currentUser} />
                 </div>
             )}

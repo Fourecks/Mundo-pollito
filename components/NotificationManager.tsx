@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
 // Clave pública de VAPID (cámbiala por la tuya)
 // Debes crearla como un "Secret" en Supabase y exponerla a través de las variables de entorno de tu proyecto.
 // Por ahora, la ponemos aquí, pero lo ideal es usar process.env.VAPID_PUBLIC_KEY
-const VAPID_PUBLIC_KEY = "BKg_w0313j4tM-G_gH-rA6y1K-ab3a8cSTLQ2edHyEgA1qXwTfT-2TgB8Yd_fGnhW5zwfU9-wX_f8m4sF9bU7_o";
+const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VITE_VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
