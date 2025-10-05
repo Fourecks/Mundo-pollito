@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import BellIcon from './icons/BellIcon';
 import { supabase } from '../supabaseClient';
+import { config } from '../config';
 
-// Clave pública de VAPID (cámbiala por la tuya)
-// Debes crearla como un "Secret" en Supabase y exponerla a través de las variables de entorno de tu proyecto.
-// Por ahora, la ponemos aquí, pero lo ideal es usar process.env.VAPID_PUBLIC_KEY
-const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VITE_VAPID_PUBLIC_KEY;
+// This logic will try to read Render's env var first, and if it doesn't exist,
+// it will fall back to the value from the config file for the Gemini editor.
+const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || config.VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
