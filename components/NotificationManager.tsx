@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import BellIcon from './icons/BellIcon';
 import { supabase } from '../supabaseClient';
+import { config } from '../config';
 
 // This logic will try to read Render's env var first, and if it doesn't exist,
-// it will fall back to the Gemini editor's env var (which doesn't have the VITE_ prefix).
-const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VAPID_PUBLIC_KEY;
+// it will fall back to the Gemini editor's env var (which doesn't have the VITE_ prefix),
+// and finally to the local config file.
+const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VAPID_PUBLIC_KEY || config.VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);

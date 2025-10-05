@@ -9,6 +9,7 @@ import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import SparklesIcon from './icons/SparklesIcon';
 import { GoogleGenAI } from "@google/genai";
 import MobileHeader from './MobileHeader';
+import { config } from '../config';
 
 
 interface NotesSectionProps {
@@ -222,7 +223,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         }
         
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const apiKey = process.env.API_KEY || config.API_KEY;
+            const ai = new GoogleGenAI({ apiKey: apiKey as string });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: prompt,

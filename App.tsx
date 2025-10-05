@@ -37,10 +37,11 @@ import CustomizationPanel from './components/CustomizationPanel';
 import ChevronRightIcon from './components/icons/ChevronRightIcon';
 import GamesHub from './components/GamesHub';
 import { supabase } from './supabaseClient';
+import { config } from './config';
 
 // --- Google Drive Configuration ---
 // Placed at the top level to be accessible by both Desktop and Mobile components.
-const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID;
+const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 
@@ -398,7 +399,7 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   useEffect(() => {
       if (gapiReady && gisReady) {
           // FIX: This comparison appears to be unintentional because the types have no overlap.
-          if (!CLIENT_ID) {
+          if (!CLIENT_ID || CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
               console.warn('Google Client ID is missing. Google Drive features will be disabled.');
           } else {
               try {
@@ -1466,7 +1467,7 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
 
     useEffect(() => {
         if (gapiReady && gisReady) {
-            if (!CLIENT_ID) {
+            if (!CLIENT_ID || CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
                 console.warn('Google Client ID is missing. Google Drive features will be disabled.');
             } else {
                 try {
