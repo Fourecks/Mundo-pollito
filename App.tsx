@@ -1441,83 +1441,6 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
 
     useEffect(() => { if (initialized) localStorage.setItem(`${currentUser.email}_browserSession`, JSON.stringify(browserSession)); }, [browserSession, initialized, currentUser]);
     
-    // Google API Initialization (ROBUST)
-    useEffect(() => {
-        const gapiPoll = setInterval(() => {
-            if (window.gapi && window.gapi.load) {
-                clearInterval(gapiPoll);
-                window.gapi.load('client', () => {
-                    setGapiReady(true);
-                });
-            }
-        }, 100);
-
-        const gisPoll = setInterval(() => {
-            if (window.google && window.google.accounts) {
-                clearInterval(gisPoll);
-                setGisReady(true);
-            }
-        }, 100);
-
-        return () => {
-            clearInterval(gapiPoll);
-            clearInterval(gisPoll);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (gapiReady && gisReady) {
-            if (!CLIENT_ID || CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
-                console.warn('Google Client ID is missing. Google Drive features will be disabled.');
-            } else {
-                try {
-                    tokenClient.current = window.google.accounts.oauth2.initTokenClient({
-                        client_id: CLIENT_ID,
-                        scope: SCOPES,
-                        callback: '', // Will be set on click
-                    });
-                } catch (e) {
-                    console.error("Error initializing Google token client:", e);
-                }
-            }
-        }
-    }, [gapiReady, gisReady]);
-
-    // Logic/handler effects (copied from DesktopApp)
-    useEffect(() => {
-        let timer: number | undefined;
-        if (pomodoroState.isActive && pomodoroState.timeLeft > 0) {
-          timer = window.setInterval(() => setPomodoroState(s => ({ ...s, timeLeft: s.timeLeft - 1 })), 1000);
-        } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
-          pomodoroAudioRef.current?.play();
-          const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
-          if (Notification.permission === 'granted') {
-              new Notification('Pomodoro Terminado');
-          }
-          setPomodoroState(s => ({ ...s, mode: newMode, timeLeft: s.durations[newMode], isActive: true }));
-        }
-        return () => clearInterval(timer);
-    }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations]);
-
-    useEffect(() => {
-        const audio = ambientAudioRef.current;
-        if (!audio) return;
-        const soundMap: Record<AmbientSoundType, string | null> = {
-          'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
-        };
-        const newSrc = soundMap[ambientSound.type];
-        if (newSrc) {
-          if (audio.src !== newSrc) audio.src = newSrc;
-          audio.loop = true;
-          audio.volume = ambientSound.volume;
-          audio.play().catch(e => console.error("Audio play failed:", e));
-        } else {
-          audio.pause();
-          audio.src = '';
-        }
-        audio.volume = ambientSound.volume;
-    }, [ambientSound]);
-    
     // --- Google Drive Handlers ---
     const findOrCreateAppFolder = useCallback(async () => {
         try {
@@ -1589,26 +1512,108 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
     }
   }, []);
 
-    const handleAuthClick = useCallback(async () => {
+    // Google API Initialization (ROBUST)
+    useEffect(() => {
+        const gapiPoll = setInterval(() => {
+            if (window.gapi && window.gapi.load) {
+                clearInterval(gapiPoll);
+                window.gapi.load('client', () => {
+                    setGapiReady(true);
+                });
+            }
+        }, 100);
+
+        const gisPoll = setInterval(() => {
+            if (window.google && window.google.accounts) {
+                clearInterval(gisPoll);
+                setGisReady(true);
+            }
+        }, 100);
+
+        return () => {
+            clearInterval(gapiPoll);
+            clearInterval(gisPoll);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (gapiReady && gisReady) {
+            if (!CLIENT_ID || CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
+                console.warn('Google Client ID is missing. Google Drive features will be disabled.');
+            } else {
+                try {
+                    const oauthCallback = async (resp: any) => {
+                        if (resp.error) {
+                            console.error("Google Auth Error:", resp.error);
+                            alert("Hubo un error al iniciar sesión con Google. Por favor, intenta de nuevo.");
+                            return;
+                        };
+                        setGdriveToken(resp.access_token);
+                        window.gapi.client.setToken({ access_token: resp.access_token });
+                        
+                        await window.gapi.client.load('drive', 'v3');
+                        
+                        await findOrCreateAppFolder();
+                        await loadGalleryImagesFromDrive();
+                        await loadBackgroundsFromDrive();
+                    };
+
+                    tokenClient.current = window.google.accounts.oauth2.initTokenClient({
+                        client_id: CLIENT_ID,
+                        scope: SCOPES,
+                        callback: oauthCallback,
+                    });
+                } catch (e) {
+                    console.error("Error initializing Google token client:", e);
+                }
+            }
+        }
+    }, [gapiReady, gisReady, findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive]);
+
+    // Logic/handler effects (copied from DesktopApp)
+    useEffect(() => {
+        let timer: number | undefined;
+        if (pomodoroState.isActive && pomodoroState.timeLeft > 0) {
+          timer = window.setInterval(() => setPomodoroState(s => ({ ...s, timeLeft: s.timeLeft - 1 })), 1000);
+        } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
+          pomodoroAudioRef.current?.play();
+          const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
+          if (Notification.permission === 'granted') {
+              new Notification('Pomodoro Terminado');
+          }
+          setPomodoroState(s => ({ ...s, mode: newMode, timeLeft: s.durations[newMode], isActive: true }));
+        }
+        return () => clearInterval(timer);
+    }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations]);
+
+    useEffect(() => {
+        const audio = ambientAudioRef.current;
+        if (!audio) return;
+        const soundMap: Record<AmbientSoundType, string | null> = {
+          'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
+        };
+        const newSrc = soundMap[ambientSound.type];
+        if (newSrc) {
+          if (audio.src !== newSrc) audio.src = newSrc;
+          audio.loop = true;
+          audio.volume = ambientSound.volume;
+          audio.play().catch(e => console.error("Audio play failed:", e));
+        } else {
+          audio.pause();
+          audio.src = '';
+        }
+        audio.volume = ambientSound.volume;
+    }, [ambientSound]);
+    
+
+    const handleAuthClick = useCallback(() => {
         if (!tokenClient.current) {
-            alert("La configuración para Google Drive está incompleta. Por favor, añade tu ID de cliente en el archivo App.tsx.");
+            alert("La configuración para Google Drive está incompleta.");
             return;
         }
-        tokenClient.current.callback = async (resp: any) => {
-            if (resp.error) throw (resp);
-            setGdriveToken(resp.access_token);
-            window.gapi.client.setToken({ access_token: resp.access_token });
-            
-            await window.gapi.client.load('drive', 'v3');
-            
-            await findOrCreateAppFolder();
-            await loadGalleryImagesFromDrive();
-            await loadBackgroundsFromDrive();
-        };
-        if (!gdriveToken) {
-            tokenClient.current.requestAccessToken({ prompt: 'consent' });
-        }
-    }, [gdriveToken, findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive]);
+        // The callback is already set during initialization. Just request the token.
+        tokenClient.current.requestAccessToken({ prompt: 'consent' });
+    }, []);
 
     // Handlers (copied & adapted)
     const handleAddTodo = async (text: string) => {
