@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -412,7 +413,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         onClose={() => setIsCustomizationPanelOpen(false)}
         isSignedIn={!!gdriveToken}
         onAuthClick={handleAuthClick}
-        isGapiReady={props.gapiReady && props.gisReady}
+        isGapiReady={props.gapiReady}
         colors={themeColors}
         onColorChange={onThemeColorChange}
         onReset={onResetThemeColors}
@@ -460,7 +461,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
           {openWindows.includes('gallery') && (
               <ModalWindow isOpen onClose={() => toggleWindow('gallery')} title="Galería de Recuerdos" isDraggable isResizable zIndex={focusedWindow === 'gallery' ? 50 : 40} onFocus={() => bringToFront('gallery')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.gallery} onStateChange={s => setWindowStates(ws => ({...ws, gallery: s}))}>
-                  <ImageGallery images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!gdriveToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady && props.gisReady} isLoading={galleryIsLoading} />
+                  <ImageGallery images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!gdriveToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
               </ModalWindow>
           )}
           {openWindows.includes('pomodoro') && (
@@ -618,7 +619,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 return (
                     <div className="flex flex-col h-full">
                         <MobileHeader title="Galería" />
-                        <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!gdriveToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady && props.gisReady} isLoading={galleryIsLoading} />
+                        <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!gdriveToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
                     </div>
                 );
             case 'games':
@@ -701,7 +702,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               isMobile={true}
               isSignedIn={!!gdriveToken}
               onAuthClick={handleAuthClick}
-              isGapiReady={props.gapiReady && props.gisReady}
+              isGapiReady={props.gapiReady}
               colors={themeColors}
               onColorChange={onThemeColorChange}
               onReset={onResetThemeColors}
@@ -819,14 +820,12 @@ const App: React.FC = () => {
 
   // Google Drive State
   const [gapiReady, setGapiReady] = useState(false);
-  const [gisReady, setGisReady] = useState(false);
   const [gdriveToken, setGdriveToken] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
   const [galleryIsLoading, setGalleryIsLoading] = useState(false);
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
-  const tokenClient = useRef<any>(null);
 
   // --- SUPABASE AUTH & DATA LOADING ---
   useEffect(() => {
@@ -955,7 +954,6 @@ const App: React.FC = () => {
       });
       const newBgs = await Promise.all(bgPromises);
       setUserBackgrounds(newBgs);
-      // After loading, check if a background was saved and set it
       const { data } = await supabase.from('site_settings').select('active_background_id').single();
       if(data?.active_background_id) {
           const bgToActivate = newBgs.find(b => b.id === data.active_background_id);
@@ -964,47 +962,77 @@ const App: React.FC = () => {
     } catch (e) { console.error("Error loading backgrounds from Drive", e); } finally { setBackgroundsAreLoading(false); }
   }, []);
 
-  const handleTokenResponse = useCallback(async (resp: any) => {
-      if (resp.error) { console.error("Google Auth Error:", resp.error); return; }
-      setGdriveToken(resp.access_token);
-      window.gapi.client.setToken({ access_token: resp.access_token });
-      await window.gapi.client.load('drive', 'v3');
-      await findOrCreateAppFolder();
-      await loadGalleryImagesFromDrive();
-      await loadBackgroundsFromDrive();
-  }, [findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive]);
+  const handleGoogleLogout = useCallback(() => {
+    if (user?.email) {
+        localStorage.removeItem(`${user.email}_gdrive_token`);
+        localStorage.removeItem(`${user.email}_gdrive_expiry`);
+    }
+    setGdriveToken(null);
+    setGalleryImages([]);
+    setUserBackgrounds([]);
+    appFolderId.current = null;
+  }, [user]);
+
+  const initializeDrive = useCallback(async (accessToken: string) => {
+    if (!gapiReady) return;
+    setGdriveToken(accessToken);
+    window.gapi.client.setToken({ access_token: accessToken });
+    try {
+        await window.gapi.client.load('drive', 'v3');
+        await findOrCreateAppFolder();
+        await Promise.all([loadGalleryImagesFromDrive(), loadBackgroundsFromDrive()]);
+    } catch (error) {
+        console.error("Error initializing Google Drive:", error);
+        handleGoogleLogout(); // Token might be invalid/expired, clear it
+    }
+  }, [gapiReady, findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive, handleGoogleLogout]);
   
   useEffect(() => {
       const gapiPoll = setInterval(() => { if (window.gapi && window.gapi.load) { clearInterval(gapiPoll); window.gapi.load('client', () => setGapiReady(true)); } }, 100);
-      const gisPoll = setInterval(() => { if (window.google && window.google.accounts) { clearInterval(gisPoll); setGisReady(true); } }, 100);
-      return () => { clearInterval(gapiPoll); clearInterval(gisPoll); };
+      return () => { clearInterval(gapiPoll); };
   }, []);
 
   useEffect(() => {
-      if (gapiReady && gisReady && user) {
-          if (!CLIENT_ID || CLIENT_ID.includes('YOUR_GOOGLE_CLIENT_ID')) {
-              console.warn('Google Client ID is missing. Google Drive features will be disabled.');
-          } else {
-              try {
-                  tokenClient.current = window.google.accounts.oauth2.initTokenClient({
-                      client_id: CLIENT_ID,
-                      scope: SCOPES,
-                      callback: handleTokenResponse,
-                      error_callback: (error: any) => {
-                        //   An error here means silent sign-in failed. This is expected if the
-                        //   user isn't logged in or hasn't granted consent yet.
-                        //   No action is needed, the user can click the button to sign in manually.
-                        console.log('Silent auth error:', error.type);
-                      }
-                  });
-                  // Attempt to get a token silently on page load.
-                  tokenClient.current.requestAccessToken({ prompt: '' });
-              } catch (e) { console.error("Error initializing Google token client:", e); }
-          }
-      }
-  }, [gapiReady, gisReady, user, handleTokenResponse]);
+    if (!user || !gapiReady || gdriveToken) return;
 
-  const handleAuthClick = useCallback(() => { if (tokenClient.current) tokenClient.current.requestAccessToken({ prompt: 'consent' }); }, []);
+    // 1. Check for token in URL hash (after redirect from Google)
+    if (window.location.hash.includes('access_token')) {
+        const params = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = params.get('access_token');
+        const expiresIn = params.get('expires_in');
+
+        if (accessToken && expiresIn) {
+            const expiryTime = Date.now() + parseInt(expiresIn, 10) * 1000;
+            localStorage.setItem(`${user.email}_gdrive_token`, accessToken);
+            localStorage.setItem(`${user.email}_gdrive_expiry`, String(expiryTime));
+            
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+
+            initializeDrive(accessToken);
+            return;
+        }
+    }
+
+    // 2. If no token in URL, check localStorage for a saved session
+    const storedToken = localStorage.getItem(`${user.email}_gdrive_token`);
+    const storedExpiry = localStorage.getItem(`${user.email}_gdrive_expiry`);
+
+    if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry, 10)) {
+        initializeDrive(storedToken);
+    }
+  }, [user, gapiReady, initializeDrive, gdriveToken]);
+
+  const handleAuthClick = () => {
+    const redirectUri = window.location.origin;
+    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+        client_id: CLIENT_ID,
+        redirect_uri: redirectUri,
+        scope: SCOPES,
+        response_type: 'token',
+        include_granted_scopes: 'true',
+    });
+    window.location.href = authUrl;
+  };
 
   // --- ALL HANDLERS ---
   const handleAddTodo = async (text: string) => {
@@ -1030,15 +1058,15 @@ const App: React.FC = () => {
     let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
     let oldDateKey: string | null = null;
     let originalTask: Todo | null = null;
-    // FIX: Explicitly type the 't' parameter in array methods to prevent 'unknown' type errors after JSON.parse.
-    for (const key in newAllTodos) { const task = newAllTodos[key].find((t: Todo) => t.id === todoToSave.id); if (task) { oldDateKey = key; originalTask = task; break; } }
-    // FIX: Explicitly type the 't' parameter in array methods to prevent 'unknown' type errors after JSON.parse.
-    if (originalTask?.recurrence?.id) { for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => (t.recurrence?.id !== originalTask!.recurrence!.id) || (t.id === todoToSave.id) || (t.due_date && originalTask!.due_date && t.due_date <= originalTask!.due_date)); } }
-    // FIX: Explicitly type the 't' parameter in array methods to prevent 'unknown' type errors after JSON.parse.
-    if(oldDateKey && oldDateKey !== todoToSave.due_date && newAllTodos[oldDateKey]) { newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t: Todo) => t.id !== todoToSave.id); }
+    // FIX: Explicitly cast `t` as `Todo` to resolve TypeScript error about 'unknown' type.
+    for (const key in newAllTodos) { const task = newAllTodos[key].find((t) => (t as Todo).id === todoToSave.id); if (task) { oldDateKey = key; originalTask = task; break; } }
+    if (originalTask?.recurrence?.id) { 
+        // FIX: Explicitly cast `t` as `Todo` to resolve TypeScript error about 'unknown' type when accessing properties.
+        for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t) => ((t as Todo).recurrence?.id !== originalTask!.recurrence!.id) || ((t as Todo).id === todoToSave.id) || ((t as Todo).due_date && originalTask!.due_date && (t as Todo).due_date <= originalTask!.due_date)); } }
+    // FIX: Explicitly cast `t` as `Todo` to resolve TypeScript error about 'unknown' type.
+    if(oldDateKey && oldDateKey !== todoToSave.due_date && newAllTodos[oldDateKey]) { newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t) => (t as Todo).id !== todoToSave.id); }
     const newDateKey = todoToSave.due_date!;
     const dateTasks = newAllTodos[newDateKey] || [];
-    // FIX: Explicitly type the 't' parameter in array methods to prevent 'unknown' type errors after JSON.parse.
     const taskIndex = dateTasks.findIndex((t: Todo) => t.id === todoToSave.id);
     if(taskIndex > -1) { dateTasks[taskIndex] = todoToSave; } else { dateTasks.push(todoToSave); }
     newAllTodos[newDateKey] = [...dateTasks];
@@ -1095,7 +1123,6 @@ const App: React.FC = () => {
     try {
         let idsToDelete: number[] = [id];
         if (taskToDelete.recurrence?.id && taskToDelete.due_date) {
-            // FIX: Add explicit type to the data returned from Supabase to resolve 't.id' access error.
             const { data }: { data: { id: number }[] | null } = await supabase.from('todos').select('id').eq('user_id', user.id).eq('recurrence->>id', taskToDelete.recurrence.id).gte('due_date', taskToDelete.due_date);
             if (data) idsToDelete = [...new Set([...idsToDelete, ...data.map(t => t.id)])];
         }
@@ -1240,7 +1267,10 @@ const App: React.FC = () => {
   const toggleTheme = () => setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   const handleThemeColorChange = (colorName: keyof ThemeColors, value: string) => setThemeColors(prev => ({...prev, [colorName]: value}));
   const handleResetThemeColors = () => setThemeColors(DEFAULT_COLORS);
-  const handleLogout = async () => { await supabase.auth.signOut(); setGdriveToken(null); setGalleryImages([]); setUserBackgrounds([]); };
+  const handleLogout = async () => { 
+      await supabase.auth.signOut(); 
+      handleGoogleLogout();
+  };
   
   if (loading || (!initialized && user)) {
      return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando pollito...</p></div>;
@@ -1248,7 +1278,6 @@ const App: React.FC = () => {
   if (!user) { return <Login onLogin={() => {}} />; }
   
   const appProps: AppComponentProps = {
-      // FIX: Correctly assign handleResetThemeColors to the onResetThemeColors prop.
       currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound,
@@ -1259,7 +1288,8 @@ const App: React.FC = () => {
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-      gapiReady, gisReady,
+      gapiReady, 
+      gisReady: true, // No longer used for token flow, set to true to satisfy prop types
   };
 
   return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;
