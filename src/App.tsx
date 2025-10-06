@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1049,7 +1050,7 @@ const App: React.FC = () => {
     const dateKey = formatDateKey(selectedDate);
     const { data: newTodo, error } = await supabase.from('todos').insert({ text, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }).select().single();
     if (error) { console.error("Error adding todo:", error); return; }
-    // FIX: Add a null check for `newTodo`. The `data` from a Supabase `.select().single()` call can be null. Spreading a null value would result in an empty object `{}`, which does not satisfy the `Todo` type, causing the TypeScript error.
+    // FIX: The data from a Supabase `.select().single()` call can be null. Added a check to ensure `newTodo` exists before attempting to spread it into a new object. This prevents a type error where an empty object `{}` would be created, which is not a valid `Todo`.
     if (newTodo) {
       setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), { ...newTodo, subtasks: [] }] }));
     }
