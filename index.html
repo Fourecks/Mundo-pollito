@@ -211,8 +211,7 @@
         }
 
         if ('serviceWorker' in navigator) {
-          const swUrl = `${window.location.origin}/sw.js`;
-          navigator.serviceWorker.register(swUrl).then(registration => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
           }).catch(err => {
             console.error('ServiceWorker registration failed: ', err);

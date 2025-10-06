@@ -109,7 +109,10 @@ const NotificationManager: React.FC = () => {
 
     const getPopoverContent = () => {
         if (!('serviceWorker' in navigator && 'PushManager' in window)) {
-            return <p className="text-sm text-center text-gray-600 dark:text-gray-300">Las notificaciones no son compatibles con este navegador.</p>;
+            if (!window.isSecureContext) {
+                 return <p className="text-sm text-center text-gray-600 dark:text-gray-300">Las notificaciones requieren una conexión segura (HTTPS). Esta función no está disponible porque la app no se está sirviendo sobre HTTPS.</p>;
+            }
+            return <p className="text-sm text-center text-gray-600 dark:text-gray-300">Las notificaciones push no son compatibles con este navegador o están deshabilitadas.</p>;
         }
         if (subscriptionLoading) {
             return <p className="text-sm text-center text-gray-600 dark:text-gray-300">Comprobando estado...</p>;

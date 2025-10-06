@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -808,6 +810,7 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [activeBackground, setActiveBackground] = useState<Background | null>(null);
+  const [savedActiveBgId, setSavedActiveBgId] = useState<string | null>(null);
   const [particleType, setParticleType] = useState<ParticleType>('none');
   const [ambientSound, setAmbientSound] = useState<{ type: AmbientSoundType; volume: number }>({ type: 'none', volume: 0.5 });
   const [pomodoroState, setPomodoroState] = useState({
@@ -865,6 +868,9 @@ const App: React.FC = () => {
             setParticleType(settingsData.particle_type || 'none');
             setAmbientSound(settingsData.ambient_sound || { type: 'none', volume: 0.5 });
             setPomodoroState(prev => ({ ...prev, ...(settingsData.pomodoro_config || {}) }));
+            if (settingsData.active_background_id) {
+                setSavedActiveBgId(settingsData.active_background_id);
+            }
         } else if (!settingsError) {
             await supabase.from('site_settings').insert({ user_id: user.id, theme_mode: 'light', theme_colors: DEFAULT_COLORS, pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: 50, showBackgroundTimer: false } });
         }
@@ -964,11 +970,6 @@ const App: React.FC = () => {
       });
       const newBgs = await Promise.all(bgPromises);
       setUserBackgrounds(newBgs);
-      const { data } = await supabase.from('site_settings').select('active_background_id').single();
-      if(data?.active_background_id) {
-          const bgToActivate = newBgs.find(b => b.id === data.active_background_id);
-          if (bgToActivate) setActiveBackground(bgToActivate);
-      }
     } catch (e) { console.error("Error loading backgrounds from Drive", e); } finally { setBackgroundsAreLoading(false); }
   }, []);
 
@@ -1031,6 +1032,15 @@ const App: React.FC = () => {
         initializeDrive(storedToken);
     }
   }, [user, gapiReady, initializeDrive, gdriveToken]);
+  
+  useEffect(() => {
+    if (savedActiveBgId && userBackgrounds.length > 0) {
+        const bgToActivate = userBackgrounds.find(b => b.id === savedActiveBgId);
+        if (bgToActivate && activeBackground?.id !== bgToActivate.id) {
+            setActiveBackground(bgToActivate);
+        }
+    }
+  }, [userBackgrounds, savedActiveBgId, activeBackground]);
 
   const handleAuthClick = () => {
     const redirectUri = window.location.origin;
@@ -1050,7 +1060,9 @@ const App: React.FC = () => {
     const dateKey = formatDateKey(selectedDate);
     const { data: newTodo, error } = await supabase.from('todos').insert({ text, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }).select().single();
     if (error) { console.error("Error adding todo:", error); return; }
-    // FIX: The data from a Supabase `.select().single()` call can be null. Added a check to ensure `newTodo` exists before attempting to spread it into a new object. This prevents a type error where an empty object `{}` would be created, which is not a valid `Todo`.
+    // FIX: The data from a Supabase `.select().single()` call can be null.
+    // Added a check to ensure `newTodo` exists before attempting to spread it.
+    // This prevents a type error where spreading `null` would create an object `{}` that is not a valid `Todo`.
     if (newTodo) {
       setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), { ...newTodo, subtasks: [] }] }));
     }
