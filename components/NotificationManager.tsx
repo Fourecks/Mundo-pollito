@@ -19,54 +19,56 @@ function urlBase64ToUint8Array(base64String: string) {
 
 type Status = 'loading' | 'unsupported' | 'subscribed' | 'unsubscribed' | 'denied';
 
+// Promise timeout utility
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => reject(new Error(`Promise timed out after ${ms}ms`)), ms);
+        promise.then(
+            res => { clearTimeout(timeoutId); resolve(res); },
+            err => { clearTimeout(timeoutId); reject(err); }
+        );
+    });
+};
+
 const NotificationManager: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [status, setStatus] = useState<Status>('loading');
     const [isActionLoading, setIsActionLoading] = useState(false);
     
-    const menuRef = useRef<HTMLDivElement>(null);
+    const popoverRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
 
-    const checkSubscriptionStatus = useCallback(async () => {
-        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !VAPID_PUBLIC_KEY) {
+    // This function runs once to set the initial state, with a timeout to prevent getting stuck.
+    const checkInitialStatus = useCallback(async () => {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !VAPID_PUBLIC_KEY || !window.isSecureContext) {
             setStatus('unsupported');
             return;
         }
-        
-        if (!window.isSecureContext) {
-            setStatus('unsupported');
+
+        if (Notification.permission === 'denied') {
+            setStatus('denied');
             return;
         }
 
         try {
-            const permission = Notification.permission;
-            if (permission === 'denied') {
-                setStatus('denied');
-                return;
-            }
-
-            const registration = await navigator.serviceWorker.ready;
+            // navigator.serviceWorker.ready can hang, so we use a timeout.
+            const registration = await withTimeout(navigator.serviceWorker.ready, 5000);
             const subscription = await registration.pushManager.getSubscription();
-
-            if (subscription) {
-                setStatus('subscribed');
-            } else {
-                setStatus('unsubscribed');
-            }
+            setStatus(subscription ? 'subscribed' : 'unsubscribed');
         } catch (error) {
-            console.error("Error checking notification status:", error);
-            setStatus('unsupported');
+            console.error("Error checking notification status on load:", error);
+            setStatus('unsupported'); // Assume unsupported if SW isn't ready in time
         }
     }, []);
 
     useEffect(() => {
-        setStatus('loading');
-        checkSubscriptionStatus();
-    }, [checkSubscriptionStatus]);
-
+        checkInitialStatus();
+    }, [checkInitialStatus]);
+    
+    // Close popover on outside click
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node) && buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
+            if (popoverRef.current && !popoverRef.current.contains(event.target as Node) && buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
         };
@@ -78,35 +80,23 @@ const NotificationManager: React.FC = () => {
         setIsActionLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                throw new Error("User not logged in. Cannot subscribe.");
-            }
+            if (!user) throw new Error("User not logged in.");
 
             const registration = await navigator.serviceWorker.ready;
             const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey
-            });
+            const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
             
-            const { error } = await supabase.from('push_subscriptions').insert({ 
+            // Use upsert with onConflict to avoid duplicate entries for the same endpoint
+            await supabase.from('push_subscriptions').upsert({ 
                 subscription: subscription.toJSON(),
-                user_id: user.id 
-            });
-            
-            if (error && error.code !== '23505') { // '23505' is unique_violation, which is ok
-                throw error;
-            }
+                user_id: user.id,
+                endpoint: subscription.endpoint,
+            }, { onConflict: 'endpoint' });
 
             setStatus('subscribed');
         } catch (err) {
-            console.error('Failed to subscribe the user: ', err);
-            if (Notification.permission === 'denied') {
-                setStatus('denied');
-            } else {
-                setStatus('unsubscribed');
-            }
+            console.error('Failed to subscribe user:', err);
+            setStatus(Notification.permission === 'denied' ? 'denied' : 'unsubscribed');
         } finally {
             setIsActionLoading(false);
             setIsOpen(false);
@@ -120,17 +110,18 @@ const NotificationManager: React.FC = () => {
             const subscription = await registration.pushManager.getSubscription();
             if (subscription) {
                 await supabase.from('push_subscriptions').delete().eq('subscription->>endpoint', subscription.endpoint);
-                const unsubscribed = await subscription.unsubscribe();
-                if(unsubscribed) setStatus('unsubscribed');
+                await subscription.unsubscribe();
             }
+            setStatus('unsubscribed');
         } catch (err) {
-            console.error('Error unsubscribing', err);
+            console.error('Error unsubscribing:', err);
         } finally {
             setIsActionLoading(false);
             setIsOpen(false);
         }
     };
     
+    // Main click handler logic
     const handleBellClick = async () => {
         if (isOpen) {
             setIsOpen(false);
@@ -146,27 +137,38 @@ const NotificationManager: React.FC = () => {
             } else {
                 setStatus('denied');
             }
-        } else {
+            return;
+        }
+        
+        // For 'granted' or 'denied', open the popover and refresh status.
+        if (currentPermission === 'granted') {
+            setIsActionLoading(true); // Show a brief loading state while checking
+            setIsOpen(true);
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.getSubscription();
+                setStatus(subscription ? 'subscribed' : 'unsubscribed');
+            } finally {
+                setIsActionLoading(false);
+            }
+        } else { // 'denied'
+            setStatus('denied');
             setIsOpen(true);
         }
     };
 
     const getIconColor = () => {
         switch (status) {
-            case 'subscribed':
-                return 'text-primary dark:text-primary-dark';
-            case 'denied':
-                return 'text-red-500 dark:text-red-400';
-            case 'unsupported':
-                return 'text-gray-400 dark:text-gray-500 line-through';
-            default:
-                return 'text-gray-700 dark:text-gray-300';
+            case 'subscribed': return 'text-primary dark:text-primary-dark';
+            case 'denied': return 'text-red-500 dark:text-red-400';
+            case 'unsupported': return 'text-gray-400 dark:text-gray-500 line-through';
+            default: return 'text-gray-700 dark:text-gray-300';
         }
     };
     
     const PopoverContent: React.FC = () => {
         if (isActionLoading || status === 'loading') {
-            return <p className="text-sm text-center text-gray-600 dark:text-gray-300">Cargando...</p>;
+            return <p className="text-sm text-center text-gray-600 dark:text-gray-300">Comprobando estado...</p>;
         }
 
         switch (status) {
@@ -214,13 +216,13 @@ const NotificationManager: React.FC = () => {
                 onClick={handleBellClick}
                 className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${getIconColor()}`}
                 aria-label="Configurar notificaciones"
-                disabled={status === 'loading' || status === 'unsupported'}
+                disabled={status === 'loading'}
             >
                 <BellIcon className="h-6 w-6" />
             </button>
 
             {isOpen && (
-                <div ref={menuRef} className="absolute top-full right-0 mt-2 z-10 w-64 bg-white/80 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl shadow-2xl p-4 animate-pop-in origin-top-right">
+                <div ref={popoverRef} className="absolute top-full right-0 mt-2 z-[70001] w-64 bg-white/80 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl shadow-2xl p-4 animate-pop-in origin-top-right">
                     <PopoverContent />
                 </div>
             )}
