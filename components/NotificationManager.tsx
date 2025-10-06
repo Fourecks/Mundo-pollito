@@ -87,9 +87,10 @@ const NotificationManager: React.FC = () => {
             console.error('Failed to subscribe the user: ', err);
             setPermission(Notification.permission);
             setIsSubscribed(false);
+        } finally {
+            setSubscriptionLoading(false);
+            setIsOpen(false);
         }
-        setSubscriptionLoading(false);
-        setIsOpen(false);
     };
 
     const unsubscribeUser = async () => {
@@ -105,9 +106,26 @@ const NotificationManager: React.FC = () => {
             }
         } catch (err) {
             console.error('Error unsubscribing', err);
+        } finally {
+            setSubscriptionLoading(false);
+            setIsOpen(false);
         }
-        setSubscriptionLoading(false);
-        setIsOpen(false);
+    };
+    
+    const handleBellClick = async () => {
+        if (isOpen) {
+            setIsOpen(false);
+            return;
+        }
+
+        const currentPermission = Notification.permission;
+        setPermission(currentPermission);
+        
+        if (currentPermission === 'default') {
+            await subscribeUser();
+        } else {
+            setIsOpen(true);
+        }
     };
 
     const getIconColor = () => {
@@ -159,7 +177,7 @@ const NotificationManager: React.FC = () => {
         <div className="relative">
             <button
                 ref={buttonRef}
-                onClick={() => setIsOpen(prev => !prev)}
+                onClick={handleBellClick}
                 className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${getIconColor()}`}
                 aria-label="Configurar notificaciones"
                 disabled={!isSupported && !isOpen}

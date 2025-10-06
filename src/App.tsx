@@ -6,6 +6,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1060,12 +1062,9 @@ const App: React.FC = () => {
   const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    // FIX: Explicitly type the response from Supabase to aid TypeScript's type inference. This ensures `newTodo` is correctly identified as `Todo | null`, allowing the conditional check to narrow its type to `Todo` and preventing an invalid object from being added to the state.
+    // FIX: The result of `.select().single()` can be null. Added a check for `newTodo` to prevent a type error from spreading null.
     const { data: newTodo, error }: { data: Todo | null; error: any } = await supabase.from('todos').insert({ text, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }).select().single();
     if (error) { console.error("Error adding todo:", error); return; }
-    // FIX: The data from a Supabase `.select().single()` call can be null.
-    // Added a check to ensure `newTodo` exists before attempting to spread it.
-    // This prevents a type error where spreading `null` would create an object `{}` that is not a valid `Todo`.
     if (newTodo) {
       setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), { ...newTodo, subtasks: [] }] }));
     }
@@ -1143,8 +1142,6 @@ const App: React.FC = () => {
 
   const handleDeleteTodo = async (id: number) => {
     if (!user) return;
-    // FIX: Explicitly typing `taskToDelete` as `Todo | undefined` resolves an issue
-    // where its type was incorrectly inferred as `unknown`.
     const taskToDelete: Todo | undefined = Object.values(allTodos).flat().find((t: Todo) => t.id === id);
     if (!taskToDelete) return;
     try {
