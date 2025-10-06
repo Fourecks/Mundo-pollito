@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -987,6 +986,8 @@ const App: React.FC = () => {
           } else {
               try {
                   tokenClient.current = window.google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleTokenResponse });
+                  // Attempt to silently get a token on page load.
+                  tokenClient.current.requestAccessToken({ prompt: '' });
               } catch (e) { console.error("Error initializing Google token client:", e); }
           }
       }
@@ -1015,19 +1016,15 @@ const App: React.FC = () => {
         await supabase.from('subtasks').insert(subtasks.map(st => ({ text: st.text, completed: st.completed, todo_id: todoToSave.id })));
     }
     
-    // FIX: Explicitly type `newAllTodos` to prevent type inference issues with properties like 'recurrence' and 'due_date' after JSON operations.
+    // FIX: Explicitly type parameters in array methods to prevent 'unknown' type errors after JSON.parse, which erases type information.
     let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
     let oldDateKey: string | null = null;
     let originalTask: Todo | null = null;
-    // FIX: Explicitly type the 't' parameter in array methods to prevent 'unknown' type errors after JSON.parse.
     for (const key in newAllTodos) { const task = newAllTodos[key].find((t: Todo) => t.id === todoToSave.id); if (task) { oldDateKey = key; originalTask = task; break; } }
-    // FIX: Explicitly type the 't' parameter in array methods to prevent 'unknown' type errors after JSON.parse.
     if (originalTask?.recurrence?.id) { for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => (t.recurrence?.id !== originalTask!.recurrence!.id) || (t.id === todoToSave.id) || (t.due_date && originalTask!.due_date && t.due_date <= originalTask!.due_date)); } }
-    // FIX: Explicitly type the 't' parameter in array methods to prevent 'unknown' type errors after JSON.parse.
     if(oldDateKey && oldDateKey !== todoToSave.due_date && newAllTodos[oldDateKey]) { newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t: Todo) => t.id !== todoToSave.id); }
     const newDateKey = todoToSave.due_date!;
     const dateTasks = newAllTodos[newDateKey] || [];
-    // FIX: Explicitly type the 't' parameter in array methods to prevent 'unknown' type errors after JSON.parse.
     const taskIndex = dateTasks.findIndex((t: Todo) => t.id === todoToSave.id);
     if(taskIndex > -1) { dateTasks[taskIndex] = todoToSave; } else { dateTasks.push(todoToSave); }
     newAllTodos[newDateKey] = [...dateTasks];
