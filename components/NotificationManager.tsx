@@ -77,6 +77,11 @@ const NotificationManager: React.FC = () => {
     const subscribeUser = async () => {
         setIsActionLoading(true);
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error("User not logged in. Cannot subscribe.");
+            }
+
             const registration = await navigator.serviceWorker.ready;
             const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
 
@@ -85,9 +90,12 @@ const NotificationManager: React.FC = () => {
                 applicationServerKey
             });
             
-            const { error } = await supabase.from('push_subscriptions').insert({ subscription: subscription.toJSON() });
+            const { error } = await supabase.from('push_subscriptions').insert({ 
+                subscription: subscription.toJSON(),
+                user_id: user.id 
+            });
             
-            if (error && error.code !== '23505') { // '23505' is unique_violation
+            if (error && error.code !== '23505') { // '23505' is unique_violation, which is ok
                 throw error;
             }
 
