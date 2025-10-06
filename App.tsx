@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1122,9 +1123,9 @@ const App: React.FC = () => {
 
   const handleDeleteTodo = async (id: number) => {
     if (!user) return;
-    // FIX: Explicitly typing the parameter of the `find` callback as `Todo` ensures
-    // that `taskToDelete` is correctly inferred as `Todo | undefined`, resolving the type error.
-    const taskToDelete = Object.values(allTodos).flat().find((t: Todo) => t.id === id);
+    // FIX: Explicitly typing `taskToDelete` as `Todo | undefined` resolves an issue
+    // where its type was incorrectly inferred as `unknown`.
+    const taskToDelete: Todo | undefined = Object.values(allTodos).flat().find((t: Todo) => t.id === id);
     if (!taskToDelete) return;
     try {
         let idsToDelete: number[] = [id];

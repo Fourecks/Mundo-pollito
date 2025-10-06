@@ -32,6 +32,8 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({ images, onBack, isMobile }) => 
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const [isOverBank, setIsOverBank] = useState(false);
     const [aspectRatio, setAspectRatio] = useState(1);
+    const [heldPiece, setHeldPiece] = useState<{ piece: Piece; fromIndex: number; from: 'bank' | 'board' } | null>(null);
+
 
     const draggedItem = useRef<{ piece: Piece; fromIndex: number; from: 'bank' | 'board' } | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,6 +44,7 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({ images, onBack, isMobile }) => 
         setPieces([]);
         setBoardState([]);
         setPieceBank([]);
+        setHeldPiece(null);
     };
 
     const startGame = useCallback(async (image: GalleryImage, diff: number) => {
@@ -97,12 +100,15 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({ images, onBack, isMobile }) => 
         }
     }, [boardState, gameState]);
 
+    // --- Desktop Drag & Drop Logic ---
     const handleDragStart = (piece: Piece, fromIndex: number, from: 'bank' | 'board') => {
+        if (isMobile) return;
         draggedItem.current = { piece, fromIndex, from };
         setDraggedPieceId(piece.id);
     };
 
     const handleDragEnd = () => {
+        if (isMobile) return;
         draggedItem.current = null;
         setDraggedPieceId(null);
         setDragOverIndex(null);
@@ -134,7 +140,7 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({ images, onBack, isMobile }) => 
         }
 
         setBoardState(newBoardState);
-        setPieceBank(newPieceBank.sort(() => Math.random() - 0.5)); // Re-shuffle bank for better layout
+        setPieceBank(newPieceBank.sort(() => Math.random() - 0.5));
         setDragOverIndex(null);
     };
     
@@ -155,6 +161,37 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({ images, onBack, isMobile }) => 
         setPieceBank(newPieceBank.sort(() => Math.random() - 0.5));
         setIsOverBank(false);
     }
+
+    // --- Mobile Click Logic ---
+    const handleMobileClick = (clickedPiece: Piece | null, index: number, from: 'bank' | 'board') => {
+        if (!isMobile) return;
+
+        if (heldPiece) {
+            // This is the second click (placing the piece)
+            draggedItem.current = heldPiece; // Use existing drop logic
+            if (from === 'board') {
+                handleDrop(index);
+            } else { // Clicked on the bank, but we need to drop on a specific piece index to swap. The logic needs to be simpler
+                 handleBankDrop();
+            }
+            draggedItem.current = null;
+            setHeldPiece(null);
+
+        } else if (clickedPiece) {
+            // This is the first click (picking up a piece)
+            setHeldPiece({ piece: clickedPiece, fromIndex: index, from });
+        }
+    };
+    
+    const handleBankClick = () => {
+        if (isMobile && heldPiece && heldPiece.from === 'board') {
+            draggedItem.current = heldPiece;
+            handleBankDrop();
+            draggedItem.current = null;
+            setHeldPiece(null);
+        }
+    };
+
 
     if (isLoading) {
         return (
@@ -230,18 +267,19 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({ images, onBack, isMobile }) => 
                             {boardState.map((piece, i) => (
                                 <div 
                                     key={i} 
-                                    className={`transition-all duration-200 ${dragOverIndex === i ? 'bg-primary/20 scale-105' : 'bg-black/5 dark:bg-black/20'}`}
-                                    onDragOver={e => { e.preventDefault(); setDragOverIndex(i); }}
-                                    onDragLeave={() => setDragOverIndex(null)}
-                                    onDrop={() => handleDrop(i)}
+                                    className={`transition-all duration-200 ${dragOverIndex === i ? 'bg-primary/20 scale-105' : 'bg-black/5 dark:bg-black/20'} ${heldPiece ? 'cursor-pointer hover:bg-primary/20' : ''}`}
+                                    onDragOver={e => { e.preventDefault(); if(!isMobile) setDragOverIndex(i); }}
+                                    onDragLeave={() => { if(!isMobile) setDragOverIndex(null); }}
+                                    onDrop={() => { if(!isMobile) handleDrop(i); }}
+                                    onClick={isMobile ? () => handleMobileClick(piece, i, 'board') : undefined}
                                 >
                                     {piece && (
                                         <img 
                                             src={piece.img} 
-                                            draggable 
+                                            draggable={!isMobile} 
                                             onDragStart={() => handleDragStart(piece, i, 'board')}
                                             onDragEnd={handleDragEnd}
-                                            className={`w-full h-full object-cover cursor-grab transition-opacity ${draggedPieceId === piece.id ? 'opacity-50' : ''}`}
+                                            className={`w-full h-full object-cover transition-all duration-200 ${isMobile ? '' : 'cursor-grab'} ${draggedPieceId === piece.id ? 'opacity-50' : ''} ${heldPiece?.piece.id === piece.id ? 'ring-4 ring-primary-dark ring-offset-2 z-10' : ''}`}
                                             style={{ transition: gameState === 'solved' ? 'opacity 0.5s 0.5s' : '', opacity: gameState === 'solved' ? 0.999 : 1 }} // Opacity trick to trigger transition
                                         />
                                     )}
@@ -258,20 +296,22 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({ images, onBack, isMobile }) => 
                     {/* Piece Bank */}
                      {gameState !== 'solved' && (
                         <div 
-                            className={`puzzle-bank-container w-full lg:w-56 h-48 lg:h-full rounded-xl p-2 flex-shrink-0 overflow-auto custom-scrollbar transition-all ${isOverBank ? 'bg-primary/20 ring-2 ring-primary' : 'bg-white/50 dark:bg-gray-800/50'}`}
-                            onDragOver={e => { e.preventDefault(); if (draggedItem.current?.from === 'board') setIsOverBank(true); }}
-                            onDragLeave={() => setIsOverBank(false)}
-                            onDrop={() => handleBankDrop()}
+                            className={`puzzle-bank-container w-full lg:w-56 h-48 lg:h-full rounded-xl p-2 flex-shrink-0 overflow-auto custom-scrollbar transition-all ${isOverBank || (isMobile && heldPiece?.from === 'board') ? 'bg-primary/20 ring-2 ring-primary' : 'bg-white/50 dark:bg-gray-800/50'}`}
+                            onDragOver={e => { e.preventDefault(); if (!isMobile && draggedItem.current?.from === 'board') setIsOverBank(true); }}
+                            onDragLeave={() => { if(!isMobile) setIsOverBank(false); }}
+                            onDrop={() => { if(!isMobile) handleBankDrop(); }}
+                            onClick={handleBankClick}
                         >
                             <div className={`grid grid-cols-4 lg:grid-cols-2 gap-2`}>
                                 {pieceBank.map((piece, i) => (
                                     <img 
                                         key={piece.id} 
                                         src={piece.img}
-                                        draggable
+                                        draggable={!isMobile}
                                         onDragStart={() => handleDragStart(piece, i, 'bank')}
                                         onDragEnd={handleDragEnd}
-                                        className={`w-full object-cover rounded-md shadow-sm cursor-grab transition-opacity ${draggedPieceId === piece.id ? 'opacity-50' : ''}`}
+                                        onClick={isMobile ? (e) => { e.stopPropagation(); handleMobileClick(piece, i, 'bank'); } : undefined}
+                                        className={`w-full object-cover rounded-md shadow-sm transition-all duration-200 ${isMobile ? 'cursor-pointer' : 'cursor-grab'} ${draggedPieceId === piece.id ? 'opacity-50' : ''} ${heldPiece?.piece.id === piece.id ? 'ring-4 ring-primary-dark ring-offset-2 z-10' : ''}`}
                                     />
                                 ))}
                             </div>
