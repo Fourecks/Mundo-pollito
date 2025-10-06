@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -45,7 +43,7 @@ const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.en
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 // Helper to format date as YYYY-MM-DD key
 const formatDateKey = (date: Date): string => {
@@ -237,9 +235,7 @@ interface AppComponentProps {
   handleAddBackground: (file: File) => Promise<void>;
   handleDeleteBackground: (id: string) => Promise<void>;
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
-  // FIX: Add gapiReady and gisReady to AppComponentProps to resolve type error.
   gapiReady: boolean;
-  gisReady: boolean;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -369,7 +365,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   };
   
   const capitalizedUserName = useMemo(() => {
-      const userName = currentUser.email!.split('@')[0];
+      if (!currentUser.email) return 'Pollito';
+      const userName = currentUser.email.split('@')[0];
       return userName.charAt(0).toUpperCase() + userName.slice(1);
   }, [currentUser.email]);
 
@@ -585,7 +582,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const handlePomodoroToggle = () => setPomodoroState(s => ({ ...s, isActive: !s.isActive }));
     
     const capitalizedUserName = useMemo(() => {
-        const userName = currentUser.email!.split('@')[0];
+        if (!currentUser.email) return 'Pollito';
+        const userName = currentUser.email.split('@')[0];
         return userName.charAt(0).toUpperCase() + userName.slice(1);
     }, [currentUser.email]);
 
@@ -789,14 +787,14 @@ const adjustBrightness = (hex: string, percent: number) => {
 
 const App: React.FC = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [themeColors, setThemeColors] = useState<ThemeColors>(DEFAULT_COLORS);
   const isMobile = useMediaQuery('(max-width: 767px)');
   
   const settingsSaveTimeout = useRef<number | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
   
   // --- ALL SHARED STATE MOVED HERE ---
   const [allTodos, setAllTodos] = useState<{ [key: string]: Todo[] }>({});
@@ -829,24 +827,30 @@ const App: React.FC = () => {
 
   // --- SUPABASE AUTH & DATA LOADING ---
   useEffect(() => {
-    const getSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
-    };
-    getSession();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
+    setAuthLoading(true);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    
+    // Check for existing session on initial load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+          setAuthLoading(false);
+      }
+      // onAuthStateChange will handle setting the user
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!user) {
-        setLoading(false);
-        setInitialized(false);
+        setDataLoaded(false);
         return;
     };
 
     const loadAllData = async () => {
-      setLoading(true);
       try {
         await initDB(user.email!);
         
@@ -902,8 +906,7 @@ const App: React.FC = () => {
       } catch (error) {
         console.error("Failed to initialize app state:", error);
       } finally {
-        setInitialized(true);
-        setLoading(false);
+        setDataLoaded(true);
       }
     };
     loadAllData();
@@ -1058,13 +1061,10 @@ const App: React.FC = () => {
     let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
     let oldDateKey: string | null = null;
     let originalTask: Todo | null = null;
-    // FIX: Explicitly cast `t` as `Todo` to resolve TypeScript error about 'unknown' type.
-    for (const key in newAllTodos) { const task = newAllTodos[key].find((t) => (t as Todo).id === todoToSave.id); if (task) { oldDateKey = key; originalTask = task; break; } }
+    for (const key in newAllTodos) { const task = newAllTodos[key].find((t: Todo) => t.id === todoToSave.id); if (task) { oldDateKey = key; originalTask = task; break; } }
     if (originalTask?.recurrence?.id) { 
-        // FIX: Explicitly cast `t` as `Todo` to resolve TypeScript error about 'unknown' type when accessing properties.
-        for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t) => ((t as Todo).recurrence?.id !== originalTask!.recurrence!.id) || ((t as Todo).id === todoToSave.id) || ((t as Todo).due_date && originalTask!.due_date && (t as Todo).due_date <= originalTask!.due_date)); } }
-    // FIX: Explicitly cast `t` as `Todo` to resolve TypeScript error about 'unknown' type.
-    if(oldDateKey && oldDateKey !== todoToSave.due_date && newAllTodos[oldDateKey]) { newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t) => (t as Todo).id !== todoToSave.id); }
+        for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => (t.recurrence?.id !== originalTask!.recurrence!.id) || (t.id === todoToSave.id) || (t.due_date && originalTask!.due_date && t.due_date <= originalTask!.due_date)); } }
+    if(oldDateKey && oldDateKey !== todoToSave.due_date && newAllTodos[oldDateKey]) { newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t: Todo) => t.id !== todoToSave.id); }
     const newDateKey = todoToSave.due_date!;
     const dateTasks = newAllTodos[newDateKey] || [];
     const taskIndex = dateTasks.findIndex((t: Todo) => t.id === todoToSave.id);
@@ -1118,7 +1118,8 @@ const App: React.FC = () => {
 
   const handleDeleteTodo = async (id: number) => {
     if (!user) return;
-    const taskToDelete = Object.values(allTodos).flat().find(t => t.id === id);
+    // FIX: Add explicit type 'Todo' to the find callback parameter to resolve type errors.
+    const taskToDelete = Object.values(allTodos).flat().find((t: Todo) => t.id === id);
     if (!taskToDelete) return;
     try {
         let idsToDelete: number[] = [id];
@@ -1239,7 +1240,7 @@ const App: React.FC = () => {
 
   // Debounced save settings to Supabase & localStorage
   useEffect(() => {
-    if (!initialized || !user) return;
+    if (!dataLoaded || !user) return;
     localStorage.setItem(`${user.email}_browserSession`, JSON.stringify(browserSession));
     if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
     settingsSaveTimeout.current = window.setTimeout(async () => {
@@ -1247,7 +1248,7 @@ const App: React.FC = () => {
         await supabase.from('site_settings').upsert(settingsPayload, { onConflict: 'user_id' });
     }, 1500);
     return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
-  }, [theme, themeColors, activeBackground, particleType, ambientSound, pomodoroState, browserSession, initialized, user]);
+  }, [theme, themeColors, activeBackground, particleType, ambientSound, pomodoroState, browserSession, dataLoaded, user]);
 
   useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); }, [theme]);
   
@@ -1272,10 +1273,14 @@ const App: React.FC = () => {
       handleGoogleLogout();
   };
   
-  if (loading || (!initialized && user)) {
+  if (authLoading) {
      return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando pollito...</p></div>;
   }
   if (!user) { return <Login onLogin={() => {}} />; }
+
+  if (!dataLoaded) {
+     return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando tus datos...</p></div>;
+  }
   
   const appProps: AppComponentProps = {
       currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
@@ -1289,7 +1294,6 @@ const App: React.FC = () => {
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       gapiReady, 
-      gisReady: true, // No longer used for token flow, set to true to satisfy prop types
   };
 
   return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;

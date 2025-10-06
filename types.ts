@@ -1,3 +1,4 @@
+
 import { GenerateContentResponse } from '@google/genai';
 
 export interface WindowState {
@@ -79,12 +80,6 @@ export interface QuickNote {
   created_at: string;
 }
 
-// FIX: Add and export the `EncouragementNote` type to fix missing export error.
-export interface EncouragementNote {
-  id: string;
-  text: string;
-}
-
 export type ParticleType = 'none' | 'snow' | 'rain' | 'stars' | 'bubbles' | 'sparks';
 export type AmbientSoundType = 'none' | 'rain' | 'forest' | 'coffee_shop' | 'ocean';
 
@@ -136,6 +131,12 @@ export interface ThemeColors {
 export interface SupabaseUser {
   id: string;
   email?: string;
+}
+
+// FIX: Add missing EncouragementNote type.
+export interface EncouragementNote {
+  id: string;
+  text: string;
 }
 
 // FIX: Centralized YouTube IFrame API type definitions to fix duplicate declaration errors.
