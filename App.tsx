@@ -372,14 +372,98 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
   useEffect(() => { if (initialized) localStorage.setItem(getUserKey('openWindows'), JSON.stringify(openWindows)); }, [openWindows, initialized, getUserKey]);
   useEffect(() => { if (initialized) localStorage.setItem(getUserKey('browserSession'), JSON.stringify(browserSession)); }, [browserSession, initialized, getUserKey]);
   
-  // Google API Initialization (ROBUST)
+  // --- Google Drive Handlers ---
+  const findOrCreateAppFolder = useCallback(async () => {
+    try {
+        const response = await window.gapi.client.drive.files.list({
+            q: `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`,
+            fields: 'files(id)',
+        });
+        if (response.result.files && response.result.files.length > 0) {
+            appFolderId.current = response.result.files[0].id!;
+        } else {
+            const createResponse = await window.gapi.client.drive.files.create({
+                resource: { name: APP_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' },
+                fields: 'id',
+            } as any);
+            appFolderId.current = createResponse.result.id!;
+        }
+    } catch (e) { console.error("Error finding/creating app folder", e); }
+  }, []);
+
+  const loadGalleryImagesFromDrive = useCallback(async () => {
+    if (!appFolderId.current) return;
+    setGalleryIsLoading(true);
+    try {
+        const response = await window.gapi.client.drive.files.list({
+            q: `'${appFolderId.current}' in parents and mimeType contains 'image/' and (not appProperties has { key='type' and value='background' }) and trashed=false`,
+            fields: 'files(id)',
+        });
+        const files = response.result.files || [];
+        const imagePromises = files.map(async (file) => {
+            const fileResponse = await window.gapi.client.drive.files.get({ fileId: file.id!, alt: 'media' });
+            const blob = new Blob([fileResponse.body], { type: fileResponse.headers['Content-Type'] });
+            return { id: file.id!, url: URL.createObjectURL(blob) };
+        });
+        const newImages = await Promise.all(imagePromises);
+        setGalleryImages(newImages.reverse());
+    } catch (e) {
+        console.error("Error loading images from Drive", e);
+    } finally {
+        setGalleryIsLoading(false);
+    }
+  }, []);
+  
+  const loadBackgroundsFromDrive = useCallback(async () => {
+    if (!appFolderId.current) return;
+    setBackgroundsAreLoading(true);
+    try {
+      const response = await window.gapi.client.drive.files.list({
+        q: `'${appFolderId.current}' in parents and appProperties has { key='type' and value='background' } and trashed=false`,
+        fields: 'files(id, name, mimeType, appProperties)',
+      });
+      const files = response.result.files || [];
+      const bgPromises = files.map(async (file) => {
+        const fileResponse = await window.gapi.client.drive.files.get({ fileId: file.id!, alt: 'media' });
+        const blob = new Blob([fileResponse.body], { type: file.mimeType });
+        return {
+          id: file.id!,
+          name: file.name!,
+          url: URL.createObjectURL(blob),
+          type: file.mimeType!.startsWith('video') ? 'video' : 'image',
+          isFavorite: file.appProperties?.isFavorite === 'true',
+        };
+      });
+      const newBgs = await Promise.all(bgPromises);
+      setUserBackgrounds(newBgs);
+    } catch (e) {
+      console.error("Error loading backgrounds from Drive", e);
+    } finally {
+      setBackgroundsAreLoading(false);
+    }
+  }, []);
+
+  const handleTokenResponse = useCallback(async (resp: any) => {
+      if (resp.error) {
+          console.error("Google Auth Error:", resp.error);
+          return;
+      }
+      setGdriveToken(resp.access_token);
+      window.gapi.client.setToken({ access_token: resp.access_token });
+      
+      await window.gapi.client.load('drive', 'v3');
+      
+      await findOrCreateAppFolder();
+      await loadGalleryImagesFromDrive();
+      await loadBackgroundsFromDrive();
+  }, [findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive]);
+  
+  // Google API Initialization (ROBUST & PERSISTENT)
   useEffect(() => {
       const gapiPoll = setInterval(() => {
           if (window.gapi && window.gapi.load) {
               clearInterval(gapiPoll);
-              window.gapi.load('client', () => {
-                  setGapiReady(true);
-              });
+              window.gapi.load('client', () => setGapiReady(true));
           }
       }, 100);
 
@@ -390,30 +474,35 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
           }
       }, 100);
 
-      return () => {
-          clearInterval(gapiPoll);
-          clearInterval(gisPoll);
-      };
+      return () => { clearInterval(gapiPoll); clearInterval(gisPoll); };
   }, []);
 
   useEffect(() => {
       if (gapiReady && gisReady) {
-          // FIX: This comparison appears to be unintentional because the types have no overlap.
           if (!CLIENT_ID || CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
               console.warn('Google Client ID is missing. Google Drive features will be disabled.');
           } else {
               try {
-                tokenClient.current = window.google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: SCOPES,
-                    callback: '', // Will be set on click
-                });
+                  tokenClient.current = window.google.accounts.oauth2.initTokenClient({
+                      client_id: CLIENT_ID,
+                      scope: SCOPES,
+                      callback: handleTokenResponse,
+                  });
+                  // Attempt to get a token silently on page load
+                  tokenClient.current.requestAccessToken({ prompt: '' });
               } catch (e) {
-                console.error("Error initializing Google token client:", e);
+                  console.error("Error initializing Google token client:", e);
               }
           }
       }
-  }, [gapiReady, gisReady]);
+  }, [gapiReady, gisReady, handleTokenResponse]);
+
+  const handleAuthClick = useCallback(() => {
+    if (tokenClient.current) {
+        // Prompt user for consent if not already signed in
+        tokenClient.current.requestAccessToken({ prompt: 'consent' });
+    }
+  }, []);
 
   // Pomodoro Timer Effect
   useEffect(() => {
@@ -470,112 +559,6 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
 
   }, [ambientSound]);
   
-
-  // --- Google Drive Handlers ---
-  const findOrCreateAppFolder = useCallback(async () => {
-    try {
-        // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
-        const response = await window.gapi.client.drive.files.list({
-            q: `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`,
-            fields: 'files(id)',
-        });
-        if (response.result.files && response.result.files.length > 0) {
-            appFolderId.current = response.result.files[0].id!;
-        } else {
-            // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
-            const createResponse = await window.gapi.client.drive.files.create({
-                // @ts-ignore
-                resource: { name: APP_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' },
-                fields: 'id',
-            });
-            appFolderId.current = createResponse.result.id!;
-        }
-    } catch (e) { console.error("Error finding/creating app folder", e); }
-  }, []);
-
-  const loadGalleryImagesFromDrive = useCallback(async () => {
-    if (!appFolderId.current) return;
-    setGalleryIsLoading(true);
-    try {
-        // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
-        const response = await window.gapi.client.drive.files.list({
-            q: `'${appFolderId.current}' in parents and mimeType contains 'image/' and (not appProperties has { key='type' and value='background' }) and trashed=false`,
-            fields: 'files(id)',
-        });
-        const files = response.result.files || [];
-        const imagePromises = files.map(async (file) => {
-            // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
-            const fileResponse = await window.gapi.client.drive.files.get({ fileId: file.id!, alt: 'media' });
-            const blob = new Blob([fileResponse.body], { type: fileResponse.headers['Content-Type'] });
-            return { id: file.id!, url: URL.createObjectURL(blob) };
-        });
-        const newImages = await Promise.all(imagePromises);
-        setGalleryImages(newImages.reverse());
-    } catch (e) {
-        console.error("Error loading images from Drive", e);
-    } finally {
-        setGalleryIsLoading(false);
-    }
-  }, []);
-  
-  const loadBackgroundsFromDrive = useCallback(async () => {
-    if (!appFolderId.current) return;
-    setBackgroundsAreLoading(true);
-    try {
-      const response = await window.gapi.client.drive.files.list({
-        q: `'${appFolderId.current}' in parents and appProperties has { key='type' and value='background' } and trashed=false`,
-        fields: 'files(id, name, mimeType, appProperties)',
-      });
-      const files = response.result.files || [];
-      const bgPromises = files.map(async (file) => {
-        const fileResponse = await window.gapi.client.drive.files.get({ fileId: file.id!, alt: 'media' });
-        const blob = new Blob([fileResponse.body], { type: file.mimeType });
-        return {
-          id: file.id!,
-          name: file.name!,
-          url: URL.createObjectURL(blob),
-          type: file.mimeType!.startsWith('video') ? 'video' : 'image',
-          isFavorite: file.appProperties?.isFavorite === 'true',
-        };
-      });
-      const newBgs = await Promise.all(bgPromises);
-      setUserBackgrounds(newBgs);
-
-      // We no longer get this from local storage, it will be loaded from DB settings
-      // const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
-      // if (storedActiveBgId) {
-      //   const active = newBgs.find(bg => bg.id === storedActiveBgId);
-      //   if (active) setActiveBackground(active);
-      // }
-    } catch (e) {
-      console.error("Error loading backgrounds from Drive", e);
-    } finally {
-      setBackgroundsAreLoading(false);
-    }
-  }, [getUserKey]);
-
-
-  const handleAuthClick = useCallback(async () => {
-    if (!tokenClient.current) {
-        alert("La configuración para Google Drive está incompleta. Por favor, añade tu ID de cliente en el archivo App.tsx.");
-        return;
-    }
-    tokenClient.current.callback = async (resp: any) => {
-        if (resp.error) throw (resp);
-        setGdriveToken(resp.access_token);
-        window.gapi.client.setToken({ access_token: resp.access_token });
-        
-        await window.gapi.client.load('drive', 'v3');
-        
-        await findOrCreateAppFolder();
-        await loadGalleryImagesFromDrive();
-        await loadBackgroundsFromDrive();
-    };
-    if (!gdriveToken) {
-        tokenClient.current.requestAccessToken({ prompt: 'consent' });
-    }
-  }, [gdriveToken, findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive]);
-  
   const handleAddGalleryImages = async (files: File[]) => {
     if (!appFolderId.current || !gdriveToken) return;
     for (const file of files) {
@@ -607,7 +590,6 @@ const DesktopApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleTh
 
   const handleDeleteGalleryImage = async (id: string) => {
     try {
-        // FIX: Cannot find name 'gapi'. Prefixed with 'window.'
         await window.gapi.client.drive.files.delete({ fileId: id });
         setGalleryImages(prev => prev.filter(img => {
             if (img.id === id) {
@@ -1512,14 +1494,27 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
     }
   }, []);
 
-    // Google API Initialization (ROBUST)
+    const handleTokenResponse = useCallback(async (resp: any) => {
+        if (resp.error) {
+            console.error("Google Auth Error:", resp.error);
+            return;
+        }
+        setGdriveToken(resp.access_token);
+        window.gapi.client.setToken({ access_token: resp.access_token });
+        
+        await window.gapi.client.load('drive', 'v3');
+        
+        await findOrCreateAppFolder();
+        await loadGalleryImagesFromDrive();
+        await loadBackgroundsFromDrive();
+    }, [findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive]);
+    
+    // Google API Initialization (ROBUST & PERSISTENT)
     useEffect(() => {
         const gapiPoll = setInterval(() => {
             if (window.gapi && window.gapi.load) {
                 clearInterval(gapiPoll);
-                window.gapi.load('client', () => {
-                    setGapiReady(true);
-                });
+                window.gapi.load('client', () => setGapiReady(true));
             }
         }, 100);
 
@@ -1530,10 +1525,7 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
             }
         }, 100);
 
-        return () => {
-            clearInterval(gapiPoll);
-            clearInterval(gisPoll);
-        };
+        return () => { clearInterval(gapiPoll); clearInterval(gisPoll); };
     }, []);
 
     useEffect(() => {
@@ -1542,33 +1534,26 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
                 console.warn('Google Client ID is missing. Google Drive features will be disabled.');
             } else {
                 try {
-                    const oauthCallback = async (resp: any) => {
-                        if (resp.error) {
-                            console.error("Google Auth Error:", resp.error);
-                            alert("Hubo un error al iniciar sesión con Google. Por favor, intenta de nuevo.");
-                            return;
-                        };
-                        setGdriveToken(resp.access_token);
-                        window.gapi.client.setToken({ access_token: resp.access_token });
-                        
-                        await window.gapi.client.load('drive', 'v3');
-                        
-                        await findOrCreateAppFolder();
-                        await loadGalleryImagesFromDrive();
-                        await loadBackgroundsFromDrive();
-                    };
-
                     tokenClient.current = window.google.accounts.oauth2.initTokenClient({
                         client_id: CLIENT_ID,
                         scope: SCOPES,
-                        callback: oauthCallback,
+                        callback: handleTokenResponse,
                     });
+                    // Attempt to get a token silently on page load
+                    tokenClient.current.requestAccessToken({ prompt: '' });
                 } catch (e) {
                     console.error("Error initializing Google token client:", e);
                 }
             }
         }
-    }, [gapiReady, gisReady, findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive]);
+    }, [gapiReady, gisReady, handleTokenResponse]);
+
+    const handleAuthClick = useCallback(() => {
+        if (tokenClient.current) {
+            // Prompt user for consent if not already signed in
+            tokenClient.current.requestAccessToken({ prompt: 'consent' });
+        }
+    }, []);
 
     // Logic/handler effects (copied from DesktopApp)
     useEffect(() => {
@@ -1605,16 +1590,6 @@ const MobileApp: React.FC<AppProps> = ({ currentUser, onLogout, theme, toggleThe
         audio.volume = ambientSound.volume;
     }, [ambientSound]);
     
-
-    const handleAuthClick = useCallback(() => {
-        if (!tokenClient.current) {
-            alert("La configuración para Google Drive está incompleta.");
-            return;
-        }
-        // The callback is already set during initialization. Just request the token.
-        tokenClient.current.requestAccessToken({ prompt: 'consent' });
-    }, []);
-
     // Handlers (copied & adapted)
     const handleAddTodo = async (text: string) => {
         const dateKey = formatDateKey(selectedDate);
