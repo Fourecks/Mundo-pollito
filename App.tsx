@@ -935,8 +935,10 @@ const App: React.FC = () => {
         const response = await window.gapi.client.drive.files.list({ q: `'${appFolderId.current}' in parents and mimeType contains 'image/' and (not appProperties has { key='type' and value='background' }) and trashed=false`, fields: 'files(id)' });
         const files = response.result.files || [];
         const imagePromises = files.map(async (file) => {
-            const fileResponse = await window.gapi.client.drive.files.get({ fileId: file.id!, alt: 'media' });
-            const blob = new Blob([fileResponse.body], { type: fileResponse.headers['Content-Type'] });
+            const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+                headers: { Authorization: `Bearer ${window.gapi.client.getToken().access_token}` }
+            });
+            const blob = await response.blob();
             return { id: file.id!, url: URL.createObjectURL(blob) };
         });
         const newImages = await Promise.all(imagePromises);
@@ -951,8 +953,10 @@ const App: React.FC = () => {
       const response = await window.gapi.client.drive.files.list({ q: `'${appFolderId.current}' in parents and appProperties has { key='type' and value='background' } and trashed=false`, fields: 'files(id, name, mimeType, appProperties)' });
       const files = response.result.files || [];
       const bgPromises = files.map(async (file) => {
-        const fileResponse = await window.gapi.client.drive.files.get({ fileId: file.id!, alt: 'media' });
-        const blob = new Blob([fileResponse.body], { type: file.mimeType });
+        const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+            headers: { Authorization: `Bearer ${window.gapi.client.getToken().access_token}` }
+        });
+        const blob = await response.blob();
         return { id: file.id!, name: file.name!, url: URL.createObjectURL(blob), type: file.mimeType!.startsWith('video') ? 'video' : 'image', isFavorite: file.appProperties?.isFavorite === 'true' };
       });
       const newBgs = await Promise.all(bgPromises);
@@ -1118,7 +1122,8 @@ const App: React.FC = () => {
 
   const handleDeleteTodo = async (id: number) => {
     if (!user) return;
-    // FIX: Add explicit type 'Todo' to the find callback parameter to resolve type errors.
+    // FIX: Explicitly typing the parameter of the `find` callback as `Todo` ensures
+    // that `taskToDelete` is correctly inferred as `Todo | undefined`, resolving the type error.
     const taskToDelete = Object.values(allTodos).flat().find((t: Todo) => t.id === id);
     if (!taskToDelete) return;
     try {
