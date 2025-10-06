@@ -24,5 +24,8 @@ export const config = {
 
   // --- Push Notifications ---
   // Generate VAPID keys using a library like `web-push`.
-  VAPID_PUBLIC_KEY: "BPGS1Q5RvxzF71vMEb3gKolzNWG0NCme4gJbGKaC4q9j9UDt16-wQ27Y5uClL8eOvYjrwXPvBm3lQwX5M-X8qpw"
+  // The public key is safe to expose on the client.
+  VAPID_PUBLIC_KEY: "BPGS1Q5RvxzF71vMEb3gKolzNWG0NCme4gJbGKaC4q9j9UDt16-wQ27Y5uClL8eOvYjrwXPvBm3lQwX5M-X8qpw",
+  // The private key MUST be kept secret on your server/edge function.
+  VAPID_PRIVATE_KEY: "6xYn4T5yVAIuIFceWuk2y_hJ_l3YLdJTM6rV0w7hJLo"
 };

@@ -1,13 +1,4 @@
 
-
-
-
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1065,7 +1056,8 @@ const App: React.FC = () => {
     // FIX: The result of `.select().single()` can be null. Added a check for `newTodo` to prevent a type error from spreading null.
     const { data: newTodo, error }: { data: Todo | null; error: any } = await supabase.from('todos').insert({ text, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }).select().single();
     if (error) { console.error("Error adding todo:", error); return; }
-    if (newTodo) {
+    // FIX: Add a more robust check to ensure newTodo is not an empty object, which can be truthy but is not a valid Todo.
+    if (newTodo && Object.keys(newTodo).length > 0) {
       setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), { ...newTodo, subtasks: [] }] }));
     }
   };
