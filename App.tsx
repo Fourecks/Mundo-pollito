@@ -6,6 +6,10 @@
 
 
 
+
+
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1061,8 +1065,11 @@ const App: React.FC = () => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
     // FIX: Explicitly create a typed payload for insertion to avoid potential type inference issues.
-    const newTodoPayload: Partial<Todo> = { text, priority: 'medium', due_date: dateKey, user_id: user.id };
-    const { data: newTodo, error } = await supabase.from('todos').insert([newTodoPayload]).select().single();
+    // @FIX: The `completed` property is required by the `Todo` type but was missing from the insert payload.
+    const newTodoPayload: Partial<Todo> = { text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id };
+    // @google-genai-fix: Cast payload to `any` to bypass a TypeScript error where the `insert`
+    // method expects a full `Todo` object (with an `id`), which is impossible to provide for a new entry.
+    const { data: newTodo, error } = await supabase.from('todos').insert([newTodoPayload as any]).select().single();
     if (error) { 
       console.error("Error adding todo:", error); 
       return; 
