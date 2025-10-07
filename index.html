@@ -212,8 +212,8 @@
 
         if ('serviceWorker' in navigator) {
           console.log('Attempting to register service worker...');
-          // Changed to relative path and added explicit scope for robustness.
-          navigator.serviceWorker.register('./sw.js', { scope: '/' }).then(registration => {
+          // Changed to absolute path for robustness on deployment platforms.
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
           }).catch(err => {
             console.error('ServiceWorker registration failed: ', err);
