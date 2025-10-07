@@ -82,13 +82,38 @@ const NotificationManager: React.FC = () => {
             const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
             const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
             
-            const { error } = await supabase.from('push_subscriptions').upsert([{ 
+            // Manually perform upsert logic to avoid issues with `onConflict` on non-standard columns.
+            // First, check if a subscription with the same endpoint already exists.
+            const { data: existingSubscription, error: selectError } = await supabase
+                .from('push_subscriptions')
+                .select('id')
+                .eq('subscription->>endpoint', subscription.endpoint) // Query within the JSONB field
+                .single();
+
+            // "PGRST116: exact one row expected, but found no rows" is an expected outcome for a new subscription, so we ignore it.
+            if (selectError && selectError.code !== 'PGRST116') {
+                throw selectError;
+            }
+
+            const payload = {
                 subscription: subscription.toJSON(),
                 user_id: user.id,
-                endpoint: subscription.endpoint,
-            }], { onConflict: 'endpoint' });
+            };
 
-            if (error) throw error;
+            if (existingSubscription) {
+                // If it exists, update it.
+                const { error: updateError } = await supabase
+                    .from('push_subscriptions')
+                    .update(payload)
+                    .eq('id', existingSubscription.id);
+                if (updateError) throw updateError;
+            } else {
+                // If it doesn't exist, insert a new one.
+                const { error: insertError } = await supabase
+                    .from('push_subscriptions')
+                    .insert(payload);
+                if (insertError) throw insertError;
+            }
 
             setStatus('subscribed');
         } catch (err) {
