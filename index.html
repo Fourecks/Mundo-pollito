@@ -211,9 +211,40 @@
         }
 
         if ('serviceWorker' in navigator) {
-          console.log('Attempting to register service worker...');
-          // Changed to absolute path for robustness on deployment platforms.
-          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
+          console.log('Attempting to register service worker from inline script...');
+
+          const swCode = `
+            self.addEventListener('push', function(event) {
+              const data = event.data ? event.data.json() : {};
+              const title = data.title || "Recordatorio de Pollito";
+              const options = {
+                body: data.body || '¡Tienes una tarea pendiente!',
+                icon: '/favicon.ico',
+                badge: '/favicon.ico',
+                tag: data.tag || 'recordatorio-general',
+                renotify: true,
+              };
+              event.waitUntil(self.registration.showNotification(title, options));
+            });
+
+            self.addEventListener('notificationclick', function(event) {
+              event.notification.close();
+              event.waitUntil(clients.openWindow('/'));
+            });
+
+            self.addEventListener('install', event => {
+              self.skipWaiting();
+            });
+
+            self.addEventListener('activate', event => {
+              event.waitUntil(self.clients.claim());
+            });
+          `;
+          
+          const blob = new Blob([swCode], { type: 'application/javascript' });
+          const swUrl = URL.createObjectURL(blob);
+
+          navigator.serviceWorker.register(swUrl, { scope: '/' }).then(registration => {
             console.log('ServiceWorker registration successful with scope: ', registration.scope);
           }).catch(err => {
             console.error('ServiceWorker registration failed: ', err);
