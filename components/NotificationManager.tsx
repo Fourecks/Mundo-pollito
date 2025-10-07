@@ -82,42 +82,35 @@ const NotificationManager: React.FC = () => {
             const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
             const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
             
-            // Manually perform upsert logic to avoid issues with `onConflict` on non-standard columns.
-            // First, check if a subscription with the same endpoint already exists.
-            const { data: existingSubscription, error: selectError } = await supabase
-                .from('push_subscriptions')
-                .select('id')
-                .eq('subscription->>endpoint', subscription.endpoint) // Query within the JSONB field
-                .single();
+            const subscriptionJson = subscription.toJSON();
 
-            // "PGRST116: exact one row expected, but found no rows" is an expected outcome for a new subscription, so we ignore it.
-            if (selectError && selectError.code !== 'PGRST116') {
-                throw selectError;
+            // First, delete any existing subscription with the same endpoint.
+            // This simplifies the logic to a "replace" operation, avoiding complex upsert conditions.
+            const { error: deleteError } = await supabase
+                .from('push_subscriptions')
+                .delete()
+                .eq('subscription->>endpoint', subscriptionJson.endpoint);
+
+            if (deleteError) {
+                console.warn("Could not delete old subscription, continuing with insert...", deleteError);
             }
 
-            const payload = {
-                subscription: subscription.toJSON(),
-                user_id: user.id,
-            };
+            // Now, insert the new subscription.
+            const { error: insertError } = await supabase
+                .from('push_subscriptions')
+                .insert({
+                    subscription: subscriptionJson,
+                    user_id: user.id,
+                });
 
-            if (existingSubscription) {
-                // If it exists, update it.
-                const { error: updateError } = await supabase
-                    .from('push_subscriptions')
-                    .update(payload)
-                    .eq('id', existingSubscription.id);
-                if (updateError) throw updateError;
-            } else {
-                // If it doesn't exist, insert a new one.
-                const { error: insertError } = await supabase
-                    .from('push_subscriptions')
-                    .insert(payload);
-                if (insertError) throw insertError;
+            // If the insert fails, it's a critical error (likely RLS).
+            if (insertError) {
+                throw insertError;
             }
 
             setStatus('subscribed');
         } catch (err) {
-            console.error('Failed to subscribe user:', err);
+            console.error('Failed to subscribe user to notifications. This might be due to a database policy (RLS). Full error:', err);
             setStatus(Notification.permission === 'denied' ? 'denied' : 'unsubscribed');
         } finally {
             setIsActionLoading(false);
