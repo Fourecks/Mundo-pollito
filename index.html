@@ -200,5 +200,29 @@
     <script type="module" src="/index.tsx"></script>
     <script src="https://accounts.google.com/gsi/client" async></script>
     <script src="https://apis.google.com/js/api.js" async></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        // We wait for the 'load' event to ensure the page is fully loaded
+        // before registering the service worker. This is a best practice.
+        window.addEventListener('load', () => {
+          // This check prevents registration errors in some sandboxed
+          // editor environments that use 'blob:' protocol.
+          if (window.location.protocol === 'blob:') {
+            console.warn('Advertencia: Las notificaciones push están deshabilitadas en esta vista previa.');
+            return;
+          }
+
+          console.log('Attempting to register service worker...');
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then(registration => {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            })
+            .catch(err => {
+              // The 404 error comes from here. It means the server can't find /sw.js
+              console.error('ServiceWorker registration failed: ', err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>

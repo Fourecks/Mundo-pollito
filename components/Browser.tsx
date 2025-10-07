@@ -129,8 +129,8 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
         setSummarizingUrl(urlToSummarize);
 
         try {
-            // FIX: Per guidelines, use process.env.API_KEY directly for Gemini API initialization.
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const apiKey = process.env.API_KEY || config.API_KEY;
+            const ai = new GoogleGenAI({ apiKey: apiKey as string });
             const prompt = `¡Pío, pío! Pollito, por favor resume esta página web para mí en un par de párrafos amigables, como si se lo explicaras a un amigo: ${urlToSummarize}. Mantén tu personalidad de pollito alegre y dirígete a mí como 'pollito'.`;
             
             const response = await ai.models.generateContent({
@@ -181,8 +181,8 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
         setAiQuery('');
 
         try {
-            // FIX: Per guidelines, use process.env.API_KEY directly for Gemini API initialization.
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const apiKey = process.env.API_KEY || config.API_KEY;
+            const ai = new GoogleGenAI({ apiKey: apiKey as string });
             
             const historyForAPI = currentConversation.map(turn => ({
                 role: turn.role,

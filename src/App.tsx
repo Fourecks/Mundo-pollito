@@ -3,13 +3,6 @@
 
 
 
-
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1064,37 +1057,19 @@ const App: React.FC = () => {
   const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    // FIX: Explicitly create a typed payload for insertion to avoid potential type inference issues.
-    // @FIX: The `completed` property is required by the `Todo` type but was missing from the insert payload.
-    const newTodoPayload: Partial<Todo> = { text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id };
-    // @google-genai-fix: Cast payload to `any` to bypass a TypeScript error where the `insert`
-    // method expects a full `Todo` object (with an `id`), which is impossible to provide for a new entry.
-    const { data: newTodo, error } = await supabase.from('todos').insert([newTodoPayload as any]).select().single();
+    // FIX: The insert method for Supabase expects an array of rows.
+    // The result of `.select().single()` can also be null if the insert fails without an error (e.g., RLS policy).
+    const { data: newTodo, error } = await supabase.from('todos').insert([{ text, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }]).select().single();
     if (error) { 
       console.error("Error adding todo:", error); 
       return; 
     }
 
+    // FIX: A simple check for `newTodo` is not sufficient, as it could be an empty object {}.
+    // Spreading an empty object would result in `{ subtasks: [] }`, which does not match the `Todo` type.
+    // We check for a required property like `id` to ensure it's a valid object before adding to state.
     if (newTodo && 'id' in newTodo) {
-      // FIX: Explicitly construct the Todo object to satisfy TypeScript's type checker,
-      // as spreading an 'any' type from Supabase can be unsafe if the returned object is partial.
-      const todoDataFromDb = newTodo as { [key: string]: any };
-      const todoToAdd: Todo = {
-        id: todoDataFromDb.id,
-        text: todoDataFromDb.text ?? text,
-        completed: todoDataFromDb.completed ?? false,
-        priority: todoDataFromDb.priority ?? 'medium',
-        due_date: todoDataFromDb.due_date,
-        start_time: todoDataFromDb.start_time,
-        end_time: todoDataFromDb.end_time,
-        notes: todoDataFromDb.notes,
-        subtasks: [],
-        recurrence: todoDataFromDb.recurrence,
-        reminder_offset: todoDataFromDb.reminder_offset,
-        notification_sent: todoDataFromDb.notification_sent,
-        user_id: todoDataFromDb.user_id,
-        created_at: todoDataFromDb.created_at,
-      };
+      const todoToAdd: Todo = { ...(newTodo as Todo), subtasks: [] };
       setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
     }
   };
