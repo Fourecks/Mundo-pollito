@@ -1,6 +1,11 @@
 
 
 
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1055,13 +1060,35 @@ const App: React.FC = () => {
   const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    // FIX: The result of `.select().single()` can be null. Added a check for `newTodo` to prevent a type error from spreading null.
-    // FIX: Wrap insert payload in an array to ensure consistent API behavior.
-    const { data: newTodo, error }: { data: Todo | null; error: any } = await supabase.from('todos').insert([{ text, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }]).select().single();
-    if (error) { console.error("Error adding todo:", error); return; }
-    // FIX: The previous check was not a sufficient type guard. Using a property check like `'id' in newTodo` correctly narrows the type to `Todo`.
+    // FIX: Explicitly create a typed payload for insertion to avoid potential type inference issues.
+    const newTodoPayload: Partial<Todo> = { text, priority: 'medium', due_date: dateKey, user_id: user.id };
+    const { data: newTodo, error } = await supabase.from('todos').insert([newTodoPayload]).select().single();
+    if (error) { 
+      console.error("Error adding todo:", error); 
+      return; 
+    }
+
     if (newTodo && 'id' in newTodo) {
-      setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), { ...newTodo, subtasks: [] }] }));
+      // FIX: Explicitly construct the Todo object to satisfy TypeScript's type checker,
+      // as spreading an 'any' type from Supabase can be unsafe if the returned object is partial.
+      const todoDataFromDb = newTodo as { [key: string]: any };
+      const todoToAdd: Todo = {
+        id: todoDataFromDb.id,
+        text: todoDataFromDb.text ?? text,
+        completed: todoDataFromDb.completed ?? false,
+        priority: todoDataFromDb.priority ?? 'medium',
+        due_date: todoDataFromDb.due_date,
+        start_time: todoDataFromDb.start_time,
+        end_time: todoDataFromDb.end_time,
+        notes: todoDataFromDb.notes,
+        subtasks: [],
+        recurrence: todoDataFromDb.recurrence,
+        reminder_offset: todoDataFromDb.reminder_offset,
+        notification_sent: todoDataFromDb.notification_sent,
+        user_id: todoDataFromDb.user_id,
+        created_at: todoDataFromDb.created_at,
+      };
+      setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
     }
   };
 

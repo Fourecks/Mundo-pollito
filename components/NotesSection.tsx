@@ -223,8 +223,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         }
         
         try {
-            const apiKey = process.env.API_KEY || config.API_KEY;
-            const ai = new GoogleGenAI({ apiKey: apiKey as string });
+            // FIX: Per guidelines, use process.env.API_KEY directly for Gemini API initialization.
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: prompt,
