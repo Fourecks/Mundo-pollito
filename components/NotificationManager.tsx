@@ -82,11 +82,11 @@ const NotificationManager: React.FC = () => {
             const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
             const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
             
-            const { error } = await supabase.from('push_subscriptions').upsert({ 
+            const { error } = await supabase.from('push_subscriptions').upsert([{ 
                 subscription: subscription.toJSON(),
                 user_id: user.id,
                 endpoint: subscription.endpoint,
-            }, { onConflict: 'endpoint' });
+            }], { onConflict: 'endpoint' });
 
             if (error) throw error;
 
