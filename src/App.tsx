@@ -39,6 +39,9 @@ import GamesHub from './components/GamesHub';
 import { supabase } from './supabaseClient';
 import { config } from './config';
 
+// Define Permission type here for clarity
+type Permission = "default" | "denied" | "granted";
+
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -237,6 +240,9 @@ interface AppComponentProps {
   handleDeleteBackground: (id: string) => Promise<void>;
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
   gapiReady: boolean;
+  // Notification Props
+  notificationPermission: Permission;
+  isSubscribed: boolean;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -400,7 +406,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             >
               <PaletteIcon />
             </button>
-          <NotificationManager />
+          <NotificationManager permission={props.notificationPermission} isSubscribed={props.isSubscribed} />
         </div>
       </header>
 
@@ -644,7 +650,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             </div>
                             <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg flex justify-between items-center">
                                 <h3 className="font-bold text-primary-dark dark:text-primary">Notificaciones</h3>
-                                <NotificationManager />
+                                <NotificationManager permission={props.notificationPermission} isSubscribed={props.isSubscribed} />
                             </div>
                              <button onClick={onLogout} className="w-full mt-4 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
                                 <LogoutIcon />
@@ -814,6 +820,9 @@ const App: React.FC = () => {
       backgroundTimerOpacity: 50,
   });
 
+  const [notificationPermission, setNotificationPermission] = useState<Permission>('default');
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
   // Google Drive State
   const [gapiReady, setGapiReady] = useState(false);
   const [gdriveToken, setGdriveToken] = useState<string | null>(null);
@@ -823,15 +832,51 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // OneSignal Initialization (runs only once)
+  // OneSignal Full Lifecycle Management
   useEffect(() => {
     window.OneSignal = window.OneSignal || [];
-    window.OneSignal.push(function() {
-      window.OneSignal.init({
-        appId: config.ONESIGNAL_APP_ID,
-      });
+    const OneSignal = window.OneSignal;
+
+    const updateStatus = async () => {
+        if (!OneSignal.Notifications) return;
+
+        const permission = OneSignal.Notifications.permission;
+        setNotificationPermission(permission);
+
+        if (permission === 'granted') {
+            const subscription = await OneSignal.User.PushSubscription.get();
+            setIsSubscribed(!!subscription);
+        } else {
+            setIsSubscribed(false);
+        }
+    };
+
+    OneSignal.push(async function() {
+        if (!OneSignal.isPushNotificationsSupported || !OneSignal.isPushNotificationsSupported()) {
+            console.warn("Push notifications are not supported by this browser.");
+            return;
+        }
+        
+        await OneSignal.init({
+            appId: config.ONESIGNAL_APP_ID,
+        });
+
+        updateStatus();
+
+        OneSignal.Notifications.addEventListener('permissionChange', updateStatus);
+        OneSignal.Notifications.addEventListener('subscriptionChange', updateStatus);
     });
-  }, []); // Empty dependency array ensures this runs once on mount
+
+    return () => {
+        // Cleanup listeners
+        OneSignal.push(function() {
+            if (OneSignal.Notifications) {
+                OneSignal.Notifications.removeEventListener('permissionChange', updateStatus);
+                OneSignal.Notifications.removeEventListener('subscriptionChange', updateStatus);
+            }
+        });
+    };
+  }, []); // Run only once on mount
 
   // OneSignal User Session Management
   useEffect(() => {
@@ -1334,6 +1379,8 @@ const App: React.FC = () => {
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       gapiReady, 
+      notificationPermission,
+      isSubscribed,
   };
 
   return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;

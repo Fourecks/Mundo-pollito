@@ -1,10 +1,15 @@
 
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import BellIcon from './icons/BellIcon';
 import IosShareIcon from './icons/IosShareIcon';
 
 type Permission = "default" | "denied" | "granted";
+
+interface NotificationManagerProps {
+    permission: Permission;
+    isSubscribed: boolean;
+}
 
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches;
@@ -28,51 +33,8 @@ const IosInstallPrompt: React.FC<{onClose: () => void}> = ({ onClose }) => {
     );
 };
 
-const NotificationManager: React.FC = () => {
-    const [permission, setPermission] = useState<Permission>("default");
-    const [isSubscribed, setIsSubscribed] = useState(false);
+const NotificationManager: React.FC<NotificationManagerProps> = ({ permission, isSubscribed }) => {
     const [showIosPrompt, setShowIosPrompt] = useState(false);
-
-    const updateStatus = useCallback(() => {
-        window.OneSignal.push(async function() {
-            if (!window.OneSignal.Notifications) return;
-
-            const currentPermission = window.OneSignal.Notifications.permission;
-            setPermission(currentPermission);
-
-            if (currentPermission === 'granted') {
-                const subscription = await window.OneSignal.User.PushSubscription.get();
-                setIsSubscribed(!!subscription);
-            } else {
-                setIsSubscribed(false);
-            }
-        });
-    }, []);
-
-    useEffect(() => {
-        window.OneSignal = window.OneSignal || [];
-        window.OneSignal.push(function() {
-            if (!window.OneSignal.isPushNotificationsSupported || !window.OneSignal.isPushNotificationsSupported()) {
-                console.warn("Push notifications are not supported by this browser.");
-                return;
-            }
-            
-            updateStatus();
-
-            window.OneSignal.Notifications.addEventListener('permissionChange', updateStatus);
-            window.OneSignal.Notifications.addEventListener('subscriptionChange', updateStatus);
-        });
-
-        return () => {
-            // Safely queue the cleanup logic to run only when the SDK is available.
-            window.OneSignal.push(function() {
-                if (window.OneSignal.Notifications) {
-                    window.OneSignal.Notifications.removeEventListener('permissionChange', updateStatus);
-                    window.OneSignal.Notifications.removeEventListener('subscriptionChange', updateStatus);
-                }
-            });
-        };
-    }, [updateStatus]);
     
     const handleBellClick = () => {
         if (isIOS() && !isStandalone()) {
