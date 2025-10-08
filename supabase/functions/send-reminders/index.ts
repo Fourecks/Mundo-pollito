@@ -1,5 +1,5 @@
-// FIX: Add Deno type reference to resolve "Cannot find name 'Deno'" error in a non-Deno environment.
-/// <reference types="https://deno.land/x/deno/cli/types/dts/index.d.ts" />
+// FIX: Declare Deno global to resolve TypeScript errors in non-Deno environments.
+declare const Deno: any;
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
