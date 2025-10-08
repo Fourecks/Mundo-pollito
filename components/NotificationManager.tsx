@@ -72,50 +72,57 @@ const NotificationManager: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const subscribeUser = async () => {
+    const handleSubscriptionRequest = () => {
+        if (isActionLoading) return;
         setIsActionLoading(true);
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("User not logged in.");
+        setIsOpen(false);
 
-            const registration = await navigator.serviceWorker.ready;
-            const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-            const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
-            
-            const subscriptionJson = subscription.toJSON();
-
-            // First, delete any existing subscription with the same endpoint.
-            // This simplifies the logic to a "replace" operation, avoiding complex upsert conditions.
-            const { error: deleteError } = await supabase
-                .from('push_subscriptions')
-                .delete()
-                .eq('subscription->>endpoint', subscriptionJson.endpoint);
-
-            if (deleteError) {
-                console.warn("Could not delete old subscription, continuing with insert...", deleteError);
-            }
-
-            // Now, insert the new subscription.
-            const { error: insertError } = await supabase
-                .from('push_subscriptions')
-                .insert({
-                    subscription: subscriptionJson,
-                    user_id: user.id,
+        Notification.requestPermission()
+            .then((permissionResult) => {
+                if (permissionResult !== 'granted') {
+                    setStatus(permissionResult === 'denied' ? 'denied' : 'unsubscribed');
+                    throw new Error(`Permission not granted: ${permissionResult}`);
+                }
+                return navigator.serviceWorker.ready;
+            })
+            .then((registration) => {
+                const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+                return registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey,
                 });
+            })
+            .then(async (subscription) => {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error("User not logged in.");
 
-            // If the insert fails, it's a critical error (likely RLS).
-            if (insertError) {
-                throw insertError;
-            }
+                const subscriptionJson = subscription.toJSON();
+                
+                await supabase
+                    .from('push_subscriptions')
+                    .delete()
+                    .eq('subscription->>endpoint', subscriptionJson.endpoint);
 
-            setStatus('subscribed');
-        } catch (err) {
-            console.error('Failed to subscribe user to notifications. This might be due to a database policy (RLS). Full error:', err);
-            setStatus(Notification.permission === 'denied' ? 'denied' : 'unsubscribed');
-        } finally {
-            setIsActionLoading(false);
-            setIsOpen(false);
-        }
+                const { error: insertError } = await supabase
+                    .from('push_subscriptions')
+                    .insert({
+                        subscription: subscriptionJson,
+                        user_id: user.id,
+                    });
+                
+                if (insertError) throw insertError;
+
+                setStatus('subscribed');
+            })
+            .catch((err) => {
+                console.error('Failed during subscription process:', err);
+                if (status !== 'denied') {
+                    setStatus('unsubscribed');
+                }
+            })
+            .finally(() => {
+                setIsActionLoading(false);
+            });
     };
 
     const unsubscribeUser = async () => {
@@ -136,24 +143,14 @@ const NotificationManager: React.FC = () => {
         }
     };
     
-    const handleBellClick = async () => {
-        // The button is never truly disabled, so this click handler is the source of truth.
-        const currentPermission = Notification.permission;
-
-        if (currentPermission === 'default') {
-            // Directly request permission instead of opening a popover.
-            const permissionResult = await Notification.requestPermission();
-            if (permissionResult === 'granted') {
-                await subscribeUser();
-            } else {
-                setStatus('denied');
-            }
+    const handleBellClick = () => {
+        if (Notification.permission === 'default') {
+            handleSubscriptionRequest();
             return;
         }
-        
-        // For 'granted' or 'denied', toggle the popover.
+
         if (!isOpen) {
-            await checkStatus(); // Refresh status before showing
+            checkStatus();
         }
         setIsOpen(!isOpen);
     };
@@ -200,7 +197,7 @@ const NotificationManager: React.FC = () => {
                     <div>
                         <h4 className="font-bold text-gray-700 dark:text-gray-200 text-center mb-2">Activar Recordatorios</h4>
                         <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-4">Permite las notificaciones para recibir avisos de tus tareas.</p>
-                        <button onClick={subscribeUser} className="w-full bg-primary text-white font-bold rounded-lg px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
+                        <button onClick={handleSubscriptionRequest} className="w-full bg-primary text-white font-bold rounded-lg px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
                             Activar en este dispositivo
                         </button>
                     </div>
@@ -219,8 +216,8 @@ const NotificationManager: React.FC = () => {
                 aria-label="Configurar notificaciones"
                 disabled={status === 'unsupported'}
             >
-                {status === 'loading'
-                  ? <div className="w-6 h-6 border-2 border-gray-400/50 border-t-gray-400 rounded-full animate-spin"></div>
+                {isActionLoading
+                  ? <div className="w-6 h-6 border-2 border-primary/50 border-t-primary rounded-full animate-spin"></div>
                   : <BellIcon className="h-6 w-6" />
                 }
             </button>

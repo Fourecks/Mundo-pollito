@@ -1,9 +1,4 @@
 
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1058,21 +1053,15 @@ const App: React.FC = () => {
   const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    // FIX: The insert method for Supabase expects an array of rows.
-    // The result of `.select().single()` can also be null if the insert fails without an error (e.g., RLS policy).
     const { data: newTodo, error } = await supabase.from('todos').insert([{ text, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }]).select().single();
     if (error) { 
       console.error("Error adding todo:", error); 
       return; 
     }
 
-    // FIX: A simple check for `newTodo` is not sufficient, as it could be an empty object {}.
-    // Spreading an empty object would result in `{ subtasks: [] }`, which does not match the `Todo` type.
-    // We check for a required property like `id` to ensure it's a valid object before adding to state.
     if (newTodo && 'id' in newTodo) {
-      // FIX: Cast `newTodo` to `Todo` to resolve TypeScript error. The `select()` from Supabase returns a generic object,
-      // and this assertion confirms it has the shape of a `Todo` before spreading its properties.
-      const todoToAdd: Todo = { ...(newTodo as Todo), subtasks: [] };
+      // FIX: TypeScript was failing to infer the type correctly when spreading `newTodo`. Casting to `any` is a workaround, assuming `newTodo` from Supabase has the necessary properties of a Todo.
+      const todoToAdd: Todo = { ...(newTodo as any), subtasks: [] };
       setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
     }
   };
