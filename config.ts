@@ -7,6 +7,12 @@
 // This is intended for local development/preview environments only.
 
 export const config = {
+  // --- OneSignal Push Notifications ---
+  // Get your App ID and REST API Key from your OneSignal dashboard.
+  // https://onesignal.com/
+  ONESIGNAL_APP_ID: "89fee09e-9d85-472a-a7c8-cda821a90bbf", // 👈 PEGA TU APP ID AQUÍ
+  ONESIGNAL_REST_API_KEY: "lwohjugmiusgesb7n6ql3mnjw", // 👈 PEGA TU REST API KEY AQUÍ
+
   // --- Google Drive ---
   // To get a client ID, follow the Google Drive API documentation:
   // https://developers.google.com/drive/api/v3/quickstart/js
@@ -22,10 +28,8 @@ export const config = {
   SUPABASE_URL: "https://pbtdzkpympdfemnejpwj.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidGR6a3B5bXBkZmVtbmVqcHdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MzYyMTYsImV4cCI6MjA3NTExMjIxNn0.VsHBuGnmV3T0hJ5sSO6vYlckONHO9IIQmTTjb_S_pBg",
 
-  // --- Push Notifications ---
-  // Generate VAPID keys using a library like `web-push`.
-  // The public key is safe to expose on the client.
+  // --- Push Notifications (DEPRECATED) ---
+  // These are no longer used after switching to OneSignal.
   VAPID_PUBLIC_KEY: "BPGS1Q5RvxzF71vMEb3gKolzNWG0NCme4gJbGKaC4q9j9UDt16-wQ27Y5uClL8eOvYjrwXPvBm3lQwX5M-X8qpw",
-  // The private key MUST be kept secret on your server/edge function.
   VAPID_PRIVATE_KEY: "6xYn4T5yVAIuIFceWuk2y_hJ_l3YLdJTM6rV0w7hJLo"
 };

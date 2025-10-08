@@ -39,6 +39,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <style>
       :root {
         --color-primary: #F472B6; /* pink-400 */
@@ -206,23 +207,5 @@
     <script type="module" src="/index.tsx"></script>
     <script src="https://accounts.google.com/gsi/client" async></script>
     <script src="https://apis.google.com/js/api.js" async></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        // This check prevents registration errors in some sandboxed
-        // editor environments that use 'blob:' protocol.
-        if (window.location.protocol === 'blob:') {
-          console.warn('Advertencia: Las notificaciones push están deshabilitadas en esta vista previa.');
-        } else {
-          console.log('Attempting to register service worker...');
-          navigator.serviceWorker.register('/sw.js', { scope: '/' })
-            .then(registration => {
-              console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            })
-            .catch(err => {
-              console.error('ServiceWorker registration failed: ', err);
-            });
-        }
-      }
-    </script>
   </body>
 </html>

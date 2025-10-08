@@ -1,47 +1,44 @@
-// FIX: Declare Deno global to resolve TypeScript errors in non-Deno environments.
+// Import Deno's standard server and createClient from Supabase
 declare const Deno: any;
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
-import webpush from 'https://deno.land/x/webpush@0.2.0/mod.ts';
 
-const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY')!;
-const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')!;
-
-// Initialize web-push
-webpush.setVapidDetails(
-  'mailto:example@example.com',
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY,
-);
-
+// CORS headers for preflight requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders, status: 200 });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Create a Supabase client with the service_role key
+    // Get OneSignal credentials from Supabase secrets
+    // IMPORTANT: You must set these in your Supabase project's Edge Function settings
+    const ONESIGNAL_APP_ID = Deno.env.get('ONESIGNAL_APP_ID');
+    const ONESIGNAL_REST_API_KEY = Deno.env.get('ONESIGNAL_REST_API_KEY');
+
+    if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
+      throw new Error('OneSignal App ID or REST API Key are not set in Supabase secrets.');
+    }
+
+    // Create an admin Supabase client to access database
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // 1. Find tasks that are due for a reminder
+    // Find tasks that are due for a reminder in the next minute
     const now = new Date();
     const oneMinuteFromNow = new Date(now.getTime() + 60 * 1000);
     const todayDateString = now.toISOString().split('T')[0];
 
     const { data: todos, error: todosError } = await supabaseAdmin
       .from('todos')
-      .select('*')
+      .select('id, text, user_id, due_date, start_time, reminder_offset')
       .eq('due_date', todayDateString)
       .eq('completed', false)
       .eq('notification_sent', false)
@@ -55,32 +52,32 @@ serve(async (req) => {
 
     for (const todo of todos) {
       const startTime = new Date(`${todo.due_date}T${todo.start_time}`);
-      const reminderTime = new Date(startTime.getTime() - todo.reminder_offset * 60 * 1000);
+      const reminderTime = new Date(startTime.getTime() - (todo.reminder_offset || 0) * 60 * 1000);
 
+      // Check if the reminder time is within the current minute
       if (reminderTime >= now && reminderTime < oneMinuteFromNow) {
-        // 2. Find the user's push subscription
-        const { data: subscriptions, error: subsError } = await supabaseAdmin
-          .from('push_subscriptions')
-          .select('subscription')
-          .eq('user_id', todo.user_id);
-
-        if (subsError) {
-          console.error(`Error fetching subscriptions for user ${todo.user_id}:`, subsError);
-          continue;
-        }
-
-        // 3. Prepare to send notifications
-        for (const { subscription } of subscriptions) {
-          if (subscription && subscription.endpoint) {
-            const payload = JSON.stringify({
-              title: 'Recordatorio de Tarea',
-              body: `¡Es hora de empezar: "${todo.text}"!`,
-              tag: `todo-${todo.id}`
-            });
-            notificationsToSend.push({ subscription, payload, todoId: todo.id });
-            sentTodoIds.add(todo.id);
-          }
-        }
+        
+        // Prepare the notification payload for OneSignal
+        const notification = {
+          app_id: ONESIGNAL_APP_ID,
+          include_external_user_ids: [todo.user_id], // Target the user by their Supabase ID
+          headings: { en: 'Recordatorio de Tarea' },
+          contents: { en: `¡Es hora de empezar: "${todo.text}"!` },
+          // You can add more options like sounds, badges, etc.
+          // web_url: 'https://your-app-url.com' // Optional: URL to open on click
+        };
+        
+        notificationsToSend.push(
+          fetch('https://onesignal.com/api/v1/notifications', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Authorization': `Basic ${ONESIGNAL_REST_API_KEY}`,
+            },
+            body: JSON.stringify(notification),
+          })
+        );
+        sentTodoIds.add(todo.id);
       }
     }
 
@@ -91,25 +88,10 @@ serve(async (req) => {
       });
     }
 
-    // 4. Send all notifications
-    const sendPromises = notificationsToSend.map(async ({ subscription, payload, todoId }) => {
-      try {
-        await webpush.sendNotification(subscription, payload);
-      } catch (error) {
-        console.error(`Error sending notification for todo ${todoId}:`, error);
-        if (error.statusCode === 410) {
-          console.log(`Subscription for endpoint ${subscription.endpoint} is gone. Deleting.`);
-          await supabaseAdmin
-            .from('push_subscriptions')
-            .delete()
-            .eq('subscription->>endpoint', subscription.endpoint);
-        }
-      }
-    });
-    
-    await Promise.all(sendPromises);
+    // Send all notifications in parallel
+    await Promise.all(notificationsToSend);
 
-    // 5. Mark todos as having had their notification sent
+    // Mark todos as having had their notification sent
     if (sentTodoIds.size > 0) {
       const { error: updateError } = await supabaseAdmin
         .from('todos')
@@ -125,7 +107,7 @@ serve(async (req) => {
 
   } catch (err) {
     console.error('Function error:', err);
-    return new Response(String(err?.message ?? err), { 
+    return new Response(JSON.stringify({ error: err.message }), { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500 
     });

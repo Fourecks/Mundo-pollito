@@ -264,7 +264,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
   const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
-  const [isSendingTest, setIsSendingTest] = useState(false);
   const pomodoroStartedRef = useRef(false);
 
   const getUserKey = useCallback((key: string) => `${currentUser.email}_${key}`, [currentUser]);
@@ -305,9 +304,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       pomodoroAudioRef.current?.play();
       const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
       const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
-      if (Notification.permission === 'granted') {
-          new Notification('Pomodoro Terminado', { body: message, icon: '/favicon.ico' });
-      }
+      // Notifications are now handled by OneSignal server-side
       setPomodoroState(s => ({
           ...s,
           mode: newMode,
@@ -366,26 +363,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     });
   };
   
-  const handleSendTestNotification = async () => {
-    if (isSendingTest) return;
-    setIsSendingTest(true);
-    
-    // UI feedback immediately
-    console.log("Solicitando notificación de prueba... llegará en 5 segundos.");
-
-    setTimeout(async () => {
-      try {
-        const { error } = await supabase.functions.invoke('send-test-notification');
-        if (error) throw error;
-        console.log("¡Solicitud de notificación enviada con éxito!");
-      } catch (error) {
-        console.error("Error al invocar la función de prueba:", error);
-      } finally {
-        setIsSendingTest(false);
-      }
-    }, 5000);
-  };
-  
   const capitalizedUserName = useMemo(() => {
       if (!currentUser.email) return 'Pollito';
       const userName = currentUser.email.split('@')[0];
@@ -424,15 +401,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               <PaletteIcon />
             </button>
           <NotificationManager />
-           {currentUser.email === 'sito@pollito.app' && (
-            <button
-              onClick={handleSendTestNotification}
-              disabled={isSendingTest}
-              className="bg-secondary/80 text-white font-bold rounded-full px-4 py-2 shadow-lg transition-all duration-300 hover:scale-105 hover:bg-secondary-dark text-xs disabled:bg-secondary-light disabled:cursor-wait"
-            >
-              {isSendingTest ? "Enviando..." : "Test Notif."}
-            </button>
-          )}
         </div>
       </header>
 
@@ -555,7 +523,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isPomodoroModalOpen, setIsPomodoroModalOpen] = useState(false);
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
-    const [isSendingTest, setIsSendingTest] = useState(false);
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
     const ambientAudioRef = useRef<HTMLAudioElement>(null);
@@ -578,9 +545,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
           pomodoroAudioRef.current?.play();
           const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
-          if (Notification.permission === 'granted') {
-              new Notification('Pomodoro Terminado');
-          }
+          // Notifications are now handled by OneSignal server-side
           setPomodoroState(s => ({ ...s, mode: newMode, timeLeft: s.durations[newMode], isActive: true }));
         }
         return () => clearInterval(timer);
@@ -612,23 +577,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     };
 
     const handlePomodoroToggle = () => setPomodoroState(s => ({ ...s, isActive: !s.isActive }));
-    
-    const handleSendTestNotification = async () => {
-      if (isSendingTest) return;
-      setIsSendingTest(true);
-      
-      setTimeout(async () => {
-        try {
-          const { error } = await supabase.functions.invoke('send-test-notification');
-          if (error) throw error;
-        } catch (error) {
-          console.error("Error invoking test function:", error);
-          alert("Error al enviar la notificación de prueba.");
-        } finally {
-          setIsSendingTest(false);
-        }
-      }, 5000);
-    };
 
     const capitalizedUserName = useMemo(() => {
         if (!currentUser.email) return 'Pollito';
@@ -698,21 +646,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 <h3 className="font-bold text-primary-dark dark:text-primary">Notificaciones</h3>
                                 <NotificationManager />
                             </div>
-                            {currentUser.email === 'sito@pollito.app' && (
-                                <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg">
-                                  <button onClick={handleSendTestNotification} disabled={isSendingTest} className="w-full flex justify-between items-center text-left disabled:opacity-50">
-                                    <div>
-                                        <h3 className="font-bold text-secondary-dark dark:text-secondary">Test Notificación</h3>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                          {isSendingTest ? "Enviando en 5 seg..." : "Enviar notificación de prueba."}
-                                        </p>
-                                    </div>
-                                    <div className="text-secondary-dark dark:text-secondary">
-                                      {isSendingTest ? <div className="w-5 h-5 border-2 border-secondary/50 border-t-secondary rounded-full animate-spin"></div> : <ChevronRightIcon />}
-                                    </div>
-                                  </button>
-                                </div>
-                              )}
                              <button onClick={onLogout} className="w-full mt-4 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
                                 <LogoutIcon />
                                 Cerrar Sesión
@@ -889,6 +822,29 @@ const App: React.FC = () => {
   const [galleryIsLoading, setGalleryIsLoading] = useState(false);
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
+  
+  // OneSignal Initialization (runs only once)
+  useEffect(() => {
+    window.OneSignal = window.OneSignal || [];
+    window.OneSignal.push(function() {
+      window.OneSignal.init({
+        appId: config.ONESIGNAL_APP_ID,
+      });
+    });
+  }, []); // Empty dependency array ensures this runs once on mount
+
+  // OneSignal User Session Management
+  useEffect(() => {
+    if (user) {
+      window.OneSignal.push(function() {
+        window.OneSignal.login(user.id);
+      });
+    } else {
+      window.OneSignal.push(function() {
+        window.OneSignal.logout();
+      });
+    }
+  }, [user]);
 
   // --- SUPABASE AUTH & DATA LOADING ---
   useEffect(() => {

@@ -1,37 +1,12 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+
+
+import React, { useState, useEffect, useCallback } from 'react';
 import BellIcon from './icons/BellIcon';
-import { supabase } from '../supabaseClient';
-import { config } from '../config';
 import IosShareIcon from './icons/IosShareIcon';
 
-const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VAPID_PUBLIC_KEY || config.VAPID_PUBLIC_KEY;
+type Permission = "default" | "denied" | "granted";
 
-// Helper to convert VAPID key
-function urlBase64ToUint8Array(base64String: string) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-}
-
-type Status = 'loading' | 'unsupported' | 'subscribed' | 'unsubscribed' | 'denied';
-
-const isIOS = () => {
-  return [
-    'iPad Simulator',
-    'iPhone Simulator',
-    'iPod Simulator',
-    'iPad',
-    'iPhone',
-    'iPod'
-  ].includes(navigator.platform)
-  || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
-}
-
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches;
 
 const IosInstallPrompt: React.FC<{onClose: () => void}> = ({ onClose }) => {
@@ -53,227 +28,104 @@ const IosInstallPrompt: React.FC<{onClose: () => void}> = ({ onClose }) => {
     );
 };
 
-
 const NotificationManager: React.FC = () => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [status, setStatus] = useState<Status>('loading');
-    const [isActionLoading, setIsActionLoading] = useState(false);
-    const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
-    
-    const popoverRef = useRef<HTMLDivElement>(null);
-    const buttonRef = useRef<HTMLButtonElement>(null);
+    const [permission, setPermission] = useState<Permission>("default");
+    const [isSubscribed, setIsSubscribed] = useState(false);
+    const [showIosPrompt, setShowIosPrompt] = useState(false);
 
-    const checkStatus = useCallback(async (isInitialCheck = false) => {
-        if (!isInitialCheck) setStatus('loading');
-        
-        try {
-            if (!('serviceWorker' in navigator) || !('PushManager' in window) || !VAPID_PUBLIC_KEY || !window.isSecureContext) {
-                setStatus('unsupported');
-                return;
-            }
+    const updateStatus = useCallback(() => {
+        window.OneSignal.push(async function() {
+            if (!window.OneSignal.Notifications) return;
 
-            const permission = Notification.permission;
-            if (permission === 'denied') {
-                setStatus('denied');
-                return;
+            const currentPermission = window.OneSignal.Notifications.permission;
+            setPermission(currentPermission);
+
+            if (currentPermission === 'granted') {
+                const subscription = await window.OneSignal.User.PushSubscription.get();
+                setIsSubscribed(!!subscription);
+            } else {
+                setIsSubscribed(false);
             }
-            
-            if (permission === 'granted') {
-                const registration = await navigator.serviceWorker.ready;
-                const subscription = await registration.pushManager.getSubscription();
-                setStatus(subscription ? 'subscribed' : 'unsubscribed');
-                return;
-            }
-            
-            setStatus('unsubscribed');
-        } catch (error) {
-            console.error("Error checking notification status:", error);
-            setStatus('unsupported');
-        }
+        });
     }, []);
 
     useEffect(() => {
-        checkStatus(true);
-    }, [checkStatus]);
-    
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (popoverRef.current && !popoverRef.current.contains(event.target as Node) && buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
+        window.OneSignal = window.OneSignal || [];
+        window.OneSignal.push(function() {
+            if (!window.OneSignal.isPushNotificationsSupported || !window.OneSignal.isPushNotificationsSupported()) {
+                console.warn("Push notifications are not supported by this browser.");
+                return;
             }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+            
+            updateStatus();
 
-    const subscribeUser = useCallback(() => {
-        setIsActionLoading(true);
-        setIsOpen(false);
-    
-        navigator.serviceWorker.ready
-            .then((registration) => {
-                const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-                return registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey,
-                });
-            })
-            .then(async (subscription) => {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) throw new Error("User not logged in.");
-    
-                const subscriptionJson = subscription.toJSON();
-                
-                await supabase
-                    .from('push_subscriptions')
-                    .delete()
-                    .eq('subscription->>endpoint', subscriptionJson.endpoint);
-    
-                const { error: insertError } = await supabase
-                    .from('push_subscriptions')
-                    .insert({
-                        subscription: subscriptionJson,
-                        user_id: user.id,
-                    });
-                
-                if (insertError) throw insertError;
-    
-                setStatus('subscribed');
-            })
-            .catch((err) => {
-                console.error('Failed during subscription process:', err);
-                setStatus('unsubscribed');
-            })
-            .finally(() => {
-                setIsActionLoading(false);
+            window.OneSignal.Notifications.addEventListener('permissionChange', updateStatus);
+            window.OneSignal.Notifications.addEventListener('subscriptionChange', updateStatus);
+        });
+
+        return () => {
+            // Safely queue the cleanup logic to run only when the SDK is available.
+            window.OneSignal.push(function() {
+                if (window.OneSignal.Notifications) {
+                    window.OneSignal.Notifications.removeEventListener('permissionChange', updateStatus);
+                    window.OneSignal.Notifications.removeEventListener('subscriptionChange', updateStatus);
+                }
             });
-    }, []);
-
-    const unsubscribeUser = useCallback(async () => {
-        setIsActionLoading(true);
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
-            if (subscription) {
-                await supabase.from('push_subscriptions').delete().eq('subscription->>endpoint', subscription.endpoint);
-                await subscription.unsubscribe();
-            }
-            setStatus('unsubscribed');
-        } catch (err) {
-            console.error('Error unsubscribing:', err);
-        } finally {
-            setIsActionLoading(false);
-            setIsOpen(false);
-        }
-    }, []);
+        };
+    }, [updateStatus]);
     
     const handleBellClick = () => {
-        if (isActionLoading) return;
-
         if (isIOS() && !isStandalone()) {
-            setShowIosInstallPrompt(true);
+            setShowIosPrompt(true);
             return;
         }
-
-        if (Notification.permission === 'default') {
-            setIsActionLoading(true);
-            Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
-                    subscribeUser();
-                } else {
-                    setStatus(permission === 'denied' ? 'denied' : 'unsubscribed');
-                    setIsActionLoading(false);
-                }
-            }).catch(err => {
-                console.error("Permission request failed", err);
-                setIsActionLoading(false);
-            });
-            return;
-        }
-
-        if (!isOpen) {
-            checkStatus();
-        }
-        setIsOpen(!isOpen);
-    };
-
-    const handleActivateFromPopover = () => {
-        setIsOpen(false);
-        handleBellClick(); // The logic is now identical and safe
-    };
-
-    const getIconColor = () => {
-        switch (status) {
-            case 'subscribed': return 'text-primary dark:text-primary-dark';
-            case 'denied': return 'text-red-500 dark:text-red-400';
-            case 'unsupported': return 'text-gray-400 dark:text-gray-500';
-            default: return 'text-gray-700 dark:text-gray-300';
-        }
+        
+        window.OneSignal.push(function() {
+             if (window.OneSignal.Notifications) {
+                window.OneSignal.Notifications.requestPermission();
+             }
+        });
     };
     
-    const PopoverContent: React.FC = () => {
-        if (isActionLoading || status === 'loading') {
-            return <div className="flex justify-center items-center h-24"><div className="w-6 h-6 border-2 border-primary/50 border-t-primary rounded-full animate-spin"></div></div>;
+    const getButtonState = () => {
+        if (permission === 'denied') {
+            return {
+                label: "Bloqueadas",
+                iconColor: "text-red-500",
+                disabled: true,
+                title: "Las notificaciones están bloqueadas en la configuración de tu navegador."
+            };
         }
-
-        switch (status) {
-            case 'unsupported':
-                return <p className="text-sm text-center text-gray-600 dark:text-gray-300">
-                    { !window.isSecureContext
-                        ? "Las notificaciones requieren una conexión segura (HTTPS)."
-                        : "Las notificaciones no son compatibles con este navegador."
-                    }
-                </p>;
-            case 'subscribed':
-                 return (
-                    <div>
-                        <h4 className="font-bold text-gray-700 dark:text-gray-200 text-center mb-2">Notificaciones Activadas</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-4">¡Recibirás recordatorios en este dispositivo!</p>
-                        <button onClick={unsubscribeUser} className="w-full bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold rounded-lg px-4 py-2 hover:bg-red-200 dark:hover:bg-red-900/70 transition-colors">Desactivar</button>
-                    </div>
-                );
-            case 'denied':
-                 return (
-                    <div>
-                        <h4 className="font-bold text-red-500 dark:text-red-400 text-center mb-2">Notificaciones Bloqueadas</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 text-center">Para recibir recordatorios, necesitas habilitar las notificaciones para este sitio en los ajustes de tu navegador.</p>
-                    </div>
-                );
-            case 'unsubscribed':
-                return (
-                    <div>
-                        <h4 className="font-bold text-gray-700 dark:text-gray-200 text-center mb-2">Activar Recordatorios</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-4">Permite las notificaciones para recibir avisos de tus tareas.</p>
-                        <button onClick={handleActivateFromPopover} className="w-full bg-primary text-white font-bold rounded-lg px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
-                            Activar en este dispositivo
-                        </button>
-                    </div>
-                );
-            default:
-                return null;
+        if (permission === 'granted' && isSubscribed) {
+            return {
+                label: "Activadas",
+                iconColor: "text-primary",
+                disabled: true,
+                title: "Las notificaciones están activas para este dispositivo."
+            };
         }
+        return {
+            label: "Activar",
+            iconColor: "text-gray-700 dark:text-gray-300",
+            disabled: false,
+            title: "Activar notificaciones"
+        };
     };
+
+    const { label, iconColor, disabled, title } = getButtonState();
 
     return (
         <div className="relative">
             <button
-                ref={buttonRef}
                 onClick={handleBellClick}
-                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${getIconColor()}`}
-                aria-label="Configurar notificaciones"
-                disabled={status === 'unsupported'}
+                disabled={disabled}
+                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${iconColor}`}
+                aria-label={title}
+                title={title}
             >
-                {isActionLoading
-                  ? <div className="w-6 h-6 border-2 border-primary/50 border-t-primary rounded-full animate-spin"></div>
-                  : <BellIcon className="h-6 w-6" />
-                }
+                <BellIcon className="h-6 w-6" />
             </button>
-            {showIosInstallPrompt && <IosInstallPrompt onClose={() => setShowIosInstallPrompt(false)} />}
-            {isOpen && (
-                <div ref={popoverRef} className="absolute top-full right-0 mt-2 z-[70001] w-64 bg-white/80 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl shadow-2xl p-4 animate-pop-in origin-top-right">
-                    <PopoverContent />
-                </div>
-            )}
+            {showIosPrompt && <IosInstallPrompt onClose={() => setShowIosPrompt(false)} />}
         </div>
     );
 };
