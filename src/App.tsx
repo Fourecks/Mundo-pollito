@@ -822,6 +822,7 @@ const App: React.FC = () => {
 
   const [notificationPermission, setNotificationPermission] = useState<Permission>('default');
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [oneSignalReady, setOneSignalReady] = useState(false);
 
   // Google Drive State
   const [gapiReady, setGapiReady] = useState(false);
@@ -832,64 +833,60 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // OneSignal Full Lifecycle Management
+  // --- OneSignal Initialization ---
   useEffect(() => {
-    window.OneSignal = window.OneSignal || [];
-    const OneSignal = window.OneSignal;
-
-    const updateStatus = async () => {
-        if (!OneSignal.Notifications) return;
-
-        const permission = OneSignal.Notifications.permission;
-        setNotificationPermission(permission);
-
-        if (permission === 'granted') {
-            const subscription = await OneSignal.User.PushSubscription.get();
-            setIsSubscribed(!!subscription);
-        } else {
-            setIsSubscribed(false);
+    // This effect runs only once to initialize the SDK and set up listeners.
+    const listenerRef = {
+        onSubscriptionChange: () => {
+            window.OneSignal.push(async function(this: any) {
+                try {
+                    setNotificationPermission(this.Notifications.permission);
+                    const subscription = await this.User.PushSubscription.get();
+                    setIsSubscribed(!!subscription);
+                } catch (e) { console.error("Error getting OneSignal subscription state:", e); }
+            });
         }
     };
 
-    OneSignal.push(async function() {
-        if (!OneSignal.isPushNotificationsSupported || !OneSignal.isPushNotificationsSupported()) {
+    window.OneSignal.push(async function(this: any) {
+        if (!this.isPushNotificationsSupported()) {
             console.warn("Push notifications are not supported by this browser.");
+            setOneSignalReady(true);
             return;
         }
         
-        await OneSignal.init({
-            appId: config.ONESIGNAL_APP_ID,
-        });
-
-        updateStatus();
-
-        OneSignal.Notifications.addEventListener('permissionChange', updateStatus);
-        OneSignal.Notifications.addEventListener('subscriptionChange', updateStatus);
+        try {
+            await this.init({ appId: config.ONESIGNAL_APP_ID });
+            
+            this.Notifications.addEventListener('permissionChange', listenerRef.onSubscriptionChange);
+            this.Notifications.addEventListener('subscriptionChange', listenerRef.onSubscriptionChange);
+            
+            listenerRef.onSubscriptionChange(); // Initial check
+            setOneSignalReady(true);
+        } catch (e) {
+            console.error("Error initializing OneSignal:", e);
+        }
     });
 
     return () => {
-        // Cleanup listeners
-        OneSignal.push(function() {
-            if (OneSignal.Notifications) {
-                OneSignal.Notifications.removeEventListener('permissionChange', updateStatus);
-                OneSignal.Notifications.removeEventListener('subscriptionChange', updateStatus);
+        window.OneSignal.push(function(this: any) {
+            if (this.Notifications) {
+                this.Notifications.removeEventListener('permissionChange', listenerRef.onSubscriptionChange);
+                this.Notifications.removeEventListener('subscriptionChange', listenerRef.onSubscriptionChange);
             }
         });
     };
-  }, []); // Run only once on mount
+  }, []);
 
-  // OneSignal User Session Management
+  // --- OneSignal User Login ---
   useEffect(() => {
-    if (user) {
-      window.OneSignal.push(function() {
-        window.OneSignal.login(user.id);
-      });
-    } else {
-      window.OneSignal.push(function() {
-        window.OneSignal.logout();
-      });
+    if (oneSignalReady && user) {
+        window.OneSignal.push(function(this: any) {
+            this.login(user.id);
+        });
     }
-  }, [user]);
+  }, [user, oneSignalReady]);
+
 
   // --- SUPABASE AUTH & DATA LOADING ---
   useEffect(() => {
@@ -899,12 +896,10 @@ const App: React.FC = () => {
       setAuthLoading(false);
     });
     
-    // Check for existing session on initial load
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
           setAuthLoading(false);
       }
-      // onAuthStateChange will handle setting the user
     });
 
     return () => subscription.unsubscribe();
@@ -920,7 +915,6 @@ const App: React.FC = () => {
       try {
         await initDB(user.email!);
         
-        // Settings first
         const { data: settingsData, error: settingsError } = await supabase.from('site_settings').select('*').single();
         if (settingsData) {
             setTheme(settingsData.theme_mode || 'light');
@@ -935,7 +929,6 @@ const App: React.FC = () => {
             await supabase.from('site_settings').insert({ user_id: user.id, theme_mode: 'light', theme_colors: DEFAULT_COLORS, pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: 50, showBackgroundTimer: false } });
         }
 
-        // Load Todos from Supabase
         const { data: todosData, error: todosError } = await supabase.from('todos').select('*, subtasks(*)');
         if (todosError) throw todosError;
         if (todosData) {
@@ -949,7 +942,6 @@ const App: React.FC = () => {
             setAllTodos(groupedTodos);
         }
 
-        // Load Folders & Notes from Supabase
         const { data: foldersData, error: foldersError } = await supabase.from('folders').select('*');
         if (foldersError) throw foldersError;
         const { data: notesData, error: notesError } = await supabase.from('notes').select('*');
@@ -1066,7 +1058,6 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user || !gapiReady || gdriveToken) return;
 
-    // 1. Check for token in URL hash (after redirect from Google)
     if (window.location.hash.includes('access_token')) {
         const params = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = params.get('access_token');
@@ -1084,7 +1075,6 @@ const App: React.FC = () => {
         }
     }
 
-    // 2. If no token in URL, check localStorage for a saved session
     const storedToken = localStorage.getItem(`${user.email}_gdrive_token`);
     const storedExpiry = localStorage.getItem(`${user.email}_gdrive_expiry`);
 
@@ -1118,8 +1108,6 @@ const App: React.FC = () => {
   const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    // FIX: The object passed to `supabase.from('todos').insert` was missing the
-    // required 'completed' and 'priority' fields. Added default values to fix the type error.
     const { data: newTodo, error } = await supabase.from('todos').insert([{ text, completed: false, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }]).select().single();
     if (error) { 
       console.error("Error adding todo:", error); 
@@ -1353,9 +1341,15 @@ const App: React.FC = () => {
   const toggleTheme = () => setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   const handleThemeColorChange = (colorName: keyof ThemeColors, value: string) => setThemeColors(prev => ({...prev, [colorName]: value}));
   const handleResetThemeColors = () => setThemeColors(DEFAULT_COLORS);
-  const handleLogout = async () => { 
-      await supabase.auth.signOut(); 
-      handleGoogleLogout();
+  
+  const handleLogout = async () => {
+    if (oneSignalReady) {
+        window.OneSignal.push(function(this: any) {
+            this.logout();
+        });
+    }
+    await supabase.auth.signOut(); 
+    handleGoogleLogout();
   };
   
   if (authLoading) {

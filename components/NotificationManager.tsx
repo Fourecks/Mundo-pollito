@@ -43,9 +43,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ permission, i
         }
         
         window.OneSignal.push(function() {
-             if (window.OneSignal.Notifications) {
-                window.OneSignal.Notifications.requestPermission();
-             }
+             // `this` is the safely scoped SDK instance here.
+             this.Notifications.requestPermission();
         });
     };
     

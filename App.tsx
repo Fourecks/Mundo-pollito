@@ -822,6 +822,7 @@ const App: React.FC = () => {
 
   const [notificationPermission, setNotificationPermission] = useState<Permission>('default');
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [oneSignalReady, setOneSignalReady] = useState(false);
 
   // Google Drive State
   const [gapiReady, setGapiReady] = useState(false);
@@ -832,64 +833,63 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // OneSignal Full Lifecycle Management
+  // OneSignal Initialization and event handling
   useEffect(() => {
-    window.OneSignal = window.OneSignal || [];
-    const OneSignal = window.OneSignal;
-
-    const updateStatus = async () => {
-        if (!OneSignal.Notifications) return;
-
-        const permission = OneSignal.Notifications.permission;
-        setNotificationPermission(permission);
-
-        if (permission === 'granted') {
-            const subscription = await OneSignal.User.PushSubscription.get();
-            setIsSubscribed(!!subscription);
-        } else {
-            setIsSubscribed(false);
-        }
-    };
-
-    OneSignal.push(async function() {
-        if (!OneSignal.isPushNotificationsSupported || !OneSignal.isPushNotificationsSupported()) {
-            console.warn("Push notifications are not supported by this browser.");
-            return;
-        }
-        
-        await OneSignal.init({
-            appId: config.ONESIGNAL_APP_ID,
-        });
-
-        updateStatus();
-
-        OneSignal.Notifications.addEventListener('permissionChange', updateStatus);
-        OneSignal.Notifications.addEventListener('subscriptionChange', updateStatus);
-    });
-
-    return () => {
-        // Cleanup listeners
-        OneSignal.push(function() {
-            if (OneSignal.Notifications) {
-                OneSignal.Notifications.removeEventListener('permissionChange', updateStatus);
-                OneSignal.Notifications.removeEventListener('subscriptionChange', updateStatus);
+    const onSubscriptionChange = () => {
+        window.OneSignal.push(async function(this: any) {
+            try {
+                const permission = this.Notifications.permission;
+                setNotificationPermission(permission);
+                const subscription = await this.User.PushSubscription.get();
+                setIsSubscribed(!!subscription);
+            } catch (e) {
+                console.error("Error getting OneSignal subscription state:", e);
             }
         });
     };
-  }, []); // Run only once on mount
 
-  // OneSignal User Session Management
+    window.OneSignal.push(async function(this: any) { // `this` is the SDK instance
+        if (!this.isPushNotificationsSupported()) {
+            console.warn("Push notifications are not supported by this browser.");
+            setOneSignalReady(true);
+            return;
+        }
+        
+        try {
+            await this.init({ appId: config.ONESIGNAL_APP_ID });
+            
+            onSubscriptionChange(); // Initial check
+            
+            this.Notifications.addEventListener('permissionChange', onSubscriptionChange);
+            this.Notifications.addEventListener('subscriptionChange', onSubscriptionChange);
+            
+            setOneSignalReady(true);
+        } catch (e) {
+            console.error("Error initializing OneSignal:", e);
+        }
+    });
+
+    // Cleanup listeners on component unmount
+    return () => {
+        window.OneSignal.push(function(this: any) {
+            if (this.Notifications) { // Check if SDK was loaded
+                this.Notifications.removeEventListener('permissionChange', onSubscriptionChange);
+                this.Notifications.removeEventListener('subscriptionChange', onSubscriptionChange);
+            }
+        });
+    };
+  }, []);
+
+  // OneSignal User Login
   useEffect(() => {
-    if (user) {
-      window.OneSignal.push(function() {
-        window.OneSignal.login(user.id);
-      });
-    } else {
-      window.OneSignal.push(function() {
-        window.OneSignal.logout();
-      });
+    if (oneSignalReady && user) {
+        window.OneSignal.push(function(this: any) {
+            this.login(user.id);
+        });
     }
-  }, [user]);
+    // Logout is handled explicitly in handleLogout function
+  }, [user, oneSignalReady]);
+
 
   // --- SUPABASE AUTH & DATA LOADING ---
   useEffect(() => {
@@ -1353,9 +1353,15 @@ const App: React.FC = () => {
   const toggleTheme = () => setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   const handleThemeColorChange = (colorName: keyof ThemeColors, value: string) => setThemeColors(prev => ({...prev, [colorName]: value}));
   const handleResetThemeColors = () => setThemeColors(DEFAULT_COLORS);
-  const handleLogout = async () => { 
-      await supabase.auth.signOut(); 
-      handleGoogleLogout();
+  
+  const handleLogout = async () => {
+    if (oneSignalReady) {
+        window.OneSignal.push(function(this: any) {
+            this.logout();
+        });
+    }
+    await supabase.auth.signOut(); 
+    handleGoogleLogout();
   };
   
   if (authLoading) {
