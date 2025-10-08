@@ -1116,7 +1116,7 @@ const App: React.FC = () => {
   const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    // FIX: Add missing 'completed' property to satisfy the 'Todo' type on insert.
+    // When creating a new todo, the 'completed' field must be included to satisfy the 'Todo' type.
     const { data: newTodo, error } = await supabase.from('todos').insert([{ text, completed: false, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }]).select().single();
     if (error) { 
       console.error("Error adding todo:", error); 
