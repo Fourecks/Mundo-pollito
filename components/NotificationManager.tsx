@@ -85,9 +85,7 @@ const NotificationManager: React.FC = () => {
                 return;
             }
             
-            // If permission is 'default'
             setStatus('unsubscribed');
-
         } catch (error) {
             console.error("Error checking notification status:", error);
             setStatus('unsupported');
@@ -108,19 +106,11 @@ const NotificationManager: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleSubscriptionRequest = () => {
-        if (isActionLoading) return;
+    const subscribeUser = useCallback(() => {
         setIsActionLoading(true);
         setIsOpen(false);
-
-        Notification.requestPermission()
-            .then((permissionResult) => {
-                if (permissionResult !== 'granted') {
-                    setStatus(permissionResult === 'denied' ? 'denied' : 'unsubscribed');
-                    throw new Error(`Permission not granted: ${permissionResult}`);
-                }
-                return navigator.serviceWorker.ready;
-            })
+    
+        navigator.serviceWorker.ready
             .then((registration) => {
                 const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
                 return registration.pushManager.subscribe({
@@ -131,14 +121,14 @@ const NotificationManager: React.FC = () => {
             .then(async (subscription) => {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) throw new Error("User not logged in.");
-
+    
                 const subscriptionJson = subscription.toJSON();
                 
                 await supabase
                     .from('push_subscriptions')
                     .delete()
                     .eq('subscription->>endpoint', subscriptionJson.endpoint);
-
+    
                 const { error: insertError } = await supabase
                     .from('push_subscriptions')
                     .insert({
@@ -147,21 +137,19 @@ const NotificationManager: React.FC = () => {
                     });
                 
                 if (insertError) throw insertError;
-
+    
                 setStatus('subscribed');
             })
             .catch((err) => {
                 console.error('Failed during subscription process:', err);
-                if (status !== 'denied') {
-                    setStatus('unsubscribed');
-                }
+                setStatus('unsubscribed');
             })
             .finally(() => {
                 setIsActionLoading(false);
             });
-    };
+    }, []);
 
-    const unsubscribeUser = async () => {
+    const unsubscribeUser = useCallback(async () => {
         setIsActionLoading(true);
         try {
             const registration = await navigator.serviceWorker.ready;
@@ -177,16 +165,29 @@ const NotificationManager: React.FC = () => {
             setIsActionLoading(false);
             setIsOpen(false);
         }
-    };
+    }, []);
     
     const handleBellClick = () => {
+        if (isActionLoading) return;
+
         if (isIOS() && !isStandalone()) {
             setShowIosInstallPrompt(true);
             return;
         }
 
         if (Notification.permission === 'default') {
-            handleSubscriptionRequest();
+            setIsActionLoading(true);
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    subscribeUser();
+                } else {
+                    setStatus(permission === 'denied' ? 'denied' : 'unsubscribed');
+                    setIsActionLoading(false);
+                }
+            }).catch(err => {
+                console.error("Permission request failed", err);
+                setIsActionLoading(false);
+            });
             return;
         }
 
@@ -194,6 +195,11 @@ const NotificationManager: React.FC = () => {
             checkStatus();
         }
         setIsOpen(!isOpen);
+    };
+
+    const handleActivateFromPopover = () => {
+        setIsOpen(false);
+        handleBellClick(); // The logic is now identical and safe
     };
 
     const getIconColor = () => {
@@ -238,7 +244,7 @@ const NotificationManager: React.FC = () => {
                     <div>
                         <h4 className="font-bold text-gray-700 dark:text-gray-200 text-center mb-2">Activar Recordatorios</h4>
                         <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-4">Permite las notificaciones para recibir avisos de tus tareas.</p>
-                        <button onClick={handleSubscriptionRequest} className="w-full bg-primary text-white font-bold rounded-lg px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
+                        <button onClick={handleActivateFromPopover} className="w-full bg-primary text-white font-bold rounded-lg px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
                             Activar en este dispositivo
                         </button>
                     </div>

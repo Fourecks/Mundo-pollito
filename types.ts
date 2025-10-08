@@ -1,4 +1,5 @@
 
+
 import { GenerateContentResponse } from '@google/genai';
 
 export interface WindowState {
@@ -133,7 +134,7 @@ export interface SupabaseUser {
   email?: string;
 }
 
-// FIX: Add missing EncouragementNote type.
+// FIX: Added missing EncouragementNote type.
 export interface EncouragementNote {
   id: string;
   text: string;
@@ -173,7 +174,7 @@ declare global {
   interface Window {
     YT?: typeof YT;
     onYouTubeIframeAPIReady?: () => void;
-    // FIX: Add google and gapi to the Window interface to resolve TypeScript errors in App.tsx.
+    // FIX: Added google and gapi to the Window interface to resolve TypeScript errors in App.tsx.
     google: any;
     gapi: any;
     supabase: {

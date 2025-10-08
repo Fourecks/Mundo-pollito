@@ -134,7 +134,7 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
     // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
-    }, [track.id]);
+    }, [track.id, isMuted, volume, track.name]);
 
     const handlePlayPause = () => {
         if (!playerRef.current) return;
