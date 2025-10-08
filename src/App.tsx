@@ -3,6 +3,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1069,6 +1070,8 @@ const App: React.FC = () => {
     // Spreading an empty object would result in `{ subtasks: [] }`, which does not match the `Todo` type.
     // We check for a required property like `id` to ensure it's a valid object before adding to state.
     if (newTodo && 'id' in newTodo) {
+      // FIX: Cast `newTodo` to `Todo` to resolve TypeScript error. The `select()` from Supabase returns a generic object,
+      // and this assertion confirms it has the shape of a `Todo` before spreading its properties.
       const todoToAdd: Todo = { ...(newTodo as Todo), subtasks: [] };
       setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
     }
