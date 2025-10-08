@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import BellIcon from './icons/BellIcon';
 import { supabase } from '../supabaseClient';
 import { config } from '../config';
+import IosShareIcon from './icons/IosShareIcon';
 
 const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VAPID_PUBLIC_KEY || config.VAPID_PUBLIC_KEY;
 
@@ -19,10 +20,45 @@ function urlBase64ToUint8Array(base64String: string) {
 
 type Status = 'loading' | 'unsupported' | 'subscribed' | 'unsubscribed' | 'denied';
 
+const isIOS = () => {
+  return [
+    'iPad Simulator',
+    'iPhone Simulator',
+    'iPod Simulator',
+    'iPad',
+    'iPhone',
+    'iPod'
+  ].includes(navigator.platform)
+  || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+}
+
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches;
+
+const IosInstallPrompt: React.FC<{onClose: () => void}> = ({ onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80000] flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 text-center max-w-sm w-full animate-pop-in" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-primary-dark dark:text-primary">Habilitar Notificaciones</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Para recibir recordatorios en tu iPhone, primero debes añadir esta aplicación a tu pantalla de inicio.</p>
+                <div className="text-left text-sm space-y-3 mt-4 text-gray-700 dark:text-gray-200">
+                    <p>1. Toca el botón de Compartir <IosShareIcon className="h-5 w-5 inline-block -mt-1" /> en la barra de herramientas de Safari.</p>
+                    <p>2. Desliza hacia arriba y selecciona <span className="font-semibold">"Añadir a la pantalla de inicio"</span>.</p>
+                    <p>3. Abre la aplicación desde tu pantalla de inicio y vuelve a tocar la campana.</p>
+                </div>
+                 <button onClick={onClose} className="mt-6 w-full bg-primary text-white font-bold rounded-full px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
+                    Entendido
+                </button>
+            </div>
+        </div>
+    );
+};
+
+
 const NotificationManager: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [status, setStatus] = useState<Status>('loading');
     const [isActionLoading, setIsActionLoading] = useState(false);
+    const [showIosInstallPrompt, setShowIosInstallPrompt] = useState(false);
     
     const popoverRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -144,6 +180,11 @@ const NotificationManager: React.FC = () => {
     };
     
     const handleBellClick = () => {
+        if (isIOS() && !isStandalone()) {
+            setShowIosInstallPrompt(true);
+            return;
+        }
+
         if (Notification.permission === 'default') {
             handleSubscriptionRequest();
             return;
@@ -221,7 +262,7 @@ const NotificationManager: React.FC = () => {
                   : <BellIcon className="h-6 w-6" />
                 }
             </button>
-
+            {showIosInstallPrompt && <IosInstallPrompt onClose={() => setShowIosInstallPrompt(false)} />}
             {isOpen && (
                 <div ref={popoverRef} className="absolute top-full right-0 mt-2 z-[70001] w-64 bg-white/80 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl shadow-2xl p-4 animate-pop-in origin-top-right">
                     <PopoverContent />

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1053,14 +1054,14 @@ const App: React.FC = () => {
   const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    const { data: newTodo, error } = await supabase.from('todos').insert([{ text, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }]).select().single();
+    // FIX: Added `completed: false` to the insert payload to ensure the new todo object has all required properties of the `Todo` type.
+    const { data: newTodo, error } = await supabase.from('todos').insert([{ text, completed: false, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }]).select().single();
     if (error) { 
       console.error("Error adding todo:", error); 
       return; 
     }
 
     if (newTodo && 'id' in newTodo) {
-      // FIX: TypeScript was failing to infer the type correctly when spreading `newTodo`. Casting to `any` is a workaround, assuming `newTodo` from Supabase has the necessary properties of a Todo.
       const todoToAdd: Todo = { ...(newTodo as any), subtasks: [] };
       setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
     }
