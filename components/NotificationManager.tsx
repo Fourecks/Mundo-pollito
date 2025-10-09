@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import BellIcon from './icons/BellIcon';
 import IosShareIcon from './icons/IosShareIcon';
@@ -33,64 +32,79 @@ const IosInstallPrompt: React.FC<{onClose: () => void}> = ({ onClose }) => {
     );
 };
 
+const DeniedPrompt: React.FC<{onClose: () => void}> = ({ onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80000] flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 text-center max-w-sm w-full animate-pop-in" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-red-500">Notificaciones Bloqueadas</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                    Has bloqueado las notificaciones para este sitio. Para habilitarlas, necesitas cambiar la configuración de tu navegador.
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                    Busca el ícono de candado 🔒 en la barra de direcciones, haz clic en él y ajusta los permisos de notificaciones.
+                </p>
+                <button onClick={onClose} className="mt-6 w-full bg-primary text-white font-bold rounded-full px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
+                    Entendido
+                </button>
+            </div>
+        </div>
+    );
+};
+
 const NotificationManager: React.FC<NotificationManagerProps> = ({ permission, isSubscribed }) => {
     const [showIosPrompt, setShowIosPrompt] = useState(false);
+    const [showDeniedHelp, setShowDeniedHelp] = useState(false);
     
     const handleBellClick = () => {
+        // Handle special cases first
+        if (permission === 'denied') {
+            setShowDeniedHelp(true);
+            return;
+        }
+
         if (isIOS() && !isStandalone()) {
             setShowIosPrompt(true);
             return;
         }
         
-        window.OneSignal.push(function() {
-             // `this` is the safely scoped SDK instance here.
-             this.Notifications.requestPermission();
-        });
+        // Default action: prompt for permission if not yet granted
+        if (permission === 'default') {
+            window.OneSignal.push(() => {
+                window.OneSignal.Notifications.requestPermission();
+            });
+        }
     };
     
-    const getButtonState = () => {
-        if (permission === 'denied') {
-            return {
-                iconColor: "text-red-500",
-                disabled: true,
-                title: "Las notificaciones están bloqueadas en la configuración de tu navegador."
-            };
-        }
-        if (permission === 'granted' && isSubscribed) {
-            return {
-                iconColor: "text-primary",
-                disabled: true,
-                title: "Las notificaciones están activas para este dispositivo."
-            };
-        }
-        if (permission === 'granted' && !isSubscribed) {
-            return {
-                iconColor: "text-yellow-500 animate-pulse",
-                disabled: true,
-                title: "Estamos activando las notificaciones... Esto puede tardar unos segundos."
-            };
-        }
-        return {
-            iconColor: "text-gray-700 dark:text-gray-300",
-            disabled: false,
-            title: "Activar notificaciones"
-        };
-    };
+    let title = "Activar notificaciones";
+    let iconClass = "text-gray-700 dark:text-gray-300";
+    let isDisabled = false;
 
-    const { iconColor, disabled, title } = getButtonState();
-
+    if (permission === 'denied') {
+        title = "Notificaciones bloqueadas. Haz clic para obtener ayuda.";
+        iconClass = "text-red-500";
+    } else if (permission === 'granted' && isSubscribed) {
+        title = "Las notificaciones están activas.";
+        iconClass = "text-primary";
+        isDisabled = true;
+    } else if (permission === 'granted' && !isSubscribed) {
+        title = "Registrando para notificaciones...";
+        iconClass = "text-yellow-500 animate-pulse";
+        isDisabled = true;
+    }
+    
     return (
         <div className="relative">
             <button
                 onClick={handleBellClick}
-                disabled={disabled}
-                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${disabled ? 'cursor-not-allowed' : 'hover:scale-110'} ${iconColor}`}
+                disabled={isDisabled}
+                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'hover:scale-110'}`}
                 aria-label={title}
                 title={title}
             >
-                <BellIcon className="h-6 w-6" />
+                <BellIcon className={`h-6 w-6 ${iconClass}`} />
             </button>
             {showIosPrompt && <IosInstallPrompt onClose={() => setShowIosPrompt(false)} />}
+            {showDeniedHelp && <DeniedPrompt onClose={() => setShowDeniedHelp(false)} />}
         </div>
     );
 };

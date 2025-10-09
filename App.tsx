@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -834,61 +835,50 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // OneSignal Initialization and event handling
+  // OneSignal Initialization and event handling (REWRITTEN)
   useEffect(() => {
-    const onSubscriptionChange = () => {
-        window.OneSignal.push(async function(this: any) {
-            try {
-                const permission = this.Notifications.permission;
-                setNotificationPermission(permission);
-                const subscription = await this.User.PushSubscription.get();
-                setIsSubscribed(!!subscription);
-            } catch (e) {
-                console.error("Error getting OneSignal subscription state:", e);
-            }
-        });
-    };
+    window.OneSignal.push(async function() {
+      if (!window.OneSignal.isPushNotificationsSupported()) {
+        console.warn("Push notifications are not supported by this browser.");
+        setOneSignalReady(true);
+        return;
+      }
 
-    window.OneSignal.push(async function(this: any) { // `this` is the SDK instance
-        if (!this.isPushNotificationsSupported()) {
-            console.warn("Push notifications are not supported by this browser.");
-            setOneSignalReady(true);
-            return;
-        }
+      try {
+        await window.OneSignal.init({ appId: config.ONESIGNAL_APP_ID });
+        setOneSignalReady(true);
         
-        try {
-            await this.init({ appId: config.ONESIGNAL_APP_ID });
-            
-            onSubscriptionChange(); // Initial check
-            
-            this.Notifications.addEventListener('permissionChange', onSubscriptionChange);
-            this.Notifications.addEventListener('subscriptionChange', onSubscriptionChange);
-            
-            setOneSignalReady(true);
-        } catch (e) {
-            console.error("Error initializing OneSignal:", e);
-        }
-    });
+        const updateStatus = async () => {
+          try {
+            const permission = await window.OneSignal.Notifications.getPermission();
+            setNotificationPermission(permission);
+            const isSubscribed = await window.OneSignal.User.PushSubscription.isSubscribed();
+            setIsSubscribed(isSubscribed);
+          } catch (e) {
+            console.error("Error getting OneSignal status:", e);
+          }
+        };
 
-    // Cleanup listeners on component unmount
-    return () => {
-        window.OneSignal.push(function(this: any) {
-            if (this.Notifications) { // Check if SDK was loaded
-                this.Notifications.removeEventListener('permissionChange', onSubscriptionChange);
-                this.Notifications.removeEventListener('subscriptionChange', onSubscriptionChange);
-            }
-        });
-    };
-  }, []);
+        // Add listeners for changes
+        window.OneSignal.Notifications.addEventListener('permissionChange', updateStatus);
+        window.OneSignal.User.PushSubscription.addEventListener('change', updateStatus);
+
+        // Run initial status check
+        await updateStatus();
+
+      } catch (e) {
+        console.error("Error initializing OneSignal:", e);
+      }
+    });
+  }, []); // Run only once on mount
 
   // OneSignal User Login
   useEffect(() => {
     if (oneSignalReady && user) {
-        window.OneSignal.push(function(this: any) {
-            this.login(user.id);
+        window.OneSignal.push(function() {
+            window.OneSignal.login(user.id);
         });
     }
-    // Logout is handled explicitly in handleLogout function
   }, [user, oneSignalReady]);
 
 
@@ -944,7 +934,8 @@ const App: React.FC = () => {
                 const dateKey = todo.due_date;
                 if (!dateKey) return acc;
                 if (!acc[dateKey]) acc[dateKey] = [];
-                acc[dateKey].push({ ...todo, subtasks: todo.subtasks || [] });
+                // FIX: Ensure priority exists to satisfy Todo type, defaulting to 'medium'. This prevents type errors if data is missing from the database.
+                acc[dateKey].push({ ...todo, priority: todo.priority || 'medium', subtasks: todo.subtasks || [] });
                 return acc;
             }, {} as { [key: string]: Todo[] });
             setAllTodos(groupedTodos);
@@ -1164,9 +1155,10 @@ const App: React.FC = () => {
         if (refetchError) throw refetchError;
         if (!refreshedTodo) throw new Error("Failed to refetch todo after update.");
 
-        // FIX: The type from Supabase can be ambiguous. Casting to `any` ensures all properties
-        // from the fetched object are spread correctly into the new `Todo` object.
-        const finalTodo: Todo = { ...(refreshedTodo as any), subtasks: (refreshedTodo as any).subtasks || [] };
+// FIX: The type from Supabase can be ambiguous, sometimes returning an empty object `{}` instead of `null`.
+// To prevent a type error where required `Todo` properties are missing, we spread `updatedTodo`
+// as a baseline. The properties from `refreshedTodo` will then overwrite it with fresh data from the database.
+        const finalTodo: Todo = { ...updatedTodo, ...(refreshedTodo as Partial<Todo>), subtasks: (refreshedTodo as Todo)?.subtasks || [] };
         
         let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
         let oldDateKey: string | null = null;
@@ -1213,11 +1205,19 @@ const App: React.FC = () => {
         if (allJustCompleted && !allWereCompletedBefore) { onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]); triggerConfetti(); }
         
         let finalAllTodos = { ...allTodos, [dateKey]: newTodosForDay };
-        // FIX: Explicitly typed sourceTodoWithId and corrected logic to prevent runtime errors.
+        
+        // FIX: Refactored to an immutable pattern to ensure type safety when adding a recurrence ID.
         if (newCompletedState && targetTodo.recurrence && targetTodo.recurrence.frequency !== 'none') {
-            const sourceTodoWithId: Todo = { ...targetTodo, completed: newCompletedState };
-            if (!sourceTodoWithId.recurrence.id) {
-                sourceTodoWithId.recurrence = {...sourceTodoWithId.recurrence, id: `recurrence-${sourceTodoWithId.id}`};
+            let sourceTodoWithId: Todo = { ...targetTodo, completed: newCompletedState };
+            if (sourceTodoWithId.recurrence && !sourceTodoWithId.recurrence.id) {
+                // Perform an immutable-style update on the recurrence object for safety.
+                sourceTodoWithId = {
+                    ...sourceTodoWithId,
+                    recurrence: {
+                        ...sourceTodoWithId.recurrence,
+                        id: `recurrence-${sourceTodoWithId.id}`
+                    }
+                };
             }
             finalAllTodos = await generateRecurringTasks(sourceTodoWithId, finalAllTodos);
         }
@@ -1498,8 +1498,8 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     try {
         if (oneSignalReady) {
-            window.OneSignal.push(function(this: any) {
-                this.logout();
+            window.OneSignal.push(function() {
+                window.OneSignal.logout();
             });
         }
         await supabase.auth.signOut(); 
