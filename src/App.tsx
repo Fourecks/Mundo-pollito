@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from '../types';
 import CompletionModal from '../components/CompletionModal';
@@ -835,7 +832,7 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // OneSignal Initialization and event handling (REWRITTEN)
+  // OneSignal Initialization and event handling
   useEffect(() => {
     window.OneSignal.push(async function() {
       if (!window.OneSignal.isPushNotificationsSupported()) {
@@ -859,9 +856,9 @@ const App: React.FC = () => {
           }
         };
 
-        // Add listeners for changes
-        window.OneSignal.Notifications.addEventListener('permissionChange', updateStatus);
-        window.OneSignal.User.PushSubscription.addEventListener('change', updateStatus);
+        // Use the top-level .on() method for stability
+        window.OneSignal.on('notificationPermissionChange', updateStatus);
+        window.OneSignal.on('subscriptionChange', updateStatus);
 
         // Run initial status check
         await updateStatus();
