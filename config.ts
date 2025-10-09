@@ -11,7 +11,7 @@ export const config = {
   // Get your App ID and REST API Key from your OneSignal dashboard.
   // https://onesignal.com/
   ONESIGNAL_APP_ID: "89fee09e-9d85-472a-a7c8-cda821a90bbf", // 👈 PEGA TU APP ID AQUÍ
-  ONESIGNAL_REST_API_KEY: "lwohjugmiusgesb7n6ql3mnjw", // 👈 PEGA TU REST API KEY AQUÍ
+  ONESIGNAL_REST_API_KEY: "os_v2_app_rh7obhu5qvdsvj6izwucdkilx5s2ysovsu6eycue5rkab35s3yqdrgqfhu6wabiee5b6oz4kwvw5bmdmjlaqsehopck2nqtlcuuwkny", // 👈 PEGA TU REST API KEY AQUÍ
 
   // --- Google Drive ---
   // To get a client ID, follow the Google Drive API documentation:
