@@ -15,9 +15,7 @@ interface BackgroundSelectorProps {
     userBackgrounds: Background[];
     onSelect: (background: Background | null) => void;
     onAddBackground: (file: File) => void;
-    // FIX: Changed parameter name from 'uuid' to 'id' to match the 'Background' type.
     onDeleteBackground: (id: string) => void;
-    // FIX: Changed parameter name from 'uuid' to 'id' to match the 'Background' type.
     onToggleFavorite: (id: string) => void;
 }
 
@@ -46,7 +44,6 @@ const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
     
     const confirmDelete = () => {
         if(bgToDelete) {
-            // FIX: Changed 'uuid' to 'id' to match the 'Background' type.
             onDeleteBackground(bgToDelete.id);
             setBgToDelete(null);
         }
@@ -110,11 +107,9 @@ const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
                                 )}
 
                                 {filteredBackgrounds.map(bg => (
-                                    // FIX: Changed key from 'bg.uuid' to 'bg.id'.
                                     <div key={bg.id} className="group relative">
                                         <button
                                             onClick={() => onSelect(bg)}
-                                            // FIX: Changed 'uuid' to 'id' for comparison.
                                             className={`w-full aspect-video rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 block ${activeBackground?.id === bg.id ? 'ring-2 ring-primary' : ''}`}
                                         >
                                             {bg.type === 'video' ? (
@@ -128,7 +123,6 @@ const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
                                         </button>
                                         <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
-                                                // FIX: Changed 'bg.uuid' to 'bg.id'.
                                                 onClick={() => onToggleFavorite(bg.id)}
                                                 className="p-1.5 rounded-full bg-black/30 text-white hover:bg-yellow-500 backdrop-blur-sm"
                                                 title={bg.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
@@ -170,5 +164,4 @@ const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
     );
 };
 
-// FIX: Added default export to make the component available for import.
 export default BackgroundSelector;

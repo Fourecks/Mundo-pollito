@@ -45,7 +45,7 @@ const MemoryGame: React.FC<MemoryGameProps> = ({ images, onBack, isMobile }) => 
         const shuffledImages = [...images].sort(() => 0.5 - Math.random());
         const selectedImages = shuffledImages.slice(0, pairCount);
 
-        // FIX: Use `image.id` instead of `image.uuid` as `uuid` does not exist on the `GalleryImage` type.
+        
         const cardPairs = selectedImages.flatMap((image, index) => [
             { id: index * 2, imageId: image.id, url: image.url },
             { id: index * 2 + 1, imageId: image.id, url: image.url },

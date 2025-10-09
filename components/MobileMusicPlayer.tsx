@@ -6,6 +6,7 @@ import NextIcon from './icons/NextIcon';
 import PreviousIcon from './icons/PreviousIcon';
 import CloseIcon from './icons/CloseIcon';
 import ChevronDownIcon from './icons/ChevronDownIcon';
+import { ensureYoutubeApiReady } from '../utils/youtubeApi';
 
 const formatTime = (seconds: number) => {
     if (isNaN(seconds)) return '00:00';
@@ -76,8 +77,14 @@ const MobileMusicPlayer: React.FC<MobileMusicPlayerProps> = ({ track, queue, onS
         };
 
         const onPlayerReady = (event: { target: YT.Player }) => {
-            if (latestState.current.track) {
-                event.target.loadVideoById(latestState.current.track.source_id);
+            const player = event.target;
+            const { track: currentTrack } = latestState.current;
+            if (currentTrack) {
+                if (currentTrack.type === 'playlist') {
+                    player.loadPlaylist({ list: currentTrack.source_id, listType: 'playlist' });
+                } else {
+                    player.loadVideoById(currentTrack.source_id);
+                }
             }
         };
         
@@ -92,8 +99,9 @@ const MobileMusicPlayer: React.FC<MobileMusicPlayerProps> = ({ track, queue, onS
             });
         };
         
-        if (window.YT && window.YT.Player) createPlayer();
-        else window.onYouTubeIframeAPIReady = createPlayer;
+        ensureYoutubeApiReady().then(() => {
+            createPlayer();
+        });
 
         return () => {
             if (playerRef.current) {

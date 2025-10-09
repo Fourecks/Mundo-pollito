@@ -38,6 +38,7 @@ import ChevronRightIcon from './components/icons/ChevronRightIcon';
 import GamesHub from './components/GamesHub';
 import { supabase } from './supabaseClient';
 import { config } from './config';
+import { ensureYoutubeApiReady } from './utils/youtubeApi';
 
 // Define Permission type here for clarity
 type Permission = "default" | "denied" | "granted";
@@ -1117,47 +1118,82 @@ const App: React.FC = () => {
   // --- ALL HANDLERS ---
   const handleAddTodo = async (text: string) => {
     if (!user) return;
-    const dateKey = formatDateKey(selectedDate);
-    // FIX: The object passed to `supabase.from('todos').insert` was missing the
-    // required 'completed' and 'priority' fields. Added default values to fix the type error.
-    const { data: newTodo, error } = await supabase.from('todos').insert([{ text, completed: false, priority: 'medium' as 'medium', due_date: dateKey, user_id: user.id }]).select().single();
-    if (error) { 
-      console.error("Error adding todo:", error); 
-      return; 
-    }
+    try {
+      const dateKey = formatDateKey(selectedDate);
+      const { data: newTodo, error } = await supabase.from('todos').insert([{ text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id }]).select().single();
+      if (error) { 
+        throw error;
+      }
 
-    if (newTodo && 'id' in newTodo) {
-      const todoToAdd: Todo = { ...(newTodo as any), subtasks: [] };
-      setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
+      if (newTodo && 'id' in newTodo) {
+        const todoToAdd: Todo = { ...(newTodo as Todo), subtasks: [] };
+        setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
+      }
+    } catch (error) {
+        console.error("Error adding todo:", error);
     }
   };
 
   const handleUpdateTodo = async (updatedTodo: Todo) => {
-    let todoToSave = { ...updatedTodo };
-    if (todoToSave.recurrence && todoToSave.recurrence.frequency !== 'none' && !todoToSave.recurrence.id) {
-        todoToSave.recurrence.id = `recurrence-${Date.now()}`;
+    try {
+        let todoToSave = { ...updatedTodo };
+        if (todoToSave.recurrence && todoToSave.recurrence.frequency !== 'none' && !todoToSave.recurrence.id) {
+            todoToSave.recurrence.id = `recurrence-${Date.now()}`;
+        }
+        const { subtasks, ...payloadForSupabase } = todoToSave;
+        
+        await supabase.from('todos').update(payloadForSupabase).eq('id', todoToSave.id).throwOnError();
+        
+        await supabase.from('subtasks').delete().eq('todo_id', todoToSave.id).throwOnError();
+        
+        if (subtasks && subtasks.length > 0) {
+            const subtasksToInsert = subtasks.map(({ text, completed }) => ({
+                text,
+                completed,
+                todo_id: todoToSave.id,
+            }));
+            await supabase.from('subtasks').insert(subtasksToInsert).throwOnError();
+        }
+        
+        const { data: refreshedTodo, error: refetchError } = await supabase
+            .from('todos')
+            .select('*, subtasks(*)')
+            .eq('id', todoToSave.id)
+            .single();
+            
+        if (refetchError) throw refetchError;
+        if (!refreshedTodo) throw new Error("Failed to refetch todo after update.");
+
+        // FIX: The type from Supabase can be ambiguous. Casting to `any` ensures all properties
+        // from the fetched object are spread correctly into the new `Todo` object.
+        const finalTodo: Todo = { ...(refreshedTodo as any), subtasks: (refreshedTodo as any).subtasks || [] };
+        
+        let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
+        let oldDateKey: string | null = null;
+        let originalTask: Todo | null = null;
+        for (const key in newAllTodos) { const task = newAllTodos[key].find((t: Todo) => t.id === finalTodo.id); if (task) { oldDateKey = key; originalTask = task; break; } }
+        
+        if (originalTask?.recurrence?.id) { 
+            for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => (t.recurrence?.id !== originalTask!.recurrence!.id) || (t.id === finalTodo.id) || (t.due_date && originalTask!.due_date && t.due_date <= originalTask!.due_date)); } 
+        }
+        
+        if(oldDateKey && oldDateKey !== finalTodo.due_date && newAllTodos[oldDateKey]) { newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t: Todo) => t.id !== finalTodo.id); }
+        
+        const newDateKey = finalTodo.due_date!;
+        const dateTasks = newAllTodos[newDateKey] || [];
+        const taskIndex = dateTasks.findIndex((t: Todo) => t.id === finalTodo.id);
+        
+        if(taskIndex > -1) { dateTasks[taskIndex] = finalTodo; } else { dateTasks.push(finalTodo); }
+        newAllTodos[newDateKey] = [...dateTasks];
+        
+        if (finalTodo.recurrence && finalTodo.recurrence.frequency !== 'none') { 
+            newAllTodos = await generateRecurringTasks(finalTodo, newAllTodos); 
+        }
+        setAllTodos(newAllTodos);
+
+    } catch (error) {
+        console.error("Error in handleUpdateTodo:", error);
     }
-    const { subtasks, ...payloadForSupabase } = todoToSave;
-    await supabase.from('todos').update(payloadForSupabase).eq('id', todoToSave.id);
-    await supabase.from('subtasks').delete().eq('todo_id', todoToSave.id);
-    if (subtasks && subtasks.length > 0) {
-        await supabase.from('subtasks').insert(subtasks.map(st => ({ text: st.text, completed: st.completed, todo_id: todoToSave.id })));
-    }
-    
-    let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
-    let oldDateKey: string | null = null;
-    let originalTask: Todo | null = null;
-    for (const key in newAllTodos) { const task = newAllTodos[key].find((t: Todo) => t.id === todoToSave.id); if (task) { oldDateKey = key; originalTask = task; break; } }
-    if (originalTask?.recurrence?.id) { 
-        for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => (t.recurrence?.id !== originalTask!.recurrence!.id) || (t.id === todoToSave.id) || (t.due_date && originalTask!.due_date && t.due_date <= originalTask!.due_date)); } }
-    if(oldDateKey && oldDateKey !== todoToSave.due_date && newAllTodos[oldDateKey]) { newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t: Todo) => t.id !== todoToSave.id); }
-    const newDateKey = todoToSave.due_date!;
-    const dateTasks = newAllTodos[newDateKey] || [];
-    const taskIndex = dateTasks.findIndex((t: Todo) => t.id === todoToSave.id);
-    if(taskIndex > -1) { dateTasks[taskIndex] = todoToSave; } else { dateTasks.push(todoToSave); }
-    newAllTodos[newDateKey] = [...dateTasks];
-    if (todoToSave.recurrence && todoToSave.recurrence.frequency !== 'none') { newAllTodos = await generateRecurringTasks(todoToSave, newAllTodos); }
-    setAllTodos(newAllTodos);
   };
 
   const handleToggleTodo = async (id: number, onAllCompleted: (quote: string) => void) => {
@@ -1165,20 +1201,30 @@ const App: React.FC = () => {
     const todosForDay = allTodos[dateKey] || [];
     const targetTodo = todosForDay.find(t => t.id === id);
     if (!targetTodo) return;
-    const newCompletedState = !targetTodo.completed;
-    await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id);
-    if (targetTodo.subtasks?.length) await supabase.from('subtasks').update({ completed: newCompletedState }).eq('todo_id', id);
-    const allWereCompletedBefore = todosForDay.every(t => t.completed);
-    const newTodosForDay = todosForDay.map(t => t.id === id ? { ...t, completed: newCompletedState, subtasks: t.subtasks?.map(st => ({...st, completed: newCompletedState})) } : t);
-    const allJustCompleted = newTodosForDay.every(t => t.completed);
-    if (allJustCompleted && !allWereCompletedBefore) { onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]); triggerConfetti(); }
-    let finalAllTodos = { ...allTodos, [dateKey]: newTodosForDay };
-    if (newCompletedState && targetTodo.recurrence?.frequency !== 'none') {
-        const sourceTodoWithId = { ...targetTodo };
-        if (!sourceTodoWithId.recurrence!.id) sourceTodoWithId.recurrence = {...sourceTodoWithId.recurrence!, id: `recurrence-${sourceTodoWithId.id}`};
-        finalAllTodos = await generateRecurringTasks(sourceTodoWithId, finalAllTodos);
+    
+    try {
+        const newCompletedState = !targetTodo.completed;
+        await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id).throwOnError();
+        if (targetTodo.subtasks?.length) await supabase.from('subtasks').update({ completed: newCompletedState }).eq('todo_id', id).throwOnError();
+        
+        const allWereCompletedBefore = todosForDay.every(t => t.completed);
+        const newTodosForDay = todosForDay.map(t => t.id === id ? { ...t, completed: newCompletedState, subtasks: t.subtasks?.map(st => ({...st, completed: newCompletedState})) } : t);
+        const allJustCompleted = newTodosForDay.every(t => t.completed);
+        if (allJustCompleted && !allWereCompletedBefore) { onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]); triggerConfetti(); }
+        
+        let finalAllTodos = { ...allTodos, [dateKey]: newTodosForDay };
+        // FIX: Explicitly typed sourceTodoWithId and corrected logic to prevent runtime errors.
+        if (newCompletedState && targetTodo.recurrence && targetTodo.recurrence.frequency !== 'none') {
+            const sourceTodoWithId: Todo = { ...targetTodo, completed: newCompletedState };
+            if (!sourceTodoWithId.recurrence.id) {
+                sourceTodoWithId.recurrence = {...sourceTodoWithId.recurrence, id: `recurrence-${sourceTodoWithId.id}`};
+            }
+            finalAllTodos = await generateRecurringTasks(sourceTodoWithId, finalAllTodos);
+        }
+        setAllTodos(finalAllTodos);
+    } catch(error) {
+        console.error("Error toggling todo:", error);
     }
-    setAllTodos(finalAllTodos);
   };
   
   const handleToggleSubtask = async (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => {
@@ -1187,19 +1233,29 @@ const App: React.FC = () => {
       const task = oldTodosForDay.find(t => t.id === taskId);
       const subtask = task?.subtasks?.find(st => st.id === subtaskId);
       if (!task || !subtask) return;
-      const newCompletedState = !subtask.completed;
-      await supabase.from('subtasks').update({ completed: newCompletedState }).eq('id', subtaskId);
-      const allWereCompletedBefore = oldTodosForDay.every(t => t.completed);
-      let parentCompleted = task.completed;
-      const newSubtasks = task.subtasks?.map(st => st.id === subtaskId ? { ...st, completed: newCompletedState } : st);
-      if (newSubtasks) {
-          const allSubtasksCompleted = newSubtasks.every(st => st.completed);
-          if (allSubtasksCompleted !== task.completed) { parentCompleted = allSubtasksCompleted; await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId); }
+
+      try {
+        const newCompletedState = !subtask.completed;
+        await supabase.from('subtasks').update({ completed: newCompletedState }).eq('id', subtaskId).throwOnError();
+        
+        const allWereCompletedBefore = oldTodosForDay.every(t => t.completed);
+        let parentCompleted = task.completed;
+        const newSubtasks = task.subtasks?.map(st => st.id === subtaskId ? { ...st, completed: newCompletedState } : st);
+        
+        if (newSubtasks) {
+            const allSubtasksCompleted = newSubtasks.every(st => st.completed);
+            if (allSubtasksCompleted !== task.completed) { 
+                parentCompleted = allSubtasksCompleted; 
+                await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId).throwOnError(); 
+            }
+        }
+        const newTodosForDay = oldTodosForDay.map(t => t.id === taskId ? { ...t, subtasks: newSubtasks, completed: parentCompleted } : t);
+        const allJustCompleted = newTodosForDay.every(t => t.completed);
+        if (allJustCompleted && !allWereCompletedBefore) { onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]); triggerConfetti(); }
+        setAllTodos(prev => ({ ...prev, [dateKey]: newTodosForDay }));
+      } catch (error) {
+          console.error("Error toggling subtask:", error);
       }
-      const newTodosForDay = oldTodosForDay.map(t => t.id === taskId ? { ...t, subtasks: newSubtasks, completed: parentCompleted } : t);
-      const allJustCompleted = newTodosForDay.every(t => t.completed);
-      if (allJustCompleted && !allWereCompletedBefore) { onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]); triggerConfetti(); }
-      setAllTodos(prev => ({ ...prev, [dateKey]: newTodosForDay }));
   };
 
   const handleDeleteTodo = async (id: number) => {
@@ -1213,8 +1269,8 @@ const App: React.FC = () => {
             if (data) idsToDelete = [...new Set([...idsToDelete, ...data.map(t => t.id)])];
         }
         if (idsToDelete.length > 0) {
-            await supabase.from('subtasks').delete().in('todo_id', idsToDelete);
-            await supabase.from('todos').delete().in('id', idsToDelete);
+            await supabase.from('subtasks').delete().in('todo_id', idsToDelete).throwOnError();
+            await supabase.from('todos').delete().in('id', idsToDelete).throwOnError();
         }
         setAllTodos(prev => {
             const newAllTodos = JSON.parse(JSON.stringify(prev));
@@ -1227,100 +1283,181 @@ const App: React.FC = () => {
 
   const handleAddFolder = async (name: string) => {
     if (!user) return null;
-    const { data: newFolder } = await supabase.from('folders').insert({ name, user_id: user.id }).select().single();
-    if (newFolder) setFolders(prev => [{...newFolder, notes: []}, ...prev]);
-    return newFolder;
+    try {
+        const { data: newFolder, error } = await supabase.from('folders').insert({ name, user_id: user.id }).select().single();
+        if (error) throw error;
+        if (newFolder) setFolders(prev => [{...newFolder, notes: []}, ...prev]);
+        return newFolder;
+    } catch (error) {
+        console.error("Error adding folder:", error);
+        return null;
+    }
   };
   const handleUpdateFolder = async (folderId: number, name: string) => {
-    await supabase.from('folders').update({ name }).eq('id', folderId);
-    setFolders(prev => prev.map(f => f.id === folderId ? {...f, name} : f));
+    try {
+        await supabase.from('folders').update({ name }).eq('id', folderId).throwOnError();
+        setFolders(prev => prev.map(f => f.id === folderId ? {...f, name} : f));
+    } catch(error) {
+        console.error("Error updating folder:", error);
+    }
   };
   const handleDeleteFolder = async (folderId: number) => {
-    await supabase.from('notes').delete().eq('folder_id', folderId);
-    await supabase.from('folders').delete().eq('id', folderId);
-    setFolders(prev => prev.filter(f => f.id !== folderId));
+    try {
+        await supabase.from('notes').delete().eq('folder_id', folderId).throwOnError();
+        await supabase.from('folders').delete().eq('id', folderId).throwOnError();
+        setFolders(prev => prev.filter(f => f.id !== folderId));
+    } catch(error) {
+        console.error("Error deleting folder:", error);
+    }
   };
   const handleAddNote = async (folderId: number) => {
     if (!user) return null;
-    const { data: newNote } = await supabase.from('notes').insert({ folder_id: folderId, user_id: user.id, title: "", content: "" }).select().single();
-    if (newNote) setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: [newNote, ...f.notes]} : f));
-    return newNote;
+    try {
+        const { data: newNote, error } = await supabase.from('notes').insert({ folder_id: folderId, user_id: user.id, title: "", content: "" }).select().single();
+        if (error) throw error;
+        if (newNote) setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: [newNote, ...f.notes]} : f));
+        return newNote;
+    } catch(error) {
+        console.error("Error adding note:", error);
+        return null;
+    }
   };
   const handleUpdateNote = async (note: Note) => {
-    await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id);
-    setFolders(prev => prev.map(f => f.id === note.folder_id ? {...f, notes: f.notes.map(n => n.id === note.id ? note : n).sort((a,b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())} : f));
+    try {
+        await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id).throwOnError();
+        setFolders(prev => prev.map(f => f.id === note.folder_id ? {...f, notes: f.notes.map(n => n.id === note.id ? note : n).sort((a,b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())} : f));
+    } catch (error) {
+        console.error("Error updating note:", error);
+    }
   };
   const handleDeleteNote = async (noteId: number, folderId: number) => {
-      await supabase.from('notes').delete().eq('id', noteId);
+    try {
+      await supabase.from('notes').delete().eq('id', noteId).throwOnError();
       setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: f.notes.filter(n => n.id !== noteId)} : f));
+    } catch (error) {
+        console.error("Error deleting note:", error);
+    }
   };
   const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => {
     if (!user) return;
-    const { data: newPlaylist } = await supabase.from('playlists').insert({ ...playlistData, user_id: user.id }).select().single();
-    if (newPlaylist) setPlaylists(prev => [...prev, newPlaylist]);
+    try {
+        const { data: newPlaylist, error } = await supabase.from('playlists').insert({ ...playlistData, user_id: user.id }).select().single();
+        if (error) throw error;
+        if (newPlaylist) setPlaylists(prev => [...prev, newPlaylist]);
+    } catch (error) {
+        console.error("Error adding playlist:", error);
+    }
   };
   const handleUpdatePlaylist = async (playlist: Playlist) => {
-    await supabase.from('playlists').update(playlist).eq('id', playlist.id);
-    setPlaylists(prev => prev.map(p => p.id === playlist.id ? playlist : p));
+    try {
+        await supabase.from('playlists').update(playlist).eq('id', playlist.id).throwOnError();
+        setPlaylists(prev => prev.map(p => p.id === playlist.id ? playlist : p));
+    } catch(error) {
+        console.error("Error updating playlist:", error);
+    }
   };
   const handleDeletePlaylist = async (playlistId: number) => {
-    await supabase.from('playlists').delete().eq('id', playlistId);
-    setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+    try {
+        await supabase.from('playlists').delete().eq('id', playlistId).throwOnError();
+        setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+    } catch(error) {
+        console.error("Error deleting playlist:", error);
+    }
   };
   const handleAddBackground = async (file: File) => {
     if (!appFolderId.current || !gdriveToken || !user) return;
-    const metadata = { name: file.name, mimeType: file.type, parents: [appFolderId.current], appProperties: { type: 'background', isFavorite: 'false' } };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', file);
-    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }), body: form });
-    if (!response.ok) { console.error("Google Drive Upload Error:", await response.json()); return; }
-    const newFile = await response.json();
-    const newBg: Background = { id: newFile.id, name: file.name, url: URL.createObjectURL(file), type: file.type.startsWith('video') ? 'video' : 'image', isFavorite: false };
-    setUserBackgrounds(prev => [...prev, newBg]);
-    setActiveBackground(newBg);
+    try {
+        const metadata = { name: file.name, mimeType: file.type, parents: [appFolderId.current], appProperties: { type: 'background', isFavorite: 'false' } };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', file);
+        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }), body: form });
+        if (!response.ok) { 
+            const errorBody = await response.json();
+            console.error("Google Drive Upload Error:", errorBody);
+            throw new Error(`Upload failed: ${errorBody.error.message}`);
+        }
+        const newFile = await response.json();
+        const newBg: Background = { id: newFile.id, name: file.name, url: URL.createObjectURL(file), type: file.type.startsWith('video') ? 'video' : 'image', isFavorite: false };
+        setUserBackgrounds(prev => [...prev, newBg]);
+        setActiveBackground(newBg);
+    } catch (error) {
+        console.error("Error adding background:", error);
+    }
   };
   const handleDeleteBackground = async (id: string) => {
-    await window.gapi.client.drive.files.delete({ fileId: id });
-    setUserBackgrounds(prev => prev.filter(bg => { if (bg.id === id) { URL.revokeObjectURL(bg.url); return false; } return true; }));
-    if (activeBackground?.id === id) setActiveBackground(null);
+    try {
+        await window.gapi.client.drive.files.delete({ fileId: id });
+        setUserBackgrounds(prev => prev.filter(bg => { if (bg.id === id) { URL.revokeObjectURL(bg.url); return false; } return true; }));
+        if (activeBackground?.id === id) setActiveBackground(null);
+    } catch(error) {
+        console.error("Error deleting background:", error);
+    }
   };
   const handleToggleFavoriteBackground = async (id: string) => {
       const bg = userBackgrounds.find(b => b.id === id);
       if (!bg || !gdriveToken) return;
-      const newFavState = !bg.isFavorite;
-      await window.gapi.client.drive.files.update({ fileId: id, resource: { appProperties: { isFavorite: String(newFavState) } } as any });
-      setUserBackgrounds(bgs => bgs.map(b => b.id === id ? {...b, isFavorite: newFavState} : b));
+      try {
+        const newFavState = !bg.isFavorite;
+        await window.gapi.client.drive.files.update({ fileId: id, resource: { appProperties: { isFavorite: String(newFavState) } } as any });
+        setUserBackgrounds(bgs => bgs.map(b => b.id === id ? {...b, isFavorite: newFavState} : b));
+      } catch (error) {
+          console.error("Error toggling favorite background:", error);
+      }
   };
   const handleAddGalleryImages = async (files: File[]) => {
     if (!appFolderId.current || !gdriveToken) return;
-    for (const file of files) {
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify({ name: file.name, mimeType: file.type, parents: [appFolderId.current] })], { type: 'application/json' }));
-      form.append('file', file);
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }), body: form });
-      if (!response.ok) { console.error("Google Drive Upload Error:", await response.json()); continue; }
-      const newFile = await response.json();
-      setGalleryImages(prev => [{ id: newFile.id, url: URL.createObjectURL(file) }, ...prev]);
+    try {
+        for (const file of files) {
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify({ name: file.name, mimeType: file.type, parents: [appFolderId.current] })], { type: 'application/json' }));
+            form.append('file', file);
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }), body: form });
+            if (!response.ok) { 
+                console.error("Google Drive Upload Error:", await response.json()); 
+                continue; // Continue with next file
+            }
+            const newFile = await response.json();
+            setGalleryImages(prev => [{ id: newFile.id, url: URL.createObjectURL(file) }, ...prev]);
+        }
+    } catch(error) {
+        console.error("Error adding gallery images:", error);
     }
   };
   const handleDeleteGalleryImage = async (id: string) => {
-    await window.gapi.client.drive.files.delete({ fileId: id });
-    setGalleryImages(prev => prev.filter(img => { if (img.id === id) URL.revokeObjectURL(img.url); return img.id !== id; }));
+    try {
+        await window.gapi.client.drive.files.delete({ fileId: id });
+        setGalleryImages(prev => prev.filter(img => { if (img.id === id) URL.revokeObjectURL(img.url); return img.id !== id; }));
+    } catch (error) {
+        console.error("Error deleting gallery image:", error);
+    }
   };
   const handleAddQuickNote = async (text: string) => {
     if (!user) return;
-    const { data: newNote } = await supabase.from('quick_notes').insert({ text, user_id: user.id }).select().single();
-    if (newNote) setQuickNotes(prev => [newNote, ...prev]);
+    try {
+        const { data: newNote, error } = await supabase.from('quick_notes').insert({ text, user_id: user.id }).select().single();
+        if (error) throw error;
+        if (newNote) setQuickNotes(prev => [newNote, ...prev]);
+    } catch (error) {
+        console.error("Error adding quick note:", error);
+    }
   };
   const handleDeleteQuickNote = async (id: number) => {
-    await supabase.from('quick_notes').delete().eq('id', id);
-    setQuickNotes(prev => prev.filter(qn => qn.id !== id));
+    try {
+        await supabase.from('quick_notes').delete().eq('id', id).throwOnError();
+        setQuickNotes(prev => prev.filter(qn => qn.id !== id));
+    } catch(error) {
+        console.error("Error deleting quick note:", error);
+    }
   };
   const handleClearAllQuickNotes = async () => {
     if (!user) return;
-    await supabase.from('quick_notes').delete().eq('user_id', user.id);
-    setQuickNotes([]);
+    try {
+        await supabase.from('quick_notes').delete().eq('user_id', user.id).throwOnError();
+        setQuickNotes([]);
+    } catch(error) {
+        console.error("Error clearing quick notes:", error);
+    }
   };
 
   // Debounced save settings to Supabase & localStorage
@@ -1329,8 +1466,12 @@ const App: React.FC = () => {
     localStorage.setItem(`${user.email}_browserSession`, JSON.stringify(browserSession));
     if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
     settingsSaveTimeout.current = window.setTimeout(async () => {
-        const settingsPayload = { user_id: user.id, theme_mode: theme, theme_colors: themeColors, active_background_id: activeBackground?.id || null, particle_type: particleType, ambient_sound: ambientSound, pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: pomodoroState.backgroundTimerOpacity, showBackgroundTimer: pomodoroState.showBackgroundTimer } };
-        await supabase.from('site_settings').upsert(settingsPayload, { onConflict: 'user_id' });
+        try {
+            const settingsPayload = { user_id: user.id, theme_mode: theme, theme_colors: themeColors, active_background_id: activeBackground?.id || null, particle_type: particleType, ambient_sound: ambientSound, pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: pomodoroState.backgroundTimerOpacity, showBackgroundTimer: pomodoroState.showBackgroundTimer } };
+            await supabase.from('site_settings').upsert(settingsPayload, { onConflict: 'user_id' }).throwOnError();
+        } catch(error) {
+            console.error("Error saving settings:", error);
+        }
     }, 1500);
     return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
   }, [theme, themeColors, activeBackground, particleType, ambientSound, pomodoroState, browserSession, dataLoaded, user]);
@@ -1355,13 +1496,17 @@ const App: React.FC = () => {
   const handleResetThemeColors = () => setThemeColors(DEFAULT_COLORS);
   
   const handleLogout = async () => {
-    if (oneSignalReady) {
-        window.OneSignal.push(function(this: any) {
-            this.logout();
-        });
+    try {
+        if (oneSignalReady) {
+            window.OneSignal.push(function(this: any) {
+                this.logout();
+            });
+        }
+        await supabase.auth.signOut(); 
+        handleGoogleLogout();
+    } catch(error) {
+        console.error("Error during logout:", error);
     }
-    await supabase.auth.signOut(); 
-    handleGoogleLogout();
   };
   
   if (authLoading) {

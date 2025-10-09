@@ -51,7 +51,6 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ permission, i
     const getButtonState = () => {
         if (permission === 'denied') {
             return {
-                label: "Bloqueadas",
                 iconColor: "text-red-500",
                 disabled: true,
                 title: "Las notificaciones están bloqueadas en la configuración de tu navegador."
@@ -59,28 +58,33 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ permission, i
         }
         if (permission === 'granted' && isSubscribed) {
             return {
-                label: "Activadas",
                 iconColor: "text-primary",
                 disabled: true,
                 title: "Las notificaciones están activas para este dispositivo."
             };
         }
+        if (permission === 'granted' && !isSubscribed) {
+            return {
+                iconColor: "text-yellow-500 animate-pulse",
+                disabled: true,
+                title: "Estamos activando las notificaciones... Esto puede tardar unos segundos."
+            };
+        }
         return {
-            label: "Activar",
             iconColor: "text-gray-700 dark:text-gray-300",
             disabled: false,
             title: "Activar notificaciones"
         };
     };
 
-    const { label, iconColor, disabled, title } = getButtonState();
+    const { iconColor, disabled, title } = getButtonState();
 
     return (
         <div className="relative">
             <button
                 onClick={handleBellClick}
                 disabled={disabled}
-                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${iconColor}`}
+                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${disabled ? 'cursor-not-allowed' : 'hover:scale-110'} ${iconColor}`}
                 aria-label={title}
                 title={title}
             >

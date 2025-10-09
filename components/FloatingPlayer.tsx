@@ -10,6 +10,7 @@ import VolumeMuteIcon from './icons/VolumeMuteIcon';
 import ExternalLinkIcon from './icons/ExternalLinkIcon';
 import CloseIcon from './icons/CloseIcon';
 import ChevronDownIcon from './icons/ChevronDownIcon';
+import { ensureYoutubeApiReady } from '../utils/youtubeApi';
 
 
 interface FloatingPlayerProps {
@@ -57,7 +58,6 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
             const { track: currentTrack, queue: currentQueue, isShuffle: currentShuffle, onSelectTrack: currentOnSelectTrack } = latestState.current;
             if (currentTrack.type === 'playlist' || currentQueue.length <= 1) return;
             
-            // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
             const currentIndex = currentQueue.findIndex(t => t.id === currentTrack.id);
             let nextIndex;
 
@@ -100,10 +100,8 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
             const player = event.target;
             const { track: currentTrack } = latestState.current;
              if (currentTrack.type === 'playlist') {
-                // FIX: Type 'number' is not assignable to type 'string'. Use 'source_id' instead of 'id'.
                 player.loadPlaylist({ list: currentTrack.source_id, listType: 'playlist' });
             } else {
-                // FIX: Argument of type 'number' is not assignable to parameter of type 'string'. Use 'source_id' instead of 'id'.
                 player.loadVideoById(currentTrack.source_id);
             }
             player.setVolume(volume);
@@ -123,8 +121,9 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
             });
         };
         
-        if (window.YT && window.YT.Player) createPlayer();
-        else window.onYouTubeIframeAPIReady = createPlayer;
+        ensureYoutubeApiReady().then(() => {
+            createPlayer();
+        });
 
         return () => {
             if (playerRef.current) {
@@ -133,7 +132,6 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
             }
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         };
-    // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
     }, [track.id, isMuted, volume, track.name]);
 
     const handlePlayPause = () => {
@@ -147,7 +145,6 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
         const { track: currentTrack, queue: currentQueue, onSelectTrack: currentOnSelectTrack } = latestState.current;
         if (currentTrack.type === 'playlist' && playerRef.current) playerRef.current.nextVideo();
         else {
-            // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
             const currentIndex = currentQueue.findIndex(t => t.id === currentTrack.id);
             const nextIndex = (currentIndex + 1) % currentQueue.length;
             currentOnSelectTrack(currentQueue[nextIndex], currentQueue);
@@ -158,7 +155,6 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
         const { track: currentTrack, queue: currentQueue, onSelectTrack: currentOnSelectTrack } = latestState.current;
         if (currentTrack.type === 'playlist' && playerRef.current) playerRef.current.previousVideo();
         else {
-            // FIX: Property 'uuid' does not exist on type 'Playlist'. Changed to 'id'.
             const currentIndex = currentQueue.findIndex(t => t.id === currentTrack.id);
             const prevIndex = (currentIndex - 1 + currentQueue.length) % currentQueue.length;
             currentOnSelectTrack(currentQueue[prevIndex], currentQueue);
@@ -222,7 +218,6 @@ const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, queue, onSelectT
                             <div className="flex items-center justify-between">
                                 <p className="font-bold text-gray-800 dark:text-gray-200 text-sm truncate">{videoTitle}</p>
                                 <div className="flex items-center flex-shrink-0 pl-2">
-                                     {/* FIX: Use source_id for the youtube link. */}
                                      <a href={`https://www.youtube.com/watch?v=${track.source_id}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 dark:text-gray-500 hover:text-pink-500 dark:hover:text-pink-400 flex-shrink-0">
                                         <ExternalLinkIcon />
                                     </a>

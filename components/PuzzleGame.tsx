@@ -218,7 +218,7 @@ const PuzzleGame: React.FC<PuzzleGameProps> = ({ images, onBack, isMobile }) => 
                     <div className="flex-grow overflow-y-auto p-4 custom-scrollbar">
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                             {images.map(image => (
-                                // FIX: Use `image.id` for the key as `uuid` does not exist on the `GalleryImage` type.
+                                
                                 <button key={image.id} onClick={() => { setSelectedImage(image); setGameState('selecting-difficulty'); }} className="rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 block w-full aspect-square focus:outline-none focus:ring-4 focus:ring-primary">
                                     <img src={image.url} alt="Recuerdo" className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" />
                                 </button>

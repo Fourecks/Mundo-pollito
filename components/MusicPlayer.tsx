@@ -7,6 +7,7 @@ import MusicIcon from './icons/MusicIcon';
 import DotsVerticalIcon from './icons/DotsVerticalIcon';
 import TrashIcon from './icons/TrashIcon';
 import ConfirmationModal from './ConfirmationModal';
+import { ensureYoutubeApiReady } from '../utils/youtubeApi';
 
 interface MusicPlayerProps {
   onSelectTrack: (track: Playlist, queue: Playlist[]) => void;
@@ -75,19 +76,9 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
       }
     };
   
-    // Check if the YouTube IFrame API is ready
-    if (window.YT && window.YT.Player) {
-      createPlayer();
-    } else {
-      // If not, wait for the API to be ready
-      const originalOnReady = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => {
-        if (originalOnReady) {
-          originalOnReady();
-        }
+    ensureYoutubeApiReady().then(() => {
         createPlayer();
-      };
-    }
+    });
   
     // Cleanup function to destroy the player when the component unmounts
     return () => {

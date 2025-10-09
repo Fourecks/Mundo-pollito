@@ -75,11 +75,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const handleSave = async () => {
         if (!todo) return;
         
-        if (reminderOffset !== 0 && 'Notification' in window && Notification.permission === 'default') {
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                 alert("No se podrán mostrar las notificaciones si no das permiso.");
-            }
+        if (reminderOffset !== 0 && 'Notification' in window && Notification.permission !== 'granted') {
+            alert("Para recibir recordatorios, por favor, primero activa las notificaciones usando el ícono de la campana en la pantalla principal.");
         }
         
         const finalStartTime = to24h(startTimeParts.hour, startTimeParts.minute, startTimeParts.period) || undefined;

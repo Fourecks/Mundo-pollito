@@ -134,13 +134,12 @@ export interface SupabaseUser {
   email?: string;
 }
 
-// FIX: Added missing EncouragementNote type.
 export interface EncouragementNote {
   id: string;
   text: string;
 }
 
-// FIX: Centralized YouTube IFrame API type definitions to fix duplicate declaration errors.
+// Centralized YouTube IFrame API type definitions.
 declare global {
   namespace YT {
     enum PlayerState {
@@ -174,7 +173,6 @@ declare global {
   interface Window {
     YT?: typeof YT;
     onYouTubeIframeAPIReady?: () => void;
-    // FIX: Added google and gapi to the Window interface to resolve TypeScript errors in App.tsx.
     google: any;
     gapi: any;
     supabase: {
