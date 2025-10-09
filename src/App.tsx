@@ -832,42 +832,53 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // OneSignal Initialization and event handling
-  useEffect(() => {
-    window.OneSignal.push(async function() {
-      if (!window.OneSignal.isPushNotificationsSupported()) {
-        console.warn("Push notifications are not supported by this browser.");
-        setOneSignalReady(true);
-        return;
-      }
+// OneSignal Initialization and event handling
+useEffect(() => {
+  window.OneSignal.push(async function() {
+    if (!window.OneSignal.isPushNotificationsSupported()) {
+      console.warn("Push notifications are not supported by this browser.");
+      setOneSignalReady(true);
+      return;
+    }
 
-      try {
-        await window.OneSignal.init({ appId: config.ONESIGNAL_APP_ID });
-        setOneSignalReady(true);
-        
-        const updateStatus = async () => {
-          try {
-            const permission = await window.OneSignal.Notifications.getPermission();
-            setNotificationPermission(permission);
-            const isSubscribed = await window.OneSignal.User.PushSubscription.isSubscribed();
-            setIsSubscribed(isSubscribed);
-          } catch (e) {
-            console.error("Error getting OneSignal status:", e);
-          }
-        };
+    try {
+      // Initialize OneSignal
+      await window.OneSignal.init({ appId: config.ONESIGNAL_APP_ID });
+      setOneSignalReady(true); // Mark as ready AFTER init
+      
+      const updateStatus = async () => {
+        try {
+          const permission = await window.OneSignal.Notifications.getPermission();
+          setNotificationPermission(permission);
+          const isSubscribed = await window.OneSignal.User.PushSubscription.isSubscribed();
+          setIsSubscribed(isSubscribed);
+        } catch (e) {
+          console.error("Error getting OneSignal status:", e);
+        }
+      };
 
-        // Use the top-level .on() method for stability
-        window.OneSignal.on('notificationPermissionChange', updateStatus);
-        window.OneSignal.on('subscriptionChange', updateStatus);
+      // Set up listeners AFTER init is complete and successful
+      window.OneSignal.Notifications.addEventListener('permissionChange', async () => {
+          await updateStatus();
+      });
 
-        // Run initial status check
-        await updateStatus();
+      // An alternative way to listen for subscription changes if the top-level .on() is problematic
+      const subscriptionObserver = async (isSubscribed: boolean) => {
+          setIsSubscribed(isSubscribed);
+          const permission = await window.OneSignal.Notifications.getPermission();
+          setNotificationPermission(permission);
+      };
+      window.OneSignal.User.PushSubscription.addEventListener("change", subscriptionObserver);
 
-      } catch (e) {
-        console.error("Error initializing OneSignal:", e);
-      }
-    });
-  }, []); // Run only once on mount
+      // Run initial status check
+      await updateStatus();
+
+    } catch (e) {
+      console.error("Error initializing OneSignal:", e);
+    }
+  });
+}, []); // Run only once on mount
+
 
   // OneSignal User Login
   useEffect(() => {
