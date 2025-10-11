@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -861,7 +860,7 @@ useEffect(() => {
             promptOptions: {
                 slidedown: {
                     enabled: true,
-                    autoPrompt: true, // Automatically prompt on first visit if not blocked
+                    autoPrompt: false, // Prompt is now triggered manually by the bell icon.
                     actionMessage: "Nos gustaría enviarte notificaciones para recordatorios de tareas y alarmas del Pomodoro.",
                     acceptButtonText: "¡Claro que sí!",
                     cancelButtonText: "Quizás más tarde",

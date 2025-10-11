@@ -67,10 +67,12 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ permission, i
             return;
         }
         
-        // Default action: prompt for permission if not yet granted
+        // If permission is not determined, show the user-friendly slidedown prompt.
         if (permission === 'default') {
             window.OneSignal.push(() => {
-                window.OneSignal.Notifications.requestPermission();
+                // Show the slidedown prompt instead of the native one directly.
+                // This provides a better user experience.
+                window.OneSignal.Slidedown.promptPush();
             });
         }
     };
