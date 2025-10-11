@@ -16,7 +16,6 @@ import MusicPlayer from '../components/MusicPlayer';
 import FloatingPlayer from '../components/FloatingPlayer';
 import SpotifyFloatingPlayer from '../components/SpotifyFloatingPlayer';
 import TaskDetailsModal from '../components/TaskDetailsModal';
-import NotificationManager from '../components/NotificationManager';
 import ParticleLayer from '../components/ParticleLayer';
 import { initDB } from '../db';
 import Login from '../components/Login';
@@ -38,9 +37,7 @@ import GamesHub from '../components/GamesHub';
 import { supabase } from '../supabaseClient';
 import { config } from '../config';
 import { ensureYoutubeApiReady } from '../utils/youtubeApi';
-
-// Define Permission type here for clarity
-type Permission = "default" | "denied" | "granted";
+import NotificationManager from '../components/NotificationManager';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -240,9 +237,9 @@ interface AppComponentProps {
   handleDeleteBackground: (id: string) => Promise<void>;
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
   gapiReady: boolean;
-  // Notification Props
-  notificationPermission: Permission;
+    // Notification Props
   isSubscribed: boolean;
+  isPermissionBlocked: boolean;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -257,6 +254,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+    isSubscribed, isPermissionBlocked
   } = props;
   
   // Local UI State for Desktop
@@ -398,6 +396,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         </div>
         <FocusModeButton isFocusMode={isFocusMode} onToggle={() => setIsFocusMode(!isFocusMode)} />
         <div className={`transition-opacity duration-300 flex flex-col items-end gap-3 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+           <NotificationManager isSubscribed={isSubscribed} isPermissionBlocked={isPermissionBlocked} />
           <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
           <button
               onClick={() => setIsCustomizationPanelOpen(true)}
@@ -406,7 +405,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             >
               <PaletteIcon />
             </button>
-          <NotificationManager permission={props.notificationPermission} isSubscribed={props.isSubscribed} />
         </div>
       </header>
 
@@ -517,6 +515,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+      isSubscribed, isPermissionBlocked
     } = props;
 
     // Local UI state for Mobile
@@ -650,7 +649,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             </div>
                             <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg flex justify-between items-center">
                                 <h3 className="font-bold text-primary-dark dark:text-primary">Notificaciones</h3>
-                                <NotificationManager permission={props.notificationPermission} isSubscribed={props.isSubscribed} />
+                                <NotificationManager isSubscribed={isSubscribed} isPermissionBlocked={isPermissionBlocked} />
                             </div>
                              <button onClick={onLogout} className="w-full mt-4 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
                                 <LogoutIcon />
@@ -820,10 +819,6 @@ const App: React.FC = () => {
       backgroundTimerOpacity: 50,
   });
 
-  const [notificationPermission, setNotificationPermission] = useState<Permission>('default');
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [oneSignalReady, setOneSignalReady] = useState(false);
-
   // Google Drive State
   const [gapiReady, setGapiReady] = useState(false);
   const [gdriveToken, setGdriveToken] = useState<string | null>(null);
@@ -833,67 +828,64 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-// OneSignal Initialization and event handling
-useEffect(() => {
-    // This function is queued and will execute as soon as the OneSignal SDK is ready.
-    window.OneSignal.push(function() {
-        if (!window.OneSignal.isPushNotificationsSupported()) {
-            console.warn("Push notifications are not supported by this browser.");
-            setOneSignalReady(true);
-            return;
-        }
-
-        // 1. Register Listeners: Listeners are registered BEFORE initializing.
-        // The '.on()' method is deprecated. The v16 SDK uses '.addEventListener()' on specific namespaces.
-        window.OneSignal.Notifications.addEventListener('permissionChange', () => {
-            // When the permission changes, we re-fetch the detailed permission string
-            // to update our state correctly, as the event itself may not provide the string.
-            window.OneSignal.Notifications.getPermission().then(permissionString => {
-                setNotificationPermission(permissionString as Permission);
-            });
-        });
-
-        window.OneSignal.User.PushSubscription.addEventListener('change', (isSubscribed) => {
-            setIsSubscribed(isSubscribed);
-        });
-        
-        // 2. Initialize: Now that listeners are ready, we initialize the service.
-        window.OneSignal.init({ 
+  // OneSignal State
+  const [isOneSignalInitialized, setIsOneSignalInitialized] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
+  
+  // --- ONESIGNAL LOGIC ---
+  useEffect(() => {
+    if (!user || isOneSignalInitialized) return;
+    
+    window.OneSignal = window.OneSignal || [];
+    window.OneSignal.push(() => {
+        window.OneSignal.init({
             appId: config.ONESIGNAL_APP_ID,
-            allowLocalhostAsSecureOrigin: true, // For easier local development
+            allowLocalhostAsSecureOrigin: true,
+            autoPrompt: false, // We control the prompt with our custom UI
             promptOptions: {
                 slidedown: {
                     enabled: true,
-                    autoPrompt: false, // Prompt is now triggered manually by the bell icon.
-                    actionMessage: "Nos gustaría enviarte notificaciones para recordatorios de tareas y alarmas del Pomodoro.",
-                    acceptButtonText: "¡Claro que sí!",
-                    cancelButtonText: "Quizás más tarde",
-                }
-            }
-        })
-            .then(async () => {
-                // 3. Get Initial State: Once initialized, we get the current state.
-                setOneSignalReady(true);
-                const permission = await window.OneSignal.Notifications.getPermission();
-                setNotificationPermission(permission);
-                
-                const isSubscribed = await window.OneSignal.User.PushSubscription.isSubscribed();
-                setIsSubscribed(isSubscribed);
-            })
-            .catch(e => console.error("Error initializing OneSignal:", e));
-    });
-}, []); // The empty dependency array ensures this runs only once.
-
-
-  // OneSignal User Login
-  useEffect(() => {
-    if (oneSignalReady && user) {
-        window.OneSignal.push(function() {
-            window.OneSignal.login(user.id);
+                    autoPrompt: false,
+                    text: {
+                        title: '¿Activar Notificaciones?',
+                        message: 'Recibe recordatorios de tus tareas y pomodoros para mantenerte enfocado.',
+                        acceptButton: '¡Claro!',
+                        cancelButton: 'Ahora no',
+                    },
+                },
+            },
         });
-    }
-  }, [user, oneSignalReady]);
+        setIsOneSignalInitialized(true);
+    });
+  }, [user, isOneSignalInitialized]);
 
+  useEffect(() => {
+      if (!isOneSignalInitialized || !user) return;
+      
+      const handlePermissionChange = async () => {
+          const permission = await window.OneSignal.Notifications.getPermissionStatus();
+          setIsSubscribed(permission === 'granted');
+          setIsPermissionBlocked(permission === 'denied');
+      };
+
+      handlePermissionChange(); // Check initial state
+
+      window.OneSignal.Notifications.addEventListener('permissionChange', handlePermissionChange);
+
+      return () => {
+          window.OneSignal.Notifications.removeEventListener('permissionChange', handlePermissionChange);
+      };
+
+  }, [isOneSignalInitialized, user]);
+
+  useEffect(() => {
+      if (!isOneSignalInitialized || !user) return;
+      
+      // Associate the OneSignal user with your internal user ID
+      window.OneSignal.login(user.id);
+
+  }, [isOneSignalInitialized, user]);
 
   // --- SUPABASE AUTH & DATA LOADING ---
   useEffect(() => {
@@ -1511,10 +1503,8 @@ useEffect(() => {
   
   const handleLogout = async () => {
     try {
-        if (oneSignalReady) {
-            window.OneSignal.push(function() {
-                window.OneSignal.logout();
-            });
+        if (window.OneSignal) {
+            window.OneSignal.logout();
         }
         await supabase.auth.signOut(); 
         handleGoogleLogout();
@@ -1532,7 +1522,7 @@ useEffect(() => {
      return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando tus datos...</p></div>;
   }
   
-  const appProps: AppComponentProps = {
+  const appProps = {
       currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound,
@@ -1543,9 +1533,8 @@ useEffect(() => {
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-      gapiReady, 
-      notificationPermission,
-      isSubscribed,
+      gapiReady,
+      isSubscribed, isPermissionBlocked,
   };
 
   return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;

@@ -1,113 +1,51 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import BellIcon from './icons/BellIcon';
-import IosShareIcon from './icons/IosShareIcon';
-
-type Permission = "default" | "denied" | "granted";
 
 interface NotificationManagerProps {
-    permission: Permission;
     isSubscribed: boolean;
+    isPermissionBlocked: boolean;
 }
 
-const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches;
-
-const IosInstallPrompt: React.FC<{onClose: () => void}> = ({ onClose }) => {
-    return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80000] flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 text-center max-w-sm w-full animate-pop-in" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-bold text-primary-dark dark:text-primary">Habilitar Notificaciones</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Para recibir recordatorios en tu iPhone, primero debes añadir esta aplicación a tu pantalla de inicio.</p>
-                <div className="text-left text-sm space-y-3 mt-4 text-gray-700 dark:text-gray-200">
-                    <p>1. Toca el botón de Compartir <IosShareIcon className="h-5 w-5 inline-block -mt-1" /> en la barra de herramientas de Safari.</p>
-                    <p>2. Desliza hacia arriba y selecciona <span className="font-semibold">"Añadir a la pantalla de inicio"</span>.</p>
-                    <p>3. Abre la aplicación desde tu pantalla de inicio y vuelve a tocar la campana.</p>
-                </div>
-                 <button onClick={onClose} className="mt-6 w-full bg-primary text-white font-bold rounded-full px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
-                    Entendido
-                </button>
-            </div>
-        </div>
-    );
-};
-
-const DeniedPrompt: React.FC<{onClose: () => void}> = ({ onClose }) => {
-    return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80000] flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 text-center max-w-sm w-full animate-pop-in" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-bold text-red-500">Notificaciones Bloqueadas</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                    Has bloqueado las notificaciones para este sitio. Para habilitarlas, necesitas cambiar la configuración de tu navegador.
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                    Busca el ícono de candado 🔒 en la barra de direcciones, haz clic en él y ajusta los permisos de notificaciones.
-                </p>
-                <button onClick={onClose} className="mt-6 w-full bg-primary text-white font-bold rounded-full px-4 py-2 shadow-sm hover:bg-primary-dark transition-colors">
-                    Entendido
-                </button>
-            </div>
-        </div>
-    );
-};
-
-const NotificationManager: React.FC<NotificationManagerProps> = ({ permission, isSubscribed }) => {
-    const [showIosPrompt, setShowIosPrompt] = useState(false);
-    const [showDeniedHelp, setShowDeniedHelp] = useState(false);
+const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed, isPermissionBlocked }) => {
     
-    const handleBellClick = () => {
-        // Handle special cases first
-        if (permission === 'denied') {
-            setShowDeniedHelp(true);
-            return;
-        }
-
-        if (isIOS() && !isStandalone()) {
-            setShowIosPrompt(true);
-            return;
-        }
+    const handleNotificationClick = () => {
+        if (!window.OneSignal || !window.OneSignal.Notifications) return;
         
-        // If permission is not determined, show the user-friendly slidedown prompt.
-        if (permission === 'default') {
-            window.OneSignal.push(() => {
-                // Show the slidedown prompt instead of the native one directly.
-                // This provides a better user experience.
-                window.OneSignal.Slidedown.promptPush();
-            });
-        }
+        // This will show the slidedown prompt if it's configured in the init options.
+        // If the user accepts the slidedown, it will then show the native browser prompt.
+        window.OneSignal.Notifications.requestPermission();
     };
-    
-    let title = "Activar notificaciones";
-    let iconClass = "text-gray-700 dark:text-gray-300";
-    let isDisabled = false;
 
-    if (permission === 'denied') {
-        title = "Notificaciones bloqueadas. Haz clic para obtener ayuda.";
-        iconClass = "text-red-500";
-    } else if (permission === 'granted' && isSubscribed) {
-        title = "Las notificaciones están activas.";
-        iconClass = "text-primary";
-        isDisabled = true;
-    } else if (permission === 'granted' && !isSubscribed) {
-        title = "Registrando para notificaciones...";
-        iconClass = "text-yellow-500 animate-pulse";
-        isDisabled = true;
+    let buttonTitle = 'Activar notificaciones';
+    let iconColor = 'text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary';
+    let iconElement = <BellIcon className="h-6 w-6" />;
+
+    if (isPermissionBlocked) {
+        buttonTitle = 'Las notificaciones están bloqueadas en tu navegador';
+        iconColor = 'text-red-400 dark:text-red-500 cursor-not-allowed';
+        iconElement = (
+            <div className="relative">
+                <BellIcon className="h-6 w-6" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-red-600 dark:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+            </div>
+        );
+    } else if (isSubscribed) {
+        buttonTitle = 'Estás suscrito a las notificaciones';
+        iconColor = 'text-primary dark:text-primary';
     }
-    
+
     return (
-        <div className="relative">
-            <button
-                onClick={handleBellClick}
-                disabled={isDisabled}
-                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'hover:scale-110'}`}
-                aria-label={title}
-                title={title}
-            >
-                <BellIcon className={`h-6 w-6 ${iconClass}`} />
-            </button>
-            {showIosPrompt && <IosInstallPrompt onClose={() => setShowIosPrompt(false)} />}
-            {showDeniedHelp && <DeniedPrompt onClose={() => setShowDeniedHelp(false)} />}
-        </div>
+        <button
+            onClick={handleNotificationClick}
+            disabled={isPermissionBlocked || isSubscribed}
+            className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${isSubscribed || isPermissionBlocked ? '' : 'hover:scale-110'} ${iconColor}`}
+            aria-label={buttonTitle}
+            title={buttonTitle}
+        >
+            {iconElement}
+        </button>
     );
 };
 

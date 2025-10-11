@@ -7,12 +7,6 @@
 // This is intended for local development/preview environments only.
 
 export const config = {
-  // --- OneSignal Push Notifications ---
-  // Get your App ID and REST API Key from your OneSignal dashboard.
-  // https://onesignal.com/
-  ONESIGNAL_APP_ID: "89fee09e-9d85-472a-a7c8-cda821a90bbf", // 👈 PEGA TU APP ID AQUÍ
-  ONESIGNAL_REST_API_KEY: "os_v2_app_rh7obhu5qvdsvj6izwucdkilx5s2ysovsu6eycue5rkab35s3yqdrgqfhu6wabiee5b6oz4kwvw5bmdmjlaqsehopck2nqtlcuuwkny", // 👈 PEGA TU REST API KEY AQUÍ
-
   // --- Google Drive ---
   // To get a client ID, follow the Google Drive API documentation:
   // https://developers.google.com/drive/api/v3/quickstart/js
@@ -27,6 +21,10 @@ export const config = {
   // Get your project URL and anon key from your Supabase project settings.
   SUPABASE_URL: "https://pbtdzkpympdfemnejpwj.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidGR6a3B5bXBkZmVtbmVqcHdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MzYyMTYsImV4cCI6MjA3NTExMjIxNn0.VsHBuGnmV3T0hJ5sSO6vYlckONHO9IIQmTTjb_S_pBg",
+
+  // --- OneSignal Push Notifications ---
+  ONESIGNAL_APP_ID: "89fee09e-9d85-472a-a7c8-cda821a90bbf",
+  ONESIGNAL_REST_API_KEY: "os_v2_app_rh7obhu5qvdsvj6izwucdkilx74ru4y7fneu6kvtg5bax2yhynfsme55obn5jyg64es75dgvt2lzys7rhjypkjmpzsefxpzodnjhqba",
 
   // --- Push Notifications (DEPRECATED) ---
   // These are no longer used after switching to OneSignal.

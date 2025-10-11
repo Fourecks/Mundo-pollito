@@ -178,7 +178,6 @@ declare global {
     supabase: {
       createClient: (url: string, key: string) => any;
     };
-    // Add OneSignal to the window object for TypeScript
     OneSignal: any;
   }
 }
