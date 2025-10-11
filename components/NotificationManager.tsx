@@ -9,11 +9,16 @@ interface NotificationManagerProps {
 const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed, isPermissionBlocked }) => {
     
     const handleNotificationClick = () => {
-        if (!window.OneSignal || !window.OneSignal.Notifications) return;
+        if (!window.OneSignal) {
+            console.error("OneSignal SDK not loaded.");
+            return;
+        }
         
-        // This will show the slidedown prompt if it's configured in the init options.
-        // If the user accepts the slidedown, it will then show the native browser prompt.
-        window.OneSignal.Notifications.requestPermission();
+        // The .push() method queues the function call until the SDK is fully initialized.
+        // This prevents race conditions where the button is clicked before init completes.
+        window.OneSignal.push(() => {
+            window.OneSignal.Notifications.requestPermission();
+        });
     };
 
     let buttonTitle = 'Activar notificaciones';
