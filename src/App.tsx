@@ -844,9 +844,13 @@ useEffect(() => {
         }
 
         // 1. Register Listeners: Listeners are registered BEFORE initializing.
-        // OneSignal will save them and trigger them at the appropriate time.
-        window.OneSignal.on('notificationPermissionChange', (permission) => {
-            setNotificationPermission(permission as Permission);
+        // The '.on()' method is deprecated. The v16 SDK uses '.addEventListener()' on specific namespaces.
+        window.OneSignal.Notifications.addEventListener('permissionChange', () => {
+            // When the permission changes, we re-fetch the detailed permission string
+            // to update our state correctly, as the event itself may not provide the string.
+            window.OneSignal.Notifications.getPermission().then(permissionString => {
+                setNotificationPermission(permissionString as Permission);
+            });
         });
 
         window.OneSignal.User.PushSubscription.addEventListener('change', (isSubscribed) => {

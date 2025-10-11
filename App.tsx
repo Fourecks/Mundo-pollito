@@ -844,9 +844,13 @@ useEffect(() => {
         }
 
         // 1. Register Listeners: Listeners are registered BEFORE initializing.
-        // OneSignal will save them and trigger them at the appropriate time.
-        window.OneSignal.on('notificationPermissionChange', (permission) => {
-            setNotificationPermission(permission as Permission);
+        // The '.on()' method is deprecated. The v16 SDK uses '.addEventListener()' on specific namespaces.
+        window.OneSignal.Notifications.addEventListener('permissionChange', () => {
+            // When the permission changes, we re-fetch the detailed permission string
+            // to update our state correctly, as the event itself may not provide the string.
+            window.OneSignal.Notifications.getPermission().then(permissionString => {
+                setNotificationPermission(permissionString as Permission);
+            });
         });
 
         window.OneSignal.User.PushSubscription.addEventListener('change', (isSubscribed) => {
@@ -1164,10 +1168,10 @@ useEffect(() => {
         if (refetchError) throw refetchError;
         if (!refreshedTodo) throw new Error("Failed to refetch todo after update.");
 
-// FIX: The type from Supabase can be ambiguous, sometimes returning an empty object `{}` instead of `null`.
+        // FIX: The type from Supabase can be ambiguous, sometimes returning an empty object `{}` instead of `null`.
 // To prevent a type error where required `Todo` properties are missing, we spread `updatedTodo`
 // as a baseline. The properties from `refreshedTodo` will then overwrite it with fresh data from the database.
-// FIX: The cast to `Todo` was unsafe if `refreshedTodo` is an empty object. Using `Partial<Todo>` is safer.
+// FIX: Casting to `any` was hiding type issues and causing `unknown` type inference. Using `Partial<Todo>` is safer and provides better type information.
         const finalTodo: Todo = { ...updatedTodo, ...(refreshedTodo as Partial<Todo>), subtasks: (refreshedTodo as Partial<Todo>)?.subtasks || [] };
         
         let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
