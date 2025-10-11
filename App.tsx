@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -834,7 +836,7 @@ const App: React.FC = () => {
   
 // OneSignal Initialization and event handling
 useEffect(() => {
-    // Esta función se pone en cola y se ejecutará tan pronto como el SDK de OneSignal esté listo.
+    // This function is queued and will execute as soon as the OneSignal SDK is ready.
     window.OneSignal.push(function() {
         if (!window.OneSignal.isPushNotificationsSupported()) {
             console.warn("Push notifications are not supported by this browser.");
@@ -842,8 +844,8 @@ useEffect(() => {
             return;
         }
 
-        // 1. REGISTRAR "OYENTES": Se registran los listeners ANTES de inicializar.
-        // OneSignal los guardará y los activará cuando sea el momento adecuado.
+        // 1. Register Listeners: Listeners are registered BEFORE initializing.
+        // OneSignal will save them and trigger them at the appropriate time.
         window.OneSignal.on('notificationPermissionChange', (permission) => {
             setNotificationPermission(permission as Permission);
         });
@@ -852,10 +854,22 @@ useEffect(() => {
             setIsSubscribed(isSubscribed);
         });
         
-        // 2. INICIALIZAR: Ahora que los listeners están listos, iniciamos el servicio.
-        window.OneSignal.init({ appId: config.ONESIGNAL_APP_ID })
+        // 2. Initialize: Now that listeners are ready, we initialize the service.
+        window.OneSignal.init({ 
+            appId: config.ONESIGNAL_APP_ID,
+            allowLocalhostAsSecureOrigin: true, // For easier local development
+            promptOptions: {
+                slidedown: {
+                    enabled: true,
+                    autoPrompt: true, // Automatically prompt on first visit if not blocked
+                    actionMessage: "Nos gustaría enviarte notificaciones para recordatorios de tareas y alarmas del Pomodoro.",
+                    acceptButtonText: "¡Claro que sí!",
+                    cancelButtonText: "Quizás más tarde",
+                }
+            }
+        })
             .then(async () => {
-                // 3. OBTENER ESTADO INICIAL: Una vez inicializado, obtenemos el estado actual.
+                // 3. Get Initial State: Once initialized, we get the current state.
                 setOneSignalReady(true);
                 const permission = await window.OneSignal.Notifications.getPermission();
                 setNotificationPermission(permission);
@@ -865,7 +879,8 @@ useEffect(() => {
             })
             .catch(e => console.error("Error initializing OneSignal:", e));
     });
-}, []); // El array vacío asegura que esto solo se ejecute una vez.
+}, []); // The empty dependency array ensures this runs only once.
+
 
   // OneSignal User Login
   useEffect(() => {
@@ -1153,7 +1168,8 @@ useEffect(() => {
 // FIX: The type from Supabase can be ambiguous, sometimes returning an empty object `{}` instead of `null`.
 // To prevent a type error where required `Todo` properties are missing, we spread `updatedTodo`
 // as a baseline. The properties from `refreshedTodo` will then overwrite it with fresh data from the database.
-        const finalTodo: Todo = { ...updatedTodo, ...(refreshedTodo as Partial<Todo>), subtasks: (refreshedTodo as Todo)?.subtasks || [] };
+// FIX: The cast to `Todo` was unsafe if `refreshedTodo` is an empty object. Using `Partial<Todo>` is safer.
+        const finalTodo: Todo = { ...updatedTodo, ...(refreshedTodo as Partial<Todo>), subtasks: (refreshedTodo as Partial<Todo>)?.subtasks || [] };
         
         let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
         let oldDateKey: string | null = null;

@@ -1,3 +1,4 @@
+
 // Import Deno's standard server and createClient from Supabase
 declare const Deno: any;
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -61,8 +62,11 @@ serve(async (req) => {
         const notification = {
           app_id: ONESIGNAL_APP_ID,
           include_external_user_ids: [todo.user_id], // Target the user by their Supabase ID
-          headings: { en: 'Recordatorio de Tarea' },
-          contents: { en: `¡Es hora de empezar: "${todo.text}"!` },
+          headings: { es: 'Recordatorio de Tarea ⏰' },
+          subtitle: { es: 'Lista de Tareas Pollito' },
+          contents: { es: `¡Es hora de empezar: "${todo.text}"!` },
+          chrome_web_icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/chicken_icon_notification.png",
+          firefox_icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/chicken_icon_notification.png"
           // You can add more options like sounds, badges, etc.
           // web_url: 'https://your-app-url.com' // Optional: URL to open on click
         };
