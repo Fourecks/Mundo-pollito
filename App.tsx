@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1141,10 +1142,10 @@ const App: React.FC = () => {
 
       if (newTodo && 'id' in newTodo) {
         // FIX: The `newTodo` object from Supabase may have an ambiguous type (`any`, `{}`, or `unknown`).
-        // Explicitly cast to `any` and provide defaults for required fields to ensure
-        // the new object conforms to the `Todo` type, resolving type errors.
+        // Explicitly providing required properties alongside the spread helps TypeScript validate the object shape.
         const todoToAdd: Todo = {
           ...(newTodo as any),
+          id: (newTodo as any).id,
           text: (newTodo as any).text ?? text,
           completed: (newTodo as any).completed ?? false,
           priority: (newTodo as any).priority ?? 'medium',

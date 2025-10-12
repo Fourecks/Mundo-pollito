@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import BellIcon from './icons/BellIcon';
 
 interface NotificationManagerProps {
@@ -8,18 +8,64 @@ interface NotificationManagerProps {
 }
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed, isPermissionBlocked }) => {
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown on click outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [wrapperRef]);
     
-    const handlePermissionClick = () => {
+    // Request permission when dropdown is opened for the first time
+    useEffect(() => {
+        if (isDropdownOpen && !isSubscribed && !isPermissionBlocked) {
+            window.OneSignal.push(() => {
+                window.OneSignal.Notifications.requestPermission();
+            });
+        }
+    }, [isDropdownOpen, isSubscribed, isPermissionBlocked]);
+
+    const handleToggleClick = () => {
+        setIsDropdownOpen(prev => !prev);
+    };
+    
+    const handleSubscriptionToggle = () => {
         if (!window.OneSignal) {
             console.error("OneSignal SDK not loaded.");
             return;
         }
-        
-        // Directly request the native browser prompt. This is more reliable than
-        // the slidedown prompt, which can sometimes fail silently. The app's
-        // event listeners will handle the permission change automatically.
-        window.OneSignal.push(() => {
-            window.OneSignal.Notifications.requestPermission();
+
+        window.OneSignal.push(async () => {
+            const permission = window.OneSignal.Notifications.permission;
+
+            if (permission === 'denied') {
+                return; // Should be disabled anyway
+            }
+            
+            const isOptedIn = await window.OneSignal.User.PushSubscription.getOptedIn();
+
+            if (isOptedIn) {
+                // Currently subscribed, so opt-out
+                window.OneSignal.User.PushSubscription.optOut();
+            } else {
+                if (permission === 'granted') {
+                    // Permission exists, but they opted out. Opt back in.
+                    window.OneSignal.User.PushSubscription.optIn();
+                } else {
+                    // No permission yet, request it.
+                    window.OneSignal.Notifications.requestPermission();
+                }
+            }
+            // Close dropdown after action to provide clear feedback
+            setIsDropdownOpen(false);
         });
     };
 
@@ -29,9 +75,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             return;
         }
 
-        console.log("Sending test notification now...");
         window.OneSignal.push(() => {
-            // Using a simpler, immediate notification call for reliability.
             window.OneSignal.Notifications.sendSelfNotification(
                 "¡Notificación de Prueba! 🐣",
                 "Si ves esto, ¡las notificaciones funcionan!",
@@ -41,15 +85,13 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         });
     };
 
-    let statusText = 'Estado: Desconocido';
-    let buttonTitle = 'Activar notificaciones';
     let iconColor = 'text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary';
     let iconElement = <BellIcon className="h-6 w-6" />;
+    let statusText = 'Desactivadas';
 
     if (isPermissionBlocked) {
-        statusText = 'Estado: Bloqueado';
-        buttonTitle = 'Notificaciones bloqueadas. Revise la configuración de su navegador.';
         iconColor = 'text-red-400 dark:text-red-500 cursor-not-allowed';
+        statusText = 'Bloqueadas';
         iconElement = (
             <div className="relative">
                 <BellIcon className="h-6 w-6" />
@@ -59,36 +101,60 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             </div>
         );
     } else if (isSubscribed) {
-        statusText = 'Estado: Suscrito';
-        buttonTitle = 'Suscrito a notificaciones';
         iconColor = 'text-primary dark:text-primary';
-    } else {
-        statusText = 'Estado: No suscrito';
+        statusText = 'Activadas';
     }
 
     return (
-        <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-3">
-                {isSubscribed && !isPermissionBlocked && (
-                    <button
-                        onClick={handleTestNotificationClick}
-                        className="bg-secondary text-white font-bold rounded-full px-4 py-2 text-xs shadow-md hover:bg-secondary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 animate-pop-in"
-                        title="Enviar una notificación de prueba inmediata"
-                    >
-                        Probar
-                    </button>
-                )}
-                <button
-                    onClick={handlePermissionClick}
-                    disabled={isPermissionBlocked || isSubscribed}
-                    className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${isSubscribed || isPermissionBlocked ? '' : 'hover:scale-110'} ${iconColor}`}
-                    aria-label={buttonTitle}
-                    title={buttonTitle}
-                >
-                    {iconElement}
-                </button>
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded-full">{statusText}</p>
+        <div className="relative" ref={wrapperRef}>
+            <button
+                onClick={handleToggleClick}
+                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${iconColor}`}
+                aria-label="Administrar notificaciones"
+            >
+                {iconElement}
+            </button>
+
+            {isDropdownOpen && (
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-4 animate-pop-in origin-top-right z-10">
+                    <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-gray-800 dark:text-gray-100">Notificaciones</h4>
+                        <label htmlFor="notif-toggle" className={`cursor-pointer ${isPermissionBlocked ? 'cursor-not-allowed' : ''}`}>
+                            <div className="relative">
+                                <input 
+                                    type="checkbox" 
+                                    id="notif-toggle" 
+                                    className="sr-only" 
+                                    checked={isSubscribed}
+                                    onChange={handleSubscriptionToggle}
+                                    disabled={isPermissionBlocked}
+                                />
+                                <div className={`block w-10 h-6 rounded-full transition-colors ${isSubscribed ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isSubscribed ? 'translate-x-full' : ''}`}></div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Estado: <span className="font-semibold">{statusText}</span>
+                    </p>
+
+                    {isPermissionBlocked && (
+                         <p className="text-xs text-red-500 dark:text-red-400 mt-2 p-2 bg-red-100/50 dark:bg-red-900/30 rounded-lg">
+                            Debes cambiar los permisos en la configuración de tu navegador.
+                        </p>
+                    )}
+
+                    {isSubscribed && (
+                        <button
+                            onClick={handleTestNotificationClick}
+                            className="w-full mt-4 bg-secondary text-white font-bold rounded-full px-4 py-2 text-xs shadow-md hover:bg-secondary-dark transition-colors duration-200"
+                        >
+                            Enviar Notificación de Prueba
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
