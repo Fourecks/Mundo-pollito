@@ -15,8 +15,11 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             return;
         }
         
+        // Directly request the native browser prompt. This is more reliable than
+        // the slidedown prompt, which can sometimes fail silently. The app's
+        // event listeners will handle the permission change automatically.
         window.OneSignal.push(() => {
-            window.OneSignal.Slidedown.prompt();
+            window.OneSignal.Notifications.requestPermission();
         });
     };
 

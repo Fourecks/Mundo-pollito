@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from '../types';
 import CompletionModal from '../components/CompletionModal';
@@ -1139,7 +1140,16 @@ const App: React.FC = () => {
       }
 
       if (newTodo && 'id' in newTodo) {
-        const todoToAdd: Todo = { ...(newTodo as Todo), subtasks: [] };
+        // FIX: The `newTodo` object from Supabase may have an ambiguous type (`any`, `{}`, or `unknown`).
+        // Explicitly cast to `any` and provide defaults for required fields to ensure
+        // the new object conforms to the `Todo` type, resolving type errors.
+        const todoToAdd: Todo = {
+          ...(newTodo as any),
+          text: (newTodo as any).text ?? text,
+          completed: (newTodo as any).completed ?? false,
+          priority: (newTodo as any).priority ?? 'medium',
+          subtasks: [],
+        };
         setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
       }
     } catch (error) {
