@@ -838,29 +838,40 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // --- ONESIGNAL USER ASSOCIATION ---
-  useEffect(() => {
-    if (!user) return; // Only run when a user is logged in.
+  // OneSignal State
+  const [isOneSignalInitialized, setIsOneSignalInitialized] = useState(false);
 
-    // The OneSignal script in index.html handles initialization.
-    // This effect is now only responsible for associating the logged-in user.
+  // --- ONESIGNAL INITIALIZATION & USER ASSOCIATION ---
+  useEffect(() => {
+    // This effect runs only once to initialize the OneSignal SDK.
     window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(() => {
+    window.OneSignalDeferred.push(async (OneSignal) => {
+      await OneSignal.init({
+        appId: config.ONESIGNAL_APP_ID,
+        safari_web_id: "web.onesignal.auto.571cab93-0309-4674-850d-02fe7b657956",
+        notifyButton: {
+          enable: true,
+        },
+      });
+      setIsOneSignalInitialized(true);
+    });
+  }, []); // Empty dependency array ensures this runs only once on mount.
+
+  useEffect(() => {
+    // This effect handles associating the user with OneSignal after initialization and login.
+    if (isOneSignalInitialized) {
+      if (user) {
         window.OneSignal.login(user.id);
         console.log(`Associated OneSignal with user ID: ${user.id}`);
-    });
-
-    // The cleanup function for when the user logs out.
-    return () => {
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        window.OneSignalDeferred.push(() => {
-            if (window.OneSignal.isInitialized) {
-                console.log("Logging out from OneSignal.");
-                window.OneSignal.logout();
-            }
-        });
-    };
-  }, [user]); // This effect correctly depends only on the user session.
+      } else {
+        // If the user logs out, we should also log them out from OneSignal
+        if (window.OneSignal.User.isLoggedIn()) {
+          window.OneSignal.logout();
+          console.log("Logged out from OneSignal.");
+        }
+      }
+    }
+  }, [user, isOneSignalInitialized]);
 
 
   // --- SUPABASE AUTH & DATA LOADING ---
@@ -1458,26 +1469,22 @@ const App: React.FC = () => {
   };
 
   const handleSendTestNotification = () => {
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(() => {
-        if (!window.OneSignal.isInitialized) {
-            console.error("OneSignal SDK not initialized.");
-            alert("El servicio de notificaciones aún no está listo. Inténtalo de nuevo en un momento.");
-            return;
-        }
+    if (!isOneSignalInitialized) {
+      alert("El servicio de notificaciones aún no está listo. Inténtalo de nuevo en un momento.");
+      return;
+    }
 
-        const isSubscribed = window.OneSignal.User.PushSubscription.isSubscribed;
-        if (isSubscribed) {
-            window.OneSignal.Notifications.sendSelfNotification(
-                "¡Notificación de Prueba! 🐣",
-                "Si ves esto, ¡las notificaciones funcionan correctamente!",
-                window.location.href,
-                'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png'
-            );
-        } else {
-            alert("Debes suscribirte a las notificaciones primero. Haz clic en el botón de la campana flotante y permite los permisos.");
-        }
-    });
+    const isSubscribed = window.OneSignal.User.PushSubscription.isSubscribed;
+    if (isSubscribed) {
+      window.OneSignal.Notifications.sendSelfNotification(
+        "¡Notificación de Prueba! 🐣",
+        "Si ves esto, ¡las notificaciones funcionan correctamente!",
+        window.location.href,
+        'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png'
+      );
+    } else {
+      alert("Debes suscribirte a las notificaciones primero. Haz clic en el botón de la campana flotante y permite los permisos.");
+    }
   };
 
   // Debounced save settings to Supabase & localStorage
