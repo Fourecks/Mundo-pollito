@@ -10,6 +10,20 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
+    // --- Optimistic UI State ---
+    const [optimisticSubscribed, setOptimisticSubscribed] = useState(isSubscribed);
+    const [isToggling, setIsToggling] = useState(false);
+
+    // Sync local state when the real prop from App.tsx changes
+    useEffect(() => {
+        setOptimisticSubscribed(isSubscribed);
+        // Once the real state arrives, we know the toggle operation is complete.
+        if (isToggling) {
+            setIsToggling(false);
+        }
+    }, [isSubscribed]);
+
+
     // Close dropdown on click outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -28,23 +42,25 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
     };
     
     const handleSubscriptionToggle = () => {
-        // This function is now more direct and uses the recommended OneSignal methods.
-        if (isPermissionBlocked || !window.OneSignal) {
+        if (isPermissionBlocked || !window.OneSignal || isToggling) {
             return;
         }
 
+        // 1. Start toggling state and provide immediate visual feedback
+        setIsToggling(true);
+        setOptimisticSubscribed(current => !current);
+
+        // 2. Call the actual OneSignal SDK method
         window.OneSignal.push(() => {
+            // The logic is based on the REAL state (isSubscribed), not the optimistic one
             if (isSubscribed) {
-                // If the app state shows the user is subscribed, they want to unsubscribe.
-                // The most reliable way is to call optOut().
                 window.OneSignal.User.PushSubscription.optOut();
             } else {
-                // If the app state shows they are not subscribed, they want to subscribe.
-                // requestPermission() handles both initial prompting and re-subscribing
-                // if they previously granted permission but opted out.
                 window.OneSignal.Notifications.requestPermission();
             }
         });
+        // The useEffect hook listening to `isSubscribed` will set isToggling back to false
+        // once the operation is confirmed.
     };
 
     const handleTestNotificationClick = () => {
@@ -78,7 +94,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                 </svg>
             </div>
         );
-    } else if (isSubscribed) {
+    } else if (optimisticSubscribed) { // Use optimistic state for UI
         iconColor = 'text-primary dark:text-primary';
         statusText = 'Activadas';
     }
@@ -97,24 +113,24 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-4 animate-pop-in origin-top-right z-10">
                     <div className="flex items-center justify-between">
                         <h4 className="font-bold text-gray-800 dark:text-gray-100">Notificaciones</h4>
-                        <label htmlFor="notif-toggle" className={`cursor-pointer ${isPermissionBlocked ? 'cursor-not-allowed' : ''}`}>
+                        <label htmlFor="notif-toggle" className={`cursor-pointer ${isPermissionBlocked || isToggling ? 'cursor-not-allowed' : ''}`}>
                             <div className="relative">
                                 <input 
                                     type="checkbox" 
                                     id="notif-toggle" 
                                     className="sr-only" 
-                                    checked={isSubscribed}
+                                    checked={optimisticSubscribed}
                                     onChange={handleSubscriptionToggle}
-                                    disabled={isPermissionBlocked}
+                                    disabled={isPermissionBlocked || isToggling}
                                 />
-                                <div className={`block w-10 h-6 rounded-full transition-colors ${isSubscribed ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isSubscribed ? 'translate-x-full' : ''}`}></div>
+                                <div className={`block w-10 h-6 rounded-full transition-colors ${optimisticSubscribed ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${optimisticSubscribed ? 'translate-x-full' : ''}`}></div>
                             </div>
                         </label>
                     </div>
 
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Estado: <span className="font-semibold">{statusText}</span>
+                        Estado: <span className="font-semibold">{isToggling ? 'Cambiando...' : statusText}</span>
                     </p>
 
                     {isPermissionBlocked && (
@@ -123,7 +139,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                         </p>
                     )}
 
-                    {isSubscribed && (
+                    {optimisticSubscribed && !isToggling && (
                         <button
                             onClick={handleTestNotificationClick}
                             className="w-full mt-4 bg-secondary text-white font-bold rounded-full px-4 py-2 text-xs shadow-md hover:bg-secondary-dark transition-colors duration-200"
