@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import BellIcon from './icons/BellIcon';
 
@@ -23,17 +22,20 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             document.removeEventListener("mousedown", handleClickOutside);
         };
     }, [wrapperRef]);
-    
-    // Request permission when dropdown is opened for the first time
-    useEffect(() => {
-        if (isDropdownOpen && !isSubscribed && !isPermissionBlocked) {
-            window.OneSignal.push(() => {
-                window.OneSignal.Notifications.requestPermission();
-            });
-        }
-    }, [isDropdownOpen, isSubscribed, isPermissionBlocked]);
 
     const handleToggleClick = () => {
+        const currentlyOpen = isDropdownOpen;
+        // If we are about to open the dropdown
+        if (!currentlyOpen) {
+            // And if permission has not been granted or denied
+            if (!isSubscribed && !isPermissionBlocked) {
+                // Then request permission. This fulfills the user's request.
+                window.OneSignal.push(() => {
+                    window.OneSignal.Notifications.requestPermission();
+                });
+            }
+        }
+        // Then, toggle the dropdown state
         setIsDropdownOpen(prev => !prev);
     };
     
@@ -47,20 +49,22 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             const permission = window.OneSignal.Notifications.permission;
 
             if (permission === 'denied') {
-                return; // Should be disabled anyway
+                return; // The UI should reflect this and disable the toggle
             }
             
             const isOptedIn = await window.OneSignal.User.PushSubscription.getOptedIn();
 
             if (isOptedIn) {
-                // Currently subscribed, so opt-out
+                // User is subscribed, so they want to unsubscribe (opt-out)
                 window.OneSignal.User.PushSubscription.optOut();
             } else {
+                // User is not subscribed
                 if (permission === 'granted') {
-                    // Permission exists, but they opted out. Opt back in.
+                    // Permission was granted before, but they are opted out. Opt back in.
                     window.OneSignal.User.PushSubscription.optIn();
                 } else {
-                    // No permission yet, request it.
+                    // This case should be handled by the dropdown opening, but as a fallback:
+                    // No permission yet, so request it.
                     window.OneSignal.Notifications.requestPermission();
                 }
             }
@@ -76,11 +80,12 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         }
 
         window.OneSignal.push(() => {
+            // OneSignal requires a heading and content.
             window.OneSignal.Notifications.sendSelfNotification(
-                "¡Notificación de Prueba! 🐣",
-                "Si ves esto, ¡las notificaciones funcionan!",
-                window.location.href,
-                'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png'
+                "¡Notificación de Prueba! 🐣", // Title
+                "Si ves esto, ¡las notificaciones funcionan correctamente!", // Message
+                window.location.href, // URL to open
+                'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png' // Icon
             );
         });
     };
