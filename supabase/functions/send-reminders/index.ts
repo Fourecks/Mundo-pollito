@@ -5,6 +5,65 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // This is for local type-checking; the Deno runtime provides this global.
 declare const Deno: any;
 
+/*
+-- ⚠️ IMPORTANT SETUP INSTRUCTIONS FOR NOTIFICATIONS ⚠️
+--
+-- For reminders to work, three things must be configured in your Supabase project:
+--
+-- 1. CREATE THE DATABASE FUNCTION:
+--    The code below needs to be run ONCE in your Supabase SQL Editor.
+--    Go to your Supabase project -> SQL Editor -> "New query" -> Paste the code -> Click "RUN".
+--    This function allows the server to efficiently find which reminders to send.
+--
+-- 2. SET ENVIRONMENT VARIABLES (SECRETS):
+--    This function needs your OneSignal keys to send notifications.
+--    Go to your Supabase project -> Edge Functions -> "send-reminders" -> Click on it -> Go to the "Secrets" tab.
+--    Create two secrets:
+--    - Name: ONESIGNAL_APP_ID      -> Value: [Your OneSignal App ID from the OneSignal dashboard]
+--    - Name: ONESIGNAL_REST_API_KEY -> Value: [Your OneSignal REST API Key from the OneSignal dashboard]
+--
+-- 3. SCHEDULE THE FUNCTION TO RUN (CRON JOB):
+--    This function needs to be triggered automatically every minute to check for reminders.
+--    Go to your Supabase project -> Database -> "Cron Jobs".
+--    Create a new job with this configuration:
+--    - Schedule: * * * * *  (this means "run every minute")
+--    - Function: Choose "send-reminders" from the dropdown.
+--
+-- NOTE ON TIMEZONES: This setup assumes the task time is entered in UTC. For simplicity, it doesn't handle user-specific timezones.
+--
+-- PASTE THIS CODE INTO THE SUPABASE SQL EDITOR AND RUN IT:
+*/
+/*
+CREATE OR REPLACE FUNCTION get_pending_reminders(from_time timestamptz, to_time timestamptz)
+RETURNS TABLE (
+    id bigint,
+    text text,
+    user_id uuid
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        t.id,
+        t.text,
+        t.user_id
+    FROM
+        public.todos t
+    WHERE
+        t.completed = FALSE
+        AND t.notification_sent = FALSE
+        AND t.reminder_offset IS NOT NULL
+        AND t.reminder_offset > 0
+        AND t.start_time IS NOT NULL
+        AND t.due_date IS NOT NULL
+        AND (
+            (t.due_date::timestamp AT TIME ZONE 'UTC') +
+            (t.start_time::time) -
+            (t.reminder_offset * interval '1 minute')
+        ) BETWEEN from_time AND to_time;
+END;
+$$ LANGUAGE plpgsql;
+*/
+
 const ONESIGNAL_APP_ID = Deno.env.get('ONESIGNAL_APP_ID')!;
 const ONESIGNAL_REST_API_KEY = Deno.env.get('ONESIGNAL_REST_API_KEY')!;
 
@@ -54,8 +113,7 @@ serve(async (req) => {
       subtitle: { "es": "Tu pollito te recuerda:" },
       contents: { "es": reminder.text },
       small_icon: 'ic_stat_onesignal_default',
-      // You can add a custom icon URL here
-      // large_icon: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png',
+      large_icon: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png',
       language: "es"
     }));
 
@@ -99,39 +157,3 @@ serve(async (req) => {
     });
   }
 });
-
-/*
--- Run this SQL in your Supabase SQL Editor to create the required database function
--- This function calculates the exact time a notification should be sent and allows
--- the Edge Function to query for it efficiently.
-
-CREATE OR REPLACE FUNCTION get_pending_reminders(from_time timestamptz, to_time timestamptz)
-RETURNS TABLE (
-    id bigint,
-    text text,
-    user_id uuid
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        t.id,
-        t.text,
-        t.user_id
-    FROM
-        public.todos t
-    WHERE
-        t.completed = FALSE
-        AND t.notification_sent = FALSE
-        AND t.reminder_offset IS NOT NULL
-        AND t.reminder_offset > 0
-        AND t.start_time IS NOT NULL
-        AND t.due_date IS NOT NULL
-        AND (
-            (t.due_date::timestamp AT TIME ZONE 'UTC') +
-            (t.start_time::time) -
-            (t.reminder_offset * interval '1 minute')
-        ) BETWEEN from_time AND to_time;
-END;
-$$ LANGUAGE plpgsql;
-
-*/
