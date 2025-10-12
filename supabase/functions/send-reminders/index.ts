@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // FIX: Add Deno type declaration to resolve "Cannot find name 'Deno'" errors.
 // This is for local type-checking; the Deno runtime provides this global.
@@ -66,6 +65,8 @@ $$ LANGUAGE plpgsql;
 
 const ONESIGNAL_APP_ID = Deno.env.get('ONESIGNAL_APP_ID')!;
 const ONESIGNAL_REST_API_KEY = Deno.env.get('ONESIGNAL_REST_API_KEY')!;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,25 +79,31 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { global: { headers: { Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` } } }
-    );
-
     const now = new Date();
-    // Check for tasks where the reminder time is within the last 5 minutes
+    // Check for tasks where the reminder time is within the last 5 minutes to be safe
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
-    const { data: reminders, error } = await supabaseAdmin.rpc('get_pending_reminders', {
+    // 1. Fetch pending reminders using Supabase REST API for RPC
+    const rpcResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_pending_reminders`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         from_time: fiveMinutesAgo.toISOString(),
-        to_time: now.toISOString()
+        to_time: now.toISOString(),
+      }),
     });
 
-    if (error) {
-      console.error('Error fetching reminders:', error);
-      throw error;
+    if (!rpcResponse.ok) {
+      const errorBody = await rpcResponse.text();
+      console.error('Error fetching reminders via RPC:', errorBody);
+      throw new Error(`Failed to fetch reminders: ${rpcResponse.status} ${rpcResponse.statusText}`);
     }
+
+    const reminders: { id: number; text: string; user_id: string }[] = await rpcResponse.json();
 
     if (!reminders || reminders.length === 0) {
       return new Response(JSON.stringify({ message: "No reminders to send." }), {
@@ -105,46 +112,56 @@ serve(async (req) => {
       });
     }
 
-    const notifications = reminders.map((reminder: any) => ({
-      app_id: ONESIGNAL_APP_ID,
-      include_external_user_ids: [reminder.user_id],
-      channel_for_external_user_ids: "push",
-      headings: { "es": "¡Recordatorio de Tarea!" },
-      subtitle: { "es": "Tu pollito te recuerda:" },
-      contents: { "es": reminder.text },
-      small_icon: 'ic_stat_onesignal_default',
-      large_icon: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png',
-      language: "es"
-    }));
+    // 2. Prepare and send notifications to OneSignal
+    const notificationPromises = reminders.map((reminder) => {
+      const notification = {
+        app_id: ONESIGNAL_APP_ID,
+        include_external_user_ids: [reminder.user_id],
+        channel_for_external_user_ids: "push",
+        headings: { "es": "¡Recordatorio de Tarea!" },
+        subtitle: { "es": "Tu pollito te recuerda:" },
+        contents: { "es": reminder.text },
+        large_icon: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png',
+        language: "es"
+      };
 
-    // Send all notifications
-    for (const notification of notifications) {
-        const response = await fetch('https://onesignal.com/api/v1/notifications', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Basic ${ONESIGNAL_REST_API_KEY}`,
-            },
-            body: JSON.stringify(notification),
-        });
+      return fetch('https://onesignal.com/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${ONESIGNAL_REST_API_KEY}`,
+        },
+        body: JSON.stringify(notification),
+      });
+    });
 
+    const results = await Promise.all(notificationPromises);
+    results.forEach(async (response, index) => {
         if (!response.ok) {
-            console.error(`OneSignal API error for user ${notification.include_external_user_ids[0]}:`, await response.text());
+            console.error(`OneSignal API error for user ${reminders[index].user_id}:`, await response.text());
         }
-    }
+    });
     
-    // Mark reminders as sent
-    const reminderIds = reminders.map((r: any) => r.id);
-    const { error: updateError } = await supabaseAdmin
-      .from('todos')
-      .update({ notification_sent: true })
-      .in('id', reminderIds);
+    // 3. Mark reminders as sent in Supabase using REST API
+    const reminderIds = reminders.map((r) => r.id);
+    const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/todos?id=in.(${reminderIds.join(',')})`, {
+        method: 'PATCH',
+        headers: {
+            'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ notification_sent: true }),
+    });
 
-    if (updateError) {
-      console.error('Error updating notification_sent status:', updateError);
+    if (!updateResponse.ok) {
+      const errorBody = await updateResponse.text();
+      console.error('Error updating notification_sent status:', errorBody);
+      // We don't throw here, as the notifications may have been sent.
     }
 
-    return new Response(JSON.stringify({ message: `Successfully processed ${notifications.length} reminders.` }), {
+    return new Response(JSON.stringify({ message: `Successfully processed ${reminders.length} reminders.` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
