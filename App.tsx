@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -836,71 +834,73 @@ const App: React.FC = () => {
   
   // --- ONESIGNAL LOGIC ---
   useEffect(() => {
-    if (!user || isOneSignalInitialized) return;
+    // This effect runs only ONCE when the user logs in to initialize the SDK.
+    if (!user) return;
     
+    // Prevent re-initialization if the SDK is already running.
+    if (window.OneSignal?.isInitialized?.()) {
+        if (!isOneSignalInitialized) setIsOneSignalInitialized(true);
+        return;
+    }
+
+    // Standard OneSignal setup.
     window.OneSignal = window.OneSignal || [];
-    window.OneSignal.push(async () => {
-        await window.OneSignal.init({
+    window.OneSignal.push(() => {
+        // We use .then() because init is asynchronous.
+        window.OneSignal.init({
             appId: config.ONESIGNAL_APP_ID,
             allowLocalhostAsSecureOrigin: true,
-            autoPrompt: false, // We control the prompt with our custom UI
-            promptOptions: {
-                slidedown: {
-                    enabled: true,
-                    autoPrompt: false,
-                    text: {
-                        title: '¿Activar Notificaciones?',
-                        message: 'Recibe recordatorios de tus tareas y pomodoros para mantenerte enfocado.',
-                        acceptButton: '¡Claro!',
-                        cancelButton: 'Ahora no',
-                    },
-                },
-            },
+            // All prompting is handled by our UI and dashboard settings.
+            autoPrompt: false, 
+        }).then(() => {
+            setIsOneSignalInitialized(true);
+            console.log("OneSignal SDK Initialized.");
         });
-        setIsOneSignalInitialized(true);
     });
-  }, [user, isOneSignalInitialized]);
+  }, [user]); // Only depends on the user, so it doesn't re-run unnecessarily.
 
   useEffect(() => {
+    // This effect synchronizes our app's state with the OneSignal SDK's state.
+    // It runs after initialization and whenever the user changes.
     if (!isOneSignalInitialized || !user) return;
+    
+    const OneSignal = window.OneSignal;
 
-    // This function checks both browser permission and OneSignal's subscription status.
-    const updateNotificationStates = () => {
-        if (!window.OneSignal || !window.OneSignal.Notifications) return;
+    // A single, reliable, async function to check and set all notification states.
+    const syncNotificationState = async () => {
+        console.log("Syncing OneSignal state...");
+        try {
+            const permission = OneSignal.Notifications.permission;
+            // This is the key change: we asynchronously ask for the real subscription status.
+            const isOptedIn = await OneSignal.User.PushSubscription.getOptedIn();
 
-        const permission = window.OneSignal.Notifications.permission;
-        // 'optedIn' is the true indicator of being subscribed on OneSignal's side.
-        const isOptedIn = window.OneSignal.User.PushSubscription.optedIn;
-
-        // A user is truly subscribed only if permission is granted AND they are opted in.
-        setIsSubscribed(permission === 'granted' && isOptedIn === true);
-        setIsPermissionBlocked(permission === 'denied');
+            console.log(`Permission: ${permission}, Is Opted In: ${isOptedIn}`);
+            
+            // A user is truly subscribed ONLY if permission is granted AND they are opted-in on OneSignal's servers.
+            setIsSubscribed(permission === 'granted' && isOptedIn);
+            setIsPermissionBlocked(permission === 'denied');
+        } catch (error) {
+            console.error("Error syncing OneSignal state:", error);
+        }
     };
 
-    // 1. Run the check as soon as the SDK is ready.
-    updateNotificationStates();
+    // 1. Perform an initial state sync.
+    syncNotificationState();
 
-    // 2. Set up listeners for any future changes from the user or the SDK.
-    window.OneSignal.Notifications.addEventListener('permissionChange', updateNotificationStates);
-    window.OneSignal.User.PushSubscription.addEventListener('change', updateNotificationStates);
+    // 2. Set up listeners that call our reliable sync function on any change.
+    OneSignal.Notifications.addEventListener('permissionChange', syncNotificationState);
+    OneSignal.User.PushSubscription.addEventListener('change', syncNotificationState);
 
-    // 3. Clean up the listeners when the component unmounts or dependencies change.
+    // 3. Associate our internal user ID with the OneSignal user for backend notifications.
+    OneSignal.login(user.id);
+    console.log(`Associated OneSignal with user ID: ${user.id}`);
+
+    // 4. Clean up the listeners when the component unmounts.
     return () => {
-        if (window.OneSignal && window.OneSignal.Notifications) {
-            window.OneSignal.Notifications.removeEventListener('permissionChange', updateNotificationStates);
-        }
-        if (window.OneSignal && window.OneSignal.User && window.OneSignal.User.PushSubscription) {
-            window.OneSignal.User.PushSubscription.removeEventListener('change', updateNotificationStates);
-        }
+        console.log("Cleaning up OneSignal listeners.");
+        OneSignal.Notifications.removeEventListener('permissionChange', syncNotificationState);
+        OneSignal.User.PushSubscription.removeEventListener('change', syncNotificationState);
     };
-  }, [isOneSignalInitialized, user]);
-
-  useEffect(() => {
-      if (!isOneSignalInitialized || !user) return;
-      
-      // Associate the OneSignal user with your internal user ID
-      window.OneSignal.login(user.id);
-
   }, [isOneSignalInitialized, user]);
 
 
