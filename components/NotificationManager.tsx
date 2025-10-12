@@ -8,7 +8,6 @@ interface NotificationManagerProps {
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed, isPermissionBlocked }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     // Close dropdown on click outside
@@ -28,27 +27,19 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         setIsDropdownOpen(prev => !prev);
     };
     
+    // This function now simply dispatches the command to OneSignal.
+    // The UI will update once the 'isSubscribed' prop changes from the main app component,
+    // which listens for state changes from OneSignal. This is a more robust pattern.
     const handleSubscriptionToggle = () => {
-        if (isPermissionBlocked || isLoading || !window.OneSignal) {
+        if (isPermissionBlocked || !window.OneSignal) {
             return;
         }
 
-        setIsLoading(true);
-
-        window.OneSignal.push(async () => {
-            try {
-                if (isSubscribed) {
-                    await window.OneSignal.User.PushSubscription.optOut();
-                } else {
-                    await window.OneSignal.Notifications.requestPermission();
-                }
-            } catch (error) {
-                console.error("Error during subscription toggle:", error);
-            } finally {
-                // The event listener in App.tsx will eventually update the `isSubscribed` prop.
-                // We'll turn off the loading state here after a short moment to handle cases
-                // where events might not fire (e.g., user closes prompt without a choice).
-                setTimeout(() => setIsLoading(false), 1000); 
+        window.OneSignal.push(() => {
+            if (isSubscribed) {
+                window.OneSignal.User.PushSubscription.optOut();
+            } else {
+                window.OneSignal.Notifications.requestPermission();
             }
         });
     };
@@ -103,7 +94,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-4 animate-pop-in origin-top-right z-10">
                     <div className="flex items-center justify-between">
                         <h4 className="font-bold text-gray-800 dark:text-gray-100">Notificaciones</h4>
-                        <label htmlFor="notif-toggle" className={`cursor-pointer ${isPermissionBlocked || isLoading ? 'cursor-not-allowed' : ''}`}>
+                        <label htmlFor="notif-toggle" className={`cursor-pointer ${isPermissionBlocked ? 'cursor-not-allowed' : ''}`}>
                             <div className="relative">
                                 <input 
                                     type="checkbox" 
@@ -111,7 +102,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                                     className="sr-only" 
                                     checked={isSubscribed}
                                     onChange={handleSubscriptionToggle}
-                                    disabled={isPermissionBlocked || isLoading}
+                                    disabled={isPermissionBlocked}
                                 />
                                 <div className={`block w-10 h-6 rounded-full transition-colors ${isSubscribed ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
                                 <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isSubscribed ? 'translate-x-full' : ''}`}></div>
@@ -120,7 +111,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                     </div>
 
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Estado: <span className="font-semibold">{isLoading ? 'Cambiando...' : statusText}</span>
+                        Estado: <span className="font-semibold">{statusText}</span>
                     </p>
 
                     {isPermissionBlocked && (
@@ -129,7 +120,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                         </p>
                     )}
 
-                    {isSubscribed && !isLoading && (
+                    {isSubscribed && (
                         <button
                             onClick={handleTestNotificationClick}
                             className="w-full mt-4 bg-secondary text-white font-bold rounded-full px-4 py-2 text-xs shadow-md hover:bg-secondary-dark transition-colors duration-200"

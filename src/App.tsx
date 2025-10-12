@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from '../types';
 import CompletionModal from '../components/CompletionModal';
@@ -237,9 +238,6 @@ interface AppComponentProps {
   handleDeleteBackground: (id: string) => Promise<void>;
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
   gapiReady: boolean;
-    // Notification Props
-  isSubscribed: boolean;
-  isPermissionBlocked: boolean;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -254,7 +252,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-    isSubscribed, isPermissionBlocked
   } = props;
   
   // Local UI State for Desktop
@@ -396,7 +393,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         </div>
         <FocusModeButton isFocusMode={isFocusMode} onToggle={() => setIsFocusMode(!isFocusMode)} />
         <div className={`transition-opacity duration-300 flex flex-col items-end gap-3 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-           <NotificationManager isSubscribed={isSubscribed} isPermissionBlocked={isPermissionBlocked} />
           <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
           <button
               onClick={() => setIsCustomizationPanelOpen(true)}
@@ -515,7 +511,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-      isSubscribed, isPermissionBlocked
     } = props;
 
     // Local UI state for Mobile
@@ -646,10 +641,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                   </div>
                                   <ChevronRightIcon />
                                 </button>
-                            </div>
-                            <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg flex justify-between items-center">
-                                <h3 className="font-bold text-primary-dark dark:text-primary">Notificaciones</h3>
-                                <NotificationManager isSubscribed={isSubscribed} isPermissionBlocked={isPermissionBlocked} />
                             </div>
                              <button onClick={onLogout} className="w-full mt-4 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
                                 <LogoutIcon />
@@ -829,69 +820,24 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // OneSignal State
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
-  
-  // --- ONESIGNAL LOGIC REFACTORED ---
+  // --- ONESIGNAL USER ASSOCIATION ---
   useEffect(() => {
     if (!user) return; // Only run when a user is logged in.
 
-    const syncNotificationState = async () => {
-        try {
-            // Guard against running before the SDK is ready
-            if (!window.OneSignal || typeof window.OneSignal.Notifications === 'undefined') {
-                return;
-            }
-            const permission = await window.OneSignal.Notifications.getPermission();
-            const isOptedIn = await window.OneSignal.User.PushSubscription.getOptedIn();
-
-            setIsSubscribed(permission === 'granted' && isOptedIn);
-            setIsPermissionBlocked(permission === 'denied');
-        } catch (error) {
-            console.error("Error syncing OneSignal state:", error);
-        }
-    };
-    
-    const setupOneSignal = async () => {
-        // This function will be queued and executed by the OneSignal SDK when it's ready.
-        await window.OneSignal.push(async () => {
-            // 1. Initialize if not already initialized
-            if (!window.OneSignal.isInitialized) {
-                await window.OneSignal.init({
-                    appId: config.ONESIGNAL_APP_ID,
-                    allowLocalhostAsSecureOrigin: true,
-                    autoPrompt: false,
-                });
-                console.log("OneSignal SDK Initialized.");
-            }
-
-            // 2. Remove old listeners to prevent duplicates, then add fresh ones.
-            window.OneSignal.Notifications.removeEventListener('permissionChange', syncNotificationState);
-            window.OneSignal.User.PushSubscription.removeEventListener('change', syncNotificationState);
-            window.OneSignal.Notifications.addEventListener('permissionChange', syncNotificationState);
-            window.OneSignal.User.PushSubscription.addEventListener('change', syncNotificationState);
-
-            // 3. ALWAYS identify the user. This fixes the main bug.
-            await window.OneSignal.login(user.id);
-            console.log(`Associated OneSignal with user ID: ${user.id}`);
-            
-            // 4. Perform the initial state sync now that everything is configured.
-            await syncNotificationState();
-        });
-    };
-
-    window.OneSignal = window.OneSignal || [];
-    setupOneSignal();
+    // The OneSignal script in index.html handles initialization.
+    // This effect is now only responsible for associating the logged-in user.
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(() => {
+        window.OneSignal.login(user.id);
+        console.log(`Associated OneSignal with user ID: ${user.id}`);
+    });
 
     // The cleanup function for when the user logs out.
     return () => {
-        window.OneSignal = window.OneSignal || [];
-        window.OneSignal.push(() => {
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        window.OneSignalDeferred.push(() => {
             if (window.OneSignal.isInitialized) {
-                console.log("Cleaning up OneSignal listeners and logging out.");
-                window.OneSignal.Notifications.removeEventListener('permissionChange', syncNotificationState);
-                window.OneSignal.User.PushSubscription.removeEventListener('change', syncNotificationState);
+                console.log("Logging out from OneSignal.");
                 window.OneSignal.logout();
             }
         });
@@ -1561,7 +1507,6 @@ const App: React.FC = () => {
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       gapiReady,
-      isSubscribed, isPermissionBlocked,
   };
 
   return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;
