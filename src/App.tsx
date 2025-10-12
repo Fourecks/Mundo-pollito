@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from '../types';
 import CompletionModal from '../components/CompletionModal';
@@ -38,7 +36,7 @@ import GamesHub from '../components/GamesHub';
 import { supabase } from '../supabaseClient';
 import { config } from '../config';
 import { ensureYoutubeApiReady } from '../utils/youtubeApi';
-import NotificationManager from '../components/NotificationManager';
+import BellIcon from '../components/icons/BellIcon';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -238,6 +236,8 @@ interface AppComponentProps {
   handleDeleteBackground: (id: string) => Promise<void>;
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
   gapiReady: boolean;
+  // Notifications
+  handleSendTestNotification: () => void;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -252,6 +252,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+    handleSendTestNotification
   } = props;
   
   // Local UI State for Desktop
@@ -401,6 +402,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             >
               <PaletteIcon />
             </button>
+            <button
+                onClick={handleSendTestNotification}
+                className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-300 hover:text-primary p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+                aria-label="Enviar notificación de prueba"
+              >
+                <BellIcon className="h-6 w-6" />
+              </button>
         </div>
       </header>
 
@@ -511,6 +519,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+      handleSendTestNotification
     } = props;
 
     // Local UI state for Mobile
@@ -638,6 +647,15 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                   <div>
                                     <h3 className="font-bold text-primary-dark dark:text-primary">Personalización</h3>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Colores, fondos, sonidos y efectos.</p>
+                                  </div>
+                                  <ChevronRightIcon />
+                                </button>
+                            </div>
+                            <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg">
+                                <button onClick={handleSendTestNotification} className="w-full flex justify-between items-center text-left">
+                                  <div>
+                                    <h3 className="font-bold text-primary-dark dark:text-primary">Probar Notificaciones</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recibe una notificación de prueba ahora.</p>
                                   </div>
                                   <ChevronRightIcon />
                                 </button>
@@ -1439,6 +1457,29 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSendTestNotification = () => {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(() => {
+        if (!window.OneSignal.isInitialized) {
+            console.error("OneSignal SDK not initialized.");
+            alert("El servicio de notificaciones aún no está listo. Inténtalo de nuevo en un momento.");
+            return;
+        }
+
+        const isSubscribed = window.OneSignal.User.PushSubscription.isSubscribed;
+        if (isSubscribed) {
+            window.OneSignal.Notifications.sendSelfNotification(
+                "¡Notificación de Prueba! 🐣",
+                "Si ves esto, ¡las notificaciones funcionan correctamente!",
+                window.location.href,
+                'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png'
+            );
+        } else {
+            alert("Debes suscribirte a las notificaciones primero. Haz clic en el botón de la campana flotante y permite los permisos.");
+        }
+    });
+  };
+
   // Debounced save settings to Supabase & localStorage
   useEffect(() => {
     if (!dataLoaded || !user) return;
@@ -1507,6 +1548,7 @@ const App: React.FC = () => {
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       gapiReady,
+      handleSendTestNotification,
   };
 
   return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;
