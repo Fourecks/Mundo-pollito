@@ -1164,10 +1164,15 @@ const App: React.FC = () => {
         if (refetchError) throw refetchError;
         if (!refreshedTodo) throw new Error("Failed to refetch todo after update.");
 
-        // FIX: Cast `refreshedTodo` to `any` and the final merged object to `Todo` to resolve a complex type inference issue.
-        // The data from Supabase can have an ambiguous type (`unknown` or `{}`), which causes type errors.
-        // Spreading `updatedTodo` first provides a safe baseline, and the final cast assures the compiler of the object's shape.
-        const finalTodo = { ...updatedTodo, ...(refreshedTodo as any), subtasks: (refreshedTodo as any)?.subtasks || [] } as Todo;
+        // FIX: Resolve complex type inference issue from Supabase data.
+        // The `refreshedTodo` can have an ambiguous type or a null `priority`, causing type errors.
+        // This ensures the final object is a valid `Todo` by providing fallbacks for required properties.
+        const finalTodo: Todo = {
+            ...updatedTodo,
+            ...(refreshedTodo as any),
+            priority: (refreshedTodo as any)?.priority || updatedTodo.priority,
+            subtasks: (refreshedTodo as any)?.subtasks || [],
+        };
         
         let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
         let oldDateKey: string | null = null;

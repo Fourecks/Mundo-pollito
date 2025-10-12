@@ -9,7 +9,7 @@ interface NotificationManagerProps {
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed, isPermissionBlocked }) => {
     
-    const handleNotificationClick = () => {
+    const handlePermissionClick = () => {
         if (!window.OneSignal) {
             console.error("OneSignal SDK not loaded.");
             return;
@@ -20,6 +20,24 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             // This will show the configured slidedown prompt.
             // OneSignal will handle showing the native prompt if the user accepts this.
             window.OneSignal.Slidedown.prompt();
+        });
+    };
+
+    const handleTestNotificationClick = () => {
+        if (!window.OneSignal) {
+            console.error("OneSignal SDK not loaded.");
+            return;
+        }
+
+        console.log("Scheduling test notification for 5 seconds from now...");
+        window.OneSignal.push(() => {
+            window.OneSignal.Notifications.sendSelfNotification({
+                title: "¡Notificación de Prueba! 🐣",
+                body: "Si ves esto, ¡las notificaciones funcionan! Se envió 5 segundos después de hacer clic.",
+                url: window.location.href,
+                icon: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png',
+                send_after: 5 // Delay in seconds
+            });
         });
     };
 
@@ -44,15 +62,26 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
     }
 
     return (
-        <button
-            onClick={handleNotificationClick}
-            disabled={isPermissionBlocked || isSubscribed}
-            className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${isSubscribed || isPermissionBlocked ? '' : 'hover:scale-110'} ${iconColor}`}
-            aria-label={buttonTitle}
-            title={buttonTitle}
-        >
-            {iconElement}
-        </button>
+        <div className="flex items-center gap-3">
+            {isSubscribed && !isPermissionBlocked && (
+                <button
+                    onClick={handleTestNotificationClick}
+                    className="bg-secondary text-white font-bold rounded-full px-4 py-2 text-xs shadow-md hover:bg-secondary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 animate-pop-in"
+                    title="Enviar una notificación de prueba en 5 segundos"
+                >
+                    Probar
+                </button>
+            )}
+            <button
+                onClick={handlePermissionClick}
+                disabled={isPermissionBlocked || isSubscribed}
+                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${isSubscribed || isPermissionBlocked ? '' : 'hover:scale-110'} ${iconColor}`}
+                aria-label={buttonTitle}
+                title={buttonTitle}
+            >
+                {iconElement}
+            </button>
+        </div>
     );
 };
 
