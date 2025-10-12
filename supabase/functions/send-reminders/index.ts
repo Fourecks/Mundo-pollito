@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 
-// FIX: Add Deno type declaration to resolve "Cannot find name 'Deno'" errors.
+// Add Deno type declaration to resolve "Cannot find name 'Deno'" errors.
 // This is for local type-checking; the Deno runtime provides this global.
 declare const Deno: any;
 
@@ -88,7 +88,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        // 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Removed to avoid potential JWT parsing issues in the runtime
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -148,7 +148,7 @@ serve(async (req) => {
         method: 'PATCH',
         headers: {
             'apikey': SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            // 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Removed to avoid potential JWT parsing issues in the runtime
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal',
         },
