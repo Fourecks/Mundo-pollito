@@ -23,54 +23,31 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         };
     }, [wrapperRef]);
 
-    const handleToggleClick = () => {
-        const currentlyOpen = isDropdownOpen;
-        // If we are about to open the dropdown
-        if (!currentlyOpen) {
-            // And if permission has not been granted or denied
-            if (!isSubscribed && !isPermissionBlocked) {
-                // Then request permission. This fulfills the user's request.
-                window.OneSignal.push(() => {
-                    window.OneSignal.Notifications.requestPermission();
-                });
-            }
-        }
-        // Then, toggle the dropdown state
+    const handleBellClick = () => {
         setIsDropdownOpen(prev => !prev);
     };
     
     const handleSubscriptionToggle = () => {
-        if (!window.OneSignal) {
-            console.error("OneSignal SDK not loaded.");
+        // This function is now more direct and uses the recommended OneSignal methods.
+        if (isPermissionBlocked || !window.OneSignal) {
             return;
         }
 
-        window.OneSignal.push(async () => {
-            const permission = window.OneSignal.Notifications.permission;
-
-            if (permission === 'denied') {
-                return; // The UI should reflect this and disable the toggle
-            }
-            
-            const isOptedIn = await window.OneSignal.User.PushSubscription.getOptedIn();
-
-            if (isOptedIn) {
-                // User is subscribed, so they want to unsubscribe (opt-out)
+        window.OneSignal.push(() => {
+            if (isSubscribed) {
+                // If the app state shows the user is subscribed, they want to unsubscribe.
+                // The most reliable way is to call optOut().
                 window.OneSignal.User.PushSubscription.optOut();
             } else {
-                // User is not subscribed
-                if (permission === 'granted') {
-                    // Permission was granted before, but they are opted out. Opt back in.
-                    window.OneSignal.User.PushSubscription.optIn();
-                } else {
-                    // This case should be handled by the dropdown opening, but as a fallback:
-                    // No permission yet, so request it.
-                    window.OneSignal.Notifications.requestPermission();
-                }
+                // If the app state shows they are not subscribed, they want to subscribe.
+                // requestPermission() handles both initial prompting and re-subscribing
+                // if they previously granted permission but opted out.
+                window.OneSignal.Notifications.requestPermission();
             }
-            // Close dropdown after action to provide clear feedback
-            setIsDropdownOpen(false);
         });
+        
+        // We can close the dropdown after the action is initiated.
+        setIsDropdownOpen(false);
     };
 
     const handleTestNotificationClick = () => {
@@ -80,7 +57,6 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         }
 
         window.OneSignal.push(() => {
-            // OneSignal requires a heading and content.
             window.OneSignal.Notifications.sendSelfNotification(
                 "¡Notificación de Prueba! 🐣", // Title
                 "Si ves esto, ¡las notificaciones funcionan correctamente!", // Message
@@ -113,7 +89,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
     return (
         <div className="relative" ref={wrapperRef}>
             <button
-                onClick={handleToggleClick}
+                onClick={handleBellClick}
                 className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${iconColor}`}
                 aria-label="Administrar notificaciones"
             >

@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1141,13 +1142,14 @@ const App: React.FC = () => {
         throw error;
       }
 
+// FIX: Correctly handle ambiguous type from Supabase by casting and ensuring all required properties of the Todo type are present.
       if (newTodo && 'id' in newTodo) {
-        // FIX: The `newTodo` object from Supabase may have an ambiguous type (`any`, `{}`, or `unknown`).
-        // Explicitly providing required properties with fallbacks ensures type safety.
-        const data = newTodo as any;
+        // The `newTodo` object from Supabase may have an ambiguous type (`any`, `{}`, or `unknown`).
+        // By casting to a Partial<Todo> and providing fallbacks, we can safely construct a valid `Todo` object.
+        const data = newTodo as Partial<Todo>;
         const todoToAdd: Todo = {
           ...data,
-          id: data.id,
+          id: data.id!,
           text: data.text ?? text,
           completed: data.completed ?? false,
           priority: data.priority ?? 'medium',
