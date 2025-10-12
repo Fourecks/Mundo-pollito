@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -838,8 +839,8 @@ const App: React.FC = () => {
     if (!user || isOneSignalInitialized) return;
     
     window.OneSignal = window.OneSignal || [];
-    window.OneSignal.push(() => {
-        window.OneSignal.init({
+    window.OneSignal.push(async () => {
+        await window.OneSignal.init({
             appId: config.ONESIGNAL_APP_ID,
             allowLocalhostAsSecureOrigin: true,
             autoPrompt: false, // We control the prompt with our custom UI
@@ -863,8 +864,8 @@ const App: React.FC = () => {
   useEffect(() => {
       if (!isOneSignalInitialized || !user) return;
       
-      const handlePermissionChange = async () => {
-          const permission = await window.OneSignal.Notifications.getPermissionStatus();
+      const handlePermissionChange = () => {
+          const permission = window.OneSignal.Notifications.permission;
           setIsSubscribed(permission === 'granted');
           setIsPermissionBlocked(permission === 'denied');
       };
@@ -874,7 +875,9 @@ const App: React.FC = () => {
       window.OneSignal.Notifications.addEventListener('permissionChange', handlePermissionChange);
 
       return () => {
-          window.OneSignal.Notifications.removeEventListener('permissionChange', handlePermissionChange);
+          if (window.OneSignal && window.OneSignal.Notifications) {
+            window.OneSignal.Notifications.removeEventListener('permissionChange', handlePermissionChange);
+          }
       };
 
   }, [isOneSignalInitialized, user]);
@@ -1161,11 +1164,10 @@ const App: React.FC = () => {
         if (refetchError) throw refetchError;
         if (!refreshedTodo) throw new Error("Failed to refetch todo after update.");
 
-        // FIX: The type from Supabase can be ambiguous, sometimes returning an empty object `{}` instead of `null`.
-// To prevent a type error where required `Todo` properties are missing, we spread `updatedTodo`
-// as a baseline. The properties from `refreshedTodo` will then overwrite it with fresh data from the database.
-// FIX: Casting to `any` was hiding type issues and causing `unknown` type inference. Using `Partial<Todo>` is safer and provides better type information.
-        const finalTodo: Todo = { ...updatedTodo, ...(refreshedTodo as Partial<Todo>), subtasks: (refreshedTodo as Partial<Todo>)?.subtasks || [] };
+        // FIX: Cast `refreshedTodo` to `any` and the final merged object to `Todo` to resolve a complex type inference issue.
+        // The data from Supabase can have an ambiguous type (`unknown` or `{}`), which causes type errors.
+        // Spreading `updatedTodo` first provides a safe baseline, and the final cast assures the compiler of the object's shape.
+        const finalTodo = { ...updatedTodo, ...(refreshedTodo as any), subtasks: (refreshedTodo as any)?.subtasks || [] } as Todo;
         
         let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
         let oldDateKey: string | null = null;

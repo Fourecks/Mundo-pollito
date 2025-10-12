@@ -1,3 +1,4 @@
+
 import React from 'react';
 import BellIcon from './icons/BellIcon';
 
@@ -15,9 +16,10 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         }
         
         // The .push() method queues the function call until the SDK is fully initialized.
-        // This prevents race conditions where the button is clicked before init completes.
         window.OneSignal.push(() => {
-            window.OneSignal.Notifications.requestPermission();
+            // This will show the configured slidedown prompt.
+            // OneSignal will handle showing the native prompt if the user accepts this.
+            window.OneSignal.Slidedown.prompt();
         });
     };
 
