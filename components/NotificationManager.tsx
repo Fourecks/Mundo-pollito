@@ -45,9 +45,6 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                 window.OneSignal.Notifications.requestPermission();
             }
         });
-        
-        // We can close the dropdown after the action is initiated.
-        setIsDropdownOpen(false);
     };
 
     const handleTestNotificationClick = () => {
