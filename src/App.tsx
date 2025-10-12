@@ -862,24 +862,37 @@ const App: React.FC = () => {
   }, [user, isOneSignalInitialized]);
 
   useEffect(() => {
-      if (!isOneSignalInitialized || !user) return;
-      
-      const handlePermissionChange = () => {
-          const permission = window.OneSignal.Notifications.permission;
-          setIsSubscribed(permission === 'granted');
-          setIsPermissionBlocked(permission === 'denied');
-      };
+    if (!isOneSignalInitialized || !user) return;
 
-      handlePermissionChange(); // Check initial state
+    // This function checks both browser permission and OneSignal's subscription status.
+    const updateNotificationStates = () => {
+        if (!window.OneSignal || !window.OneSignal.Notifications) return;
 
-      window.OneSignal.Notifications.addEventListener('permissionChange', handlePermissionChange);
+        const permission = window.OneSignal.Notifications.permission;
+        // 'optedIn' is the true indicator of being subscribed on OneSignal's side.
+        const isOptedIn = window.OneSignal.User.PushSubscription.optedIn;
 
-      return () => {
-          if (window.OneSignal && window.OneSignal.Notifications) {
-            window.OneSignal.Notifications.removeEventListener('permissionChange', handlePermissionChange);
-          }
-      };
+        // A user is truly subscribed only if permission is granted AND they are opted in.
+        setIsSubscribed(permission === 'granted' && isOptedIn === true);
+        setIsPermissionBlocked(permission === 'denied');
+    };
 
+    // 1. Run the check as soon as the SDK is ready.
+    updateNotificationStates();
+
+    // 2. Set up listeners for any future changes from the user or the SDK.
+    window.OneSignal.Notifications.addEventListener('permissionChange', updateNotificationStates);
+    window.OneSignal.User.PushSubscription.addEventListener('change', updateNotificationStates);
+
+    // 3. Clean up the listeners when the component unmounts or dependencies change.
+    return () => {
+        if (window.OneSignal && window.OneSignal.Notifications) {
+            window.OneSignal.Notifications.removeEventListener('permissionChange', updateNotificationStates);
+        }
+        if (window.OneSignal && window.OneSignal.User && window.OneSignal.User.PushSubscription) {
+            window.OneSignal.User.PushSubscription.removeEventListener('change', updateNotificationStates);
+        }
+    };
   }, [isOneSignalInitialized, user]);
 
   useEffect(() => {
