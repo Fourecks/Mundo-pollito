@@ -8,21 +8,8 @@ interface NotificationManagerProps {
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed, isPermissionBlocked }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
-
-    // --- Optimistic UI State ---
-    const [optimisticSubscribed, setOptimisticSubscribed] = useState(isSubscribed);
-    const [isToggling, setIsToggling] = useState(false);
-
-    // Sync local state when the real prop from App.tsx changes
-    useEffect(() => {
-        setOptimisticSubscribed(isSubscribed);
-        // Once the real state arrives, we know the toggle operation is complete.
-        if (isToggling) {
-            setIsToggling(false);
-        }
-    }, [isSubscribed]);
-
 
     // Close dropdown on click outside
     useEffect(() => {
@@ -42,25 +29,28 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
     };
     
     const handleSubscriptionToggle = () => {
-        if (isPermissionBlocked || !window.OneSignal || isToggling) {
+        if (isPermissionBlocked || isLoading || !window.OneSignal) {
             return;
         }
 
-        // 1. Start toggling state and provide immediate visual feedback
-        setIsToggling(true);
-        setOptimisticSubscribed(current => !current);
+        setIsLoading(true);
 
-        // 2. Call the actual OneSignal SDK method
-        window.OneSignal.push(() => {
-            // The logic is based on the REAL state (isSubscribed), not the optimistic one
-            if (isSubscribed) {
-                window.OneSignal.User.PushSubscription.optOut();
-            } else {
-                window.OneSignal.Notifications.requestPermission();
+        window.OneSignal.push(async () => {
+            try {
+                if (isSubscribed) {
+                    await window.OneSignal.User.PushSubscription.optOut();
+                } else {
+                    await window.OneSignal.Notifications.requestPermission();
+                }
+            } catch (error) {
+                console.error("Error during subscription toggle:", error);
+            } finally {
+                // The event listener in App.tsx will eventually update the `isSubscribed` prop.
+                // We'll turn off the loading state here after a short moment to handle cases
+                // where events might not fire (e.g., user closes prompt without a choice).
+                setTimeout(() => setIsLoading(false), 1000); 
             }
         });
-        // The useEffect hook listening to `isSubscribed` will set isToggling back to false
-        // once the operation is confirmed.
     };
 
     const handleTestNotificationClick = () => {
@@ -94,7 +84,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                 </svg>
             </div>
         );
-    } else if (optimisticSubscribed) { // Use optimistic state for UI
+    } else if (isSubscribed) {
         iconColor = 'text-primary dark:text-primary';
         statusText = 'Activadas';
     }
@@ -113,24 +103,24 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-4 animate-pop-in origin-top-right z-10">
                     <div className="flex items-center justify-between">
                         <h4 className="font-bold text-gray-800 dark:text-gray-100">Notificaciones</h4>
-                        <label htmlFor="notif-toggle" className={`cursor-pointer ${isPermissionBlocked || isToggling ? 'cursor-not-allowed' : ''}`}>
+                        <label htmlFor="notif-toggle" className={`cursor-pointer ${isPermissionBlocked || isLoading ? 'cursor-not-allowed' : ''}`}>
                             <div className="relative">
                                 <input 
                                     type="checkbox" 
                                     id="notif-toggle" 
                                     className="sr-only" 
-                                    checked={optimisticSubscribed}
+                                    checked={isSubscribed}
                                     onChange={handleSubscriptionToggle}
-                                    disabled={isPermissionBlocked || isToggling}
+                                    disabled={isPermissionBlocked || isLoading}
                                 />
-                                <div className={`block w-10 h-6 rounded-full transition-colors ${optimisticSubscribed ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${optimisticSubscribed ? 'translate-x-full' : ''}`}></div>
+                                <div className={`block w-10 h-6 rounded-full transition-colors ${isSubscribed ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isSubscribed ? 'translate-x-full' : ''}`}></div>
                             </div>
                         </label>
                     </div>
 
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Estado: <span className="font-semibold">{isToggling ? 'Cambiando...' : statusText}</span>
+                        Estado: <span className="font-semibold">{isLoading ? 'Cambiando...' : statusText}</span>
                     </p>
 
                     {isPermissionBlocked && (
@@ -139,7 +129,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
                         </p>
                     )}
 
-                    {optimisticSubscribed && !isToggling && (
+                    {isSubscribed && !isLoading && (
                         <button
                             onClick={handleTestNotificationClick}
                             className="w-full mt-4 bg-secondary text-white font-bold rounded-full px-4 py-2 text-xs shadow-md hover:bg-secondary-dark transition-colors duration-200"
