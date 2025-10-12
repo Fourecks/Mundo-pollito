@@ -15,10 +15,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             return;
         }
         
-        // The .push() method queues the function call until the SDK is fully initialized.
         window.OneSignal.push(() => {
-            // This will show the configured slidedown prompt.
-            // OneSignal will handle showing the native prompt if the user accepts this.
             window.OneSignal.Slidedown.prompt();
         });
     };
@@ -29,24 +26,26 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             return;
         }
 
-        console.log("Scheduling test notification for 5 seconds from now...");
+        console.log("Sending test notification now...");
         window.OneSignal.push(() => {
-            window.OneSignal.Notifications.sendSelfNotification({
-                title: "¡Notificación de Prueba! 🐣",
-                body: "Si ves esto, ¡las notificaciones funcionan! Se envió 5 segundos después de hacer clic.",
-                url: window.location.href,
-                icon: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png',
-                send_after: 5 // Delay in seconds
-            });
+            // Using a simpler, immediate notification call for reliability.
+            window.OneSignal.Notifications.sendSelfNotification(
+                "¡Notificación de Prueba! 🐣",
+                "Si ves esto, ¡las notificaciones funcionan!",
+                window.location.href,
+                'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png'
+            );
         });
     };
 
+    let statusText = 'Estado: Desconocido';
     let buttonTitle = 'Activar notificaciones';
     let iconColor = 'text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary';
     let iconElement = <BellIcon className="h-6 w-6" />;
 
     if (isPermissionBlocked) {
-        buttonTitle = 'Las notificaciones están bloqueadas en tu navegador';
+        statusText = 'Estado: Bloqueado';
+        buttonTitle = 'Notificaciones bloqueadas. Revise la configuración de su navegador.';
         iconColor = 'text-red-400 dark:text-red-500 cursor-not-allowed';
         iconElement = (
             <div className="relative">
@@ -57,30 +56,36 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
             </div>
         );
     } else if (isSubscribed) {
-        buttonTitle = 'Estás suscrito a las notificaciones';
+        statusText = 'Estado: Suscrito';
+        buttonTitle = 'Suscrito a notificaciones';
         iconColor = 'text-primary dark:text-primary';
+    } else {
+        statusText = 'Estado: No suscrito';
     }
 
     return (
-        <div className="flex items-center gap-3">
-            {isSubscribed && !isPermissionBlocked && (
+        <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-3">
+                {isSubscribed && !isPermissionBlocked && (
+                    <button
+                        onClick={handleTestNotificationClick}
+                        className="bg-secondary text-white font-bold rounded-full px-4 py-2 text-xs shadow-md hover:bg-secondary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 animate-pop-in"
+                        title="Enviar una notificación de prueba inmediata"
+                    >
+                        Probar
+                    </button>
+                )}
                 <button
-                    onClick={handleTestNotificationClick}
-                    className="bg-secondary text-white font-bold rounded-full px-4 py-2 text-xs shadow-md hover:bg-secondary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 animate-pop-in"
-                    title="Enviar una notificación de prueba en 5 segundos"
+                    onClick={handlePermissionClick}
+                    disabled={isPermissionBlocked || isSubscribed}
+                    className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${isSubscribed || isPermissionBlocked ? '' : 'hover:scale-110'} ${iconColor}`}
+                    aria-label={buttonTitle}
+                    title={buttonTitle}
                 >
-                    Probar
+                    {iconElement}
                 </button>
-            )}
-            <button
-                onClick={handlePermissionClick}
-                disabled={isPermissionBlocked || isSubscribed}
-                className={`bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 ${isSubscribed || isPermissionBlocked ? '' : 'hover:scale-110'} ${iconColor}`}
-                aria-label={buttonTitle}
-                title={buttonTitle}
-            >
-                {iconElement}
-            </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded-full">{statusText}</p>
         </div>
     );
 };
