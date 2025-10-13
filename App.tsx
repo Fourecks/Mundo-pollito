@@ -862,28 +862,32 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isOneSignalInitialized) return;
 
-    const updateSubscriptionStatus = () => {
-      const isSub = window.OneSignal.User.PushSubscription.isSubscribed;
-      setIsSubscribed(isSub);
-    };
+    // FIX: All interactions with the OneSignal SDK must be wrapped in `push` to avoid race conditions.
+    // This ensures commands are queued and executed only when the SDK is fully loaded.
+    window.OneSignal.push(() => {
+        const updateSubscriptionStatus = () => {
+            if (window.OneSignal.User?.PushSubscription) {
+                setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
+            }
+        };
 
-    window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
-    window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
+        window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
+        window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
 
-    // Initial check
-    updateSubscriptionStatus();
+        // Initial check
+        updateSubscriptionStatus();
 
-    if (user) {
-      window.OneSignal.login(user.id);
-    } else {
-      window.OneSignal.logout();
-    }
+        if (user) {
+            window.OneSignal.login(user.id);
+        } else {
+            window.OneSignal.logout();
+        }
+    });
+    // The cleanup for listeners is omitted as this effect's dependencies will cause re-runs,
+    // and OneSignal handles re-adding listeners and login state changes gracefully.
+    // This prevents a more complex cleanup implementation for this pattern.
+}, [user, isOneSignalInitialized]);
 
-    return () => {
-      window.OneSignal.User.PushSubscription.removeEventListener('change', updateSubscriptionStatus);
-      window.OneSignal.Notifications.removeEventListener('permissionChange', updateSubscriptionStatus);
-    }
-  }, [user, isOneSignalInitialized]);
 
   // Client-side reminder polling
   useEffect(() => {

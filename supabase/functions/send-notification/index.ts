@@ -1,7 +1,11 @@
 // @ts-ignore
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-// @ts-ignore
-import { corsHeaders } from '../_shared/cors.ts';
+
+// This is now defined directly in the function to avoid deployment path issues.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 // FIX: Declare Deno to provide type definition for the Deno runtime environment.
 declare const Deno: any;
