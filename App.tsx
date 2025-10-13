@@ -842,14 +842,16 @@ const App: React.FC = () => {
   // OneSignal State
   const [isSubscribed, setIsSubscribed] = useState(false);
 
-  // --- ONESIGNAL & REMINDER POLLING LOGIC ---
+// --- ONESIGNAL & REMINDER POLLING LOGIC ---
   
-  // This effect runs once to queue up the OneSignal SDK initialization
-  // and to set up listeners for subscription status changes.
+  // Este efecto se ejecuta una vez para inicializar el SDK de OneSignal.
+  // Espera a que el comando 'init' se complete antes de adjuntar los listeners
+  // para evitar condiciones de carrera en el arranque.
   useEffect(() => {
     window.OneSignal = window.OneSignal || [];
-    window.OneSignal.push(() => {
-      window.OneSignal.init({
+    window.OneSignal.push(async () => {
+      // La función init devuelve una promesa que se resuelve cuando la inicialización está completa.
+      await window.OneSignal.init({
         appId: config.ONESIGNAL_APP_ID,
         safari_web_id: "web.onesignal.auto.571cab93-0309-4674-850d-02fe7b657956",
         notifyButton: {
@@ -857,6 +859,7 @@ const App: React.FC = () => {
         },
       });
 
+      // Ahora que init está completo, podemos adjuntar los listeners de forma segura.
       const updateSubscriptionStatus = () => {
           if (window.OneSignal.User?.PushSubscription) {
               setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
@@ -865,9 +868,11 @@ const App: React.FC = () => {
 
       window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
       window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
-      updateSubscriptionStatus(); // Initial check
+      
+      // Realiza la comprobación inicial del estado después de adjuntar los listeners.
+      updateSubscriptionStatus();
     });
-  }, []); // Empty dependency array ensures this runs only once on mount.
+  }, []); // El array de dependencias vacío asegura que esto solo se ejecute una vez al montar.
 
   // This effect handles logging the user in or out of OneSignal whenever
   // the application's user state changes.
