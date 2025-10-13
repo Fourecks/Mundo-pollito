@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -839,15 +840,14 @@ const App: React.FC = () => {
   const appFolderId = useRef<string | null>(null);
   
   // OneSignal State
-  const [isOneSignalInitialized, setIsOneSignalInitialized] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
 
   // --- ONESIGNAL & REMINDER POLLING LOGIC ---
   useEffect(() => {
-    // This effect runs only once to initialize the OneSignal SDK.
+    // This effect runs once to queue up the OneSignal SDK initialization
+    // and to set up listeners for subscription status changes.
     window.OneSignal = window.OneSignal || [];
     window.OneSignal.push(() => {
-      // FIX: Use window.OneSignal for consistency and to resolve TypeScript error.
       window.OneSignal.init({
         appId: config.ONESIGNAL_APP_ID,
         safari_web_id: "web.onesignal.auto.571cab93-0309-4674-850d-02fe7b657956",
@@ -855,38 +855,31 @@ const App: React.FC = () => {
           enable: true,
         },
       });
-      setIsOneSignalInitialized(true);
+
+      const updateSubscriptionStatus = () => {
+          if (window.OneSignal.User?.PushSubscription) {
+              setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
+          }
+      };
+
+      window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
+      window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
+      updateSubscriptionStatus(); // Initial check
     });
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once on mount.
 
   useEffect(() => {
-    if (!isOneSignalInitialized) return;
-
-    // FIX: All interactions with the OneSignal SDK must be wrapped in `push` to avoid race conditions.
-    // This ensures commands are queued and executed only when the SDK is fully loaded.
+    // This effect handles logging the user in or out of OneSignal whenever
+    // the application's user state changes.
+    window.OneSignal = window.OneSignal || [];
     window.OneSignal.push(() => {
-        const updateSubscriptionStatus = () => {
-            if (window.OneSignal.User?.PushSubscription) {
-                setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
-            }
-        };
-
-        window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
-        window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
-
-        // Initial check
-        updateSubscriptionStatus();
-
-        if (user) {
-            window.OneSignal.login(user.id);
-        } else {
-            window.OneSignal.logout();
-        }
+      if (user) {
+        window.OneSignal.login(user.id);
+      } else {
+        window.OneSignal.logout();
+      }
     });
-    // The cleanup for listeners is omitted as this effect's dependencies will cause re-runs,
-    // and OneSignal handles re-adding listeners and login state changes gracefully.
-    // This prevents a more complex cleanup implementation for this pattern.
-}, [user, isOneSignalInitialized]);
+  }, [user]); // This runs whenever the 'user' object changes.
 
 
   // Client-side reminder polling
@@ -897,7 +890,8 @@ const App: React.FC = () => {
       const now = new Date();
       const todosToNotify: Todo[] = [];
 
-      Object.values(allTodos).flat().forEach(todo => {
+      // FIX: Explicitly type 'todo' as 'Todo' to resolve properties not existing on 'unknown' type.
+      Object.values(allTodos).flat().forEach((todo: Todo) => {
         if (!todo.completed && !todo.notification_sent && todo.reminder_offset && todo.due_date && todo.start_time) {
           const [year, month, day] = todo.due_date.split('-').map(Number);
           const [hour, minute] = todo.start_time.split(':').map(Number);
@@ -1342,7 +1336,7 @@ const App: React.FC = () => {
 
   const handleDeleteTodo = async (id: number) => {
     if (!user) return;
-    const taskToDelete: Todo | undefined = Object.values(allTodos).flat().find((t: Todo) => t.id === id);
+    const taskToDelete: Todo | undefined = (Object.values(allTodos).flat() as Todo[]).find(t => t.id === id);
     if (!taskToDelete) return;
     try {
         let idsToDelete: number[] = [id];
@@ -1355,9 +1349,10 @@ const App: React.FC = () => {
             await supabase.from('todos').delete().in('id', idsToDelete).throwOnError();
         }
         setAllTodos(prev => {
-            const newAllTodos = JSON.parse(JSON.stringify(prev));
+            // FIX: Correctly type `newAllTodos` to prevent type errors when filtering.
+            const newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(prev));
             const deleteIdSet = new Set(idsToDelete);
-            for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => !deleteIdSet.has(t.id)); if (newAllTodos[dateKey].length === 0) delete newAllTodos[dateKey]; }
+            for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => !deleteIdSet.has(t.id)); if (newAllTodos[dateKey].length === 0) delete newAllTodos[dateKey]; }
             return newAllTodos;
         });
     } catch (error: any) { console.error("Error deleting todo series:", error); }
@@ -1543,11 +1538,6 @@ const App: React.FC = () => {
   };
 
   const handleSendTestNotification = () => {
-    if (!isOneSignalInitialized) {
-      alert("El servicio de notificaciones aún no está listo. Inténtalo de nuevo en un momento.");
-      return;
-    }
-    
     if (isSubscribed) {
       window.OneSignal.Notifications.sendSelfNotification(
         "¡Notificación de Prueba! 🐣",

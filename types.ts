@@ -178,7 +178,5 @@ declare global {
       createClient: (url: string, key: string) => any;
     };
     OneSignal: any;
-    // FIX: Add OneSignalDeferred to window type to fix TypeScript errors.
-    OneSignalDeferred?: any[];
   }
 }
