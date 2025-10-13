@@ -843,36 +843,26 @@ const App: React.FC = () => {
   const [isSubscribed, setIsSubscribed] = useState(false);
 
 // --- ONESIGNAL & REMINDER POLLING LOGIC ---
-  
-  // Este efecto se ejecuta una vez para inicializar el SDK de OneSignal.
-  // Espera a que el comando 'init' se complete antes de adjuntar los listeners
-  // para evitar condiciones de carrera en el arranque.
   useEffect(() => {
+    // OneSignal is initialized in a <script> tag in index.html to decouple from React's lifecycle.
+    // This effect's job is to set up the listeners for subscription changes.
     window.OneSignal = window.OneSignal || [];
-    window.OneSignal.push(async () => {
-      // La función init devuelve una promesa que se resuelve cuando la inicialización está completa.
-      await window.OneSignal.init({
-        appId: config.ONESIGNAL_APP_ID,
-        safari_web_id: "web.onesignal.auto.571cab93-0309-4674-850d-02fe7b657956",
-        notifyButton: {
-          enable: true,
-        },
-      });
-
-      // Ahora que init está completo, podemos adjuntar los listeners de forma segura.
+    window.OneSignal.push(() => {
+      // This code will run after the OneSignal SDK has loaded and initialized.
       const updateSubscriptionStatus = () => {
-          if (window.OneSignal.User?.PushSubscription) {
-              setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
-          }
+        if (window.OneSignal.User?.PushSubscription) {
+          setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
+        }
       };
 
+      // Add listeners for any future changes
       window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
       window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
-      
-      // Realiza la comprobación inicial del estado después de adjuntar los listeners.
+
+      // Perform an initial check for the subscription status
       updateSubscriptionStatus();
     });
-  }, []); // El array de dependencias vacío asegura que esto solo se ejecute una vez al montar.
+  }, []); // Empty dependency array ensures this runs only once on mount.
 
   // This effect handles logging the user in or out of OneSignal whenever
   // the application's user state changes.

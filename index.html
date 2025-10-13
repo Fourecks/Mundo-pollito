@@ -199,6 +199,19 @@
 </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.OneSignal = window.OneSignal || [];
+      OneSignal.push(function() {
+        OneSignal.init({
+          appId: "89fee09e-9d85-472a-a7c8-cda821a90bbf",
+          safari_web_id: "web.onesignal.auto.571cab93-0309-4674-850d-02fe7b657956",
+          notifyButton: {
+            enable: true,
+          },
+          allowLocalhostAsSecureOrigin: true,
+        });
+      });
+    </script>
     <script type="module" src="/index.tsx"></script>
     <script src="https://accounts.google.com/gsi/client" async></script>
     <script src="https://apis.google.com/js/api.js" async></script>
