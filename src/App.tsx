@@ -239,7 +239,9 @@ interface AppComponentProps {
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
   gapiReady: boolean;
   // Notifications
-  handleSendTestNotification: () => void;
+  isSubscribed: boolean;
+  isPermissionBlocked: boolean;
+  handleNotificationAction: () => void;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -254,7 +256,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-    handleSendTestNotification
+    isSubscribed, isPermissionBlocked, handleNotificationAction
   } = props;
   
   // Local UI State for Desktop
@@ -405,12 +407,33 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               <PaletteIcon />
             </button>
             <button
-                onClick={handleSendTestNotification}
-                className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-300 hover:text-primary p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110"
-                aria-label="Enviar notificación de prueba"
-              >
+                onClick={handleNotificationAction}
+                className={`relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
+                    isPermissionBlocked
+                    ? 'text-red-400 cursor-not-allowed'
+                    : isSubscribed
+                    ? 'text-primary'
+                    : 'text-gray-700 dark:text-gray-300 hover:text-primary'
+                }`}
+                aria-label={isSubscribed ? 'Enviar notificación de prueba' : 'Activar notificaciones'}
+                title={
+                    isPermissionBlocked
+                    ? 'Notificaciones bloqueadas por el navegador'
+                    : isSubscribed
+                    ? 'Enviar una notificación de prueba'
+                    : 'Activar notificaciones para recordatorios'
+                }
+                disabled={isPermissionBlocked}
+            >
                 <BellIcon className="h-6 w-6" />
-              </button>
+                {isPermissionBlocked && (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                    </div>
+                )}
+            </button>
         </div>
       </header>
 
@@ -521,7 +544,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-      handleSendTestNotification
+      isSubscribed, isPermissionBlocked, handleNotificationAction
     } = props;
 
     // Local UI state for Mobile
@@ -654,12 +677,22 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 </button>
                             </div>
                             <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg">
-                                <button onClick={handleSendTestNotification} className="w-full flex justify-between items-center text-left">
-                                  <div>
-                                    <h3 className="font-bold text-primary-dark dark:text-primary">Probar Notificaciones</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recibe una notificación de prueba ahora.</p>
-                                  </div>
-                                  <ChevronRightIcon />
+                                <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left" disabled={isPermissionBlocked}>
+                                    <div>
+                                        <h3 className={`font-bold transition-colors ${
+                                            isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary'
+                                        }`}>
+                                            {isSubscribed ? 'Probar Notificaciones' : 'Activar Notificaciones'}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            {isPermissionBlocked
+                                                ? 'Permisos bloqueados en el navegador.'
+                                                : isSubscribed
+                                                ? 'Recibe una notificación de prueba ahora.'
+                                                : 'Permite recibir recordatorios de tareas.'}
+                                        </p>
+                                    </div>
+                                    {!isPermissionBlocked && <ChevronRightIcon />}
                                 </button>
                             </div>
                              <button onClick={onLogout} className="w-full mt-4 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
@@ -842,26 +875,27 @@ const App: React.FC = () => {
   
   // OneSignal State
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState('default');
+
 
 // --- ONESIGNAL & REMINDER POLLING LOGIC ---
   useEffect(() => {
-    // OneSignal is initialized in a <script> tag in index.html to decouple from React's lifecycle.
-    // This effect's job is to set up the listeners for subscription changes.
     window.OneSignal = window.OneSignal || [];
     window.OneSignal.push(() => {
-      // This code will run after the OneSignal SDK has loaded and initialized.
-      const updateSubscriptionStatus = () => {
-        if (window.OneSignal.User?.PushSubscription) {
-          setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
+      // This function will run after the SDK has been initialized from index.html
+      const updateStatus = () => {
+        if (window.OneSignal) {
+            setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
+            setNotificationPermission(window.OneSignal.Notifications.permission);
         }
       };
 
-      // Add listeners for any future changes
-      window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
-      window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
+      // Run once to get initial status
+      updateStatus();
 
-      // Perform an initial check for the subscription status
-      updateSubscriptionStatus();
+      // Add listeners for any future changes
+      window.OneSignal.User.PushSubscription.addEventListener('change', updateStatus);
+      window.OneSignal.Notifications.addEventListener('permissionChange', updateStatus);
     });
   }, []); // Empty dependency array ensures this runs only once on mount.
 
@@ -1534,16 +1568,26 @@ const App: React.FC = () => {
     }
   };
 
+  const isPermissionBlocked = notificationPermission === 'denied';
+
   const handleSendTestNotification = () => {
+    window.OneSignal.Notifications.sendSelfNotification(
+      "¡Notificación de Prueba! 🐣",
+      "Si ves esto, ¡las notificaciones funcionan correctamente!",
+      window.location.href,
+      'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png'
+    );
+  };
+
+  const handleNotificationAction = () => {
+    if (isPermissionBlocked) {
+        alert('Las notificaciones están bloqueadas en tu navegador. Por favor, habilítalas en la configuración del sitio para recibir recordatorios.');
+        return;
+    }
     if (isSubscribed) {
-      window.OneSignal.Notifications.sendSelfNotification(
-        "¡Notificación de Prueba! 🐣",
-        "Si ves esto, ¡las notificaciones funcionan correctamente!",
-        window.location.href,
-        'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png'
-      );
+        handleSendTestNotification();
     } else {
-      alert("Debes suscribirte a las notificaciones primero. Haz clic en el botón de la campana flotante y permite los permisos.");
+        window.OneSignal.Notifications.requestPermission();
     }
   };
 
@@ -1615,7 +1659,9 @@ const App: React.FC = () => {
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       gapiReady,
-      handleSendTestNotification,
+      isSubscribed,
+      isPermissionBlocked,
+      handleNotificationAction,
   };
 
   return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;
