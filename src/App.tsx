@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from '../types';
 import CompletionModal from '../components/CompletionModal';
@@ -842,35 +843,31 @@ const App: React.FC = () => {
   // OneSignal State
   const [isSubscribed, setIsSubscribed] = useState(false);
 
-  // --- ONESIGNAL & REMINDER POLLING LOGIC ---
+// --- ONESIGNAL & REMINDER POLLING LOGIC ---
   useEffect(() => {
-    // This effect runs once to queue up the OneSignal SDK initialization
-    // and to set up listeners for subscription status changes.
+    // OneSignal is initialized in a <script> tag in index.html to decouple from React's lifecycle.
+    // This effect's job is to set up the listeners for subscription changes.
     window.OneSignal = window.OneSignal || [];
     window.OneSignal.push(() => {
-      window.OneSignal.init({
-        appId: config.ONESIGNAL_APP_ID,
-        safari_web_id: "web.onesignal.auto.571cab93-0309-4674-850d-02fe7b657956",
-        notifyButton: {
-          enable: true,
-        },
-      });
-
+      // This code will run after the OneSignal SDK has loaded and initialized.
       const updateSubscriptionStatus = () => {
-          if (window.OneSignal.User?.PushSubscription) {
-              setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
-          }
+        if (window.OneSignal.User?.PushSubscription) {
+          setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
+        }
       };
 
+      // Add listeners for any future changes
       window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
       window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
-      updateSubscriptionStatus(); // Initial check
+
+      // Perform an initial check for the subscription status
+      updateSubscriptionStatus();
     });
   }, []); // Empty dependency array ensures this runs only once on mount.
 
+  // This effect handles logging the user in or out of OneSignal whenever
+  // the application's user state changes.
   useEffect(() => {
-    // This effect handles logging the user in or out of OneSignal whenever
-    // the application's user state changes.
     window.OneSignal = window.OneSignal || [];
     window.OneSignal.push(() => {
       if (user) {
@@ -879,7 +876,7 @@ const App: React.FC = () => {
         window.OneSignal.logout();
       }
     });
-  }, [user]); // This runs whenever the 'user' object changes.
+  }, [user]); // This runs ONLY when the 'user' object changes.
 
 
   // Client-side reminder polling
