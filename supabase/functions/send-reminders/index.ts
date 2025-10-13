@@ -1,36 +1,40 @@
-import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import * as postgres from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 
 // Add Deno type declaration to resolve "Cannot find name 'Deno'" errors.
-// This is for local type-checking; the Deno runtime provides this global.
 declare const Deno: any;
 
 /*
--- ⚠️ IMPORTANT SETUP INSTRUCTIONS FOR NOTIFICATIONS ⚠️
+-- ⚠️ SUPER IMPORTANT SETUP INSTRUCTIONS (UPDATED) ⚠️
 --
--- For reminders to work, three things must be configured in your Supabase project:
+-- The previous error "Name must not start with the SUPABASE_ prefix" was because Supabase
+-- reserves secret names starting with "SUPABASE_". We've fixed this in the code.
 --
--- 1. CREATE THE DATABASE FUNCTION:
---    The code below needs to be run ONCE in your Supabase SQL Editor.
---    Go to your Supabase project -> SQL Editor -> "New query" -> Paste the code -> Click "RUN".
---    This function allows the server to efficiently find which reminders to send.
+-- Please follow these steps carefully in your Supabase dashboard to make the reminders work.
 --
--- 2. SET ENVIRONMENT VARIABLES (SECRETS):
---    This function needs your OneSignal keys to send notifications.
---    Go to your Supabase project -> Edge Functions -> "send-reminders" -> Click on it -> Go to the "Secrets" tab.
---    Create two secrets:
---    - Name: ONESIGNAL_APP_ID      -> Value: [Your OneSignal App ID from the OneSignal dashboard]
---    - Name: ONESIGNAL_REST_API_KEY -> Value: [Your OneSignal REST API Key from the OneSignal dashboard]
+-- 1. RENAME THE DATABASE SECRET:
+--    This is the most important fix.
+--    - Go to your Supabase project -> Edge Functions -> "send-reminders" function -> "Secrets" tab.
+--    - You should see a secret named `SUPABASE_DATABASE_URL`.
+--    - Click on it to edit it.
+--    - RENAME it from `SUPABASE_DATABASE_URL` to `DATABASE_CONNECTION_STRING`.
+--    - The value (the long `postgresql://...` string with your password) stays the same.
+--    - Save the change.
 --
--- 3. SCHEDULE THE FUNCTION TO RUN (CRON JOB):
---    This function needs to be triggered automatically every minute to check for reminders.
---    Go to your Supabase project -> Database -> "Cron Jobs".
---    Create a new job with this configuration:
---    - Schedule: * * * * *  (this means "run every minute")
---    - Function: Choose "send-reminders" from the dropdown.
+-- 2. VERIFY ONESIGNAL SECRETS:
+--    In the same "Secrets" tab, make sure you have these two secrets (names must be exact):
+--    - `ONESIGNAL_APP_ID`      -> Value: [Your OneSignal App ID]
+--    - `ONESIGNAL_REST_API_KEY` -> Value: [Your OneSignal REST API Key]
 --
--- NOTE ON TIMEZONES: This setup assumes the task time is entered in UTC. For simplicity, it doesn't handle user-specific timezones.
+-- 3. VERIFY DATABASE FUNCTION:
+--    Run this code ONCE in your Supabase SQL Editor if you haven't already.
+--    (The SQL code block is provided below).
 --
--- PASTE THIS CODE INTO THE SUPABASE SQL EDITOR AND RUN IT:
+-- 4. VERIFY CRON JOB:
+--    - Go to Database -> "Cron Jobs".
+--    - Check that your job runs every minute (`* * * * *`) and calls this "send-reminders" function via POST.
+--
+-- PASTE THIS SQL CODE INTO THE SUPABASE SQL EDITOR AND RUN IT ONCE (if you haven't):
 */
 /*
 CREATE OR REPLACE FUNCTION get_pending_reminders(from_time timestamptz, to_time timestamptz)
@@ -63,111 +67,99 @@ END;
 $$ LANGUAGE plpgsql;
 */
 
-const ONESIGNAL_APP_ID = Deno.env.get('ONESIGNAL_APP_ID')!;
-const ONESIGNAL_REST_API_KEY = Deno.env.get('ONESIGNAL_REST_API_KEY')!;
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// --- Get configuration from environment variables ---
+const ONESIGNAL_APP_ID = Deno.env.get('ONESIGNAL_APP_ID');
+const ONESIGNAL_REST_API_KEY = Deno.env.get('ONESIGNAL_REST_API_KEY');
+// FIX: Changed secret name to avoid Supabase prefix restriction. The user must rename this in the Supabase dashboard.
+const DATABASE_URL = Deno.env.get('DATABASE_CONNECTION_STRING');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+// Create a connection pool for the database
+const pool = new postgres.Pool(DATABASE_URL, 3, true);
+
+serve(async (_req) => {
+  if (_req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const now = new Date();
-    // Check for tasks where the reminder time is within the last 5 minutes to be safe
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-
-    // 1. Fetch pending reminders using Supabase REST API for RPC
-    const rpcResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_pending_reminders`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_SERVICE_ROLE_KEY,
-        // 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Removed to avoid potential JWT parsing issues in the runtime
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from_time: fiveMinutesAgo.toISOString(),
-        to_time: now.toISOString(),
-      }),
-    });
-
-    if (!rpcResponse.ok) {
-      const errorBody = await rpcResponse.text();
-      console.error('Error fetching reminders via RPC:', errorBody);
-      throw new Error(`Failed to fetch reminders: ${rpcResponse.status} ${rpcResponse.statusText}`);
+    if (!DATABASE_URL || !ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
+      throw new Error("Missing required environment variables (DATABASE_CONNECTION_STRING, ONESIGNAL_APP_ID, ONESIGNAL_REST_API_KEY)");
     }
+    
+    // Get a client from the connection pool
+    const connection = await pool.connect();
 
-    const reminders: { id: number; text: string; user_id: string }[] = await rpcResponse.json();
+    try {
+      const now = new Date();
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
-    if (!reminders || reminders.length === 0) {
-      return new Response(JSON.stringify({ message: "No reminders to send." }), {
+      // 1. Call the database function to get pending reminders
+      const result = await connection.queryObject< { id: number; text: string; user_id: string } >(
+        "SELECT id, text, user_id FROM get_pending_reminders($1, $2)",
+        [fiveMinutesAgo.toISOString(), now.toISOString()]
+      );
+      const reminders = result.rows;
+
+      if (!reminders || reminders.length === 0) {
+        return new Response(JSON.stringify({ message: "No reminders to send." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+
+      // 2. Prepare and send notifications to OneSignal
+      const notificationPromises = reminders.map((reminder) => {
+        const notification = {
+          app_id: ONESIGNAL_APP_ID,
+          include_external_user_ids: [reminder.user_id],
+          channel_for_external_user_ids: "push",
+          headings: { "es": "¡Recordatorio de Tarea!" },
+          subtitle: { "es": "Tu pollito te recuerda:" },
+          contents: { "es": reminder.text },
+          large_icon: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png',
+          language: "es"
+        };
+
+        return fetch('https://onesignal.com/api/v1/notifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${ONESIGNAL_REST_API_KEY}`,
+          },
+          body: JSON.stringify(notification),
+        });
+      });
+
+      const results = await Promise.all(notificationPromises);
+      results.forEach(async (response, index) => {
+          if (!response.ok) {
+              console.error(`OneSignal API error for user ${reminders[index].user_id}:`, await response.text());
+          }
+      });
+      
+      // 3. Mark reminders as sent in the database
+      const reminderIds = reminders.map(r => r.id);
+      await connection.queryObject(
+        "UPDATE public.todos SET notification_sent = TRUE WHERE id = ANY($1::bigint[])",
+        [reminderIds]
+      );
+      
+      return new Response(JSON.stringify({ message: `Successfully processed ${reminders.length} reminders.` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
+
+    } finally {
+      // Release the client back to the pool
+      connection.release();
     }
-
-    // 2. Prepare and send notifications to OneSignal
-    const notificationPromises = reminders.map((reminder) => {
-      const notification = {
-        app_id: ONESIGNAL_APP_ID,
-        include_external_user_ids: [reminder.user_id],
-        channel_for_external_user_ids: "push",
-        headings: { "es": "¡Recordatorio de Tarea!" },
-        subtitle: { "es": "Tu pollito te recuerda:" },
-        contents: { "es": reminder.text },
-        large_icon: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png',
-        language: "es"
-      };
-
-      return fetch('https://onesignal.com/api/v1/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${ONESIGNAL_REST_API_KEY}`,
-        },
-        body: JSON.stringify(notification),
-      });
-    });
-
-    const results = await Promise.all(notificationPromises);
-    results.forEach(async (response, index) => {
-        if (!response.ok) {
-            console.error(`OneSignal API error for user ${reminders[index].user_id}:`, await response.text());
-        }
-    });
-    
-    // 3. Mark reminders as sent in Supabase using REST API
-    const reminderIds = reminders.map((r) => r.id);
-    const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/todos?id=in.(${reminderIds.join(',')})`, {
-        method: 'PATCH',
-        headers: {
-            'apikey': SUPABASE_SERVICE_ROLE_KEY,
-            // 'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Removed to avoid potential JWT parsing issues in the runtime
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({ notification_sent: true }),
-    });
-
-    if (!updateResponse.ok) {
-      const errorBody = await updateResponse.text();
-      console.error('Error updating notification_sent status:', errorBody);
-      // We don't throw here, as the notifications may have been sent.
-    }
-
-    return new Response(JSON.stringify({ message: `Successfully processed ${reminders.length} reminders.` }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-
   } catch (err) {
-    console.error('Unhandled error in function:', err);
+    console.error('Error in function execution:', err);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
