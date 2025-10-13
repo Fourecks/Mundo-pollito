@@ -840,13 +840,15 @@ const App: React.FC = () => {
   
   // OneSignal State
   const [isOneSignalInitialized, setIsOneSignalInitialized] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
-  // --- ONESIGNAL INITIALIZATION & USER ASSOCIATION ---
+  // --- ONESIGNAL & REMINDER POLLING LOGIC ---
   useEffect(() => {
     // This effect runs only once to initialize the OneSignal SDK.
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async (OneSignal) => {
-      await OneSignal.init({
+    window.OneSignal = window.OneSignal || [];
+    window.OneSignal.push(() => {
+      // FIX: Use window.OneSignal for consistency and to resolve TypeScript error.
+      window.OneSignal.init({
         appId: config.ONESIGNAL_APP_ID,
         safari_web_id: "web.onesignal.auto.571cab93-0309-4674-850d-02fe7b657956",
         notifyButton: {
@@ -855,23 +857,91 @@ const App: React.FC = () => {
       });
       setIsOneSignalInitialized(true);
     });
-  }, []); // Empty dependency array ensures this runs only once on mount.
+  }, []);
 
   useEffect(() => {
-    // This effect handles associating the user with OneSignal after initialization and login.
-    if (isOneSignalInitialized) {
-      if (user) {
-        window.OneSignal.login(user.id);
-        console.log(`Associated OneSignal with user ID: ${user.id}`);
-      } else {
-        // If the user logs out, we should also log them out from OneSignal
-        if (window.OneSignal.User.isLoggedIn()) {
-          window.OneSignal.logout();
-          console.log("Logged out from OneSignal.");
-        }
-      }
+    if (!isOneSignalInitialized) return;
+
+    const updateSubscriptionStatus = () => {
+      const isSub = window.OneSignal.User.PushSubscription.isSubscribed;
+      setIsSubscribed(isSub);
+    };
+
+    window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
+    window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
+
+    // Initial check
+    updateSubscriptionStatus();
+
+    if (user) {
+      window.OneSignal.login(user.id);
+    } else {
+      window.OneSignal.logout();
+    }
+
+    return () => {
+      window.OneSignal.User.PushSubscription.removeEventListener('change', updateSubscriptionStatus);
+      window.OneSignal.Notifications.removeEventListener('permissionChange', updateSubscriptionStatus);
     }
   }, [user, isOneSignalInitialized]);
+
+  // Client-side reminder polling
+  useEffect(() => {
+    if (!user || !isSubscribed) return;
+
+    const intervalId = setInterval(async () => {
+      const now = new Date();
+      const todosToNotify: Todo[] = [];
+
+      Object.values(allTodos).flat().forEach(todo => {
+        if (!todo.completed && !todo.notification_sent && todo.reminder_offset && todo.due_date && todo.start_time) {
+          const [year, month, day] = todo.due_date.split('-').map(Number);
+          const [hour, minute] = todo.start_time.split(':').map(Number);
+          const startTime = new Date(year, month - 1, day, hour, minute); // Creates a date in the user's local timezone
+          const reminderTime = new Date(startTime.getTime() - todo.reminder_offset * 60 * 1000);
+
+          // Check if the reminder time is in the past, but within the last minute
+          if (reminderTime <= now && (now.getTime() - reminderTime.getTime()) < 60000) {
+            todosToNotify.push(todo);
+          }
+        }
+      });
+
+      if (todosToNotify.length > 0) {
+        for (const todo of todosToNotify) {
+          console.log(`Client found reminder for task: "${todo.text}"`);
+          try {
+            const { error } = await supabase.functions.invoke('send-notification', {
+              body: {
+                heading: "¡Recordatorio de Tarea!",
+                content: todo.text,
+              },
+            });
+
+            if (error) {
+              console.error(`Error invoking send-notification for todo ${todo.id}:`, error);
+            } else {
+              // Mark as sent in DB and state
+              await supabase.from('todos').update({ notification_sent: true }).eq('id', todo.id);
+              
+              setAllTodos(prev => {
+                  const newAllTodos = { ...prev };
+                  const dateKey = todo.due_date!;
+                  if (newAllTodos[dateKey]) {
+                      newAllTodos[dateKey] = newAllTodos[dateKey].map(t => t.id === todo.id ? { ...t, notification_sent: true } : t);
+                  }
+                  return newAllTodos;
+              });
+            }
+          } catch (e) {
+            console.error(`Exception while invoking function for todo ${todo.id}:`, e);
+          }
+        }
+      }
+    }, 60 * 1000); // Run every minute
+
+    return () => clearInterval(intervalId);
+  }, [user, allTodos, isSubscribed]);
 
 
   // --- SUPABASE AUTH & DATA LOADING ---
@@ -1473,8 +1543,7 @@ const App: React.FC = () => {
       alert("El servicio de notificaciones aún no está listo. Inténtalo de nuevo en un momento.");
       return;
     }
-
-    const isSubscribed = window.OneSignal.User.PushSubscription.isSubscribed;
+    
     if (isSubscribed) {
       window.OneSignal.Notifications.sendSelfNotification(
         "¡Notificación de Prueba! 🐣",
