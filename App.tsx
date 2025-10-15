@@ -44,6 +44,9 @@ const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.en
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 
+// --- Web Push VAPID Key ---
+const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VAPID_PUBLIC_KEY || config.VAPID_PUBLIC_KEY;
+
 const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 // Helper to format date as YYYY-MM-DD key
@@ -238,7 +241,9 @@ interface AppComponentProps {
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
   gapiReady: boolean;
   // Notifications
-  handleSendTestNotification: () => void;
+  isSubscribed: boolean;
+  isPermissionBlocked: boolean;
+  handleNotificationAction: () => void;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -253,7 +258,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-    handleSendTestNotification
+    isSubscribed, isPermissionBlocked, handleNotificationAction
   } = props;
   
   // Local UI State for Desktop
@@ -307,7 +312,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       pomodoroAudioRef.current?.play();
       const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
       const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
-      // Notifications are now handled by OneSignal server-side
+      
+      if (isSubscribed) {
+        supabase.functions.invoke('send-notification', {
+            body: {
+                title: "Pomodoro Terminado",
+                body: message,
+            },
+        });
+      }
+
       setPomodoroState(s => ({
           ...s,
           mode: newMode,
@@ -316,7 +330,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       }));
     }
     return () => clearInterval(timer);
-  }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState]);
+  }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState, isSubscribed]);
 
   // Ambient Sound Effect
   useEffect(() => {
@@ -404,12 +418,33 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               <PaletteIcon />
             </button>
             <button
-                onClick={handleSendTestNotification}
-                className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-300 hover:text-primary p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110"
-                aria-label="Enviar notificación de prueba"
-              >
+                onClick={handleNotificationAction}
+                className={`relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
+                    isPermissionBlocked
+                    ? 'text-red-400 cursor-not-allowed'
+                    : isSubscribed
+                    ? 'text-primary'
+                    : 'text-gray-700 dark:text-gray-300 hover:text-primary'
+                }`}
+                aria-label={isSubscribed ? 'Enviar notificación de prueba' : 'Activar notificaciones'}
+                title={
+                    isPermissionBlocked
+                    ? 'Notificaciones bloqueadas por el navegador'
+                    : isSubscribed
+                    ? 'Enviar una notificación de prueba'
+                    : 'Activar notificaciones para recordatorios'
+                }
+                disabled={isPermissionBlocked}
+            >
                 <BellIcon className="h-6 w-6" />
-              </button>
+                {isPermissionBlocked && (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                    </div>
+                )}
+            </button>
         </div>
       </header>
 
@@ -520,7 +555,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-      handleSendTestNotification
+      isSubscribed, isPermissionBlocked, handleNotificationAction
     } = props;
 
     // Local UI state for Mobile
@@ -555,11 +590,21 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
           pomodoroAudioRef.current?.play();
           const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
-          // Notifications are now handled by OneSignal server-side
+          const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
+          
+          if (isSubscribed) {
+            supabase.functions.invoke('send-notification', {
+                body: {
+                    title: "Pomodoro Terminado",
+                    body: message,
+                },
+            });
+          }
+          
           setPomodoroState(s => ({ ...s, mode: newMode, timeLeft: s.durations[newMode], isActive: true }));
         }
         return () => clearInterval(timer);
-    }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState]);
+    }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState, isSubscribed]);
 
     // Ambient Sound Effect
     useEffect(() => {
@@ -653,12 +698,22 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 </button>
                             </div>
                             <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg">
-                                <button onClick={handleSendTestNotification} className="w-full flex justify-between items-center text-left">
-                                  <div>
-                                    <h3 className="font-bold text-primary-dark dark:text-primary">Probar Notificaciones</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recibe una notificación de prueba ahora.</p>
-                                  </div>
-                                  <ChevronRightIcon />
+                                <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left" disabled={isPermissionBlocked}>
+                                    <div>
+                                        <h3 className={`font-bold transition-colors ${
+                                            isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary'
+                                        }`}>
+                                            {isSubscribed ? 'Probar Notificaciones' : 'Activar Notificaciones'}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            {isPermissionBlocked
+                                                ? 'Permisos bloqueados en el navegador.'
+                                                : isSubscribed
+                                                ? 'Recibe una notificación de prueba ahora.'
+                                                : 'Permite recibir recordatorios de tareas.'}
+                                        </p>
+                                    </div>
+                                    {!isPermissionBlocked && <ChevronRightIcon />}
                                 </button>
                             </div>
                              <button onClick={onLogout} className="w-full mt-4 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
@@ -797,6 +852,17 @@ const adjustBrightness = (hex: string, percent: number) => {
 };
 // --- End Color Helpers ---
 
+function urlBase64ToUint8Array(base64String: string) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
 
 const App: React.FC = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -839,43 +905,82 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // OneSignal State
+  // Native Web Push State
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
+  const serviceWorkerRegistration = useRef<ServiceWorkerRegistration | null>(null);
 
-// --- ONESIGNAL & REMINDER POLLING LOGIC ---
+  // --- NATIVE WEB PUSH NOTIFICATIONS LOGIC ---
   useEffect(() => {
-    // OneSignal is initialized in a <script> tag in index.html to decouple from React's lifecycle.
-    // This effect's job is to set up the listeners for subscription changes.
-    window.OneSignal = window.OneSignal || [];
-    window.OneSignal.push(() => {
-      // This code will run after the OneSignal SDK has loaded and initialized.
-      const updateSubscriptionStatus = () => {
-        if (window.OneSignal.User?.PushSubscription) {
-          setIsSubscribed(window.OneSignal.User.PushSubscription.isSubscribed);
-        }
-      };
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      const swUrl = new URL('sw.js', window.location.origin).href;
+      navigator.serviceWorker.register(swUrl)
+        .then(swReg => {
+          console.log('Service Worker is registered', swReg);
+          serviceWorkerRegistration.current = swReg;
+          // Check initial permission and subscription status
+          setIsPermissionBlocked(Notification.permission === 'denied');
+          swReg.pushManager.getSubscription().then(subscription => {
+            setIsSubscribed(!!subscription);
+          });
+        })
+        .catch(error => {
+          console.error('Service Worker Error', error);
+        });
+    } else {
+      console.warn('Push messaging is not supported');
+    }
+  }, []);
 
-      // Add listeners for any future changes
-      window.OneSignal.User.PushSubscription.addEventListener('change', updateSubscriptionStatus);
-      window.OneSignal.Notifications.addEventListener('permissionChange', updateSubscriptionStatus);
+  const subscribeUser = async () => {
+    if (!serviceWorkerRegistration.current) return;
+    try {
+      const subscription = await serviceWorkerRegistration.current.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      console.log('User is subscribed.');
 
-      // Perform an initial check for the subscription status
-      updateSubscriptionStatus();
-    });
-  }, []); // Empty dependency array ensures this runs only once on mount.
+      // Save subscription to backend
+      await supabase.from('push_subscriptions').insert({
+        subscription_data: subscription,
+      });
 
-  // This effect handles logging the user in or out of OneSignal whenever
-  // the application's user state changes.
-  useEffect(() => {
-    window.OneSignal = window.OneSignal || [];
-    window.OneSignal.push(() => {
-      if (user) {
-        window.OneSignal.login(user.id);
-      } else {
-        window.OneSignal.logout();
+      setIsSubscribed(true);
+      setIsPermissionBlocked(false);
+    } catch (err) {
+      console.error('Failed to subscribe the user: ', err);
+      if (Notification.permission === 'denied') {
+        setIsPermissionBlocked(true);
       }
-    });
-  }, [user]); // This runs ONLY when the 'user' object changes.
+    }
+  };
+
+  const handleNotificationAction = async () => {
+    if (isPermissionBlocked) {
+      alert('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para esta página.');
+      return;
+    }
+
+    if (isSubscribed) {
+      // Send a test notification
+      console.log('Sending test notification...');
+      const { error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          title: "¡Notificación de Prueba! 🐣",
+          body: "Si ves esto, ¡las notificaciones nativas funcionan!",
+        },
+      });
+      if (error) {
+        alert("Error al enviar la notificación de prueba.");
+        console.error("Error invoking test notification function:", error);
+      } else {
+        alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
+      }
+    } else {
+      await subscribeUser();
+    }
+  };
 
 
   // Client-side reminder polling
@@ -886,15 +991,13 @@ const App: React.FC = () => {
       const now = new Date();
       const todosToNotify: Todo[] = [];
 
-      // FIX: Explicitly type 'todo' as 'Todo' to resolve properties not existing on 'unknown' type.
       Object.values(allTodos).flat().forEach((todo: Todo) => {
         if (!todo.completed && !todo.notification_sent && todo.reminder_offset && todo.due_date && todo.start_time) {
           const [year, month, day] = todo.due_date.split('-').map(Number);
           const [hour, minute] = todo.start_time.split(':').map(Number);
-          const startTime = new Date(year, month - 1, day, hour, minute); // Creates a date in the user's local timezone
+          const startTime = new Date(year, month - 1, day, hour, minute);
           const reminderTime = new Date(startTime.getTime() - todo.reminder_offset * 60 * 1000);
 
-          // Check if the reminder time is in the past, but within the last minute
           if (reminderTime <= now && (now.getTime() - reminderTime.getTime()) < 60000) {
             todosToNotify.push(todo);
           }
@@ -907,15 +1010,14 @@ const App: React.FC = () => {
           try {
             const { error } = await supabase.functions.invoke('send-notification', {
               body: {
-                heading: "¡Recordatorio de Tarea!",
-                content: todo.text,
+                title: "¡Recordatorio de Tarea!",
+                body: todo.text,
               },
             });
 
             if (error) {
               console.error(`Error invoking send-notification for todo ${todo.id}:`, error);
             } else {
-              // Mark as sent in DB and state
               await supabase.from('todos').update({ notification_sent: true }).eq('id', todo.id);
               
               setAllTodos(prev => {
@@ -1533,19 +1635,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSendTestNotification = () => {
-    if (isSubscribed) {
-      window.OneSignal.Notifications.sendSelfNotification(
-        "¡Notificación de Prueba! 🐣",
-        "Si ves esto, ¡las notificaciones funcionan correctamente!",
-        window.location.href,
-        'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png'
-      );
-    } else {
-      alert("Debes suscribirte a las notificaciones primero. Haz clic en el botón de la campana flotante y permite los permisos.");
-    }
-  };
-
   // Debounced save settings to Supabase & localStorage
   useEffect(() => {
     if (!dataLoaded || !user) return;
@@ -1583,8 +1672,13 @@ const App: React.FC = () => {
   
   const handleLogout = async () => {
     try {
-        if (window.OneSignal) {
-            window.OneSignal.logout();
+        if (serviceWorkerRegistration.current) {
+            const subscription = await serviceWorkerRegistration.current.pushManager.getSubscription();
+            if (subscription) {
+                // We tell the server to delete the subscription.
+                await supabase.from('push_subscriptions').delete().eq('subscription_data->>endpoint', subscription.endpoint);
+                await subscription.unsubscribe();
+            }
         }
         await supabase.auth.signOut(); 
         handleGoogleLogout();
@@ -1602,7 +1696,7 @@ const App: React.FC = () => {
      return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando tus datos...</p></div>;
   }
   
-  const appProps = {
+  const appProps: AppComponentProps = {
       currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound,
@@ -1614,7 +1708,9 @@ const App: React.FC = () => {
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       gapiReady,
-      handleSendTestNotification,
+      isSubscribed,
+      isPermissionBlocked,
+      handleNotificationAction,
   };
 
   return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;

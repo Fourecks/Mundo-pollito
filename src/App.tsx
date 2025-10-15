@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from '../types';
 import CompletionModal from '../components/CompletionModal';
@@ -49,7 +47,7 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- Web Push VAPID Key ---
 const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VAPID_PUBLIC_KEY || config.VAPID_PUBLIC_KEY;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 // Helper to format date as YYYY-MM-DD key
 const formatDateKey = (date: Date): string => {
@@ -314,7 +312,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       pomodoroAudioRef.current?.play();
       const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
       const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
-      // Notifications are now handled by OneSignal server-side
+      
+      if (isSubscribed) {
+        supabase.functions.invoke('send-notification', {
+            body: {
+                title: "Pomodoro Terminado",
+                body: message,
+            },
+        });
+      }
+
       setPomodoroState(s => ({
           ...s,
           mode: newMode,
@@ -323,7 +330,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       }));
     }
     return () => clearInterval(timer);
-  }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState]);
+  }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState, isSubscribed]);
 
   // Ambient Sound Effect
   useEffect(() => {
@@ -583,11 +590,21 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
           pomodoroAudioRef.current?.play();
           const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
-          // Notifications are now handled by OneSignal server-side
+          const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
+          
+          if (isSubscribed) {
+            supabase.functions.invoke('send-notification', {
+                body: {
+                    title: "Pomodoro Terminado",
+                    body: message,
+                },
+            });
+          }
+          
           setPomodoroState(s => ({ ...s, mode: newMode, timeLeft: s.durations[newMode], isActive: true }));
         }
         return () => clearInterval(timer);
-    }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState]);
+    }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState, isSubscribed]);
 
     // Ambient Sound Effect
     useEffect(() => {
@@ -896,7 +913,8 @@ const App: React.FC = () => {
   // --- NATIVE WEB PUSH NOTIFICATIONS LOGIC ---
   useEffect(() => {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
-      navigator.serviceWorker.register('/sw.js')
+      const swUrl = new URL('sw.js', window.location.origin).href;
+      navigator.serviceWorker.register(swUrl)
         .then(swReg => {
           console.log('Service Worker is registered', swReg);
           serviceWorkerRegistration.current = swReg;
