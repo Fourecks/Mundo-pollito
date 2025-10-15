@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -943,13 +942,19 @@ const App: React.FC = () => {
       });
       console.log('User is subscribed.');
 
-      // Save subscription to backend
-      const { error } = await supabase.from('push_subscriptions').insert({
+      // Clear old subscriptions before inserting the new one to prevent duplicates.
+      const { error: deleteError } = await supabase.from('push_subscriptions').delete().eq('user_id', user.id);
+      if (deleteError) {
+          console.error('Error clearing old subscriptions:', deleteError);
+      }
+
+      // Save the new subscription to backend
+      const { error: insertError } = await supabase.from('push_subscriptions').insert({
         subscription_data: subscription,
         user_id: user.id,
       });
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
       setIsSubscribed(true);
       setIsPermissionBlocked(false);
@@ -1003,7 +1008,8 @@ const App: React.FC = () => {
           const startTime = new Date(year, month - 1, day, hour, minute);
           const reminderTime = new Date(startTime.getTime() - todo.reminder_offset * 60 * 1000);
 
-          if (reminderTime <= now && (now.getTime() - reminderTime.getTime()) < 60000) {
+          // Corrected logic: Check if the reminder time has passed, regardless of when the check runs.
+          if (reminderTime <= now) {
             todosToNotify.push(todo);
           }
         }
