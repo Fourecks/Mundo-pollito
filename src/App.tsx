@@ -912,28 +912,30 @@ const App: React.FC = () => {
 
   // --- NATIVE WEB PUSH NOTIFICATIONS LOGIC ---
   useEffect(() => {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      const swUrl = new URL('sw.js', window.location.origin).href;
-      navigator.serviceWorker.register(swUrl)
-        .then(swReg => {
-          console.log('Service Worker is registered', swReg);
-          serviceWorkerRegistration.current = swReg;
-          // Check initial permission and subscription status
-          setIsPermissionBlocked(Notification.permission === 'denied');
-          swReg.pushManager.getSubscription().then(subscription => {
-            setIsSubscribed(!!subscription);
+    window.addEventListener('load', () => {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const swUrl = new URL('sw.js', window.location.origin).href;
+        navigator.serviceWorker.register(swUrl)
+          .then(swReg => {
+            console.log('Service Worker is registered', swReg);
+            serviceWorkerRegistration.current = swReg;
+            // Check initial permission and subscription status
+            setIsPermissionBlocked(Notification.permission === 'denied');
+            swReg.pushManager.getSubscription().then(subscription => {
+              setIsSubscribed(!!subscription);
+            });
+          })
+          .catch(error => {
+            console.error('Service Worker Error', error);
           });
-        })
-        .catch(error => {
-          console.error('Service Worker Error', error);
-        });
-    } else {
-      console.warn('Push messaging is not supported');
-    }
+      } else {
+        console.warn('Push messaging is not supported');
+      }
+    });
   }, []);
 
   const subscribeUser = async () => {
-    if (!serviceWorkerRegistration.current) return;
+    if (!serviceWorkerRegistration.current || !user) return;
     try {
       const subscription = await serviceWorkerRegistration.current.pushManager.subscribe({
         userVisibleOnly: true,
@@ -942,9 +944,12 @@ const App: React.FC = () => {
       console.log('User is subscribed.');
 
       // Save subscription to backend
-      await supabase.from('push_subscriptions').insert({
+      const { error } = await supabase.from('push_subscriptions').insert({
         subscription_data: subscription,
+        user_id: user.id,
       });
+
+      if (error) throw error;
 
       setIsSubscribed(true);
       setIsPermissionBlocked(false);
