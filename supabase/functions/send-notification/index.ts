@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as webpush from 'https://deno.land/x/web_push@0.2.1/mod.ts';
+import * as webpush from 'https://esm.sh/web-push@3.6.7';
 
 declare const Deno: any;
 
