@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as webpush from 'https://esm.sh/web-push@3.6.7';
+// FIX: Switched to Deno-native web-push library to resolve compatibility issues.
+import * as webpush from 'https://deno.land/x/web_push@0.2.1/mod.ts';
 
 declare const Deno: any;
 
@@ -77,7 +78,8 @@ serve(async (req: Request) => {
     const sendPromises = subscriptions.map(sub =>
       webpush.sendNotification(sub.subscription_data, notificationPayload)
         .catch(err => {
-          console.error(`Error sending notification to endpoint, status: ${err.status}`);
+          // The Deno-native library uses `err.status`, which matches this code.
+          console.error(`Failed to send notification. Status: ${err.status}, Message: ${err.message}`);
           if (err.status === 404 || err.status === 410) {
             console.log("Subscription is expired or invalid. Deleting from DB.");
             return supabaseAdmin
@@ -96,7 +98,7 @@ serve(async (req: Request) => {
     });
 
   } catch (err) {
-    console.error('Error in send-notification function:', err);
+    console.error('Critical error in send-notification function:', err);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
