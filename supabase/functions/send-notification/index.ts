@@ -1,6 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-// FIX: Se cambió a la librería de web-push nativa de Deno para resolver problemas de compatibilidad.
 import * as webpush from 'https://deno.land/x/web_push@0.2.1/mod.ts';
 
 declare const Deno: any;
@@ -8,6 +7,8 @@ declare const Deno: any;
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  // FIX: Se añade explícitamente los métodos permitidos para cumplir con la política CORS.
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 // Estas deben ser configuradas como secrets en tu proyecto de Supabase
