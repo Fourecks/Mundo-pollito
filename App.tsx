@@ -907,28 +907,46 @@ const App: React.FC = () => {
         return;
     }
 
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-            if (registrations.length > 0) {
-                console.log('OneSignal Cleanup: Found existing service workers, unregistering...');
-                const unregisterPromises = registrations.map(reg => reg.unregister());
-                Promise.all(unregisterPromises).then(() => {
+    const runCleanup = () => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+                if (registrations.length > 0) {
+                    console.log('OneSignal Cleanup: Found existing service workers, unregistering...');
+                    const unregisterPromises = registrations.map(reg => reg.unregister());
+                    Promise.all(unregisterPromises).then(() => {
+                        sessionStorage.setItem(cleanupKey, 'true');
+                        console.log('OneSignal Cleanup: All old service workers unregistered. Reloading page for a fresh start.');
+                        window.location.reload();
+                    }).catch(err => {
+                        console.error('OneSignal Cleanup: Error unregistering service workers.', err);
+                        sessionStorage.setItem(cleanupKey, 'true'); // Avoid loops on error
+                    });
+                } else {
+                    // No workers, we are clean.
                     sessionStorage.setItem(cleanupKey, 'true');
-                    console.log('OneSignal Cleanup: All old service workers unregistered. Reloading page for a fresh start.');
-                    window.location.reload();
-                }).catch(err => {
-                    console.error('OneSignal Cleanup: Error unregistering service workers.', err);
-                    sessionStorage.setItem(cleanupKey, 'true'); // Still set key to avoid loops on error
-                });
-            } else {
-                // No workers, we are clean. Set the key and proceed.
-                sessionStorage.setItem(cleanupKey, 'true');
-            }
-        });
+                }
+            }).catch(error => {
+                console.error('OneSignal Cleanup: Failed to get service worker registrations.', error);
+                sessionStorage.setItem(cleanupKey, 'true'); // Set key to prevent loops.
+            });
+        } else {
+            // No service worker support.
+            sessionStorage.setItem(cleanupKey, 'true');
+        }
+    };
+
+    // Check if the page is already loaded.
+    if (document.readyState === 'complete') {
+        runCleanup();
     } else {
-        // No service worker support, no cleanup needed.
-        sessionStorage.setItem(cleanupKey, 'true');
+        // If not, wait for the 'load' event.
+        window.addEventListener('load', runCleanup, { once: true });
     }
+
+    // Cleanup the event listener if the component unmounts before 'load'.
+    return () => {
+        window.removeEventListener('load', runCleanup);
+    };
   }, []);
 
   // 2. Second useEffect for OneSignal initialization, dependent on user and cleanup.
