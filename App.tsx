@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -907,6 +908,7 @@ const App: React.FC = () => {
         return;
     }
 
+    // FIX: Correctly call getRegistrations() on navigator.serviceWorker, not on a single registration, to unregister all service workers.
     const runCleanup = () => {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -934,7 +936,7 @@ const App: React.FC = () => {
             sessionStorage.setItem(cleanupKey, 'true');
         }
     };
-
+    
     // Check if the page is already loaded.
     if (document.readyState === 'complete') {
         runCleanup();
@@ -968,6 +970,7 @@ const App: React.FC = () => {
         // The init process is asynchronous and must complete before other SDK calls.
         await OneSignal.init({
             appId: ONESIGNAL_APP_ID,
+            allowSlidedown: false,
         });
         console.log("OneSignal: SDK Initialized. Setting up listeners and logging in user.");
 
@@ -1491,258 +1494,4 @@ const App: React.FC = () => {
   };
 
   const handleAddFolder = async (name: string) => {
-    if (!user) return null;
-    try {
-        const { data: newFolder, error } = await supabase.from('folders').insert({ name, user_id: user.id }).select().single();
-        if (error) throw error;
-        if (newFolder) setFolders(prev => [{...newFolder, notes: []}, ...prev]);
-        return newFolder;
-    } catch (error) {
-        console.error("Error adding folder:", error);
-        return null;
-    }
-  };
-  const handleUpdateFolder = async (folderId: number, name: string) => {
-    try {
-        await supabase.from('folders').update({ name }).eq('id', folderId).throwOnError();
-        setFolders(prev => prev.map(f => f.id === folderId ? {...f, name} : f));
-    } catch(error) {
-        console.error("Error updating folder:", error);
-    }
-  };
-  const handleDeleteFolder = async (folderId: number) => {
-    try {
-        await supabase.from('notes').delete().eq('folder_id', folderId).throwOnError();
-        await supabase.from('folders').delete().eq('id', folderId).throwOnError();
-        setFolders(prev => prev.filter(f => f.id !== folderId));
-    } catch(error) {
-        console.error("Error deleting folder:", error);
-    }
-  };
-  const handleAddNote = async (folderId: number) => {
-    if (!user) return null;
-    try {
-        const { data: newNote, error } = await supabase.from('notes').insert({ folder_id: folderId, user_id: user.id, title: "", content: "" }).select().single();
-        if (error) throw error;
-        if (newNote) setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: [newNote, ...f.notes]} : f));
-        return newNote;
-    } catch(error) {
-        console.error("Error adding note:", error);
-        return null;
-    }
-  };
-  const handleUpdateNote = async (note: Note) => {
-    try {
-        await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id).throwOnError();
-        setFolders(prev => prev.map(f => f.id === note.folder_id ? {...f, notes: f.notes.map(n => n.id === note.id ? note : n).sort((a,b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())} : f));
-    } catch (error) {
-        console.error("Error updating note:", error);
-    }
-  };
-  const handleDeleteNote = async (noteId: number, folderId: number) => {
-    try {
-      await supabase.from('notes').delete().eq('id', noteId).throwOnError();
-      setFolders(prev => prev.map(f => f.id === folderId ? {...f, notes: f.notes.filter(n => n.id !== noteId)} : f));
-    } catch (error) {
-        console.error("Error deleting note:", error);
-    }
-  };
-  const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => {
-    if (!user) return;
-    try {
-        const { data: newPlaylist, error } = await supabase.from('playlists').insert({ ...playlistData, user_id: user.id }).select().single();
-        if (error) throw error;
-        if (newPlaylist) setPlaylists(prev => [...prev, newPlaylist]);
-    } catch (error) {
-        console.error("Error adding playlist:", error);
-    }
-  };
-  const handleUpdatePlaylist = async (playlist: Playlist) => {
-    try {
-        await supabase.from('playlists').update(playlist).eq('id', playlist.id).throwOnError();
-        setPlaylists(prev => prev.map(p => p.id === playlist.id ? playlist : p));
-    } catch(error) {
-        console.error("Error updating playlist:", error);
-    }
-  };
-  const handleDeletePlaylist = async (playlistId: number) => {
-    try {
-        await supabase.from('playlists').delete().eq('id', playlistId).throwOnError();
-        setPlaylists(prev => prev.filter(p => p.id !== playlistId));
-    } catch(error) {
-        console.error("Error deleting playlist:", error);
-    }
-  };
-  const handleAddBackground = async (file: File) => {
-    if (!appFolderId.current || !gdriveToken || !user) return;
-    try {
-        const metadata = { name: file.name, mimeType: file.type, parents: [appFolderId.current], appProperties: { type: 'background', isFavorite: 'false' } };
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', file);
-        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }), body: form });
-        if (!response.ok) { 
-            const errorBody = await response.json();
-            console.error("Google Drive Upload Error:", errorBody);
-            throw new Error(`Upload failed: ${errorBody.error.message}`);
-        }
-        const newFile = await response.json();
-        const newBg: Background = { id: newFile.id, name: file.name, url: URL.createObjectURL(file), type: file.type.startsWith('video') ? 'video' : 'image', isFavorite: false };
-        setUserBackgrounds(prev => [...prev, newBg]);
-        setActiveBackground(newBg);
-    } catch (error) {
-        console.error("Error adding background:", error);
-    }
-  };
-  const handleDeleteBackground = async (id: string) => {
-    try {
-        await window.gapi.client.drive.files.delete({ fileId: id });
-        setUserBackgrounds(prev => prev.filter(bg => { if (bg.id === id) { URL.revokeObjectURL(bg.url); return false; } return true; }));
-        if (activeBackground?.id === id) setActiveBackground(null);
-    } catch(error) {
-        console.error("Error deleting background:", error);
-    }
-  };
-  const handleToggleFavoriteBackground = async (id: string) => {
-      const bg = userBackgrounds.find(b => b.id === id);
-      if (!bg || !gdriveToken) return;
-      try {
-        const newFavState = !bg.isFavorite;
-        await window.gapi.client.drive.files.update({ fileId: id, resource: { appProperties: { isFavorite: String(newFavState) } } as any });
-        setUserBackgrounds(bgs => bgs.map(b => b.id === id ? {...b, isFavorite: newFavState} : b));
-      } catch (error) {
-          console.error("Error toggling favorite background:", error);
-      }
-  };
-  const handleAddGalleryImages = async (files: File[]) => {
-    if (!appFolderId.current || !gdriveToken) return;
-    try {
-        for (const file of files) {
-            const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify({ name: file.name, mimeType: file.type, parents: [appFolderId.current] })], { type: 'application/json' }));
-            form.append('file', file);
-            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }), body: form });
-            if (!response.ok) { 
-                console.error("Google Drive Upload Error:", await response.json()); 
-                continue; // Continue with next file
-            }
-            const newFile = await response.json();
-            setGalleryImages(prev => [{ id: newFile.id, url: URL.createObjectURL(file) }, ...prev]);
-        }
-    } catch(error) {
-        console.error("Error adding gallery images:", error);
-    }
-  };
-  const handleDeleteGalleryImage = async (id: string) => {
-    try {
-        await window.gapi.client.drive.files.delete({ fileId: id });
-        setGalleryImages(prev => prev.filter(img => { if (img.id === id) URL.revokeObjectURL(img.url); return img.id !== id; }));
-    } catch (error) {
-        console.error("Error deleting gallery image:", error);
-    }
-  };
-  const handleAddQuickNote = async (text: string) => {
-    if (!user) return;
-    try {
-        const { data: newNote, error } = await supabase.from('quick_notes').insert({ text, user_id: user.id }).select().single();
-        if (error) throw error;
-        if (newNote) setQuickNotes(prev => [newNote, ...prev]);
-    } catch (error) {
-        console.error("Error adding quick note:", error);
-    }
-  };
-  const handleDeleteQuickNote = async (id: number) => {
-    try {
-        await supabase.from('quick_notes').delete().eq('id', id).throwOnError();
-        setQuickNotes(prev => prev.filter(qn => qn.id !== id));
-    } catch(error) {
-        console.error("Error deleting quick note:", error);
-    }
-  };
-  const handleClearAllQuickNotes = async () => {
-    if (!user) return;
-    try {
-        await supabase.from('quick_notes').delete().eq('user_id', user.id).throwOnError();
-        setQuickNotes([]);
-    } catch(error) {
-        console.error("Error clearing quick notes:", error);
-    }
-  };
-
-  // Debounced save settings to Supabase & localStorage
-  useEffect(() => {
-    if (!dataLoaded || !user) return;
-    localStorage.setItem(`${user.email}_browserSession`, JSON.stringify(browserSession));
-    if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-    settingsSaveTimeout.current = window.setTimeout(async () => {
-        try {
-            const settingsPayload = { user_id: user.id, theme_mode: theme, theme_colors: themeColors, active_background_id: activeBackground?.id || null, particle_type: particleType, ambient_sound: ambientSound, pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: pomodoroState.backgroundTimerOpacity, showBackgroundTimer: pomodoroState.showBackgroundTimer } };
-            await supabase.from('site_settings').upsert(settingsPayload, { onConflict: 'user_id' }).throwOnError();
-        } catch(error) {
-            console.error("Error saving settings:", error);
-        }
-    }, 1500);
-    return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
-  }, [theme, themeColors, activeBackground, particleType, ambientSound, pomodoroState, browserSession, dataLoaded, user]);
-
-  useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); }, [theme]);
-  
-  useEffect(() => {
-    const root = document.documentElement;
-    const { primary, secondary } = themeColors;
-    const isDark = theme === 'dark';
-    root.style.setProperty('--color-primary', primary);
-    root.style.setProperty('--color-primary-light', isDark ? adjustBrightness(primary, -25) : adjustBrightness(primary, 25));
-    root.style.setProperty('--color-primary-dark', isDark ? adjustBrightness(primary, 15) : adjustBrightness(primary, -15));
-    root.style.setProperty('--color-secondary', secondary);
-    root.style.setProperty('--color-secondary-light', isDark ? adjustBrightness(secondary, -25) : adjustBrightness(secondary, 25));
-    root.style.setProperty('--color-secondary-dark', isDark ? adjustBrightness(secondary, 15) : adjustBrightness(secondary, -15));
-    root.style.setProperty('--color-secondary-lighter', isDark ? adjustBrightness(secondary, -50) : adjustBrightness(secondary, 60));
-  }, [themeColors, theme]);
-
-  const toggleTheme = () => setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
-  const handleThemeColorChange = (colorName: keyof ThemeColors, value: string) => setThemeColors(prev => ({...prev, [colorName]: value}));
-  const handleResetThemeColors = () => setThemeColors(DEFAULT_COLORS);
-  
-  const handleLogout = async () => {
-    try {
-        if (window.OneSignal) {
-          window.OneSignal.logout();
-        }
-        await supabase.auth.signOut(); 
-        handleGoogleLogout();
-    } catch(error) {
-        console.error("Error during logout:", error);
-    }
-  };
-  
-  if (authLoading) {
-     return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando pollito...</p></div>;
-  }
-  if (!user) { return <Login onLogin={() => {}} />; }
-
-  if (!dataLoaded) {
-     return <div className="h-screen w-screen bg-secondary-lighter dark:bg-gray-900 flex items-center justify-center"><p className="text-gray-600 dark:text-gray-100">Cargando tus datos...</p></div>;
-  }
-  
-  const appProps: AppComponentProps = {
-      currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
-      allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-      pomodoroState, activeBackground, particleType, ambientSound,
-      handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
-      handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
-      handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
-      handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-      setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
-      gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
-      handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-      gapiReady,
-      isSubscribed,
-      isPermissionBlocked,
-      handleNotificationAction,
-  };
-
-  return isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />;
-};
-
-export default App;
+    if
