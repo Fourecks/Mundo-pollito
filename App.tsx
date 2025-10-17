@@ -903,57 +903,50 @@ const App: React.FC = () => {
   
   // 1. First useEffect for cleanup - runs only once per session.
   useEffect(() => {
-    const cleanupKey = 'sw_cleanup_v2_complete';
+    const cleanupKey = 'sw_cleanup_v3_complete'; // Use a new key to ensure this logic runs for everyone.
     if (sessionStorage.getItem(cleanupKey)) {
         return;
     }
 
-    // FIX: Correctly call getRegistrations() on navigator.serviceWorker, not on a single registration, to unregister all service workers.
-    const runCleanup = () => {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then((registrations) => {
-                if (registrations.length > 0) {
-                    console.log('OneSignal Cleanup: Found existing service workers, unregistering...');
-                    const unregisterPromises = registrations.map(reg => reg.unregister());
-                    Promise.all(unregisterPromises).then(() => {
-                        sessionStorage.setItem(cleanupKey, 'true');
-                        console.log('OneSignal Cleanup: All old service workers unregistered. Reloading page for a fresh start.');
-                        window.location.reload();
-                    }).catch(err => {
-                        console.error('OneSignal Cleanup: Error unregistering service workers.', err);
-                        sessionStorage.setItem(cleanupKey, 'true'); // Avoid loops on error
-                    });
-                } else {
-                    // No workers, we are clean.
-                    sessionStorage.setItem(cleanupKey, 'true');
-                }
-            }).catch(error => {
-                console.error('OneSignal Cleanup: Failed to get service worker registrations.', error);
-                sessionStorage.setItem(cleanupKey, 'true'); // Set key to prevent loops.
-            });
-        } else {
-            // No service worker support.
+    if ('serviceWorker' in navigator) {
+        // navigator.serviceWorker.ready waits for a service worker to be active and ready.
+        // This is a safer approach than listening for 'window.load'.
+        navigator.serviceWorker.ready.then(registration => {
+            // Once we know the SW system is active, we can safely get all registrations.
+            console.log('OneSignal Cleanup: Service worker is ready. Checking all registrations.');
+            return navigator.serviceWorker.getRegistrations();
+        }).then(registrations => {
+            if (registrations.length > 0) {
+                console.log(`OneSignal Cleanup: Found ${registrations.length} existing service workers, unregistering...`);
+                const unregisterPromises = registrations.map(reg => reg.unregister());
+                return Promise.all(unregisterPromises);
+            }
+            return Promise.resolve(null); // No registrations to unregister
+        }).then((unregistered) => {
             sessionStorage.setItem(cleanupKey, 'true');
-        }
-    };
-    
-    // Check if the page is already loaded.
-    if (document.readyState === 'complete') {
-        runCleanup();
+            // Only reload if we actually unregistered something.
+            if (unregistered) {
+                console.log('OneSignal Cleanup: All old service workers unregistered. Reloading page for a fresh start.');
+                window.location.reload();
+            } else {
+                 console.log('OneSignal Cleanup: No service workers found to unregister. Proceeding normally.');
+            }
+        }).catch(err => {
+            // .ready might reject if there's no SW or it fails to activate.
+            // This is a common case on the very first visit to the site.
+            // We can safely assume there's nothing to clean up.
+            console.warn('OneSignal Cleanup: Could not perform cleanup (this is normal on first visit or if no worker was ever installed).', err);
+            sessionStorage.setItem(cleanupKey, 'true'); // Mark as done to prevent loops.
+        });
     } else {
-        // If not, wait for the 'load' event.
-        window.addEventListener('load', runCleanup, { once: true });
+        // No service worker support in this browser.
+        sessionStorage.setItem(cleanupKey, 'true');
     }
-
-    // Cleanup the event listener if the component unmounts before 'load'.
-    return () => {
-        window.removeEventListener('load', runCleanup);
-    };
   }, []);
 
   // 2. Second useEffect for OneSignal initialization, dependent on user and cleanup.
   useEffect(() => {
-    const cleanupKey = 'sw_cleanup_v2_complete';
+    const cleanupKey = 'sw_cleanup_v3_complete';
     // Don't start OneSignal init until the user exists, config is ready,
     // it hasn't been initialized yet, and the cleanup process is confirmed complete for the session.
     if (!user || !ONESIGNAL_APP_ID || ONESIGNAL_APP_ID.includes('YOUR_') || oneSignalInitialized.current || !sessionStorage.getItem(cleanupKey)) {
@@ -1005,14 +998,21 @@ const App: React.FC = () => {
     if (!OneSignal) return;
 
     if (isSubscribed) {
-      OneSignal.push(() => {
-        OneSignal.Notifications.sendSelfNotification(
-            "¡Notificación de Prueba! 🐣",
-            "Si ves esto, ¡las notificaciones funcionan!",
-        );
+      // Send a test notification to the current user
+      try {
+        await supabase.functions.invoke('send-notification', {
+          body: {
+            title: "¡Notificación de Prueba! 🐣",
+            body: "Si ves esto, ¡las notificaciones funcionan!",
+          },
+        });
         alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
-      });
+      } catch (error) {
+        console.error("Error sending test notification:", error);
+        alert("Error al enviar la notificación de prueba.");
+      }
     } else {
+      // Request permission
       OneSignal.push(() => {
         OneSignal.Notifications.requestPermission();
       });
@@ -1494,4 +1494,283 @@ const App: React.FC = () => {
   };
 
   const handleAddFolder = async (name: string) => {
-    if
+    if (!user) return null;
+    const { data: newFolder, error } = await supabase.from('folders').insert({ name, user_id: user.id }).select().single();
+    if (error || !newFolder) {
+        console.error("Error adding folder:", error);
+        return null;
+    }
+    const folderWithNotes = { ...newFolder, notes: [] };
+    setFolders(prev => [folderWithNotes, ...prev]);
+    return folderWithNotes;
+  };
+
+  const handleUpdateFolder = async (folderId: number, name: string) => {
+    // This function is currently not used, but let's keep it for future implementation
+    console.log("Updating folder", folderId, name);
+  };
+
+  const handleDeleteFolder = async (folderId: number) => {
+    await supabase.from('folders').delete().eq('id', folderId);
+    setFolders(prev => prev.filter(f => f.id !== folderId));
+  };
+
+  const handleAddNote = async (folderId: number): Promise<Note | null> => {
+    if (!user) return null;
+    const { data: newNote, error } = await supabase.from('notes').insert({ folder_id: folderId, title: 'Nueva Nota', content: '', user_id: user.id }).select().single();
+    if (error || !newNote) return null;
+    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, notes: [newNote, ...f.notes] } : f));
+    return newNote;
+  };
+  
+  const handleUpdateNote = async (note: Note) => {
+    const { id, ...payload } = note;
+    await supabase.from('notes').update(payload).eq('id', id);
+    setFolders(prev => prev.map(f => f.id === note.folder_id ? { ...f, notes: f.notes.map(n => n.id === id ? note : n) } : f));
+  };
+  
+  const handleDeleteNote = async (noteId: number, folderId: number) => {
+    await supabase.from('notes').delete().eq('id', noteId);
+    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, notes: f.notes.filter(n => n.id !== noteId) } : f));
+  };
+
+  const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => {
+    if (!user) return;
+    const { data: newPlaylist, error } = await supabase.from('playlists').insert({ ...playlistData, user_id: user.id }).select().single();
+    if (error) { console.error(error); return; }
+    if (newPlaylist) setPlaylists(prev => [newPlaylist, ...prev]);
+  };
+
+  const handleUpdatePlaylist = async (playlist: Playlist) => {
+    await supabase.from('playlists').update({ is_favorite: playlist.is_favorite }).eq('id', playlist.id);
+    setPlaylists(prev => prev.map(p => p.id === playlist.id ? playlist : p));
+  };
+  
+  const handleDeletePlaylist = async (playlistId: number) => {
+    await supabase.from('playlists').delete().eq('id', playlistId);
+    setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+  };
+  
+  const handleAddQuickNote = async (text: string) => {
+    if (!user) return;
+    const { data, error } = await supabase.from('quick_notes').insert({ text, user_id: user.id }).select().single();
+    if (data) setQuickNotes(prev => [data, ...prev]);
+  };
+
+  const handleDeleteQuickNote = async (id: number) => {
+    await supabase.from('quick_notes').delete().eq('id', id);
+    setQuickNotes(prev => prev.filter(note => note.id !== id));
+  };
+  
+  const handleClearAllQuickNotes = async () => {
+    if (!user) return;
+    await supabase.from('quick_notes').delete().eq('user_id', user.id);
+    setQuickNotes([]);
+  }
+
+  const handleAddGalleryImages = async (files: File[]) => {
+      if (!appFolderId.current) return;
+      setGalleryIsLoading(true);
+      const newImages: GalleryImage[] = [];
+      for (const file of files) {
+          const fileMetadata = { name: file.name, parents: [appFolderId.current], mimeType: file.type };
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify(fileMetadata)], { type: 'application/json' }));
+          form.append('file', file);
+          try {
+              const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                  method: 'POST',
+                  headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }),
+                  body: form
+              });
+              const result = await res.json();
+              if (result.id) {
+                  newImages.push({ id: result.id, url: URL.createObjectURL(file) });
+              }
+          } catch(e) { console.error("Error uploading file", e); }
+      }
+      setGalleryImages(prev => [...newImages, ...prev]);
+      setGalleryIsLoading(false);
+  };
+  
+  const handleDeleteGalleryImage = async (id: string) => {
+    try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${gdriveToken}` }
+        });
+        setGalleryImages(prev => prev.filter(img => img.id !== id));
+    } catch(e) { console.error("Error deleting image", e); }
+  };
+  
+   const handleAddBackground = async (file: File) => {
+    if (!appFolderId.current) return;
+    setBackgroundsAreLoading(true);
+    const fileMetadata = {
+        name: file.name,
+        parents: [appFolderId.current],
+        mimeType: file.type,
+        appProperties: { type: 'background' }
+    };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(fileMetadata)], { type: 'application/json' }));
+    form.append('file', file);
+    try {
+        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }),
+            body: form
+        });
+        const result = await res.json();
+        if (result.id) {
+            const newBg: Background = { id: result.id, name: file.name, url: URL.createObjectURL(file), type: file.type.startsWith('video') ? 'video' : 'image', isFavorite: false };
+            setUserBackgrounds(prev => [newBg, ...prev]);
+        }
+    } catch (e) { console.error("Error uploading background", e); } finally { setBackgroundsAreLoading(false); }
+  };
+
+  const handleDeleteBackground = async (id: string) => {
+    try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${gdriveToken}` }
+        });
+        if(activeBackground?.id === id) setActiveBackground(null);
+        setUserBackgrounds(prev => prev.filter(bg => bg.id !== id));
+    } catch(e) { console.error("Error deleting background", e); }
+  };
+  
+  const handleToggleFavoriteBackground = async (id: string) => {
+    const bg = userBackgrounds.find(b => b.id === id);
+    if (!bg) return;
+    const newIsFavorite = !bg.isFavorite;
+    try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${gdriveToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appProperties: { isFavorite: String(newIsFavorite) } })
+        });
+        setUserBackgrounds(prev => prev.map(b => b.id === id ? { ...b, isFavorite: newIsFavorite } : b));
+    } catch(e) { console.error("Error toggling favorite", e); }
+  };
+
+
+  // --- SETTINGS SAVE & THEME LOGIC ---
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    if (user) {
+        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+        settingsSaveTimeout.current = window.setTimeout(async () => {
+            await supabase.from('site_settings').upsert({ user_id: user.id, theme_mode: theme }, { onConflict: 'user_id' });
+        }, 1000);
+    }
+  }, [theme, user]);
+
+  const onThemeColorChange = (colorName: keyof ThemeColors, value: string) => {
+    setThemeColors(prev => {
+        const newColors = { ...prev, [colorName]: value };
+        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+        settingsSaveTimeout.current = window.setTimeout(async () => {
+             if (user) await supabase.from('site_settings').upsert({ user_id: user.id, theme_colors: newColors }, { onConflict: 'user_id' });
+        }, 1000);
+        return newColors;
+    });
+  };
+
+  const onResetThemeColors = async () => {
+      setThemeColors(DEFAULT_COLORS);
+      if (user) await supabase.from('site_settings').upsert({ user_id: user.id, theme_colors: DEFAULT_COLORS }, { onConflict: 'user_id' });
+  };
+  
+  useEffect(() => {
+    const root = document.documentElement;
+    const primary = themeColors.primary;
+    const secondary = themeColors.secondary;
+    root.style.setProperty('--color-primary', primary);
+    root.style.setProperty('--color-primary-light', adjustBrightness(primary, 30));
+    root.style.setProperty('--color-primary-dark', adjustBrightness(primary, -10));
+
+    root.style.setProperty('--color-secondary', secondary);
+    root.style.setProperty('--color-secondary-light', adjustBrightness(secondary, 30));
+    root.style.setProperty('--color-secondary-dark', adjustBrightness(secondary, -10));
+    root.style.setProperty('--color-secondary-lighter', adjustBrightness(secondary, 50));
+  }, [themeColors]);
+  
+  useEffect(() => {
+      if (user && activeBackground) {
+          if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+          settingsSaveTimeout.current = window.setTimeout(async () => {
+              await supabase.from('site_settings').upsert({ user_id: user.id, active_background_id: activeBackground.id }, { onConflict: 'user_id' });
+          }, 1000);
+      }
+  }, [activeBackground, user]);
+  
+  useEffect(() => {
+    if (user && particleType) {
+          if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+          settingsSaveTimeout.current = window.setTimeout(async () => {
+              await supabase.from('site_settings').upsert({ user_id: user.id, particle_type: particleType }, { onConflict: 'user_id' });
+          }, 1000);
+    }
+  }, [particleType, user]);
+  
+   useEffect(() => {
+    if (user && ambientSound) {
+          if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+          settingsSaveTimeout.current = window.setTimeout(async () => {
+              await supabase.from('site_settings').upsert({ user_id: user.id, ambient_sound: ambientSound }, { onConflict: 'user_id' });
+          }, 1000);
+    }
+  }, [ambientSound, user]);
+  
+  useEffect(() => {
+      if(user && pomodoroState) {
+          if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+          settingsSaveTimeout.current = window.setTimeout(async () => {
+              const { timeLeft, isActive, mode, ...configToSave } = pomodoroState;
+              await supabase.from('site_settings').upsert({ user_id: user.id, pomodoro_config: configToSave }, { onConflict: 'user_id' });
+          }, 1000);
+      }
+  }, [pomodoroState, user]);
+  
+  useEffect(() => {
+    if(user && browserSession) {
+        localStorage.setItem(`${user.email}_browserSession`, JSON.stringify(browserSession));
+    }
+  }, [browserSession, user]);
+
+  if (authLoading || (!dataLoaded && user)) {
+    return (
+        <div className="h-screen w-screen bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 flex flex-col items-center justify-center">
+            <ChickenIcon className="w-24 h-24 text-primary animate-pulse" />
+        </div>
+    );
+  }
+
+  if (!user) {
+    return <Login onLogin={() => {}} />;
+  }
+  
+  const componentProps: AppComponentProps = {
+    currentUser: user,
+    onLogout: () => supabase.auth.signOut(),
+    theme, toggleTheme: () => setTheme(t => t === 'light' ? 'dark' : 'light'),
+    themeColors, onThemeColorChange, onResetThemeColors,
+    allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    pomodoroState, activeBackground, particleType, ambientSound,
+    handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
+    handleAddFolder, handleUpdateFolder, handleDeleteFolder,
+    handleAddNote, handleUpdateNote, handleDeleteNote,
+    handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
+    handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
+    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
+    gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
+    handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+    gapiReady: gapiReady,
+    isSubscribed, isPermissionBlocked, handleNotificationAction,
+  };
+
+  return isMobile ? <MobileApp {...componentProps} /> : <DesktopApp {...componentProps} />;
+};
+
+export default App;
