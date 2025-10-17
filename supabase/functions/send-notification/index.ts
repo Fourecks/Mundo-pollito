@@ -1,40 +1,16 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import * as webpush from 'https://deno.land/x/web_push@0.2.1/mod.ts';
+import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 declare const Deno: any;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Estas deben ser configuradas como secrets en tu proyecto de Supabase
-const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY');
-const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY');
-const VAPID_SUBJECT = 'mailto:example@example.com'; // Es buena práctica configurar un email de contacto
-
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-function decodeBase64Url(str: string): string {
-  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-  while (base64.length % 4) {
-    base64 += '=';
-  }
-  try {
-    const decodedData = atob(base64);
-    return decodeURIComponent(
-      Array.prototype.map.call(decodedData, function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join('')
-    );
-  } catch (e) {
-    console.error("Fallo al decodificar la cadena Base64URL:", e);
-    throw new Error("Cadena Base64URL inválida");
-  }
-}
-
 serve(async (req: Request) => {
+  // Manejar la solicitud de pre-vuelo (preflight) de CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -42,20 +18,39 @@ serve(async (req: Request) => {
   try {
     const { title, body } = await req.json();
 
+    // 1. Verificar de forma segura el token JWT para obtener el ID de usuario
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Falta la cabecera de Authorization');
 
     const token = authHeader.replace('Bearer ', '');
-    const tokenParts = token.split('.');
-    if (tokenParts.length !== 3) throw new Error('Formato de JWT inválido');
+    const jwtSecret = Deno.env.get('JWT_SECRET'); // Usamos el nuevo nombre del secreto
+    if (!jwtSecret) {
+      throw new Error("El secreto 'JWT_SECRET' no está configurado en la función de Supabase.");
+    }
     
-    const payload = JSON.parse(decodeBase64Url(tokenParts[1]));
+    const key = await crypto.subtle.importKey(
+        "raw", new TextEncoder().encode(jwtSecret),
+        { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+    );
+    const payload = await verify(token, key);
     const userId = payload.sub;
+
     if (!userId) throw new Error('No se pudo extraer el ID de usuario del token');
 
+    // 2. Obtener las credenciales de Supabase y las claves VAPID de los secretos
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY');
+    const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY');
 
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+        throw new Error("Las VAPID keys no están configuradas en los secretos de la función.");
+    }
+
+    // 3. Configurar los detalles de VAPID para la librería web-push
+    webpush.setVapidDetails('mailto:example@example.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+
+    // 4. Obtener las suscripciones push del usuario desde la base de datos
     const response = await fetch(`${supabaseUrl}/rest/v1/push_subscriptions?select=subscription_data&user_id=eq.${userId}`, {
       headers: {
         'apikey': serviceRoleKey,
@@ -72,7 +67,6 @@ serve(async (req: Request) => {
     const subscriptions = await response.json();
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log(`No se encontraron suscripciones push para el usuario ${userId}`);
       return new Response(JSON.stringify({ message: "No se encontraron suscripciones" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -81,6 +75,7 @@ serve(async (req: Request) => {
 
     const notificationPayload = JSON.stringify({ title, body });
 
+    // 5. Enviar las notificaciones y manejar suscripciones expiradas
     const deleteEndpoint = async (endpoint: string) => {
         const deleteResponse = await fetch(`${supabaseUrl}/rest/v1/push_subscriptions?subscription_data->>endpoint=eq.${encodeURIComponent(endpoint)}`, {
             method: 'DELETE',
