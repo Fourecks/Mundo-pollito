@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import * as webpush from 'https://deno.land/x/web_push@0.2.1/mod.ts';
 
 declare const Deno: any;
@@ -7,7 +6,6 @@ declare const Deno: any;
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  // FIX: Se añade explícitamente los métodos permitidos para cumplir con la política CORS.
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -55,17 +53,24 @@ serve(async (req: Request) => {
     const userId = payload.sub;
     if (!userId) throw new Error('No se pudo extraer el ID de usuario del token');
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    );
-    
-    const { data: subscriptions, error } = await supabaseAdmin
-      .from('push_subscriptions')
-      .select('subscription_data')
-      .eq('user_id', userId);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (error) throw error;
+    const response = await fetch(`${supabaseUrl}/rest/v1/push_subscriptions?select=subscription_data&user_id=eq.${userId}`, {
+      headers: {
+        'apikey': serviceRoleKey,
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Error al obtener suscripciones: ${errorData.message}`);
+    }
+    
+    const subscriptions = await response.json();
+
     if (!subscriptions || subscriptions.length === 0) {
       console.log(`No se encontraron suscripciones push para el usuario ${userId}`);
       return new Response(JSON.stringify({ message: "No se encontraron suscripciones" }), {
@@ -76,16 +81,26 @@ serve(async (req: Request) => {
 
     const notificationPayload = JSON.stringify({ title, body });
 
-    const sendPromises = subscriptions.map(sub =>
+    const deleteEndpoint = async (endpoint: string) => {
+        const deleteResponse = await fetch(`${supabaseUrl}/rest/v1/push_subscriptions?subscription_data->>endpoint=eq.${encodeURIComponent(endpoint)}`, {
+            method: 'DELETE',
+            headers: {
+                'apikey': serviceRoleKey,
+                'Authorization': `Bearer ${serviceRoleKey}`,
+            }
+        });
+        if (!deleteResponse.ok) {
+            console.error(`Fallo al eliminar la suscripción expirada para el endpoint: ${endpoint}`);
+        }
+    };
+
+    const sendPromises = subscriptions.map((sub: { subscription_data: any }) =>
       webpush.sendNotification(sub.subscription_data, notificationPayload)
         .catch(err => {
           console.error(`Fallo al enviar notificación. Estado: ${err.status}, Mensaje: ${err.message}`);
           if (err.status === 404 || err.status === 410) {
             console.log("Suscripción expirada o inválida. Eliminando de la BD.");
-            return supabaseAdmin
-              .from('push_subscriptions')
-              .delete()
-              .eq('subscription_data->>endpoint', sub.subscription_data.endpoint);
+            return deleteEndpoint(sub.subscription_data.endpoint);
           }
         })
     );
