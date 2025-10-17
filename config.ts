@@ -25,10 +25,6 @@ export const config = {
   // --- OneSignal Push Notifications ---
   // Get these from your OneSignal account dashboard.
   // It's recommended to set these as environment variables in production.
-  ONESIGNAL_APP_ID: "bac24af0-01f3-40bd-bcbb-307ab78c1037",
+  ONESIGNAL_APP_ID: "YOUR_ONESIGNAL_APP_ID",
   ONESIGNAL_REST_API_KEY: "YOUR_ONESIGNAL_REST_API_KEY",
-
-  // --- Web Push Notifications ---
-  // Generate VAPID keys using a library like 'web-push' (e.g., `npx web-push generate-vapid-keys`)
-  VAPID_PUBLIC_KEY: "YOUR_VAPID_PUBLIC_KEY",
 };

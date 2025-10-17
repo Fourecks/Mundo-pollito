@@ -896,35 +896,80 @@ const App: React.FC = () => {
   // Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
+  const oneSignalInitialized = useRef(false);
 
-  // --- ONESIGNAL NOTIFICATIONS LOGIC ---
+  // --- ROBUST ONESIGNAL NOTIFICATIONS LOGIC ---
+  
+  // 1. First useEffect for cleanup - runs only once per session.
   useEffect(() => {
-    if (!user || !ONESIGNAL_APP_ID || ONESIGNAL_APP_ID.includes('YOUR_')) return;
+    const cleanupKey = 'sw_cleanup_v2_complete';
+    if (sessionStorage.getItem(cleanupKey)) {
+        return;
+    }
 
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+            if (registrations.length > 0) {
+                console.log('OneSignal Cleanup: Found existing service workers, unregistering...');
+                const unregisterPromises = registrations.map(reg => reg.unregister());
+                Promise.all(unregisterPromises).then(() => {
+                    sessionStorage.setItem(cleanupKey, 'true');
+                    console.log('OneSignal Cleanup: All old service workers unregistered. Reloading page for a fresh start.');
+                    window.location.reload();
+                }).catch(err => {
+                    console.error('OneSignal Cleanup: Error unregistering service workers.', err);
+                    sessionStorage.setItem(cleanupKey, 'true'); // Still set key to avoid loops on error
+                });
+            } else {
+                // No workers, we are clean. Set the key and proceed.
+                sessionStorage.setItem(cleanupKey, 'true');
+            }
+        });
+    } else {
+        // No service worker support, no cleanup needed.
+        sessionStorage.setItem(cleanupKey, 'true');
+    }
+  }, []);
+
+  // 2. Second useEffect for OneSignal initialization, dependent on user and cleanup.
+  useEffect(() => {
+    const cleanupKey = 'sw_cleanup_v2_complete';
+    // Don't start OneSignal init until the user exists, config is ready,
+    // it hasn't been initialized yet, and the cleanup process is confirmed complete for the session.
+    if (!user || !ONESIGNAL_APP_ID || ONESIGNAL_APP_ID.includes('YOUR_') || oneSignalInitialized.current || !sessionStorage.getItem(cleanupKey)) {
+        return;
+    }
+
+    oneSignalInitialized.current = true; // Prevents re-initialization on re-renders
+    
     window.OneSignal = window.OneSignal || [];
     const OneSignal = window.OneSignal;
 
-    OneSignal.push(() => {
-        OneSignal.init({
+    OneSignal.push(async () => {
+        console.log("OneSignal: Initializing SDK...");
+        // The init process is asynchronous and must complete before other SDK calls.
+        await OneSignal.init({
             appId: ONESIGNAL_APP_ID,
         });
+        console.log("OneSignal: SDK Initialized. Setting up listeners and logging in user.");
 
-        // Sync Supabase user ID with OneSignal
-        OneSignal.login(user.id);
-
-        // Listen for permission changes
-        OneSignal.Notifications.addEventListener('permissionChange', (permission) => {
+        // Now that init is complete, it's safe to add listeners and call login.
+        OneSignal.Notifications.addEventListener('permissionChange', (permission: any) => {
             setIsPermissionBlocked(permission === 'denied');
+            setIsSubscribed(permission === 'granted');
         });
-        
-        // Function to update subscription status
-        const updateSubscriptionStatus = () => {
-             setIsSubscribed(OneSignal.Notifications.permission === 'granted');
-        };
 
-        // Check initial status and set up listener for changes
-        updateSubscriptionStatus();
-        OneSignal.emitter.on('subscriptionChange', updateSubscriptionStatus);
+        // Check the initial state as well
+        const initialPermission = OneSignal.Notifications.permission;
+        setIsPermissionBlocked(initialPermission === 'denied');
+        setIsSubscribed(initialPermission === 'granted');
+
+        try {
+            await OneSignal.login(user.id);
+            console.log(`OneSignal: User login successful with external_user_id: ${user.id}`);
+        } catch (e) {
+            console.error("OneSignal: Login failed.", e);
+        }
     });
 
   }, [user]);
@@ -939,7 +984,6 @@ const App: React.FC = () => {
     if (!OneSignal) return;
 
     if (isSubscribed) {
-      // Send a test notification directly from the client using the SDK
       OneSignal.push(() => {
         OneSignal.Notifications.sendSelfNotification(
             "¡Notificación de Prueba! 🐣",
@@ -948,7 +992,6 @@ const App: React.FC = () => {
         alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
       });
     } else {
-      // Prompt the user for permission
       OneSignal.push(() => {
         OneSignal.Notifications.requestPermission();
       });
