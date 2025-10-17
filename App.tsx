@@ -205,6 +205,7 @@ interface AppComponentProps {
   activeBackground: Background | null;
   particleType: ParticleType;
   ambientSound: { type: AmbientSoundType; volume: number };
+  dailyEncouragementHour: number | null;
   // Handlers
   handleAddTodo: (text: string) => Promise<void>;
   handleUpdateTodo: (updatedTodo: Todo) => Promise<void>;
@@ -230,6 +231,7 @@ interface AppComponentProps {
   setActiveBackground: React.Dispatch<React.SetStateAction<Background | null>>;
   setParticleType: React.Dispatch<React.SetStateAction<ParticleType>>;
   setAmbientSound: React.Dispatch<React.SetStateAction<{ type: AmbientSoundType; volume: number }>>;
+  onSetDailyEncouragement: (localHour: number | null) => void;
   // Google Drive Props
   gdriveToken: string | null;
   galleryIsLoading: boolean;
@@ -251,12 +253,12 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
     currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-    pomodoroState, activeBackground, particleType, ambientSound,
+    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementHour,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
+    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
     isSubscribed, isPermissionBlocked, handleNotificationAction
@@ -469,6 +471,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setParticleType={setParticleType}
         ambientSound={ambientSound}
         setAmbientSound={setAmbientSound}
+        dailyEncouragementHour={dailyEncouragementHour}
+        onSetDailyEncouragement={onSetDailyEncouragement}
       />
       
       <div className={`fixed top-4 left-4 z-30 w-64 space-y-4 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block`}>
@@ -548,12 +552,12 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
       currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-      pomodoroState, activeBackground, particleType, ambientSound,
+      pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementHour,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-      setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
+      setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       isSubscribed, isPermissionBlocked, handleNotificationAction
@@ -783,6 +787,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={setParticleType}
               ambientSound={ambientSound}
               setAmbientSound={setAmbientSound}
+              dailyEncouragementHour={dailyEncouragementHour}
+              onSetDailyEncouragement={onSetDailyEncouragement}
             />
             <CompletionModal isOpen={showCompletionModal} onClose={() => setShowCompletionModal(false)} quote={completionQuote}/>
             <TaskDetailsModal isOpen={!!taskToEdit} onClose={() => setTaskToEdit(null)} onSave={handleUpdateTodo} todo={taskToEdit} />
@@ -876,6 +882,7 @@ const App: React.FC = () => {
   const [savedActiveBgId, setSavedActiveBgId] = useState<string | null>(null);
   const [particleType, setParticleType] = useState<ParticleType>('none');
   const [ambientSound, setAmbientSound] = useState<{ type: AmbientSoundType; volume: number }>({ type: 'none', volume: 0.5 });
+  const [dailyEncouragementHour, setDailyEncouragementHour] = useState<number | null>(null);
   const [pomodoroState, setPomodoroState] = useState({
       timeLeft: 25 * 60,
       isActive: false,
@@ -903,43 +910,40 @@ const App: React.FC = () => {
   
   // 1. First useEffect for cleanup - runs only once per session.
   useEffect(() => {
-    const cleanupKey = 'sw_cleanup_v3_complete'; // Use a new key to ensure this logic runs for everyone.
+    const cleanupKey = 'sw_cleanup_v3_complete';
     if (sessionStorage.getItem(cleanupKey)) {
         return;
     }
 
-    if ('serviceWorker' in navigator) {
-        // navigator.serviceWorker.ready waits for a service worker to be active and ready.
-        // This is a safer approach than listening for 'window.load'.
-        navigator.serviceWorker.ready.then(registration => {
-            // Once we know the SW system is active, we can safely get all registrations.
-            console.log('OneSignal Cleanup: Service worker is ready. Checking all registrations.');
-            return navigator.serviceWorker.getRegistrations();
-        }).then(registrations => {
+    const performCleanup = async () => {
+        try {
+            // navigator.serviceWorker.ready waits for a service worker to be active and ready.
+            await navigator.serviceWorker.ready;
+            const registrations = await navigator.serviceWorker.getRegistrations();
             if (registrations.length > 0) {
                 console.log(`OneSignal Cleanup: Found ${registrations.length} existing service workers, unregistering...`);
-                const unregisterPromises = registrations.map(reg => reg.unregister());
-                return Promise.all(unregisterPromises);
-            }
-            return Promise.resolve(null); // No registrations to unregister
-        }).then((unregistered) => {
-            sessionStorage.setItem(cleanupKey, 'true');
-            // Only reload if we actually unregistered something.
-            if (unregistered) {
+                await Promise.all(registrations.map(reg => reg.unregister()));
                 console.log('OneSignal Cleanup: All old service workers unregistered. Reloading page for a fresh start.');
+                sessionStorage.setItem(cleanupKey, 'true');
                 window.location.reload();
             } else {
-                 console.log('OneSignal Cleanup: No service workers found to unregister. Proceeding normally.');
+                console.log('OneSignal Cleanup: No service workers found to unregister. Proceeding normally.');
+                sessionStorage.setItem(cleanupKey, 'true');
             }
-        }).catch(err => {
-            // .ready might reject if there's no SW or it fails to activate.
-            // This is a common case on the very first visit to the site.
-            // We can safely assume there's nothing to clean up.
+        } catch (err) {
             console.warn('OneSignal Cleanup: Could not perform cleanup (this is normal on first visit or if no worker was ever installed).', err);
             sessionStorage.setItem(cleanupKey, 'true'); // Mark as done to prevent loops.
-        });
+        }
+    };
+
+    if ('serviceWorker' in navigator) {
+        // Wait for the page to be fully loaded before trying to access service workers.
+        if (document.readyState === 'complete') {
+            performCleanup();
+        } else {
+            window.addEventListener('load', performCleanup, { once: true });
+        }
     } else {
-        // No service worker support in this browser.
         sessionStorage.setItem(cleanupKey, 'true');
     }
   }, []);
@@ -1114,11 +1118,12 @@ const App: React.FC = () => {
             setParticleType(settingsData.particle_type || 'none');
             setAmbientSound(settingsData.ambient_sound || { type: 'none', volume: 0.5 });
             setPomodoroState(prev => ({ ...prev, ...(settingsData.pomodoro_config || {}) }));
+            setDailyEncouragementHour(settingsData.daily_encouragement_utc_hour ?? null);
             if (settingsData.active_background_id) {
                 setSavedActiveBgId(settingsData.active_background_id);
             }
         } else if (!settingsError) {
-            await supabase.from('site_settings').insert({ user_id: user.id, theme_mode: 'light', theme_colors: DEFAULT_COLORS, pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: 50, showBackgroundTimer: false } });
+            await supabase.from('site_settings').insert({ user_id: user.id, theme_mode: 'light', theme_colors: DEFAULT_COLORS, pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: 50, showBackgroundTimer: false }, daily_encouragement_utc_hour: null });
         }
 
         // Load Todos from Supabase
@@ -1739,6 +1744,22 @@ const App: React.FC = () => {
     }
   }, [browserSession, user]);
 
+  const onSetDailyEncouragement = (localHour: number | null) => {
+    let utcHour: number | null = null;
+    if (localHour !== null) {
+        const offset = new Date().getTimezoneOffset() / -60;
+        utcHour = (localHour - offset + 24) % 24;
+    }
+    setDailyEncouragementHour(utcHour);
+
+    if (user) {
+        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+        settingsSaveTimeout.current = window.setTimeout(async () => {
+            await supabase.from('site_settings').upsert({ user_id: user.id, daily_encouragement_utc_hour: utcHour }, { onConflict: 'user_id' });
+        }, 1000);
+    }
+  };
+
   if (authLoading || (!dataLoaded && user)) {
     return (
         <div className="h-screen w-screen bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 flex flex-col items-center justify-center">
@@ -1757,13 +1778,13 @@ const App: React.FC = () => {
     theme, toggleTheme: () => setTheme(t => t === 'light' ? 'dark' : 'light'),
     themeColors, onThemeColorChange, onResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-    pomodoroState, activeBackground, particleType, ambientSound,
+    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementHour,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder,
     handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound,
+    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
     gapiReady: gapiReady,
