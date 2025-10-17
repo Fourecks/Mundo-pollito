@@ -1,16 +1,16 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import * as webpush from 'https://deno.land/x/web_push@0.2.1/mod.ts';
 import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 declare const Deno: any;
 
+// CORS headers to allow requests from any origin.
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req: Request) => {
-  // Manejar la solicitud de pre-vuelo (preflight) de CORS
+  // Handle CORS preflight request.
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -18,16 +18,17 @@ serve(async (req: Request) => {
   try {
     const { title, body } = await req.json();
 
-    // 1. Verificar de forma segura el token JWT para obtener el ID de usuario
+    // 1. Securely verify the JWT to get the user ID.
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Falta la cabecera de Authorization');
+    if (!authHeader) throw new Error('Missing Authorization header');
 
     const token = authHeader.replace('Bearer ', '');
-    const jwtSecret = Deno.env.get('JWT_SECRET'); // Usamos el nuevo nombre del secreto
+    const jwtSecret = Deno.env.get('JWT_SECRET');
     if (!jwtSecret) {
-      throw new Error("El secreto 'JWT_SECRET' no está configurado en la función de Supabase.");
+      throw new Error("Secret 'JWT_SECRET' is not set in the Supabase function.");
     }
     
+    // Import the key for HMAC-SHA256 verification.
     const key = await crypto.subtle.importKey(
         "raw", new TextEncoder().encode(jwtSecret),
         { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
@@ -35,80 +36,48 @@ serve(async (req: Request) => {
     const payload = await verify(token, key);
     const userId = payload.sub;
 
-    if (!userId) throw new Error('No se pudo extraer el ID de usuario del token');
+    if (!userId) throw new Error('Could not extract user ID from token');
 
-    // 2. Obtener las credenciales de Supabase y las claves VAPID de los secretos
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY');
-    const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY');
+    // 2. Get OneSignal credentials from environment variables (secrets).
+    const ONESIGNAL_APP_ID = Deno.env.get('ONESIGNAL_APP_ID');
+    const ONESIGNAL_REST_API_KEY = Deno.env.get('ONESIGNAL_REST_API_KEY');
 
-    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-        throw new Error("Las VAPID keys no están configuradas en los secretos de la función.");
+    if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
+      throw new Error("OneSignal App ID or REST API Key is not configured in the function secrets.");
     }
 
-    // 3. Configurar los detalles de VAPID para la librería web-push
-    webpush.setVapidDetails('mailto:example@example.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    // 3. Prepare the notification payload for the OneSignal REST API.
+    const notification = {
+      app_id: ONESIGNAL_APP_ID,
+      contents: { en: body },
+      headings: { en: title },
+      // Target the notification to the specific user who made the request.
+      include_external_user_ids: [userId]
+    };
 
-    // 4. Obtener las suscripciones push del usuario desde la base de datos
-    const response = await fetch(`${supabaseUrl}/rest/v1/push_subscriptions?select=subscription_data&user_id=eq.${userId}`, {
-      headers: {
-        'apikey': serviceRoleKey,
-        'Authorization': `Bearer ${serviceRoleKey}`,
-        'Content-Type': 'application/json'
-      }
+    // 4. Send the request to OneSignal's API.
+    const response = await fetch('https://onesignal.com/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': `Basic ${ONESIGNAL_REST_API_KEY}`
+        },
+        body: JSON.stringify(notification)
     });
 
     if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`Error al obtener suscripciones: ${errorData.message}`);
+        console.error("OneSignal API Error:", errorData);
+        throw new Error(`Failed to send notification via OneSignal: ${errorData.errors.join(', ')}`);
     }
     
-    const subscriptions = await response.json();
-
-    if (!subscriptions || subscriptions.length === 0) {
-      return new Response(JSON.stringify({ message: "No se encontraron suscripciones" }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
-
-    const notificationPayload = JSON.stringify({ title, body });
-
-    // 5. Enviar las notificaciones y manejar suscripciones expiradas
-    const deleteEndpoint = async (endpoint: string) => {
-        const deleteResponse = await fetch(`${supabaseUrl}/rest/v1/push_subscriptions?subscription_data->>endpoint=eq.${encodeURIComponent(endpoint)}`, {
-            method: 'DELETE',
-            headers: {
-                'apikey': serviceRoleKey,
-                'Authorization': `Bearer ${serviceRoleKey}`,
-            }
-        });
-        if (!deleteResponse.ok) {
-            console.error(`Fallo al eliminar la suscripción expirada para el endpoint: ${endpoint}`);
-        }
-    };
-
-    const sendPromises = subscriptions.map((sub: { subscription_data: any }) =>
-      webpush.sendNotification(sub.subscription_data, notificationPayload)
-        .catch(err => {
-          console.error(`Fallo al enviar notificación. Estado: ${err.status}, Mensaje: ${err.message}`);
-          if (err.status === 404 || err.status === 410) {
-            console.log("Suscripción expirada o inválida. Eliminando de la BD.");
-            return deleteEndpoint(sub.subscription_data.endpoint);
-          }
-        })
-    );
-    
-    await Promise.all(sendPromises);
-
-    return new Response(JSON.stringify({ success: true, sent_to: subscriptions.length }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (err) {
-    console.error('Error crítico en la función send-notification:', err);
+    console.error('Critical error in send-notification function:', err);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

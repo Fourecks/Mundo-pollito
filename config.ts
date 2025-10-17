@@ -22,10 +22,13 @@ export const config = {
   SUPABASE_URL: "https://pbtdzkpympdfemnejpwj.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidGR6a3B5bXBkZmVtbmVqcHdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MzYyMTYsImV4cCI6MjA3NTExMjIxNn0.VsHBuGnmV3T0hJ5sSO6vYlckONHO9IIQmTTjb_S_pBg",
 
-  // --- Web Push Notifications (VAPID) ---
-  // These keys are used for the native browser push notifications.
-  // They are safe to be public (the public key) and are used to identify the application server.
-  // In a real production app, you would generate your own VAPID keys.
-  VAPID_PUBLIC_KEY: "BPGS1Q5RvxzF71vMEb3gKolzNWG0NCme4gJbGKaC4q9j9UDt16-wQ27Y5uClL8eOvYjrwXPvBm3lQwX5M-X8qpw",
-  VAPID_PRIVATE_KEY: "6xYn4T5yVAIuIFceWuk2y_hJ_l3YLdJTM6rV0w7hJLo"
+  // --- OneSignal Push Notifications ---
+  // Get these from your OneSignal account dashboard.
+  // It's recommended to set these as environment variables in production.
+  ONESIGNAL_APP_ID: "bac24af0-01f3-40bd-bcbb-307ab78c1037",
+  ONESIGNAL_REST_API_KEY: "YOUR_ONESIGNAL_REST_API_KEY",
+
+  // --- Web Push Notifications ---
+  // Generate VAPID keys using a library like 'web-push' (e.g., `npx web-push generate-vapid-keys`)
+  VAPID_PUBLIC_KEY: "YOUR_VAPID_PUBLIC_KEY",
 };

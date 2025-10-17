@@ -43,8 +43,9 @@ const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.en
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 
-// --- Web Push VAPID Key ---
-const VAPID_PUBLIC_KEY = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY || (process.env as any).VAPID_PUBLIC_KEY || config.VAPID_PUBLIC_KEY;
+// --- OneSignal Configuration ---
+const ONESIGNAL_APP_ID = (import.meta as any).env?.VITE_ONESIGNAL_APP_ID || (process.env as any).ONESIGNAL_APP_ID || config.ONESIGNAL_APP_ID;
+
 
 const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
@@ -851,18 +852,6 @@ const adjustBrightness = (hex: string, percent: number) => {
 };
 // --- End Color Helpers ---
 
-function urlBase64ToUint8Array(base64String: string) {
-    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-}
-
-
 const App: React.FC = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -904,91 +893,65 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // Native Web Push State
+  // Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
-  const serviceWorkerRegistration = useRef<ServiceWorkerRegistration | null>(null);
 
-  // --- NATIVE WEB PUSH NOTIFICATIONS LOGIC ---
+  // --- ONESIGNAL NOTIFICATIONS LOGIC ---
   useEffect(() => {
-    window.addEventListener('load', () => {
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        const swUrl = new URL('sw.js', window.location.origin).href;
-        navigator.serviceWorker.register(swUrl)
-          .then(swReg => {
-            console.log('Service Worker is registered', swReg);
-            serviceWorkerRegistration.current = swReg;
-            // Check initial permission and subscription status
-            setIsPermissionBlocked(Notification.permission === 'denied');
-            swReg.pushManager.getSubscription().then(subscription => {
-              setIsSubscribed(!!subscription);
-            });
-          })
-          .catch(error => {
-            console.error('Service Worker Error', error);
-          });
-      } else {
-        console.warn('Push messaging is not supported');
-      }
+    if (!user || !ONESIGNAL_APP_ID || ONESIGNAL_APP_ID.includes('YOUR_')) return;
+
+    window.OneSignal = window.OneSignal || [];
+    const OneSignal = window.OneSignal;
+
+    OneSignal.push(() => {
+        OneSignal.init({
+            appId: ONESIGNAL_APP_ID,
+        });
+
+        // Sync Supabase user ID with OneSignal
+        OneSignal.login(user.id);
+
+        // Listen for permission changes
+        OneSignal.Notifications.addEventListener('permissionChange', (permission) => {
+            setIsPermissionBlocked(permission === 'denied');
+        });
+        
+        // Function to update subscription status
+        const updateSubscriptionStatus = () => {
+             setIsSubscribed(OneSignal.Notifications.permission === 'granted');
+        };
+
+        // Check initial status and set up listener for changes
+        updateSubscriptionStatus();
+        OneSignal.emitter.on('subscriptionChange', updateSubscriptionStatus);
     });
-  }, []);
 
-  const subscribeUser = async () => {
-    if (!serviceWorkerRegistration.current || !user) return;
-    try {
-      const subscription = await serviceWorkerRegistration.current.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
-      console.log('User is subscribed.');
-
-      // Clear old subscriptions before inserting the new one to prevent duplicates.
-      const { error: deleteError } = await supabase.from('push_subscriptions').delete().eq('user_id', user.id);
-      if (deleteError) {
-          console.error('Error clearing old subscriptions:', deleteError);
-      }
-
-      // Save the new subscription to backend
-      const { error: insertError } = await supabase.from('push_subscriptions').insert({
-        subscription_data: subscription,
-        user_id: user.id,
-      });
-
-      if (insertError) throw insertError;
-
-      setIsSubscribed(true);
-      setIsPermissionBlocked(false);
-    } catch (err) {
-      console.error('Failed to subscribe the user: ', err);
-      if (Notification.permission === 'denied') {
-        setIsPermissionBlocked(true);
-      }
-    }
-  };
+  }, [user]);
 
   const handleNotificationAction = async () => {
     if (isPermissionBlocked) {
       alert('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para esta página.');
       return;
     }
+    
+    const OneSignal = window.OneSignal;
+    if (!OneSignal) return;
 
     if (isSubscribed) {
-      // Send a test notification
-      console.log('Sending test notification...');
-      const { error } = await supabase.functions.invoke('send-notification', {
-        body: {
-          title: "¡Notificación de Prueba! 🐣",
-          body: "Si ves esto, ¡las notificaciones nativas funcionan!",
-        },
-      });
-      if (error) {
-        alert("Error al enviar la notificación de prueba.");
-        console.error("Error invoking test notification function:", error);
-      } else {
+      // Send a test notification directly from the client using the SDK
+      OneSignal.push(() => {
+        OneSignal.Notifications.sendSelfNotification(
+            "¡Notificación de Prueba! 🐣",
+            "Si ves esto, ¡las notificaciones funcionan!",
+        );
         alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
-      }
+      });
     } else {
-      await subscribeUser();
+      // Prompt the user for permission
+      OneSignal.push(() => {
+        OneSignal.Notifications.requestPermission();
+      });
     }
   };
 
@@ -1008,7 +971,6 @@ const App: React.FC = () => {
           const startTime = new Date(year, month - 1, day, hour, minute);
           const reminderTime = new Date(startTime.getTime() - todo.reminder_offset * 60 * 1000);
 
-          // Corrected logic: Check if the reminder time has passed, regardless of when the check runs.
           if (reminderTime <= now) {
             todosToNotify.push(todo);
           }
@@ -1683,13 +1645,8 @@ const App: React.FC = () => {
   
   const handleLogout = async () => {
     try {
-        if (serviceWorkerRegistration.current) {
-            const subscription = await serviceWorkerRegistration.current.pushManager.getSubscription();
-            if (subscription) {
-                // We tell the server to delete the subscription.
-                await supabase.from('push_subscriptions').delete().eq('subscription_data->>endpoint', subscription.endpoint);
-                await subscription.unsubscribe();
-            }
+        if (window.OneSignal) {
+          window.OneSignal.logout();
         }
         await supabase.auth.signOut(); 
         handleGoogleLogout();
