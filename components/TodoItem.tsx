@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Todo, Priority, Subtask } from '../types';
 import SubtaskIcon from './icons/SubtaskIcon';
@@ -18,7 +19,10 @@ const priorityMap: { [key in Priority]: { color: string; label: string, borderCo
 };
 
 const formatDateKey = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const formatDueDate = (todo: Todo): string => {

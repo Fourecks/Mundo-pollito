@@ -13,7 +13,10 @@ interface CalendarProps {
 
 // Helper to format date as YYYY-MM-DD key
 const formatDateKey = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const Calendar: React.FC<CalendarProps> = ({ selectedDate, setDate, datesWithTasks, datesWithAllTasksCompleted }) => {
