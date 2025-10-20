@@ -909,91 +909,50 @@ const App: React.FC = () => {
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
   const oneSignalInitialized = useRef(false);
 
-  // --- ROBUST ONESIGNAL NOTIFICATIONS LOGIC ---
-  
-  // 1. First useEffect for cleanup - runs only once per session.
+  // --- Simplified OneSignal Notifications Logic ---
   useEffect(() => {
-    const cleanupKey = 'sw_cleanup_v3_complete';
-    if (sessionStorage.getItem(cleanupKey)) {
-        return;
-    }
-
-    const performCleanup = async () => {
-        try {
-            // navigator.serviceWorker.ready waits for a service worker to be active and ready.
-            await navigator.serviceWorker.ready;
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            if (registrations.length > 0) {
-                console.log(`OneSignal Cleanup: Found ${registrations.length} existing service workers, unregistering...`);
-                await Promise.all(registrations.map(reg => reg.unregister()));
-                console.log('OneSignal Cleanup: All old service workers unregistered. Reloading page for a fresh start.');
-                sessionStorage.setItem(cleanupKey, 'true');
-                window.location.reload();
-            } else {
-                console.log('OneSignal Cleanup: No service workers found to unregister. Proceeding normally.');
-                sessionStorage.setItem(cleanupKey, 'true');
-            }
-        } catch (err) {
-            console.warn('OneSignal Cleanup: Could not perform cleanup (this is normal on first visit or if no worker was ever installed).', err);
-            sessionStorage.setItem(cleanupKey, 'true'); // Mark as done to prevent loops.
-        }
-    };
-
-    if ('serviceWorker' in navigator) {
-        // Wait for the page to be fully loaded before trying to access service workers.
-        if (document.readyState === 'complete') {
-            performCleanup();
-        } else {
-            window.addEventListener('load', performCleanup, { once: true });
-        }
-    } else {
-        sessionStorage.setItem(cleanupKey, 'true');
-    }
-  }, []);
-
-  // 2. Second useEffect for OneSignal initialization, dependent on user and cleanup.
-  useEffect(() => {
-    const cleanupKey = 'sw_cleanup_v3_complete';
     // Don't start OneSignal init until the user exists, config is ready,
-    // it hasn't been initialized yet, and the cleanup process is confirmed complete for the session.
-    if (!user || !ONESIGNAL_APP_ID || ONESIGNAL_APP_ID.includes('YOUR_') || oneSignalInitialized.current || !sessionStorage.getItem(cleanupKey)) {
-        return;
+    // and it hasn't been initialized yet for this session.
+    if (!user || !ONESIGNAL_APP_ID || ONESIGNAL_APP_ID.includes('YOUR_') || oneSignalInitialized.current) {
+      return;
     }
 
     oneSignalInitialized.current = true; // Prevents re-initialization on re-renders
-    
+
     window.OneSignal = window.OneSignal || [];
     const OneSignal = window.OneSignal;
 
     OneSignal.push(async () => {
-        console.log("OneSignal: Initializing SDK...");
-        // The init process is asynchronous and must complete before other SDK calls.
-        await OneSignal.init({
-            appId: ONESIGNAL_APP_ID,
-            allowSlidedown: false,
-        });
-        console.log("OneSignal: SDK Initialized. Setting up listeners and logging in user.");
+      console.log("OneSignal: Initializing SDK...");
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        allowSlidedown: false, // Do not show the slidedown prompt
+      });
+      console.log("OneSignal: SDK Initialized. Setting up listeners and logging in user.");
 
-        // Now that init is complete, it's safe to add listeners and call login.
-        OneSignal.Notifications.addEventListener('permissionChange', (permission: any) => {
-            setIsPermissionBlocked(permission === 'denied');
-            setIsSubscribed(permission === 'granted');
-        });
+      // Add listener for permission changes
+      OneSignal.Notifications.addEventListener('permissionChange', (permission: any) => {
+        console.log("OneSignal: Permission changed to", permission);
+        setIsPermissionBlocked(permission === 'denied');
+        setIsSubscribed(permission === 'granted');
+      });
 
-        // Check the initial state as well
-        const initialPermission = OneSignal.Notifications.permission;
-        setIsPermissionBlocked(initialPermission === 'denied');
-        setIsSubscribed(initialPermission === 'granted');
+      // Check initial permission state
+      const initialPermission = OneSignal.Notifications.permission;
+      setIsPermissionBlocked(initialPermission === 'denied');
+      setIsSubscribed(initialPermission === 'granted');
+      console.log("OneSignal: Initial permission state is", initialPermission);
 
-        try {
-            await OneSignal.login(user.id);
-            console.log(`OneSignal: User login successful with external_user_id: ${user.id}`);
-        } catch (e) {
-            console.error("OneSignal: Login failed.", e);
-        }
+      // Log the user into OneSignal to associate them with this device
+      try {
+        await OneSignal.login(user.id);
+        console.log(`OneSignal: User login successful with external_user_id: ${user.id}`);
+      } catch (e) {
+        console.error("OneSignal: Login failed.", e);
+      }
     });
-
   }, [user]);
+
 
   const handleNotificationAction = async () => {
     if (isPermissionBlocked) {
