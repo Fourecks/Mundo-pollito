@@ -46,6 +46,8 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- PushAlert Configuration ---
 const PUSHALERT_WEBSITE_ID = (import.meta as any).env?.VITE_PUSHALERT_WEBSITE_ID || (process.env as any).PUSHALERT_WEBSITE_ID || config.PUSHALERT_WEBSITE_ID;
 
+// Module-level flag to ensure the PushAlert script is added only once.
+let isPushAlertScriptAdded = false;
 
 const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
@@ -906,67 +908,68 @@ const App: React.FC = () => {
   // PushAlert Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
-  const pushalertInitialized = useRef(false);
+  const pushalertUserSetupDone = useRef(false);
   
-  useEffect(() => {
-      if (!user || !PUSHALERT_WEBSITE_ID || PUSHALERT_WEBSITE_ID.includes('YOUR_') || pushalertInitialized.current) {
-          return;
-      }
-      pushalertInitialized.current = true;
-  
-      // Define the PushAlert ready function on the window object
-      window.onPushalertLoad = function() {
-          console.log("PushAlert SDK loaded.");
-          const pushalert = window.pushalert;
-  
-          // Set external ID to link this subscriber to your Supabase user
-          pushalert.push(['setExternalId', user.id]);
-          
-          // Listen for permission changes
-          pushalert.push(['onPermissionChange', function(permission: 'default' | 'granted' | 'denied') {
-              console.log("PushAlert: Permission changed to", permission);
-              setIsPermissionBlocked(permission === 'denied');
-          }]);
-  
-          // Get the initial permission state
-          const currentPermission = pushalert.getPermissionState();
-          setIsPermissionBlocked(currentPermission === 'denied');
-  
-          // Check if user is already subscribed
-          pushalert.push(['isSubscribed', function(subscribed: boolean) {
-              setIsSubscribed(subscribed);
-              if (subscribed) {
-                  // If already subscribed, ensure the subscriber ID is in our database
-                  const subscriberId = pushalert.getSubscriberId();
-                  if (subscriberId) {
-                      console.log("PushAlert: Found existing subscriber ID:", subscriberId);
-                      supabase.from('site_settings')
-                          .update({ push_subscriber_id: subscriberId })
-                          .eq('user_id', user.id)
-                          .then(({ error }) => {
-                              if (error) console.error('Error saving PushAlert subscriber ID:', error);
-                          });
-                  }
+    useEffect(() => {
+    // If no user, or if we have already run the setup for this user, do nothing.
+    if (!user || !PUSHALERT_WEBSITE_ID || PUSHALERT_WEBSITE_ID.includes('YOUR_') || pushalertUserSetupDone.current) {
+        return;
+    }
+
+    const setupPushAlertForUser = () => {
+      console.log("PushAlert SDK ready, configuring for user...");
+      pushalertUserSetupDone.current = true; // Mark that we've run setup for this user session.
+      const pushalert = window.pushalert;
+
+      // Set external ID, permission listeners, etc.
+      pushalert.push(['setExternalId', user.id]);
+      
+      pushalert.push(['onPermissionChange', function(permission: 'default' | 'granted' | 'denied') {
+          console.log("PushAlert: Permission changed to", permission);
+          setIsPermissionBlocked(permission === 'denied');
+      }]);
+
+      const currentPermission = pushalert.getPermissionState();
+      setIsPermissionBlocked(currentPermission === 'denied');
+
+      pushalert.push(['isSubscribed', function(subscribed: boolean) {
+          setIsSubscribed(subscribed);
+          if (subscribed) {
+              const subscriberId = pushalert.getSubscriberId();
+              if (subscriberId) {
+                  console.log("PushAlert: User is subscribed with ID:", subscriberId);
+                  supabase.from('site_settings')
+                      .update({ push_subscriber_id: subscriberId })
+                      .eq('user_id', user.id)
+                      .then(({ error }) => {
+                          if (error) console.error('Error syncing PushAlert subscriber ID:', error);
+                      });
               }
-          }]);
-      };
-  
-      // Dynamically create and append the PushAlert script to the document head
-      const script = document.createElement('script');
-      script.src = `https://cdn.pushalert.co/integrate_${PUSHALERT_WEBSITE_ID}.js`;
-      script.async = true;
-      document.head.appendChild(script);
-  
-      // Cleanup function to remove the script and the global callback when the component unmounts
-      return () => {
-          const existingScript = document.querySelector(`script[src*="integrate_${PUSHALERT_WEBSITE_ID}.js"]`);
-          if (existingScript) {
-              document.head.removeChild(existingScript);
           }
-          delete window.onPushalertLoad;
-          pushalertInitialized.current = false;
-      };
-  }, [user]);
+      }]);
+    };
+
+    // The main logic
+    if (window.pushalert) {
+        // SDK is already available, just run the setup.
+        setupPushAlertForUser();
+    } else if (!isPushAlertScriptAdded) {
+        // Script has never been added. Add it and set the callback.
+        isPushAlertScriptAdded = true;
+        window.onPushalertLoad = setupPushAlertForUser;
+  
+        const script = document.createElement('script');
+        script.src = `https://cdn.pushalert.co/integrate_${PUSHALERT_WEBSITE_ID}.js`;
+        script.async = true;
+        document.head.appendChild(script);
+    }
+    // If script is already added but not loaded yet, `onPushalertLoad` will handle it.
+
+    // Cleanup for when the user changes (logs out)
+    return () => {
+        pushalertUserSetupDone.current = false;
+    };
+}, [user]); // Re-run only when the user object changes.
   
   const handleNotificationAction = () => {
       const pushalert = window.pushalert;
@@ -1001,7 +1004,7 @@ const App: React.FC = () => {
               // Save the new subscriber ID to our Supabase database
               supabase.from('site_settings')
                   .update({ push_subscriber_id: result.subscriber_id })
-                  .eq('user_id', user.id)
+                  .eq('user_id', user!.id)
                   .then(({ error }) => {
                       if (error) console.error('Error saving PushAlert subscriber ID on subscribe:', error);
                       else console.log('PushAlert subscriber ID saved to Supabase.');
