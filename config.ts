@@ -23,8 +23,7 @@ export const config = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidGR6a3B5bXBkZmVtbmVqcHdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MzYyMTYsImV4cCI6MjA3NTExMjIxNn0.VsHBuGnmV3T0hJ5sSO6vYlckONHO9IIQmTTjb_S_pBg",
 
   // --- PushAlert Push Notifications ---
-  // Get these from your PushAlert account dashboard after adding your website.
-  // It's recommended to set these as environment variables in production.
+  // Get this from your PushAlert account dashboard after adding your website.
+  // It's recommended to set this as an environment variable in production.
   PUSHALERT_WEBSITE_ID: "697d9f97775cac03afb1b5e802561bdd",
-  PUSHALERT_API_KEY: "5906d625092a4d32040975d898f9901d",
 };
