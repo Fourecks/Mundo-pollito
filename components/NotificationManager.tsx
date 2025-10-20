@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BellIcon from './icons/BellIcon';
+// FIX: Import supabase client to interact with the backend for notifications.
+import { supabase } from '../supabaseClient';
 
 interface NotificationManagerProps {
     isSubscribed: boolean;
@@ -27,37 +29,53 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         setIsDropdownOpen(prev => !prev);
     };
     
-    // This function now simply dispatches the command to OneSignal.
-    // The UI will update once the 'isSubscribed' prop changes from the main app component,
-    // which listens for state changes from OneSignal. This is a more robust pattern.
-    const handleSubscriptionToggle = () => {
-        if (isPermissionBlocked || !window.OneSignal) {
+    // FIX: Replaced OneSignal logic with PushAlert logic, aligning with App.tsx.
+    // This now handles subscribing/unsubscribing and updating the database.
+    const handleSubscriptionToggle = async () => {
+        if (isPermissionBlocked || !window.pushalert) {
             return;
         }
 
-        window.OneSignal.push(() => {
-            if (isSubscribed) {
-                window.OneSignal.User.PushSubscription.optOut();
-            } else {
-                window.OneSignal.Notifications.requestPermission();
+        const pushalert = window.pushalert;
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (isSubscribed) {
+            pushalert.push(['unsubscribe']);
+            // After unsubscribing, nullify the subscriber ID in the database.
+            if (user) {
+                await supabase.from('site_settings').update({ push_subscriber_id: null }).eq('user_id', user.id);
             }
-        });
+        } else {
+            pushalert.push(['subscribe', async (result: { subscriber_id?: string }) => {
+                if (result && result.subscriber_id) {
+                    if (user) {
+                        await supabase.from('site_settings').update({ push_subscriber_id: result.subscriber_id }).eq('user_id', user.id);
+                    }
+                }
+            }]);
+        }
     };
 
+    // FIX: Replaced OneSignal self-notification with a call to the Supabase Edge Function, which is the correct way to send notifications with PushAlert in this app.
     const handleTestNotificationClick = () => {
-        if (!window.OneSignal) {
-            console.error("OneSignal SDK not loaded.");
+        if (!isSubscribed) {
+            alert("Debes suscribirte a las notificaciones primero.");
             return;
         }
 
-        window.OneSignal.push(() => {
-            window.OneSignal.Notifications.sendSelfNotification(
-                "¡Notificación de Prueba! 🐣", // Title
-                "Si ves esto, ¡las notificaciones funcionan correctamente!", // Message
-                window.location.href, // URL to open
-                'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito_icon.png' // Icon
-            );
-        });
+        supabase.functions.invoke('send-pushalert-notification', {
+            body: {
+              title: "¡Notificación de Prueba! 🐣",
+              body: "Si ves esto, ¡las notificaciones de PushAlert funcionan!",
+            },
+          }).then(({ error }) => {
+              if (error) {
+                  console.error("Error sending test notification:", error);
+                  alert("Error al enviar la notificación de prueba.");
+              } else {
+                  alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
+              }
+          });
     };
 
     let iconColor = 'text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary';

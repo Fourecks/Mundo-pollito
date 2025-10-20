@@ -1,4 +1,3 @@
-
 import { GenerateContentResponse } from '@google/genai';
 
 export interface WindowState {
@@ -177,6 +176,8 @@ declare global {
     supabase: {
       createClient: (url: string, key: string) => any;
     };
-    OneSignal: any;
+    // PushAlert SDK
+    pushalert: any;
+    onPushalertLoad: () => void;
   }
 }

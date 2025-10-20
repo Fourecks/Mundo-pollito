@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -44,8 +43,8 @@ const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.en
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 
-// --- OneSignal Configuration ---
-const ONESIGNAL_APP_ID = (import.meta as any).env?.VITE_ONESIGNAL_APP_ID || (process.env as any).ONESIGNAL_APP_ID || config.ONESIGNAL_APP_ID;
+// --- PushAlert Configuration ---
+const PUSHALERT_WEBSITE_ID = (import.meta as any).env?.VITE_PUSHALERT_WEBSITE_ID || (process.env as any).PUSHALERT_WEBSITE_ID || config.PUSHALERT_WEBSITE_ID;
 
 
 const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
@@ -320,7 +319,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
       
       if (isSubscribed) {
-        supabase.functions.invoke('send-notification', {
+        supabase.functions.invoke('send-pushalert-notification', {
             body: {
                 title: "Pomodoro Terminado",
                 body: message,
@@ -601,7 +600,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
           const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
           
           if (isSubscribed) {
-            supabase.functions.invoke('send-notification', {
+            supabase.functions.invoke('send-pushalert-notification', {
                 body: {
                     title: "Pomodoro Terminado",
                     body: message,
@@ -904,85 +903,114 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // Notification State
+  // PushAlert Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
-  const oneSignalInitialized = useRef(false);
-
-  // --- Simplified OneSignal Notifications Logic ---
+  const pushalertInitialized = useRef(false);
+  
   useEffect(() => {
-    // Don't start OneSignal init until the user exists, config is ready,
-    // and it hasn't been initialized yet for this session.
-    if (!user || !ONESIGNAL_APP_ID || ONESIGNAL_APP_ID.includes('YOUR_') || oneSignalInitialized.current) {
-      return;
-    }
-
-    oneSignalInitialized.current = true; // Prevents re-initialization on re-renders
-
-    window.OneSignal = window.OneSignal || [];
-    const OneSignal = window.OneSignal;
-
-    OneSignal.push(async () => {
-      console.log("OneSignal: Initializing SDK...");
-      await OneSignal.init({
-        appId: ONESIGNAL_APP_ID,
-        allowSlidedown: false, // Do not show the slidedown prompt
-      });
-      console.log("OneSignal: SDK Initialized. Setting up listeners and logging in user.");
-
-      // Add listener for permission changes
-      OneSignal.Notifications.addEventListener('permissionChange', (permission: any) => {
-        console.log("OneSignal: Permission changed to", permission);
-        setIsPermissionBlocked(permission === 'denied');
-        setIsSubscribed(permission === 'granted');
-      });
-
-      // Check initial permission state
-      const initialPermission = OneSignal.Notifications.permission;
-      setIsPermissionBlocked(initialPermission === 'denied');
-      setIsSubscribed(initialPermission === 'granted');
-      console.log("OneSignal: Initial permission state is", initialPermission);
-
-      // Log the user into OneSignal to associate them with this device
-      try {
-        await OneSignal.login(user.id);
-        console.log(`OneSignal: User login successful with external_user_id: ${user.id}`);
-      } catch (e) {
-        console.error("OneSignal: Login failed.", e);
+      if (!user || !PUSHALERT_WEBSITE_ID || PUSHALERT_WEBSITE_ID.includes('YOUR_') || pushalertInitialized.current) {
+          return;
       }
-    });
+      pushalertInitialized.current = true;
+  
+      // Define the PushAlert ready function on the window object
+      window.onPushalertLoad = function() {
+          console.log("PushAlert SDK loaded.");
+          const pushalert = window.pushalert;
+  
+          // Set external ID to link this subscriber to your Supabase user
+          pushalert.push(['setExternalId', user.id]);
+          
+          // Listen for permission changes
+          pushalert.push(['onPermissionChange', function(permission: 'default' | 'granted' | 'denied') {
+              console.log("PushAlert: Permission changed to", permission);
+              setIsPermissionBlocked(permission === 'denied');
+          }]);
+  
+          // Get the initial permission state
+          const currentPermission = pushalert.getPermissionState();
+          setIsPermissionBlocked(currentPermission === 'denied');
+  
+          // Check if user is already subscribed
+          pushalert.push(['isSubscribed', function(subscribed: boolean) {
+              setIsSubscribed(subscribed);
+              if (subscribed) {
+                  // If already subscribed, ensure the subscriber ID is in our database
+                  const subscriberId = pushalert.getSubscriberId();
+                  if (subscriberId) {
+                      console.log("PushAlert: Found existing subscriber ID:", subscriberId);
+                      supabase.from('site_settings')
+                          .update({ push_subscriber_id: subscriberId })
+                          .eq('user_id', user.id)
+                          .then(({ error }) => {
+                              if (error) console.error('Error saving PushAlert subscriber ID:', error);
+                          });
+                  }
+              }
+          }]);
+      };
+  
+      // Dynamically create and append the PushAlert script to the document head
+      const script = document.createElement('script');
+      script.src = `https://cdn.pushalert.co/integrate_${PUSHALERT_WEBSITE_ID}.js`;
+      script.async = true;
+      document.head.appendChild(script);
+  
+      // Cleanup function to remove the script and the global callback when the component unmounts
+      return () => {
+          const existingScript = document.querySelector(`script[src*="integrate_${PUSHALERT_WEBSITE_ID}.js"]`);
+          if (existingScript) {
+              document.head.removeChild(existingScript);
+          }
+          delete window.onPushalertLoad;
+          pushalertInitialized.current = false;
+      };
   }, [user]);
-
-
-  const handleNotificationAction = async () => {
-    if (isPermissionBlocked) {
-      alert('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para esta página.');
-      return;
-    }
-    
-    const OneSignal = window.OneSignal;
-    if (!OneSignal) return;
-
-    if (isSubscribed) {
-      // Send a test notification to the current user
-      try {
-        await supabase.functions.invoke('send-notification', {
-          body: {
-            title: "¡Notificación de Prueba! 🐣",
-            body: "Si ves esto, ¡las notificaciones funcionan!",
-          },
-        });
-        alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
-      } catch (error) {
-        console.error("Error sending test notification:", error);
-        alert("Error al enviar la notificación de prueba.");
+  
+  const handleNotificationAction = () => {
+      const pushalert = window.pushalert;
+      if (!pushalert) return;
+  
+      if (isPermissionBlocked) {
+        alert('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para esta página.');
+        return;
       }
-    } else {
-      // Request permission
-      OneSignal.push(() => {
-        OneSignal.Notifications.requestPermission();
-      });
-    }
+      
+      if (isSubscribed) {
+        // If already subscribed, send a test notification via our Supabase function
+        supabase.functions.invoke('send-pushalert-notification', {
+            body: {
+              title: "¡Notificación de Prueba! 🐣",
+              body: "Si ves esto, ¡las notificaciones de PushAlert funcionan!",
+            },
+          }).then(({ error }) => {
+              if (error) {
+                  console.error("Error sending test notification:", error);
+                  alert("Error al enviar la notificación de prueba.");
+              } else {
+                  alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
+              }
+          });
+      } else {
+        // If not subscribed, prompt the user to subscribe
+        pushalert.push(['subscribe', function(result: { subscriber_id?: string }) {
+          if (result && result.subscriber_id) {
+              console.log("PushAlert: Successfully subscribed with ID:", result.subscriber_id);
+              setIsSubscribed(true);
+              // Save the new subscriber ID to our Supabase database
+              supabase.from('site_settings')
+                  .update({ push_subscriber_id: result.subscriber_id })
+                  .eq('user_id', user.id)
+                  .then(({ error }) => {
+                      if (error) console.error('Error saving PushAlert subscriber ID on subscribe:', error);
+                      else console.log('PushAlert subscriber ID saved to Supabase.');
+                  });
+          } else {
+              console.warn("PushAlert: Subscription failed or was cancelled by user.");
+          }
+        }]);
+      }
   };
 
 
@@ -1011,7 +1039,7 @@ const App: React.FC = () => {
         for (const todo of todosToNotify) {
           console.log(`Client found reminder for task: "${todo.text}"`);
           try {
-            const { error } = await supabase.functions.invoke('send-notification', {
+            const { error } = await supabase.functions.invoke('send-pushalert-notification', {
               body: {
                 title: "¡Recordatorio de Tarea!",
                 body: todo.text,
@@ -1019,7 +1047,7 @@ const App: React.FC = () => {
             });
 
             if (error) {
-              console.error(`Error invoking send-notification for todo ${todo.id}:`, error);
+              console.error(`Error invoking send-pushalert-notification for todo ${todo.id}:`, error);
             } else {
               await supabase.from('todos').update({ notification_sent: true }).eq('id', todo.id);
               
