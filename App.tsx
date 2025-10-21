@@ -1003,14 +1003,21 @@ const App: React.FC = () => {
             if (subscribed) {
                 const subscriberId = pushalert.getSubscriberId();
                 if (subscriberId) {
-                    console.log("Syncing existing subscription:", subscriberId);
+                    console.log(`PushAlert reports user is subscribed. Syncing subscriber ID: ${subscriberId} for user ${user.id}`);
                     supabase.from('site_settings')
-                      .update({ push_subscriber_id: subscriberId })
-                      .eq('user_id', user.id)
+                      .upsert({ user_id: user.id, push_subscriber_id: subscriberId }, { onConflict: 'user_id' })
                       .then(({ error }) => {
-                          if (error) console.error("Error syncing subscriber ID:", error);
+                          if (error) {
+                            console.error("Error syncing existing subscriber ID during init:", error);
+                          } else {
+                            console.log("Successfully synced existing subscriber ID.");
+                          }
                       });
+                } else {
+                    console.warn("PushAlert reports subscribed, but getSubscriberId() returned null. Can't sync.");
                 }
+            } else {
+              console.log("PushAlert reports user is not subscribed. No sync needed.");
             }
         }]);
     };
@@ -1048,24 +1055,26 @@ const App: React.FC = () => {
             console.log("PushAlert subscription result:", result);
             if (result && result.subscriber_id) {
                 const subscriberId = result.subscriber_id;
-                console.log("Successfully subscribed with ID:", subscriberId);
+                console.log(`Successfully subscribed to PushAlert with ID: ${subscriberId}. User ID: ${user.id}`);
+                console.log("Attempting to save subscriber ID to Supabase...");
                 
-                // Save the new subscriber ID to our Supabase database IMMEDIATELY
+                // Use upsert to be robust: update if exists, insert if it doesn't.
                 supabase.from('site_settings')
-                    .update({ push_subscriber_id: subscriberId })
-                    .eq('user_id', user.id)
+                    .upsert({ user_id: user.id, push_subscriber_id: subscriberId }, { onConflict: 'user_id' })
+                    .select()
                     .then(({ data, error }) => {
                         if (error) {
-                            console.error('Supabase error saving subscriber ID:', error);
-                            alert('Hubo un error al guardar tu suscripción. Revisa la consola para más detalles.');
+                            console.error('Supabase UPSERT error:', error);
+                            alert(`Hubo un error al guardar tu suscripción en la base de datos: ${error.message}`);
                         } else {
-                            console.log('PushAlert subscriber ID saved to Supabase. Result:', data);
+                            console.log('Successfully saved subscriber ID to Supabase. Response:', data);
+                            alert("¡Suscripción guardada con éxito!");
                             setIsSubscribed(true); // Update state only after successful save
                         }
                     });
             } else {
                 console.warn("PushAlert subscription failed. Error:", result?.error);
-                alert("No se pudo completar la suscripción. Revisa la consola para más detalles.");
+                alert(`No se pudo completar la suscripción. PushAlert reportó un error: ${result?.error?.message || 'Error desconocido'}`);
             }
         }]);
       }
