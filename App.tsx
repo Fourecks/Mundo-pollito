@@ -37,6 +37,7 @@ import { supabase } from './supabaseClient';
 import { config } from './config';
 import { ensureYoutubeApiReady } from './utils/youtubeApi';
 import BellIcon from './components/icons/BellIcon';
+import InstallPwaBanner from './components/InstallPwaBanner';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -906,6 +907,59 @@ const App: React.FC = () => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
   
+  // PWA Install Prompt State
+  const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPromptEvent(e);
+      const isDismissed = localStorage.getItem('pwaInstallDismissed');
+      if (!isDismissed) {
+        setShowInstallBanner(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Detect iOS
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    if (isIOSDevice) {
+      setIsIos(true);
+      const isDismissed = localStorage.getItem('pwaInstallDismissed');
+      if (!isDismissed) {
+        // Delay showing banner to be less intrusive
+        setTimeout(() => setShowInstallBanner(true), 5000);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = () => {
+    if (installPromptEvent) {
+      installPromptEvent.prompt();
+      installPromptEvent.userChoice.then((choiceResult: { outcome: string }) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the A2HS prompt');
+        } else {
+          console.log('User dismissed the A2HS prompt');
+        }
+        setInstallPromptEvent(null);
+        setShowInstallBanner(false);
+      });
+    }
+  };
+
+  const handleDismissInstallBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('pwaInstallDismissed', 'true');
+  };
+
   useEffect(() => {
     if (!user || !PUSHALERT_WEBSITE_ID || PUSHALERT_WEBSITE_ID.includes('YOUR_')) {
         return;
@@ -1783,7 +1837,19 @@ const App: React.FC = () => {
     isSubscribed, isPermissionBlocked, handleNotificationAction,
   };
 
-  return isMobile ? <MobileApp {...componentProps} /> : <DesktopApp {...componentProps} />;
+  const appContent = isMobile ? <MobileApp {...componentProps} /> : <DesktopApp {...componentProps} />;
+
+  return (
+    <>
+      {appContent}
+      <InstallPwaBanner
+        isIos={isIos}
+        show={showInstallBanner}
+        onInstall={handleInstallClick}
+        onDismiss={handleDismissInstallBanner}
+      />
+    </>
+  );
 };
 
 export default App;
