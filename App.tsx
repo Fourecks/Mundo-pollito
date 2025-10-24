@@ -971,27 +971,22 @@ const App: React.FC = () => {
     window.OneSignal = window.OneSignal || [];
     const OneSignal = window.OneSignal;
   
-    const initializeOneSignal = async () => {
-      // Prevent re-initialization
-      if (OneSignal.isInitialized()) {
-        // If initialized, ensure user is logged in
-        const externalId = await OneSignal.User.getExternalId();
-        if (externalId !== user.id) {
-          console.log(`OneSignal user changed. Logging in as ${user.id}`);
-          await OneSignal.login(user.id);
-        }
-        return;
-      }
-  
+    const initializeAndLogin = async () => {
+      // The init method is idempotent, so it's safe to call. It will only initialize once.
       await OneSignal.init({
         appId: ONE_SIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true, // As recommended by the guide for local testing
       });
   
       // Associate the OneSignal device with the Supabase user ID
+      // This is also safe to call multiple times.
       await OneSignal.login(user.id);
       console.log("OneSignal user identified with external ID:", user.id);
   
+      // To prevent adding multiple listeners if this effect re-runs, remove them first.
+      OneSignal.Notifications.removeEventListener('permissionChange');
+      OneSignal.User.PushSubscription.removeEventListener('change');
+
       // Update UI state based on current subscription and permission
       const permission = await OneSignal.Notifications.getPermissionStatus();
       setIsPermissionBlocked(permission === 'denied');
@@ -1000,20 +995,20 @@ const App: React.FC = () => {
       setIsSubscribed(!!subscription?.id);
   
       // Add listeners for real-time changes
-      OneSignal.Notifications.addEventListener('permissionChange', (isPermissionGranted) => {
-        // The new SDK provides a boolean, we infer 'denied' if it's not granted after a prompt.
-        // A more robust way is to re-check status.
-        OneSignal.Notifications.getPermissionStatus().then(permission => {
+      OneSignal.Notifications.addEventListener('permissionChange', (isPermissionGranted: any) => {
+        // Re-check the status to get the most accurate state ('denied', 'granted', etc.)
+        OneSignal.Notifications.getPermissionStatus().then((permission: any) => {
           setIsPermissionBlocked(permission === 'denied');
         });
       });
   
-      OneSignal.User.PushSubscription.addEventListener('change', (subscription) => {
+      OneSignal.User.PushSubscription.addEventListener('change', (subscription: any) => {
+        // The change event provides `current` and `previous` states.
         setIsSubscribed(!!subscription.current.id);
       });
     };
   
-    OneSignal.push(initializeOneSignal);
+    OneSignal.push(initializeAndLogin);
   
   }, [user]);
 
