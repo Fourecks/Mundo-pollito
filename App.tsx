@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -969,14 +971,12 @@ const App: React.FC = () => {
         // Load the script if not already loaded, and wait for it.
         if (!window.pushalert) {
             await new Promise<void>(resolve => {
-                // Check again in case it loaded while waiting
                 if (window.pushalert) return resolve();
                 
                 window.onPushalertLoad = () => {
                     console.log("PushAlert SDK loaded.");
                     resolve();
                 };
-                // Avoid adding multiple scripts
                 if (!document.querySelector(`script[src*="integrate_${PUSHALERT_WEBSITE_ID}.js"]`)) {
                     const script = document.createElement('script');
                     script.src = `https://cdn.pushalert.co/integrate_${PUSHALERT_WEBSITE_ID}.js`;
@@ -991,6 +991,16 @@ const App: React.FC = () => {
 
         pushalert.push(['onPermissionChange', (permission: 'default' | 'granted' | 'denied') => {
             setIsPermissionBlocked(permission === 'denied');
+        }]);
+
+        pushalert.push(['onUnsubscribe', () => {
+            console.log("User has unsubscribed. Syncing with database.");
+            setIsSubscribed(false);
+            supabase.from('site_settings')
+                .upsert({ user_id: user.id, push_subscriber_id: null }, { onConflict: 'user_id' })
+                .then(({ error }) => {
+                    if (error) console.error("Error clearing subscriber ID on unsubscribe:", error);
+                });
         }]);
         
         const permission = await new Promise<'default' | 'granted' | 'denied'>(resolve => {
@@ -1007,17 +1017,19 @@ const App: React.FC = () => {
                     supabase.from('site_settings')
                       .upsert({ user_id: user.id, push_subscriber_id: subscriberId }, { onConflict: 'user_id' })
                       .then(({ error }) => {
-                          if (error) {
-                            console.error("Error syncing existing subscriber ID during init:", error);
-                          } else {
-                            console.log("Successfully synced existing subscriber ID.");
-                          }
+                          if (error) console.error("Error syncing existing subscriber ID during init:", error);
+                          else console.log("Successfully synced existing subscriber ID.");
                       });
                 } else {
                     console.warn("PushAlert reports subscribed, but getSubscriberId() returned null. Can't sync.");
                 }
             } else {
-              console.log("PushAlert reports user is not subscribed. No sync needed.");
+              console.log("PushAlert reports user is not subscribed. Syncing null ID to DB.");
+              supabase.from('site_settings')
+                .upsert({ user_id: user.id, push_subscriber_id: null }, { onConflict: 'user_id' })
+                .then(({ error }) => {
+                    if (error) console.error("Error clearing subscriber ID on init:", error);
+                });
             }
         }]);
     };
@@ -1026,58 +1038,63 @@ const App: React.FC = () => {
   }, [user]);
   
   const handleNotificationAction = () => {
-      const pushalert = window.pushalert;
-      if (!pushalert || !user) return;
-  
-      if (isPermissionBlocked) {
+    const pushalert = window.pushalert;
+    if (!pushalert || !user) return;
+
+    if (isPermissionBlocked) {
         alert('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para esta página.');
         return;
-      }
-      
-      if (isSubscribed) {
-        // If already subscribed, send a test notification via our Supabase function
-        supabase.functions.invoke('send-pushalert-notification', {
-            body: {
-              title: "¡Notificación de Prueba! 🐣",
-              body: "Si ves esto, ¡las notificaciones de PushAlert funcionan!",
-            },
-          }).then(({ error }) => {
-              if (error) {
-                  console.error("Error sending test notification:", error);
-                  alert("Error al enviar la notificación de prueba.");
-              } else {
-                  alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
-              }
-          });
-      } else {
-        // If not subscribed, prompt the user to subscribe
-        pushalert.push(['subscribe', (result: { subscriber_id?: string; error?: any }) => {
-            console.log("PushAlert subscription result:", result);
-            if (result && result.subscriber_id) {
-                const subscriberId = result.subscriber_id;
-                console.log(`Successfully subscribed to PushAlert with ID: ${subscriberId}. User ID: ${user.id}`);
-                console.log("Attempting to save subscriber ID to Supabase...");
-                
-                // Use upsert to be robust: update if exists, insert if it doesn't.
-                supabase.from('site_settings')
-                    .upsert({ user_id: user.id, push_subscriber_id: subscriberId }, { onConflict: 'user_id' })
-                    .select()
-                    .then(({ data, error }) => {
-                        if (error) {
-                            console.error('Supabase UPSERT error:', error);
-                            alert(`Hubo un error al guardar tu suscripción en la base de datos: ${error.message}`);
-                        } else {
-                            console.log('Successfully saved subscriber ID to Supabase. Response:', data);
-                            alert("¡Suscripción guardada con éxito!");
-                            setIsSubscribed(true); // Update state only after successful save
-                        }
-                    });
-            } else {
-                console.warn("PushAlert subscription failed. Error:", result?.error);
-                alert(`No se pudo completar la suscripción. PushAlert reportó un error: ${result?.error?.message || 'Error desconocido'}`);
-            }
-        }]);
-      }
+    }
+
+    // Always check real-time status from the SDK before acting
+    pushalert.push(['isSubscribed', (subscribed: boolean) => {
+        if (subscribed) {
+            // User is subscribed, so send a test notification
+            console.log("User is subscribed. Sending test notification.");
+            supabase.functions.invoke('send-pushalert-notification', {
+                body: {
+                    title: "¡Notificación de Prueba! 🐣",
+                    body: "Si ves esto, ¡las notificaciones de PushAlert funcionan!",
+                },
+            }).then(({ error }) => {
+                if (error) {
+                    console.error("Error sending test notification:", error);
+                    alert("Error al enviar la notificación de prueba.");
+                } else {
+                    alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
+                }
+            });
+            // Also, ensure local state is correct just in case.
+            if (!isSubscribed) setIsSubscribed(true);
+        } else {
+            // User is not subscribed, so trigger the subscription flow
+            console.log("User is not subscribed. Prompting for subscription.");
+            pushalert.push(['subscribe', (result: { subscriber_id?: string; error?: any }) => {
+                console.log("PushAlert subscription result:", result);
+                if (result && result.subscriber_id) {
+                    const subscriberId = result.subscriber_id;
+                    console.log(`Successfully subscribed with ID: ${subscriberId}. Saving to Supabase...`);
+                    
+                    supabase.from('site_settings')
+                        .upsert({ user_id: user.id, push_subscriber_id: subscriberId }, { onConflict: 'user_id' })
+                        .select()
+                        .then(({ data, error }) => {
+                            if (error) {
+                                console.error('Supabase UPSERT error:', error);
+                                alert(`Hubo un error al guardar tu suscripción: ${error.message}`);
+                            } else {
+                                console.log('Successfully saved subscriber ID to Supabase.');
+                                alert("¡Suscripción guardada con éxito!");
+                                setIsSubscribed(true); // Update state on success
+                            }
+                        });
+                } else {
+                    console.warn("PushAlert subscription failed. Error:", result?.error);
+                    alert(`No se pudo completar la suscripción: ${result?.error?.message || 'El usuario canceló o hubo un error.'}`);
+                }
+            }]);
+        }
+    }]);
   };
 
 
@@ -1833,6 +1850,7 @@ const App: React.FC = () => {
     currentUser: user,
     onLogout: () => supabase.auth.signOut(),
     theme, toggleTheme: () => setTheme(t => t === 'light' ? 'dark' : 'light'),
+    // FIX: Corrected a typo from `onColorChange` to `onThemeColorChange` to match the prop definition and the function's actual name.
     themeColors, onThemeColorChange, onResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementHour,
