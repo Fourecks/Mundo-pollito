@@ -176,8 +176,7 @@ declare global {
     supabase: {
       createClient: (url: string, key: string) => any;
     };
-    // PushAlert SDK
-    pushalert: any;
-    onPushalertLoad: () => void;
+    // OneSignal SDK
+    OneSignal: any;
   }
 }

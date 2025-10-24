@@ -29,34 +29,25 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         setIsDropdownOpen(prev => !prev);
     };
     
-    // FIX: Replaced OneSignal logic with PushAlert logic, aligning with App.tsx.
-    // This now handles subscribing/unsubscribing and updating the database.
+    // FIX: Replaced incorrect PushAlert logic with OneSignal logic to resolve type errors and align with the rest of the application.
     const handleSubscriptionToggle = async () => {
-        if (isPermissionBlocked || !window.pushalert) {
+        if (isPermissionBlocked) {
+            alert('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para esta página.');
             return;
         }
 
-        const pushalert = window.pushalert;
-        const { data: { user } } = await supabase.auth.getUser();
+        const OneSignal = window.OneSignal;
 
         if (isSubscribed) {
-            pushalert.push(['unsubscribe']);
-            // After unsubscribing, nullify the subscriber ID in the database.
-            if (user) {
-                await supabase.from('site_settings').update({ push_subscriber_id: null }).eq('user_id', user.id);
-            }
+            // Opt-out will stop notifications. The user can opt back in.
+            await OneSignal.User.PushSubscription.optOut();
         } else {
-            pushalert.push(['subscribe', async (result: { subscriber_id?: string }) => {
-                if (result && result.subscriber_id) {
-                    if (user) {
-                        await supabase.from('site_settings').update({ push_subscriber_id: result.subscriber_id }).eq('user_id', user.id);
-                    }
-                }
-            }]);
+            // This will prompt for permission if not yet granted, or opt-in if already opted out.
+            await OneSignal.User.PushSubscription.optIn();
         }
     };
 
-    // FIX: Replaced OneSignal self-notification with a call to the Supabase Edge Function, which is the correct way to send notifications with PushAlert in this app.
+    // FIX: The backend function `send-pushalert-notification` is misnamed but correctly sends a OneSignal notification via a Supabase Edge Function. This logic is correct.
     const handleTestNotificationClick = () => {
         if (!isSubscribed) {
             alert("Debes suscribirte a las notificaciones primero.");
@@ -66,7 +57,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ isSubscribed,
         supabase.functions.invoke('send-pushalert-notification', {
             body: {
               title: "¡Notificación de Prueba! 🐣",
-              body: "Si ves esto, ¡las notificaciones de PushAlert funcionan!",
+              body: "Si ves esto, ¡las notificaciones de OneSignal funcionan!",
             },
           }).then(({ error }) => {
               if (error) {

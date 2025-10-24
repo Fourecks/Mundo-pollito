@@ -22,8 +22,8 @@ export const config = {
   SUPABASE_URL: "https://pbtdzkpympdfemnejpwj.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidGR6a3B5bXBkZmVtbmVqcHdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MzYyMTYsImV4cCI6MjA3NTExMjIxNn0.VsHBuGnmV3T0hJ5sSO6vYlckONHO9IIQmTTjb_S_pBg",
 
-  // --- PushAlert Push Notifications ---
-  // Get this from your PushAlert account dashboard after adding your website.
+  // --- OneSignal Push Notifications ---
+  // Get this from your OneSignal account dashboard after creating a "Web" app.
   // It's recommended to set this as an environment variable in production.
-  PUSHALERT_WEBSITE_ID: "697d9f97775cac03afb1b5e802561bdd",
+  ONE_SIGNAL_APP_ID: "cd59f391-d7ba-4d08-9e9e-80de89efed4d",
 };

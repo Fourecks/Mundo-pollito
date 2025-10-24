@@ -46,8 +46,8 @@ const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.en
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 
-// --- PushAlert Configuration ---
-const PUSHALERT_WEBSITE_ID = (import.meta as any).env?.VITE_PUSHALERT_WEBSITE_ID || (process.env as any).PUSHALERT_WEBSITE_ID || config.PUSHALERT_WEBSITE_ID;
+// --- OneSignal Configuration ---
+const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
 const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
@@ -905,7 +905,7 @@ const App: React.FC = () => {
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   
-  // PushAlert Notification State
+  // OneSignal Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
   
@@ -962,139 +962,89 @@ const App: React.FC = () => {
     localStorage.setItem('pwaInstallDismissed', 'true');
   };
 
+  // --- OneSignal Initialization (Following Supabase Guide) ---
   useEffect(() => {
-    if (!user || !PUSHALERT_WEBSITE_ID || PUSHALERT_WEBSITE_ID.includes('YOUR_')) {
-        return;
+    if (!user || !ONE_SIGNAL_APP_ID || ONE_SIGNAL_APP_ID.includes('YOUR_')) {
+      return;
     }
-
-    const initAndCheckSubscription = async () => {
-        // Load the script if not already loaded, and wait for it.
-        if (!window.pushalert) {
-            await new Promise<void>(resolve => {
-                if (window.pushalert) return resolve();
-                
-                window.onPushalertLoad = () => {
-                    console.log("PushAlert SDK loaded.");
-                    resolve();
-                };
-                if (!document.querySelector(`script[src*="integrate_${PUSHALERT_WEBSITE_ID}.js"]`)) {
-                    const script = document.createElement('script');
-                    script.src = `https://cdn.pushalert.co/integrate_${PUSHALERT_WEBSITE_ID}.js`;
-                    script.async = true;
-                    document.head.appendChild(script);
-                }
-            });
-        }
-        
-        const pushalert = window.pushalert;
-        pushalert.push(['setExternalId', user.id]);
-
-        pushalert.push(['onPermissionChange', (permission: 'default' | 'granted' | 'denied') => {
-            setIsPermissionBlocked(permission === 'denied');
-        }]);
-
-        pushalert.push(['onUnsubscribe', () => {
-            console.log("User has unsubscribed. Syncing with database.");
-            setIsSubscribed(false);
-            supabase.from('site_settings')
-                .upsert({ user_id: user.id, push_subscriber_id: null }, { onConflict: 'user_id' })
-                .then(({ error }) => {
-                    if (error) console.error("Error clearing subscriber ID on unsubscribe:", error);
-                });
-        }]);
-        
-        const permission = await new Promise<'default' | 'granted' | 'denied'>(resolve => {
-            pushalert.push(['getPermissionState', (p: any) => resolve(p)]);
-        });
-        setIsPermissionBlocked(permission === 'denied');
-        
-        pushalert.push(['isSubscribed', (subscribed: boolean) => {
-            setIsSubscribed(subscribed);
-            if (subscribed) {
-                const subscriberId = pushalert.getSubscriberId();
-                if (subscriberId) {
-                    console.log(`PushAlert reports user is subscribed. Syncing subscriber ID: ${subscriberId} for user ${user.id}`);
-                    supabase.from('site_settings')
-                      .upsert({ user_id: user.id, push_subscriber_id: subscriberId }, { onConflict: 'user_id' })
-                      .then(({ error }) => {
-                          if (error) console.error("Error syncing existing subscriber ID during init:", error);
-                          else console.log("Successfully synced existing subscriber ID.");
-                      });
-                } else {
-                    console.warn("PushAlert reports subscribed, but getSubscriberId() returned null. Can't sync.");
-                }
-            } else {
-              console.log("PushAlert reports user is not subscribed. Syncing null ID to DB.");
-              supabase.from('site_settings')
-                .upsert({ user_id: user.id, push_subscriber_id: null }, { onConflict: 'user_id' })
-                .then(({ error }) => {
-                    if (error) console.error("Error clearing subscriber ID on init:", error);
-                });
-            }
-        }]);
-    };
-
-    initAndCheckSubscription();
-  }, [user]);
   
-  const handleNotificationAction = () => {
-    const pushalert = window.pushalert;
-    if (!pushalert || !user) return;
+    window.OneSignal = window.OneSignal || [];
+    const OneSignal = window.OneSignal;
+  
+    const initializeOneSignal = async () => {
+      // Prevent re-initialization
+      if (OneSignal.isInitialized()) {
+        // If initialized, ensure user is logged in
+        const externalId = await OneSignal.User.getExternalId();
+        if (externalId !== user.id) {
+          console.log(`OneSignal user changed. Logging in as ${user.id}`);
+          await OneSignal.login(user.id);
+        }
+        return;
+      }
+  
+      await OneSignal.init({
+        appId: ONE_SIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: true, // As recommended by the guide for local testing
+      });
+  
+      // Associate the OneSignal device with the Supabase user ID
+      await OneSignal.login(user.id);
+      console.log("OneSignal user identified with external ID:", user.id);
+  
+      // Update UI state based on current subscription and permission
+      const permission = await OneSignal.Notifications.getPermissionStatus();
+      setIsPermissionBlocked(permission === 'denied');
+      
+      const subscription = await OneSignal.User.PushSubscription.get();
+      setIsSubscribed(!!subscription?.id);
+  
+      // Add listeners for real-time changes
+      OneSignal.Notifications.addEventListener('permissionChange', (isPermissionGranted) => {
+        // The new SDK provides a boolean, we infer 'denied' if it's not granted after a prompt.
+        // A more robust way is to re-check status.
+        OneSignal.Notifications.getPermissionStatus().then(permission => {
+          setIsPermissionBlocked(permission === 'denied');
+        });
+      });
+  
+      OneSignal.User.PushSubscription.addEventListener('change', (subscription) => {
+        setIsSubscribed(!!subscription.current.id);
+      });
+    };
+  
+    OneSignal.push(initializeOneSignal);
+  
+  }, [user]);
 
+  
+  const handleNotificationAction = async () => {
     if (isPermissionBlocked) {
         alert('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para esta página.');
         return;
     }
 
-    // Always check real-time status from the SDK before acting
-    pushalert.push(['isSubscribed', (subscribed: boolean) => {
-        if (subscribed) {
-            // User is subscribed, so send a test notification
-            console.log("User is subscribed. Sending test notification.");
-            supabase.functions.invoke('send-pushalert-notification', {
-                body: {
-                    title: "¡Notificación de Prueba! 🐣",
-                    body: "Si ves esto, ¡las notificaciones de PushAlert funcionan!",
-                },
-            }).then(({ error }) => {
-                if (error) {
-                    console.error("Error sending test notification:", error);
-                    alert("Error al enviar la notificación de prueba.");
-                } else {
-                    alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
-                }
-            });
-            // Also, ensure local state is correct just in case.
-            if (!isSubscribed) setIsSubscribed(true);
+    if (isSubscribed) {
+        // Send a test notification via Supabase Edge Function
+        console.log("User is subscribed. Sending test notification.");
+        const { error } = await supabase.functions.invoke('send-pushalert-notification', { // Path is kept for compatibility
+            body: {
+                title: "¡Notificación de Prueba! 🐣",
+                body: "Si ves esto, ¡las notificaciones de OneSignal funcionan!",
+            },
+        });
+
+        if (error) {
+            console.error("Error sending test notification:", error);
+            alert("Error al enviar la notificación de prueba.");
         } else {
-            // User is not subscribed, so trigger the subscription flow
-            console.log("User is not subscribed. Prompting for subscription.");
-            pushalert.push(['subscribe', (result: { subscriber_id?: string; error?: any }) => {
-                console.log("PushAlert subscription result:", result);
-                if (result && result.subscriber_id) {
-                    const subscriberId = result.subscriber_id;
-                    console.log(`Successfully subscribed with ID: ${subscriberId}. Saving to Supabase...`);
-                    
-                    supabase.from('site_settings')
-                        .upsert({ user_id: user.id, push_subscriber_id: subscriberId }, { onConflict: 'user_id' })
-                        .select()
-                        .then(({ data, error }) => {
-                            if (error) {
-                                console.error('Supabase UPSERT error:', error);
-                                alert(`Hubo un error al guardar tu suscripción: ${error.message}`);
-                            } else {
-                                console.log('Successfully saved subscriber ID to Supabase.');
-                                alert("¡Suscripción guardada con éxito!");
-                                setIsSubscribed(true); // Update state on success
-                            }
-                        });
-                } else {
-                    console.warn("PushAlert subscription failed. Error:", result?.error);
-                    alert(`No se pudo completar la suscripción: ${result?.error?.message || 'El usuario canceló o hubo un error.'}`);
-                }
-            }]);
+            alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
         }
-    }]);
+    } else {
+        // Prompt user to subscribe
+        console.log("User is not subscribed. Prompting for permission.");
+        window.OneSignal.Notifications.requestPermission();
+    }
   };
 
 
@@ -1123,7 +1073,7 @@ const App: React.FC = () => {
         for (const todo of todosToNotify) {
           console.log(`Client found reminder for task: "${todo.text}"`);
           try {
-            const { error } = await supabase.functions.invoke('send-pushalert-notification', {
+            const { error } = await supabase.functions.invoke('send-pushalert-notification', { // Path is kept for compatibility
               body: {
                 title: "¡Recordatorio de Tarea!",
                 body: todo.text,
@@ -1131,7 +1081,7 @@ const App: React.FC = () => {
             });
 
             if (error) {
-              console.error(`Error invoking send-pushalert-notification for todo ${todo.id}:`, error);
+              console.error(`Error invoking notification function for todo ${todo.id}:`, error);
             } else {
               await supabase.from('todos').update({ notification_sent: true }).eq('id', todo.id);
               
