@@ -942,885 +942,809 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleInstallClick = () => {
+  const handleInstallPwa = () => {
     if (installPromptEvent) {
       installPromptEvent.prompt();
-      installPromptEvent.userChoice.then((choiceResult: { outcome: string }) => {
+      installPromptEvent.userChoice.then((choiceResult: { outcome: 'accepted' | 'dismissed' }) => {
         if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted the A2HS prompt');
+          console.log('User accepted the PWA installation');
         } else {
-          console.log('User dismissed the A2HS prompt');
+          console.log('User dismissed the PWA installation');
         }
-        setInstallPromptEvent(null);
         setShowInstallBanner(false);
+        setInstallPromptEvent(null);
       });
     }
   };
 
-  const handleDismissInstallBanner = () => {
+  const handleDismissPwaBanner = () => {
     setShowInstallBanner(false);
+    // Remember dismissal for a while to not annoy the user
     localStorage.setItem('pwaInstallDismissed', 'true');
   };
+  
+  const getUserKey = useCallback((key: string) => `${user?.email}_${key}`, [user]);
 
-  // --- OneSignal Initialization (Following Supabase Guide) ---
-  useEffect(() => {
-    if (!user || !ONE_SIGNAL_APP_ID || ONE_SIGNAL_APP_ID.includes('YOUR_')) {
-      return;
-    }
-  
-    window.OneSignal = window.OneSignal || [];
-    const OneSignal = window.OneSignal;
-  
-    const initializeAndLogin = async () => {
-      // The init method is idempotent, so it's safe to call. It will only initialize once.
-      await OneSignal.init({
-        appId: ONE_SIGNAL_APP_ID,
-        allowLocalhostAsSecureOrigin: true, // As recommended by the guide for local testing
-      });
-  
-      // Associate the OneSignal device with the Supabase user ID
-      // This is also safe to call multiple times.
-      await OneSignal.login(user.id);
-      console.log("OneSignal user identified with external ID:", user.id);
-  
-      // To prevent adding multiple listeners if this effect re-runs, remove them first.
-      OneSignal.Notifications.removeEventListener('permissionChange');
-      OneSignal.User.PushSubscription.removeEventListener('change');
-
-      // Update UI state based on current subscription and permission
-      const permission = await OneSignal.Notifications.getPermissionStatus();
-      setIsPermissionBlocked(permission === 'denied');
-      
-      const subscription = await OneSignal.User.PushSubscription.get();
-      setIsSubscribed(!!subscription?.id);
-  
-      // Add listeners for real-time changes
-      OneSignal.Notifications.addEventListener('permissionChange', (isPermissionGranted: any) => {
-        // Re-check the status to get the most accurate state ('denied', 'granted', etc.)
-        OneSignal.Notifications.getPermissionStatus().then((permission: any) => {
-          setIsPermissionBlocked(permission === 'denied');
-        });
-      });
-  
-      OneSignal.User.PushSubscription.addEventListener('change', (subscription: any) => {
-        // The change event provides `current` and `previous` states.
-        setIsSubscribed(!!subscription.current.id);
-      });
-    };
-  
-    OneSignal.push(initializeAndLogin);
-  
-  }, [user?.id]); // FIX: Depend on user ID instead of the user object. This prevents the effect from re-running on token refreshes, which was causing an "SDK already initialized" error and preventing OneSignal.login() from completing.
-
-  
-  const handleNotificationAction = async () => {
-    if (isPermissionBlocked) {
-        alert('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para esta página.');
-        return;
-    }
-
-    if (isSubscribed) {
-        // Send a test notification via Supabase Edge Function
-        console.log("User is subscribed. Sending test notification.");
-        const { error } = await supabase.functions.invoke('send-pushalert-notification', { // Path is kept for compatibility
-            body: {
-                title: "¡Notificación de Prueba! 🐣",
-                body: "Si ves esto, ¡las notificaciones de OneSignal funcionan!",
-            },
-        });
-
-        if (error) {
-            console.error("Error sending test notification:", error);
-            alert("Error al enviar la notificación de prueba.");
+  // --- Theme Management ---
+  const toggleTheme = useCallback(() => {
+    setTheme(currentTheme => {
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        localStorage.setItem('theme', newTheme);
+        if (newTheme === 'dark') {
+            document.documentElement.classList.add('dark');
         } else {
-            alert("Notificación de prueba enviada. Deberías recibirla en unos segundos.");
+            document.documentElement.classList.remove('dark');
         }
-    } else {
-        // Prompt user to subscribe
-        console.log("User is not subscribed. Prompting for permission.");
-        window.OneSignal.Notifications.requestPermission();
-    }
-  };
-
-
-  // Client-side reminder polling
-  useEffect(() => {
-    if (!user || !isSubscribed) return;
-
-    const intervalId = setInterval(async () => {
-      const now = new Date();
-      const todosToNotify: Todo[] = [];
-
-      Object.values(allTodos).flat().forEach((todo: Todo) => {
-        if (!todo.completed && !todo.notification_sent && todo.reminder_offset && todo.due_date && todo.start_time) {
-          const [year, month, day] = todo.due_date.split('-').map(Number);
-          const [hour, minute] = todo.start_time.split(':').map(Number);
-          const startTime = new Date(year, month - 1, day, hour, minute);
-          const reminderTime = new Date(startTime.getTime() - todo.reminder_offset * 60 * 1000);
-
-          if (reminderTime <= now) {
-            todosToNotify.push(todo);
-          }
-        }
-      });
-
-      if (todosToNotify.length > 0) {
-        for (const todo of todosToNotify) {
-          console.log(`Client found reminder for task: "${todo.text}"`);
-          try {
-            const { error } = await supabase.functions.invoke('send-pushalert-notification', { // Path is kept for compatibility
-              body: {
-                title: "¡Recordatorio de Tarea!",
-                body: todo.text,
-              },
-            });
-
-            if (error) {
-              console.error(`Error invoking notification function for todo ${todo.id}:`, error);
-            } else {
-              await supabase.from('todos').update({ notification_sent: true }).eq('id', todo.id);
-              
-              setAllTodos(prev => {
-                  const newAllTodos = { ...prev };
-                  const dateKey = todo.due_date!;
-                  if (newAllTodos[dateKey]) {
-                      newAllTodos[dateKey] = newAllTodos[dateKey].map(t => t.id === todo.id ? { ...t, notification_sent: true } : t);
-                  }
-                  return newAllTodos;
-              });
-            }
-          } catch (e) {
-            console.error(`Exception while invoking function for todo ${todo.id}:`, e);
-          }
-        }
-      }
-    }, 60 * 1000); // Run every minute
-
-    return () => clearInterval(intervalId);
-  }, [user, allTodos, isSubscribed]);
-
-
-  // --- SUPABASE AUTH & DATA LOADING ---
-  useEffect(() => {
-    setAuthLoading(true);
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
+        return newTheme;
     });
+  }, []);
+
+  const applyThemeColors = useCallback((colors: ThemeColors) => {
+    const root = document.documentElement;
+    // Light theme colors
+    root.style.setProperty('--color-primary', colors.primary);
+    root.style.setProperty('--color-primary-light', adjustBrightness(colors.primary, 20));
+    root.style.setProperty('--color-primary-dark', adjustBrightness(colors.primary, -10));
+    root.style.setProperty('--color-secondary', colors.secondary);
+    root.style.setProperty('--color-secondary-light', adjustBrightness(colors.secondary, 20));
+    root.style.setProperty('--color-secondary-dark', adjustBrightness(colors.secondary, -10));
+    root.style.setProperty('--color-secondary-lighter', adjustBrightness(colors.secondary, 40));
+
+    // Dark theme colors (inverted logic for light/dark properties)
+    const darkRoot = document.querySelector('html.dark');
+    if (darkRoot) {
+        (darkRoot as HTMLElement).style.setProperty('--color-primary', colors.primary);
+        (darkRoot as HTMLElement).style.setProperty('--color-primary-light', adjustBrightness(colors.primary, -20)); // darker
+        (darkRoot as HTMLElement).style.setProperty('--color-primary-dark', adjustBrightness(colors.primary, 10));  // lighter
+        (darkRoot as HTMLElement).style.setProperty('--color-secondary', adjustBrightness(colors.secondary, -10));
+        (darkRoot as HTMLElement).style.setProperty('--color-secondary-light', adjustBrightness(colors.secondary, -30)); // darker
+        (darkRoot as HTMLElement).style.setProperty('--color-secondary-dark', adjustBrightness(colors.secondary, 10));   // lighter
+    }
+  }, []);
+
+  const handleThemeColorChange = useCallback((colorName: keyof ThemeColors, value: string) => {
+    setThemeColors(prev => {
+        const newColors = { ...prev, [colorName]: value };
+        applyThemeColors(newColors);
+        // Debounce saving to localStorage
+        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+        settingsSaveTimeout.current = window.setTimeout(() => {
+          if (user) {
+              localStorage.setItem(getUserKey('themeColors'), JSON.stringify(newColors));
+          }
+        }, 500);
+        return newColors;
+    });
+  }, [applyThemeColors, getUserKey, user]);
+
+  const handleResetThemeColors = useCallback(() => {
+    setThemeColors(DEFAULT_COLORS);
+    applyThemeColors(DEFAULT_COLORS);
+    if(user) localStorage.removeItem(getUserKey('themeColors'));
+  }, [applyThemeColors, getUserKey, user]);
+  
+  // Initialize theme on load
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme ? savedTheme : (prefersDark ? 'dark' : 'light');
     
-    // Check for existing session on initial load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-          setAuthLoading(false);
-      }
-      // onAuthStateChange will handle setting the user
+    setTheme(initialTheme as 'light' | 'dark');
+    if (initialTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+
+    if (user) {
+        const savedColors = localStorage.getItem(getUserKey('themeColors'));
+        const initialColors = savedColors ? JSON.parse(savedColors) : DEFAULT_COLORS;
+        setThemeColors(initialColors);
+        applyThemeColors(initialColors);
+    } else {
+        applyThemeColors(DEFAULT_COLORS);
+    }
+}, [user, getUserKey, applyThemeColors]);
+
+  // --- Auth & Data Loading ---
+  useEffect(() => {
+    const checkUser = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if(session) setUser(session.user);
+        setAuthLoading(false);
+    };
+    checkUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+        if(!session) { // If logged out
+            setDataLoaded(false);
+            // Reset all state
+            setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]);
+            setGalleryImages([]); setUserBackgrounds([]);
+            setActiveBackground(null); setSavedActiveBgId(null);
+            setGdriveToken(null);
+        }
     });
 
-    return () => subscription.unsubscribe();
+    return () => authListener.subscription.unsubscribe();
+  }, []);
+  
+  const handleLogout = useCallback(async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error('Error logging out:', error.message);
   }, []);
 
-  useEffect(() => {
-    if (!user) {
-        setDataLoaded(false);
-        return;
-    };
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    
+    // Todos, Subtasks, and Folders/Notes
+    const [
+      { data: todosData, error: todosError },
+      { data: foldersData, error: foldersError },
+      { data: playlistsData, error: playlistsError },
+      { data: quickNotesData, error: quickNotesError }
+    ] = await Promise.all([
+      supabase.from('todos').select('*, subtasks(*)').order('created_at'),
+      supabase.from('folders').select('*, notes(*)').order('created_at').order('created_at', { foreignTable: 'notes', ascending: true }),
+      supabase.from('playlists').select('*').order('created_at'),
+      supabase.from('quick_notes').select('*').order('created_at'),
+    ]);
 
-    const loadAllData = async () => {
-      try {
-        await initDB(user.email!);
+    if (todosError) console.error("Error loading todos:", todosError);
+    else if (todosData) {
+        const todosByDate: { [key: string]: Todo[] } = {};
+        todosData.forEach(todo => {
+            const dateKey = todo.due_date ? todo.due_date : formatDateKey(new Date(todo.created_at));
+            if (!todosByDate[dateKey]) todosByDate[dateKey] = [];
+            todosByDate[dateKey].push(todo);
+        });
+        setAllTodos(todosByDate);
+    }
+    
+    if (foldersError) console.error("Error loading folders:", foldersError);
+    else setFolders(foldersData || []);
+
+    if (playlistsError) console.error("Error loading playlists:", playlistsError);
+    else setPlaylists(playlistsData || []);
+    
+    if (quickNotesError) console.error("Error loading quick notes:", quickNotesError);
+    else setQuickNotes(quickNotesData || []);
+    
+    // Load local settings
+    try {
+        const storedPomodoro = localStorage.getItem(getUserKey('pomodoroState'));
+        if (storedPomodoro) setPomodoroState(JSON.parse(storedPomodoro));
+
+        const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
+        if (storedActiveBgId) setSavedActiveBgId(storedActiveBgId);
+
+        const storedParticles = localStorage.getItem(getUserKey('particleType'));
+        if (storedParticles) setParticleType(storedParticles as ParticleType);
         
-        // Settings first
-        const { data: settingsData, error: settingsError } = await supabase.from('site_settings').select('*').single();
-        if (settingsData) {
-            setTheme(settingsData.theme_mode || 'light');
-            setThemeColors(settingsData.theme_colors || DEFAULT_COLORS);
-            setParticleType(settingsData.particle_type || 'none');
-            setAmbientSound(settingsData.ambient_sound || { type: 'none', volume: 0.5 });
-            setPomodoroState(prev => ({ ...prev, ...(settingsData.pomodoro_config || {}) }));
-            setDailyEncouragementHour(settingsData.daily_encouragement_utc_hour ?? null);
-            if (settingsData.active_background_id) {
-                setSavedActiveBgId(settingsData.active_background_id);
-            }
-        } else if (!settingsError) {
-            await supabase.from('site_settings').insert({ user_id: user.id, theme_mode: 'light', theme_colors: DEFAULT_COLORS, pomodoro_config: { durations: pomodoroState.durations, backgroundTimerOpacity: 50, showBackgroundTimer: false }, daily_encouragement_utc_hour: null });
-        }
+        const storedAmbience = localStorage.getItem(getUserKey('ambientSound'));
+        if (storedAmbience) setAmbientSound(JSON.parse(storedAmbience));
 
-        // Load Todos from Supabase
-        const { data: todosData, error: todosError } = await supabase.from('todos').select('*, subtasks(*)');
-        if (todosError) throw todosError;
-        if (todosData) {
-            const groupedTodos = todosData.reduce((acc, todo) => {
-                const dateKey = todo.due_date;
-                if (!dateKey) return acc;
-                if (!acc[dateKey]) acc[dateKey] = [];
-                // FIX: Ensure priority exists to satisfy Todo type, defaulting to 'medium'. This prevents type errors if data is missing from the database.
-                acc[dateKey].push({ ...todo, priority: todo.priority || 'medium', subtasks: todo.subtasks || [] });
-                return acc;
-            }, {} as { [key: string]: Todo[] });
-            setAllTodos(groupedTodos);
-        }
+        const storedEncouragement = localStorage.getItem(getUserKey('dailyEncouragement'));
+        if(storedEncouragement) setDailyEncouragementHour(JSON.parse(storedEncouragement));
 
-        // Load Folders & Notes from Supabase
-        const { data: foldersData, error: foldersError } = await supabase.from('folders').select('*');
-        if (foldersError) throw foldersError;
-        const { data: notesData, error: notesError } = await supabase.from('notes').select('*');
-        if (notesError) throw notesError;
+        const storedBrowserSession = localStorage.getItem(getUserKey('browserSession'));
+        if (storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
+    } catch(e) { console.error("Error parsing settings from localStorage:", e); }
 
-        if (foldersData && notesData) {
-            const foldersWithNotes = foldersData.map(folder => ({ ...folder, notes: notesData.filter(note => note.folder_id === folder.id) })).sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            setFolders(foldersWithNotes);
-        } else if (foldersData?.length === 0) {
-            const { data: newFolder } = await supabase.from('folders').insert({ name: 'Mis Notas', user_id: user.id }).select().single();
-            if (newFolder) setFolders([{ ...newFolder, notes: [] }]);
-        }
+    setDataLoaded(true);
+  }, [user, getUserKey]);
 
-        const { data: playlistsData } = await supabase.from('playlists').select('*');
-        if (playlistsData) setPlaylists(playlistsData);
-
-        const { data: quickNotesData } = await supabase.from('quick_notes').select('*').order('created_at', { ascending: false });
-        if (quickNotesData) setQuickNotes(quickNotesData);
-
-        const storedBrowserSession = localStorage.getItem(`${user.email}_browserSession`);
-        if(storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
-
-      } catch (error) {
-        console.error("Failed to initialize app state:", error);
-      } finally {
-        setDataLoaded(true);
+  useEffect(() => {
+      if (user && !dataLoaded) {
+          initDB(user.email!);
+          loadData();
       }
-    };
-    loadAllData();
-  }, [user]);
+  }, [user, dataLoaded, loadData]);
 
-  // --- GOOGLE DRIVE LOGIC ---
-  const findOrCreateAppFolder = useCallback(async () => {
-    try {
-        const response = await window.gapi.client.drive.files.list({
-            q: `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`,
-            fields: 'files(id)',
-        });
-        if (response.result.files && response.result.files.length > 0) {
-            appFolderId.current = response.result.files[0].id!;
-        } else {
-            const createResponse = await window.gapi.client.drive.files.create({ resource: { name: APP_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }, fields: 'id' } as any);
-            appFolderId.current = createResponse.result.id!;
-        }
-    } catch (e) { console.error("Error finding/creating app folder", e); }
-  }, []);
+  // --- Settings Persistence ---
+  useEffect(() => { if (user) localStorage.setItem(getUserKey('pomodoroState'), JSON.stringify(pomodoroState)); }, [pomodoroState, getUserKey, user]);
+  useEffect(() => { if (user) localStorage.setItem(getUserKey('particleType'), particleType); }, [particleType, getUserKey, user]);
+  useEffect(() => { if (user) localStorage.setItem(getUserKey('ambientSound'), JSON.stringify(ambientSound)); }, [ambientSound, getUserKey, user]);
+  useEffect(() => { if (user) localStorage.setItem(getUserKey('browserSession'), JSON.stringify(browserSession)); }, [browserSession, getUserKey, user]);
 
-  const loadGalleryImagesFromDrive = useCallback(async () => {
-    if (!appFolderId.current) return;
-    setGalleryIsLoading(true);
-    try {
-        const response = await window.gapi.client.drive.files.list({ q: `'${appFolderId.current}' in parents and mimeType contains 'image/' and (not appProperties has { key='type' and value='background' }) and trashed=false`, fields: 'files(id)' });
-        const files = response.result.files || [];
-        const imagePromises = files.map(async (file) => {
-            const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
-                headers: { Authorization: `Bearer ${window.gapi.client.getToken().access_token}` }
-            });
-            const blob = await response.blob();
-            return { id: file.id!, url: URL.createObjectURL(blob) };
-        });
-        const newImages = await Promise.all(imagePromises);
-        setGalleryImages(newImages.reverse());
-    } catch (e) { console.error("Error loading images from Drive", e); } finally { setGalleryIsLoading(false); }
-  }, []);
+  const handleSetDailyEncouragement = (localHour: number | null) => {
+    const offset = new Date().getTimezoneOffset() / 60;
+    const utcHour = localHour !== null ? (localHour - offset + 24) % 24 : null;
+    
+    setDailyEncouragementHour(utcHour);
+    if(user) localStorage.setItem(getUserKey('dailyEncouragement'), JSON.stringify(utcHour));
+  }
   
-  const loadBackgroundsFromDrive = useCallback(async () => {
-    if (!appFolderId.current) return;
-    setBackgroundsAreLoading(true);
-    try {
-      const response = await window.gapi.client.drive.files.list({ q: `'${appFolderId.current}' in parents and appProperties has { key='type' and value='background' } and trashed=false`, fields: 'files(id, name, mimeType, appProperties)' });
-      const files = response.result.files || [];
-      const bgPromises = files.map(async (file) => {
-        const response = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
-            headers: { Authorization: `Bearer ${window.gapi.client.getToken().access_token}` }
-        });
-        const blob = await response.blob();
-        return { id: file.id!, name: file.name!, url: URL.createObjectURL(blob), type: file.mimeType!.startsWith('video') ? 'video' : 'image', isFavorite: file.appProperties?.isFavorite === 'true' };
-      });
-      const newBgs = await Promise.all(bgPromises);
-      setUserBackgrounds(newBgs);
-    } catch (e) { console.error("Error loading backgrounds from Drive", e); } finally { setBackgroundsAreLoading(false); }
-  }, []);
-
-  const handleGoogleLogout = useCallback(() => {
-    if (user?.email) {
-        localStorage.removeItem(`${user.email}_gdrive_token`);
-        localStorage.removeItem(`${user.email}_gdrive_expiry`);
-    }
-    setGdriveToken(null);
-    setGalleryImages([]);
-    setUserBackgrounds([]);
-    appFolderId.current = null;
-  }, [user]);
-
-  const initializeDrive = useCallback(async (accessToken: string) => {
-    if (!gapiReady) return;
-    setGdriveToken(accessToken);
-    window.gapi.client.setToken({ access_token: accessToken });
-    try {
-        await window.gapi.client.load('drive', 'v3');
-        await findOrCreateAppFolder();
-        await Promise.all([loadGalleryImagesFromDrive(), loadBackgroundsFromDrive()]);
-    } catch (error) {
-        console.error("Error initializing Google Drive:", error);
-        handleGoogleLogout(); // Token might be invalid/expired, clear it
-    }
-  }, [gapiReady, findOrCreateAppFolder, loadGalleryImagesFromDrive, loadBackgroundsFromDrive, handleGoogleLogout]);
-  
-  useEffect(() => {
-      const gapiPoll = setInterval(() => { if (window.gapi && window.gapi.load) { clearInterval(gapiPoll); window.gapi.load('client', () => setGapiReady(true)); } }, 100);
-      return () => { clearInterval(gapiPoll); };
-  }, []);
-
-  useEffect(() => {
-    if (!user || !gapiReady || gdriveToken) return;
-
-    // 1. Check for token in URL hash (after redirect from Google)
-    if (window.location.hash.includes('access_token')) {
-        const params = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = params.get('access_token');
-        const expiresIn = params.get('expires_in');
-
-        if (accessToken && expiresIn) {
-            const expiryTime = Date.now() + parseInt(expiresIn, 10) * 1000;
-            localStorage.setItem(`${user.email}_gdrive_token`, accessToken);
-            localStorage.setItem(`${user.email}_gdrive_expiry`, String(expiryTime));
-            
-            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-
-            initializeDrive(accessToken);
-            return;
-        }
-    }
-
-    // 2. If no token in URL, check localStorage for a saved session
-    const storedToken = localStorage.getItem(`${user.email}_gdrive_token`);
-    const storedExpiry = localStorage.getItem(`${user.email}_gdrive_expiry`);
-
-    if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry, 10)) {
-        initializeDrive(storedToken);
-    }
-  }, [user, gapiReady, initializeDrive, gdriveToken]);
-  
-  useEffect(() => {
-    if (savedActiveBgId && userBackgrounds.length > 0) {
-        const bgToActivate = userBackgrounds.find(b => b.id === savedActiveBgId);
-        if (bgToActivate && activeBackground?.id !== bgToActivate.id) {
-            setActiveBackground(bgToActivate);
-        }
-    }
-  }, [userBackgrounds, savedActiveBgId, activeBackground]);
-
-  const handleAuthClick = () => {
-    const redirectUri = window.location.origin;
-    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
-        client_id: CLIENT_ID,
-        redirect_uri: redirectUri,
-        scope: SCOPES,
-        response_type: 'token',
-        include_granted_scopes: 'true',
-    });
-    window.location.href = authUrl;
-  };
-
-  // --- ALL HANDLERS ---
+  // --- Data Handlers ---
   const handleAddTodo = async (text: string) => {
     if (!user) return;
-    try {
-      const dateKey = formatDateKey(selectedDate);
-      const { data: newTodo, error } = await supabase.from('todos').insert([{ text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id }]).select().single();
-      if (error) { 
-        throw error;
-      }
-
-// FIX: Correctly handle ambiguous type from Supabase by casting and ensuring all required properties of the Todo type are present.
-      if (newTodo && 'id' in newTodo) {
-        // The `newTodo` object from Supabase may have an ambiguous type (`any`, `{}`, or `unknown`).
-        // By casting to a Partial<Todo> and providing fallbacks, we can safely construct a valid `Todo` object.
-        const data = newTodo as Partial<Todo>;
-        const todoToAdd: Todo = {
-          ...data,
-          id: data.id!,
-          text: data.text ?? text,
-          completed: data.completed ?? false,
-          priority: data.priority ?? 'medium',
-          subtasks: data.subtasks ?? [],
-        };
-        setAllTodos(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), todoToAdd] }));
-      }
-    } catch (error) {
-        console.error("Error adding todo:", error);
+    const dateKey = formatDateKey(selectedDate);
+    const newTodo: Omit<Todo, 'id' | 'created_at'> = { text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id };
+    const { data, error } = await supabase.from('todos').insert(newTodo).select('*, subtasks(*)').single();
+    if (error) console.error("Error adding todo:", error);
+    else if (data) {
+        setAllTodos(currentTodos => ({
+            ...currentTodos,
+            [dateKey]: [...(currentTodos[dateKey] || []), data]
+        }));
     }
   };
 
   const handleUpdateTodo = async (updatedTodo: Todo) => {
-    try {
-        let todoToSave = { ...updatedTodo };
-        if (todoToSave.recurrence && todoToSave.recurrence.frequency !== 'none' && !todoToSave.recurrence.id) {
-            todoToSave.recurrence.id = `recurrence-${Date.now()}`;
-        }
-        const { subtasks, ...payloadForSupabase } = todoToSave;
-        
-        await supabase.from('todos').update(payloadForSupabase).eq('id', todoToSave.id).throwOnError();
-        
-        await supabase.from('subtasks').delete().eq('todo_id', todoToSave.id).throwOnError();
-        
-        if (subtasks && subtasks.length > 0) {
-            const subtasksToInsert = subtasks.map(({ text, completed }) => ({
-                text,
-                completed,
-                todo_id: todoToSave.id,
-            }));
-            await supabase.from('subtasks').insert(subtasksToInsert).throwOnError();
-        }
-        
-        const { data: refreshedTodo, error: refetchError } = await supabase
-            .from('todos')
-            .select('*, subtasks(*)')
-            .eq('id', todoToSave.id)
-            .single();
-            
-        if (refetchError) throw refetchError;
-        if (!refreshedTodo) throw new Error("Failed to refetch todo after update.");
+      const { subtasks, ...todoForUpdate } = updatedTodo;
+      const { error } = await supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id);
+      if (error) { console.error("Error updating todo:", error); return; }
 
-        // FIX: Resolve complex type inference issue from Supabase data.
-        // The `refreshedTodo` can have an ambiguous type or a null `priority`, causing type errors.
-        // This ensures the final object is a valid `Todo` by providing fallbacks for required properties.
-        const finalTodo: Todo = {
-            ...updatedTodo,
-            ...(refreshedTodo as any),
-            priority: (refreshedTodo as any)?.priority || updatedTodo.priority,
-            subtasks: (refreshedTodo as any)?.subtasks || [],
-        };
-        
-        let newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(allTodos));
-        let oldDateKey: string | null = null;
-        let originalTask: Todo | null = null;
-        for (const key in newAllTodos) { const task = newAllTodos[key].find((t: Todo) => t.id === finalTodo.id); if (task) { oldDateKey = key; originalTask = task; break; } }
-        
-        if (originalTask?.recurrence?.id) { 
-            for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => (t.recurrence?.id !== originalTask!.recurrence!.id) || (t.id === finalTodo.id) || (t.due_date && originalTask!.due_date && t.due_date <= originalTask!.due_date)); } 
-        }
-        
-        if(oldDateKey && oldDateKey !== finalTodo.due_date && newAllTodos[oldDateKey]) { newAllTodos[oldDateKey] = newAllTodos[oldDateKey].filter((t: Todo) => t.id !== finalTodo.id); }
-        
-        const newDateKey = finalTodo.due_date!;
-        const dateTasks = newAllTodos[newDateKey] || [];
-        const taskIndex = dateTasks.findIndex((t: Todo) => t.id === finalTodo.id);
-        
-        if(taskIndex > -1) { dateTasks[taskIndex] = finalTodo; } else { dateTasks.push(finalTodo); }
-        newAllTodos[newDateKey] = [...dateTasks];
-        
-        if (finalTodo.recurrence && finalTodo.recurrence.frequency !== 'none') { 
-            newAllTodos = await generateRecurringTasks(finalTodo, newAllTodos); 
-        }
-        setAllTodos(newAllTodos);
+      const dateKey = updatedTodo.due_date || formatDateKey(new Date(updatedTodo.created_at!));
+      setAllTodos(current => {
+          const newAllTodos = JSON.parse(JSON.stringify(current));
+          const todosForDate = newAllTodos[dateKey] || [];
+          const index = todosForDate.findIndex((t: Todo) => t.id === updatedTodo.id);
+          if (index > -1) {
+              todosForDate[index] = updatedTodo;
+              newAllTodos[dateKey] = todosForDate;
+          }
+          return newAllTodos;
+      });
 
-    } catch (error) {
-        console.error("Error in handleUpdateTodo:", error);
-    }
+      if (subtasks) {
+          const updates = subtasks.filter(st => st.id > 0);
+          const inserts = subtasks.filter(st => st.id <= 0).map(st => ({ text: st.text, completed: st.completed, todo_id: updatedTodo.id }));
+          if(updates.length > 0) await supabase.from('subtasks').upsert(updates);
+          if(inserts.length > 0) await supabase.from('subtasks').insert(inserts);
+      }
   };
 
   const handleToggleTodo = async (id: number, onAllCompleted: (quote: string) => void) => {
-    const dateKey = formatDateKey(selectedDate);
-    const todosForDay = allTodos[dateKey] || [];
-    const targetTodo = todosForDay.find(t => t.id === id);
-    if (!targetTodo) return;
+    let dateKey = '';
+    let todoToToggle: Todo | undefined;
+    for (const key in allTodos) {
+      const foundTodo = allTodos[key].find(t => t.id === id);
+      if (foundTodo) {
+        dateKey = key;
+        todoToToggle = foundTodo;
+        break;
+      }
+    }
+    if (!todoToToggle || !dateKey) return;
     
-    try {
-        const newCompletedState = !targetTodo.completed;
-        await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id).throwOnError();
-        if (targetTodo.subtasks?.length) await supabase.from('subtasks').update({ completed: newCompletedState }).eq('todo_id', id).throwOnError();
-        
-        const allWereCompletedBefore = todosForDay.every(t => t.completed);
-        const newTodosForDay = todosForDay.map(t => t.id === id ? { ...t, completed: newCompletedState, subtasks: t.subtasks?.map(st => ({...st, completed: newCompletedState})) } : t);
-        const allJustCompleted = newTodosForDay.every(t => t.completed);
-        if (allJustCompleted && !allWereCompletedBefore) { onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]); triggerConfetti(); }
-        
-        let finalAllTodos = { ...allTodos, [dateKey]: newTodosForDay };
-        
-        // FIX: Refactored to an immutable pattern to ensure type safety when adding a recurrence ID.
-        if (newCompletedState && targetTodo.recurrence && targetTodo.recurrence.frequency !== 'none') {
-            let sourceTodoWithId: Todo = { ...targetTodo, completed: newCompletedState };
-            if (sourceTodoWithId.recurrence && !sourceTodoWithId.recurrence.id) {
-                // Perform an immutable-style update on the recurrence object for safety.
-                sourceTodoWithId = {
-                    ...sourceTodoWithId,
-                    recurrence: {
-                        ...sourceTodoWithId.recurrence,
-                        id: `recurrence-${sourceTodoWithId.id}`
-                    }
-                };
-            }
-            finalAllTodos = await generateRecurringTasks(sourceTodoWithId, finalAllTodos);
-        }
-        setAllTodos(finalAllTodos);
-    } catch(error) {
-        console.error("Error toggling todo:", error);
+    const wasCompleted = todoToToggle.completed;
+    const newCompletedState = !wasCompleted;
+
+    const updatedTodo = { ...todoToToggle, completed: newCompletedState };
+    setAllTodos(current => {
+      const newAllTodos = { ...current };
+      newAllTodos[dateKey] = newAllTodos[dateKey].map(t => t.id === id ? updatedTodo : t);
+      return newAllTodos;
+    });
+
+    const { error } = await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id);
+    if (error) console.error("Error toggling todo:", error);
+
+    // Generate recurring tasks if needed
+    if (newCompletedState && updatedTodo.recurrence && updatedTodo.recurrence.frequency !== 'none') {
+        const newTodos = await generateRecurringTasks(updatedTodo, allTodos);
+        setAllTodos(newTodos);
+    }
+    
+    if (newCompletedState && allTodos[dateKey].every(t => (t.id === id ? newCompletedState : t.completed))) {
+        triggerConfetti();
+        onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
     }
   };
   
   const handleToggleSubtask = async (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => {
-      const dateKey = formatDateKey(selectedDate);
-      const oldTodosForDay = allTodos[dateKey] || [];
-      const task = oldTodosForDay.find(t => t.id === taskId);
-      const subtask = task?.subtasks?.find(st => st.id === subtaskId);
-      if (!task || !subtask) return;
+      let dateKey = '';
+      let todoToUpdate: Todo | undefined;
+      for (const key in allTodos) {
+          const foundTodo = allTodos[key].find(t => t.id === taskId);
+          if (foundTodo) {
+              dateKey = key;
+              todoToUpdate = foundTodo;
+              break;
+          }
+      }
+      if (!todoToUpdate || !dateKey) return;
 
-      try {
-        const newCompletedState = !subtask.completed;
-        await supabase.from('subtasks').update({ completed: newCompletedState }).eq('id', subtaskId).throwOnError();
-        
-        const allWereCompletedBefore = oldTodosForDay.every(t => t.completed);
-        let parentCompleted = task.completed;
-        const newSubtasks = task.subtasks?.map(st => st.id === subtaskId ? { ...st, completed: newCompletedState } : st);
-        
-        if (newSubtasks) {
-            const allSubtasksCompleted = newSubtasks.every(st => st.completed);
-            if (allSubtasksCompleted !== task.completed) { 
-                parentCompleted = allSubtasksCompleted; 
-                await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId).throwOnError(); 
-            }
-        }
-        const newTodosForDay = oldTodosForDay.map(t => t.id === taskId ? { ...t, subtasks: newSubtasks, completed: parentCompleted } : t);
-        const allJustCompleted = newTodosForDay.every(t => t.completed);
-        if (allJustCompleted && !allWereCompletedBefore) { onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]); triggerConfetti(); }
-        setAllTodos(prev => ({ ...prev, [dateKey]: newTodosForDay }));
-      } catch (error) {
-          console.error("Error toggling subtask:", error);
+      const newSubtasks = todoToUpdate.subtasks?.map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st);
+      if (!newSubtasks) return;
+      
+      const allSubtasksCompleted = newSubtasks.every(st => st.completed);
+      const parentCompleted = allSubtasksCompleted;
+
+      const updatedTodo = { ...todoToUpdate, subtasks: newSubtasks, completed: parentCompleted };
+
+      setAllTodos(current => ({
+          ...current,
+          [dateKey]: current[dateKey].map(t => t.id === taskId ? updatedTodo : t),
+      }));
+      
+      const subtaskToUpdate = newSubtasks.find(st => st.id === subtaskId);
+      if (subtaskToUpdate) {
+          const { error } = await supabase.from('subtasks').update({ completed: subtaskToUpdate.completed }).eq('id', subtaskId);
+          if (error) console.error("Error updating subtask:", error);
+      }
+      
+      if (todoToUpdate.completed !== parentCompleted) {
+          const { error: todoError } = await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId);
+          if (todoError) console.error("Error updating parent todo status:", todoError);
+
+          if (parentCompleted && allTodos[dateKey].every(t => (t.id === taskId ? parentCompleted : t.completed))) {
+              triggerConfetti();
+              onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
+          }
       }
   };
 
   const handleDeleteTodo = async (id: number) => {
-    if (!user) return;
-    const taskToDelete: Todo | undefined = (Object.values(allTodos).flat() as Todo[]).find(t => t.id === id);
-    if (!taskToDelete) return;
-    try {
-        let idsToDelete: number[] = [id];
-        if (taskToDelete.recurrence?.id && taskToDelete.due_date) {
-            const { data }: { data: { id: number }[] | null } = await supabase.from('todos').select('id').eq('user_id', user.id).eq('recurrence->>id', taskToDelete.recurrence.id).gte('due_date', taskToDelete.due_date);
-            if (data) idsToDelete = [...new Set([...idsToDelete, ...data.map(t => t.id)])];
-        }
-        if (idsToDelete.length > 0) {
-            await supabase.from('subtasks').delete().in('todo_id', idsToDelete).throwOnError();
-            await supabase.from('todos').delete().in('id', idsToDelete).throwOnError();
-        }
-        setAllTodos(prev => {
-            // FIX: Correctly type `newAllTodos` to prevent type errors when filtering.
-            const newAllTodos: { [key: string]: Todo[] } = JSON.parse(JSON.stringify(prev));
-            const deleteIdSet = new Set(idsToDelete);
-            for (const dateKey in newAllTodos) { newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => !deleteIdSet.has(t.id)); if (newAllTodos[dateKey].length === 0) delete newAllTodos[dateKey]; }
-            return newAllTodos;
-        });
-    } catch (error: any) { console.error("Error deleting todo series:", error); }
+      const { error } = await supabase.from('todos').delete().eq('id', id);
+      if (error) {
+          console.error("Error deleting todo:", error);
+      } else {
+          setAllTodos(currentTodos => {
+              const newAllTodos = { ...currentTodos };
+              for (const dateKey in newAllTodos) {
+                  const initialLength = newAllTodos[dateKey].length;
+                  newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => t.id !== id);
+                  if (newAllTodos[dateKey].length !== initialLength) break;
+              }
+              return newAllTodos;
+          });
+      }
   };
 
-  const handleAddFolder = async (name: string) => {
-    if (!user) return null;
-    const { data: newFolder, error } = await supabase.from('folders').insert({ name, user_id: user.id }).select().single();
-    if (error || !newFolder) {
-        console.error("Error adding folder:", error);
-        return null;
-    }
-    const folderWithNotes = { ...newFolder, notes: [] };
-    setFolders(prev => [folderWithNotes, ...prev]);
-    return folderWithNotes;
+  const handleAddFolder = async (name: string): Promise<Folder | null> => {
+      if (!user) return null;
+      const { data, error } = await supabase.from('folders').insert({ name, user_id: user.id }).select().single();
+      if (error) { console.error("Error adding folder:", error); return null; }
+      if (data) {
+          setFolders(f => [...f, { ...data, notes: [] }]);
+          return { ...data, notes: [] };
+      }
+      return null;
   };
-
-  const handleUpdateFolder = async (folderId: number, name: string) => {
-    // This function is currently not used, but let's keep it for future implementation
-    console.log("Updating folder", folderId, name);
-  };
-
-  const handleDeleteFolder = async (folderId: number) => {
-    await supabase.from('folders').delete().eq('id', folderId);
-    setFolders(prev => prev.filter(f => f.id !== folderId));
-  };
-
+  const handleUpdateFolder = async (folderId: number, name: string) => {};
+  const handleDeleteFolder = async (folderId: number) => {};
+  
   const handleAddNote = async (folderId: number): Promise<Note | null> => {
     if (!user) return null;
-    const { data: newNote, error } = await supabase.from('notes').insert({ folder_id: folderId, title: 'Nueva Nota', content: '', user_id: user.id }).select().single();
-    if (error || !newNote) return null;
-    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, notes: [newNote, ...f.notes] } : f));
-    return newNote;
+    const newNote = { folder_id: folderId, user_id: user.id, title: 'Nueva Nota', content: '' };
+    const { data, error } = await supabase.from('notes').insert(newNote).select().single();
+    if (error) { console.error("Error adding note:", error); return null; }
+    if (data) {
+        setFolders(currentFolders => currentFolders.map(f => f.id === folderId ? { ...f, notes: [...f.notes, data] } : f));
+        return data;
+    }
+    return null;
   };
-  
+
   const handleUpdateNote = async (note: Note) => {
-    const { id, ...payload } = note;
-    await supabase.from('notes').update(payload).eq('id', id);
-    setFolders(prev => prev.map(f => f.id === note.folder_id ? { ...f, notes: f.notes.map(n => n.id === id ? note : n) } : f));
+    const { error } = await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id);
+    if (error) { console.error("Error updating note:", error); }
+    else {
+        setFolders(currentFolders => currentFolders.map(f => f.id === note.folder_id ? { ...f, notes: f.notes.map(n => n.id === note.id ? note : n) } : f));
+    }
   };
-  
+
   const handleDeleteNote = async (noteId: number, folderId: number) => {
-    await supabase.from('notes').delete().eq('id', noteId);
-    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, notes: f.notes.filter(n => n.id !== noteId) } : f));
-  };
-
-  const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => {
-    if (!user) return;
-    const { data: newPlaylist, error } = await supabase.from('playlists').insert({ ...playlistData, user_id: user.id }).select().single();
-    if (error) { console.error(error); return; }
-    if (newPlaylist) setPlaylists(prev => [newPlaylist, ...prev]);
-  };
-
-  const handleUpdatePlaylist = async (playlist: Playlist) => {
-    await supabase.from('playlists').update({ is_favorite: playlist.is_favorite }).eq('id', playlist.id);
-    setPlaylists(prev => prev.map(p => p.id === playlist.id ? playlist : p));
+    const { error } = await supabase.from('notes').delete().eq('id', noteId);
+    if (error) { console.error("Error deleting note:", error); }
+    else {
+        setFolders(currentFolders => currentFolders.map(f => f.id === folderId ? { ...f, notes: f.notes.filter(n => n.id !== noteId) } : f));
+    }
   };
   
+  const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
+    if (!user) return;
+    const { data, error } = await supabase.from('playlists').insert({...playlistData, user_id: user.id}).select().single();
+    if (error) console.error("Error adding playlist:", error);
+    else if(data) setPlaylists(p => [...p, data]);
+  };
+  const handleUpdatePlaylist = async (playlist: Playlist) => {
+      const { error } = await supabase.from('playlists').update(playlist).eq('id', playlist.id);
+      if (error) console.error("Error updating playlist:", error);
+      else setPlaylists(p => p.map(item => item.id === playlist.id ? playlist : item));
+  };
   const handleDeletePlaylist = async (playlistId: number) => {
-    await supabase.from('playlists').delete().eq('id', playlistId);
-    setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+      const { error } = await supabase.from('playlists').delete().eq('id', playlistId);
+      if (error) console.error("Error deleting playlist:", error);
+      else setPlaylists(p => p.filter(item => item.id !== playlistId));
   };
   
   const handleAddQuickNote = async (text: string) => {
-    if (!user) return;
-    const { data, error } = await supabase.from('quick_notes').insert({ text, user_id: user.id }).select().single();
-    if (data) setQuickNotes(prev => [data, ...prev]);
+      if(!user) return;
+      const {data, error} = await supabase.from('quick_notes').insert({text, user_id: user.id}).select().single();
+      if(error) console.error("Error adding quick note:", error);
+      else if (data) setQuickNotes(qn => [...qn, data]);
+  };
+  const handleDeleteQuickNote = async (id: number) => {
+      const {error} = await supabase.from('quick_notes').delete().eq('id', id);
+      if(error) console.error("Error deleting quick note:", error);
+      else setQuickNotes(qn => qn.filter(note => note.id !== id));
+  };
+  const handleClearAllQuickNotes = async () => {
+    if(!user) return;
+    const {error} = await supabase.from('quick_notes').delete().eq('user_id', user.id);
+    if(error) console.error("Error clearing all quick notes:", error);
+    else setQuickNotes([]);
   };
 
-  const handleDeleteQuickNote = async (id: number) => {
-    await supabase.from('quick_notes').delete().eq('id', id);
-    setQuickNotes(prev => prev.filter(note => note.id !== id));
-  };
+  // --- Google Drive Integration ---
+  const gapiLoadCallback = useCallback(() => {
+    window.gapi.load('client', async () => {
+      await window.gapi.client.init({
+        clientId: CLIENT_ID,
+        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+      });
+      setGapiReady(true);
+    });
+  }, []);
+
+  const gisLoadCallback = useCallback(() => {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (tokenResponse: any) => {
+        if (tokenResponse && tokenResponse.access_token) {
+          setGdriveToken(tokenResponse.access_token);
+          window.gapi.client.setToken(tokenResponse);
+        }
+      },
+    });
+    (window as any).tokenClient = tokenClient;
+  }, []);
   
-  const handleClearAllQuickNotes = async () => {
-    if (!user) return;
-    await supabase.from('quick_notes').delete().eq('user_id', user.id);
-    setQuickNotes([]);
-  }
+  useEffect(() => {
+    const scriptGapi = document.createElement('script');
+    scriptGapi.src = 'https://apis.google.com/js/api.js';
+    scriptGapi.async = true;
+    scriptGapi.defer = true;
+    scriptGapi.onload = gapiLoadCallback;
+    document.body.appendChild(scriptGapi);
+
+    const scriptGis = document.createElement('script');
+    scriptGis.src = 'https://accounts.google.com/gsi/client';
+    scriptGis.async = true;
+    scriptGis.defer = true;
+    scriptGis.onload = gisLoadCallback;
+    document.body.appendChild(scriptGis);
+
+    return () => {
+        document.body.removeChild(scriptGapi);
+        document.body.removeChild(scriptGis);
+    }
+  }, [gapiLoadCallback, gisLoadCallback]);
+
+  const handleAuthClick = () => {
+    if ((window as any).tokenClient) {
+      (window as any).tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
+  };
+
+  const findOrCreateAppFolder = useCallback(async (): Promise<string | null> => {
+    if (appFolderId.current) return appFolderId.current;
+    try {
+      const response = await window.gapi.client.drive.files.list({
+        q: `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`,
+        fields: 'files(id, name)',
+      });
+      if (response.result.files && response.result.files.length > 0) {
+        appFolderId.current = response.result.files[0].id!;
+        return appFolderId.current;
+      } else {
+        const fileMetadata = { name: APP_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' };
+        const createResponse = await window.gapi.client.drive.files.create({ resource: fileMetadata, fields: 'id' });
+        appFolderId.current = createResponse.result.id!;
+        return appFolderId.current;
+      }
+    } catch (error) { console.error("Error finding/creating app folder:", error); return null; }
+  }, []);
+  
+  const loadFilesFromDrive = useCallback(async (folderName: 'gallery' | 'backgrounds') => {
+      if (!gdriveToken) return;
+      if (folderName === 'gallery') setGalleryIsLoading(true);
+      else setBackgroundsAreLoading(true);
+
+      try {
+          const parentFolderId = await findOrCreateAppFolder();
+          if (!parentFolderId) throw new Error("Could not access app folder.");
+          
+          let subFolderId: string | null = null;
+          const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`, fields: 'files(id)' });
+          if(folderResponse.result.files && folderResponse.result.files.length > 0) {
+              subFolderId = folderResponse.result.files[0].id!;
+          } else {
+              const subFolderMeta = { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
+              const createSubResponse = await window.gapi.client.drive.files.create({ resource: subFolderMeta, fields: 'id' });
+              subFolderId = createSubResponse.result.id!;
+          }
+
+          if(!subFolderId) throw new Error(`Could not access ${folderName} folder.`);
+          
+          const filesResponse = await window.gapi.client.drive.files.list({ q: `'${subFolderId}' in parents and trashed=false`, fields: 'files(id, name, webViewLink, appProperties)' });
+          const files = filesResponse.result.files || [];
+
+          if(folderName === 'gallery') {
+              const images: GalleryImage[] = files.map(file => ({ id: file.id!, url: file.webViewLink!.replace('view?usp=drivesdk', 'uc?export=view&id=') }));
+              setGalleryImages(images);
+          } else {
+              const backgrounds: Background[] = files.map(file => ({
+                  id: file.id!,
+                  name: file.name!,
+                  url: file.webViewLink!.replace('view?usp=drivesdk', 'uc?export=view&id='),
+                  type: file.name!.toLowerCase().endsWith('.mp4') ? 'video' : 'image',
+                  isFavorite: file.appProperties?.isFavorite === 'true'
+              }));
+              setUserBackgrounds(backgrounds);
+              
+              if(savedActiveBgId) {
+                const bgToActivate = backgrounds.find(bg => bg.id === savedActiveBgId);
+                if(bgToActivate) setActiveBackground(bgToActivate);
+              }
+          }
+
+      } catch (error) { console.error(`Error loading ${folderName}:`, error); }
+      finally {
+          if (folderName === 'gallery') setGalleryIsLoading(false);
+          else setBackgroundsAreLoading(false);
+      }
+  }, [gdriveToken, findOrCreateAppFolder, savedActiveBgId]);
+  
+  useEffect(() => {
+      if (gdriveToken) {
+          loadFilesFromDrive('gallery');
+          loadFilesFromDrive('backgrounds');
+      }
+  }, [gdriveToken, loadFilesFromDrive]);
+  
+  const uploadFileToDrive = useCallback(async (file: File, folderName: 'gallery' | 'backgrounds'): Promise<any> => {
+      const parentFolderId = await findOrCreateAppFolder();
+      if (!parentFolderId) throw new Error("No parent folder");
+      
+      let subFolderId: string | null = null;
+      const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`, fields: 'files(id)' });
+      subFolderId = folderResponse.result.files?.[0]?.id || null;
+      if (!subFolderId) {
+          const subFolderMeta = { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
+          const createSubResponse = await window.gapi.client.drive.files.create({ resource: subFolderMeta, fields: 'id' });
+          subFolderId = createSubResponse.result.id!;
+      }
+
+      const metadata = { name: file.name, parents: [subFolderId] };
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', file);
+
+      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${gdriveToken}` },
+          body: form,
+      });
+      return response.json();
+  }, [gdriveToken, findOrCreateAppFolder]);
 
   const handleAddGalleryImages = async (files: File[]) => {
-      if (!appFolderId.current) return;
       setGalleryIsLoading(true);
-      const newImages: GalleryImage[] = [];
-      for (const file of files) {
-          const fileMetadata = { name: file.name, parents: [appFolderId.current], mimeType: file.type };
-          const form = new FormData();
-          form.append('metadata', new Blob([JSON.stringify(fileMetadata)], { type: 'application/json' }));
-          form.append('file', file);
-          try {
-              const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                  method: 'POST',
-                  headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }),
-                  body: form
-              });
-              const result = await res.json();
-              if (result.id) {
-                  newImages.push({ id: result.id, url: URL.createObjectURL(file) });
-              }
-          } catch(e) { console.error("Error uploading file", e); }
-      }
-      setGalleryImages(prev => [...newImages, ...prev]);
-      setGalleryIsLoading(false);
+      try {
+          const uploadPromises = files.map(file => uploadFileToDrive(file, 'gallery'));
+          await Promise.all(uploadPromises);
+          await loadFilesFromDrive('gallery');
+      } catch (error) { console.error("Error uploading images:", error); }
+      finally { setGalleryIsLoading(false); }
+  };
+  const handleDeleteFile = async (id: string, folderName: 'gallery' | 'backgrounds') => {
+      try {
+          await window.gapi.client.drive.files.delete({ fileId: id });
+          if(folderName === 'gallery') setGalleryImages(i => i.filter(img => img.id !== id));
+          else {
+              setUserBackgrounds(bgs => bgs.filter(bg => bg.id !== id));
+              if(activeBackground?.id === id) setActiveBackground(null);
+          }
+      } catch (error) { console.error(`Error deleting ${folderName} item:`, error); }
   };
   
-  const handleDeleteGalleryImage = async (id: string) => {
-    try {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${gdriveToken}` }
-        });
-        setGalleryImages(prev => prev.filter(img => img.id !== id));
-    } catch(e) { console.error("Error deleting image", e); }
+  const handleAddBackground = async (file: File) => {
+      setBackgroundsAreLoading(true);
+      try {
+          await uploadFileToDrive(file, 'backgrounds');
+          await loadFilesFromDrive('backgrounds');
+      } catch (error) { console.error("Error uploading background:", error); }
+      finally { setBackgroundsAreLoading(false); }
   };
-  
-   const handleAddBackground = async (file: File) => {
-    if (!appFolderId.current) return;
-    setBackgroundsAreLoading(true);
-    const fileMetadata = {
-        name: file.name,
-        parents: [appFolderId.current],
-        mimeType: file.type,
-        appProperties: { type: 'background' }
-    };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(fileMetadata)], { type: 'application/json' }));
-    form.append('file', file);
-    try {
-        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST',
-            headers: new Headers({ 'Authorization': `Bearer ${gdriveToken}` }),
-            body: form
-        });
-        const result = await res.json();
-        if (result.id) {
-            const newBg: Background = { id: result.id, name: file.name, url: URL.createObjectURL(file), type: file.type.startsWith('video') ? 'video' : 'image', isFavorite: false };
-            setUserBackgrounds(prev => [newBg, ...prev]);
-        }
-    } catch (e) { console.error("Error uploading background", e); } finally { setBackgroundsAreLoading(false); }
-  };
-
-  const handleDeleteBackground = async (id: string) => {
-    try {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${gdriveToken}` }
-        });
-        if(activeBackground?.id === id) setActiveBackground(null);
-        setUserBackgrounds(prev => prev.filter(bg => bg.id !== id));
-    } catch(e) { console.error("Error deleting background", e); }
-  };
-  
   const handleToggleFavoriteBackground = async (id: string) => {
     const bg = userBackgrounds.find(b => b.id === id);
     if (!bg) return;
-    const newIsFavorite = !bg.isFavorite;
+    const isFavorite = !bg.isFavorite;
     try {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
-            method: 'PATCH',
-            headers: { 'Authorization': `Bearer ${gdriveToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ appProperties: { isFavorite: String(newIsFavorite) } })
+        await window.gapi.client.drive.files.update({
+            fileId: id,
+            appProperties: { isFavorite: String(isFavorite) },
         });
-        setUserBackgrounds(prev => prev.map(b => b.id === id ? { ...b, isFavorite: newIsFavorite } : b));
-    } catch(e) { console.error("Error toggling favorite", e); }
+        setUserBackgrounds(bgs => bgs.map(b => b.id === id ? { ...b, isFavorite } : b));
+    } catch (error) { console.error("Error favoriting background:", error); }
   };
-
-
-  // --- SETTINGS SAVE & THEME LOGIC ---
+  
+  // Active Background Persistence
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
     if (user) {
-        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-        settingsSaveTimeout.current = window.setTimeout(async () => {
-            await supabase.from('site_settings').upsert({ user_id: user.id, theme_mode: theme }, { onConflict: 'user_id' });
-        }, 1000);
+        if(activeBackground) localStorage.setItem(getUserKey('activeBackgroundId'), activeBackground.id);
+        else localStorage.removeItem(getUserKey('activeBackgroundId'));
     }
-  }, [theme, user]);
+  }, [activeBackground, user, getUserKey]);
 
-  const onThemeColorChange = (colorName: keyof ThemeColors, value: string) => {
-    setThemeColors(prev => {
-        const newColors = { ...prev, [colorName]: value };
-        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-        settingsSaveTimeout.current = window.setTimeout(async () => {
-             if (user) await supabase.from('site_settings').upsert({ user_id: user.id, theme_colors: newColors }, { onConflict: 'user_id' });
-        }, 1000);
-        return newColors;
-    });
-  };
-
-  const onResetThemeColors = async () => {
-      setThemeColors(DEFAULT_COLORS);
-      if (user) await supabase.from('site_settings').upsert({ user_id: user.id, theme_colors: DEFAULT_COLORS }, { onConflict: 'user_id' });
-  };
-  
+  // --- OneSignal / Notifications ---
   useEffect(() => {
-    const root = document.documentElement;
-    const primary = themeColors.primary;
-    const secondary = themeColors.secondary;
-    root.style.setProperty('--color-primary', primary);
-    root.style.setProperty('--color-primary-light', adjustBrightness(primary, 30));
-    root.style.setProperty('--color-primary-dark', adjustBrightness(primary, -10));
+    if (!user?.id || !ONE_SIGNAL_APP_ID) {
+        return;
+    }
 
-    root.style.setProperty('--color-secondary', secondary);
-    root.style.setProperty('--color-secondary-light', adjustBrightness(secondary, 30));
-    root.style.setProperty('--color-secondary-dark', adjustBrightness(secondary, -10));
-    root.style.setProperty('--color-secondary-lighter', adjustBrightness(secondary, 50));
-  }, [themeColors]);
-  
-  useEffect(() => {
-      if (user && activeBackground) {
-          if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-          settingsSaveTimeout.current = window.setTimeout(async () => {
-              await supabase.from('site_settings').upsert({ user_id: user.id, active_background_id: activeBackground.id }, { onConflict: 'user_id' });
-          }, 1000);
+    const OneSignal = window.OneSignal || [];
+
+    const onPermissionChange = (newPermissionStatus: 'granted' | 'denied' | 'default') => {
+        setIsPermissionBlocked(newPermissionStatus === 'denied');
+    };
+
+    const onSubscriptionChange = (subscriptionState: { current: { optedIn: boolean } }) => {
+        setIsSubscribed(subscriptionState.current.optedIn);
+    };
+
+    const initializeOneSignal = async () => {
+        await OneSignal.init({
+            appId: ONE_SIGNAL_APP_ID,
+            allowLocalhostAsSecureOrigin: true,
+            autoRegister: false, // We will handle this manually.
+        });
+
+        await OneSignal.login(user.id);
+        
+        // Initial state check using synchronous properties from v16 SDK
+        setIsPermissionBlocked(OneSignal.Notifications.permission === 'denied');
+        setIsSubscribed(OneSignal.User.PushSubscription.optedIn);
+
+        // Attach listeners
+        OneSignal.Notifications.addEventListener('permissionChange', onPermissionChange);
+        OneSignal.User.PushSubscription.addEventListener('change', onSubscriptionChange);
+    };
+
+    initializeOneSignal();
+
+    // Cleanup listeners when the user changes or component unmounts
+    return () => {
+        if (window.OneSignal && window.OneSignal.Notifications && window.OneSignal.User) {
+            OneSignal.Notifications.removeEventListener('permissionChange', onPermissionChange);
+            OneSignal.User.PushSubscription.removeEventListener('change', onSubscriptionChange);
+        }
+    };
+}, [user?.id]);
+
+  const handleNotificationAction = async () => {
+      const OneSignal = window.OneSignal;
+      if (!OneSignal) return;
+
+      if (isPermissionBlocked) {
+          alert('Las notificaciones están bloqueadas en la configuración de tu navegador. Por favor, habilítalas para esta página.');
+          return;
       }
-  }, [activeBackground, user]);
-  
-  useEffect(() => {
-    if (user && particleType) {
-          if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-          settingsSaveTimeout.current = window.setTimeout(async () => {
-              await supabase.from('site_settings').upsert({ user_id: user.id, particle_type: particleType }, { onConflict: 'user_id' });
-          }, 1000);
-    }
-  }, [particleType, user]);
-  
-   useEffect(() => {
-    if (user && ambientSound) {
-          if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-          settingsSaveTimeout.current = window.setTimeout(async () => {
-              await supabase.from('site_settings').upsert({ user_id: user.id, ambient_sound: ambientSound }, { onConflict: 'user_id' });
-          }, 1000);
-    }
-  }, [ambientSound, user]);
-  
-  useEffect(() => {
-      if(user && pomodoroState) {
-          if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-          settingsSaveTimeout.current = window.setTimeout(async () => {
-              const { timeLeft, isActive, mode, ...configToSave } = pomodoroState;
-              await supabase.from('site_settings').upsert({ user_id: user.id, pomodoro_config: configToSave }, { onConflict: 'user_id' });
-          }, 1000);
+      
+      if (isSubscribed) {
+          // Send a test notification
+          supabase.functions.invoke('send-pushalert-notification', {
+            body: {
+              title: "¡Notificación de Prueba! 🐣",
+              body: "¡Así se verán los recordatorios de tus tareas!",
+            },
+          }).then(({ error }) => {
+              if (error) {
+                  console.error("Error sending test notification:", error);
+                  alert("Error al enviar la notificación de prueba.");
+              } else {
+                  // No need for an alert, the push notification is the confirmation
+              }
+          });
+      } else {
+          // This will trigger the native browser prompt.
+          await OneSignal.User.PushSubscription.optIn();
       }
-  }, [pomodoroState, user]);
-  
-  useEffect(() => {
-    if(user && browserSession) {
-        localStorage.setItem(`${user.email}_browserSession`, JSON.stringify(browserSession));
-    }
-  }, [browserSession, user]);
-
-  const onSetDailyEncouragement = (localHour: number | null) => {
-    let utcHour: number | null = null;
-    if (localHour !== null) {
-        const offset = new Date().getTimezoneOffset() / -60;
-        utcHour = (localHour - offset + 24) % 24;
-    }
-    setDailyEncouragementHour(utcHour);
-
-    if (user) {
-        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-        settingsSaveTimeout.current = window.setTimeout(async () => {
-            await supabase.from('site_settings').upsert({ user_id: user.id, daily_encouragement_utc_hour: utcHour }, { onConflict: 'user_id' });
-        }, 1000);
-    }
   };
+  
+  // --- Client-side Reminder Logic ---
+  useEffect(() => {
+      const checkReminders = () => {
+          if (!isSubscribed || !user) return;
+          const now = new Date();
+          // FIX: Cast the result of `Object.values(allTodos).flat()` to `Todo[]` to resolve a TypeScript type inference issue.
+          const allTasks: Todo[] = Object.values(allTodos).flat() as Todo[];
+          
+          allTasks.forEach(task => {
+              if (task.completed || !task.due_date || !task.start_time || !task.reminder_offset || task.notification_sent) {
+                  return;
+              }
+              const [hour, minute] = task.start_time.split(':').map(Number);
+              const [year, month, day] = task.due_date.split('-').map(Number);
+              const startTime = new Date(year, month - 1, day, hour, minute);
+              const reminderTime = new Date(startTime.getTime() - task.reminder_offset * 60 * 1000);
+              
+              // Check if the reminder time is in the past (within the last minute)
+              if (reminderTime <= now && now.getTime() - reminderTime.getTime() < 60000) {
+                  supabase.functions.invoke('send-pushalert-notification', {
+                      body: {
+                          title: "Recordatorio de Tarea 🐥",
+                          body: `¡Es hora de empezar con "${task.text}"!`,
+                      },
+                  }).then(async ({ error }) => {
+                      if (error) {
+                          console.error("Error sending reminder:", error);
+                      } else {
+                          const { error: updateError } = await supabase.from('todos').update({ notification_sent: true }).eq('id', task.id);
+                          if (!updateError) {
+                              setAllTodos(current => {
+                                  const newAllTodos = { ...current };
+                                  const dateKey = task.due_date!;
+                                  newAllTodos[dateKey] = newAllTodos[dateKey].map(t => t.id === task.id ? { ...t, notification_sent: true } : t);
+                                  return newAllTodos;
+                              });
+                          }
+                      }
+                  });
+              }
+          });
+      };
+      // Check every minute
+      const intervalId = setInterval(checkReminders, 60 * 1000);
+      // Run once on startup as well
+      checkReminders(); 
 
-  if (authLoading || (!dataLoaded && user)) {
+      return () => clearInterval(intervalId);
+  }, [allTodos, isSubscribed, user]);
+
+
+  if (authLoading || (user && !dataLoaded)) {
     return (
-        <div className="h-screen w-screen bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 flex flex-col items-center justify-center">
-            <ChickenIcon className="w-24 h-24 text-primary animate-pulse" />
+        <div className="min-h-screen bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 flex flex-col items-center justify-center text-center">
+            <div className="relative w-40 h-32">
+                <div className="absolute inset-x-0 bottom-8 h-24">
+                    <div className="animate-walk-cycle w-24 h-24 mx-auto">
+                        <ChickenIcon className="w-full h-full text-pink-400" />
+                    </div>
+                </div>
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-16 h-3 bg-black rounded-full animate-shadow-cycle"></div>
+            </div>
+             <p className="text-xl font-semibold text-gray-600 dark:text-gray-300 -mt-4 animate-pulse">
+                Cargando...
+            </p>
         </div>
     );
   }
-
+  
   if (!user) {
     return <Login onLogin={() => {}} />;
   }
-  
-  const componentProps: AppComponentProps = {
-    currentUser: user,
-    onLogout: () => supabase.auth.signOut(),
-    theme, toggleTheme: () => setTheme(t => t === 'light' ? 'dark' : 'light'),
-    // FIX: Corrected a typo from `onColorChange` to `onThemeColorChange` to match the prop definition and the function's actual name.
-    themeColors, onThemeColorChange, onResetThemeColors,
+
+  const appProps: AppComponentProps = {
+    currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementHour,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
-    handleAddFolder, handleUpdateFolder, handleDeleteFolder,
-    handleAddNote, handleUpdateNote, handleDeleteNote,
+    handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
+    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
-    handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
-    gapiReady: gapiReady,
+    handleAddGalleryImages, handleDeleteGalleryImage: (id) => handleDeleteFile(id, 'gallery'),
+    handleAddBackground, handleDeleteBackground: (id) => handleDeleteFile(id, 'backgrounds'),
+    handleToggleFavoriteBackground, gapiReady,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
   };
 
-  const appContent = isMobile ? <MobileApp {...componentProps} /> : <DesktopApp {...componentProps} />;
-
   return (
     <>
-      {appContent}
-      <InstallPwaBanner
-        isIos={isIos}
-        show={showInstallBanner}
-        onInstall={handleInstallClick}
-        onDismiss={handleDismissInstallBanner}
+      {isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />}
+      <InstallPwaBanner 
+        show={showInstallBanner} 
+        isIos={isIos} 
+        onInstall={handleInstallPwa} 
+        onDismiss={handleDismissPwaBanner} 
       />
     </>
   );
