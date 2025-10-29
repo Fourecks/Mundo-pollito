@@ -1010,7 +1010,7 @@ const App: React.FC = () => {
   
     OneSignal.push(initializeAndLogin);
   
-  }, [user]);
+  }, [user?.id]); // FIX: Depend on user ID instead of the user object. This prevents the effect from re-running on token refreshes, which was causing an "SDK already initialized" error and preventing OneSignal.login() from completing.
 
   
   const handleNotificationAction = async () => {
