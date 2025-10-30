@@ -1647,66 +1647,6 @@ const App: React.FC = () => {
       }
   };
   
-  // --- Client-side Reminder Logic ---
-  useEffect(() => {
-    const checkReminders = () => {
-        if (!isSubscribed || !user) return;
-        const now = new Date();
-        const allTasks: Todo[] = Object.values(allTodos).flat() as Todo[];
-
-        // Find the first task that needs a reminder to avoid spamming requests
-        const taskToSend = allTasks.find(task => {
-            if (task.completed || !task.due_date || !task.start_time || !task.reminder_offset || task.notification_sent) {
-                return false;
-            }
-            const [hour, minute] = task.start_time.split(':').map(Number);
-            const [year, month, day] = task.due_date.split('-').map(Number);
-            const startTime = new Date(year, month - 1, day, hour, minute);
-            const reminderTime = new Date(startTime.getTime() - task.reminder_offset * 60 * 1000);
-            
-            return reminderTime <= now;
-        });
-
-        if (taskToSend) {
-            supabase.functions.invoke('send-pushalert-notification', {
-                body: {
-                    title: "Recordatorio de Tarea 🐥",
-                    message: `¡Es hora de empezar con "${taskToSend.text}"!`,
-                },
-            }).then(async ({ error }) => {
-                if (error) {
-                    console.error("Error sending reminder:", error);
-                } else {
-                    // Mark as sent to prevent re-sending
-                    const { error: updateError } = await supabase.from('todos').update({ notification_sent: true }).eq('id', taskToSend.id);
-                    if (!updateError) {
-                        setAllTodos(current => {
-                            const newAllTodos = { ...current };
-                            const dateKey = taskToSend.due_date!;
-                            if (newAllTodos[dateKey]) {
-                                newAllTodos[dateKey] = newAllTodos[dateKey].map(t => 
-                                    t.id === taskToSend.id ? { ...t, notification_sent: true } : t
-                                );
-                            }
-                            return newAllTodos;
-                        });
-                    }
-                }
-            });
-        }
-    };
-    
-    // Check every minute
-    const intervalId = setInterval(checkReminders, 60 * 1000);
-    // Run once on startup as well, after a short delay to allow data to load
-    const startupTimeout = setTimeout(checkReminders, 5000);
-
-    return () => {
-      clearInterval(intervalId);
-      clearTimeout(startupTimeout);
-    };
-  }, [allTodos, isSubscribed, user]);
-
 
   if (authLoading || (user && !dataLoaded)) {
     return (
