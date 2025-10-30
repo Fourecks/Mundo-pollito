@@ -17,7 +17,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { title, body } = await req.json();
+    const { title, message } = await req.json();
 
     // 1. Verify JWT to get user ID
     const authHeader = req.headers.get('Authorization');
@@ -46,7 +46,7 @@ serve(async (req: Request) => {
       app_id: ONE_SIGNAL_APP_ID,
       include_external_user_ids: [userId], // This is the recommended method from the guide
       headings: { en: title },
-      contents: { en: body },
+      contents: { en: message },
       web_url: Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.onrender.com') || 'https://pollito-productivo.onrender.com',
     };
 

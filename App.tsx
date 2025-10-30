@@ -324,7 +324,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         supabase.functions.invoke('send-pushalert-notification', {
             body: {
                 title: "Pomodoro Terminado",
-                body: message,
+                message: message,
             },
         });
       }
@@ -605,7 +605,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             supabase.functions.invoke('send-pushalert-notification', {
                 body: {
                     title: "Pomodoro Terminado",
-                    body: message,
+                    message: message,
                 },
             });
           }
@@ -1632,7 +1632,7 @@ const App: React.FC = () => {
           supabase.functions.invoke('send-pushalert-notification', {
             body: {
               title: "¡Notificación de Prueba! 🐣",
-              body: "¡Así se verán los recordatorios de tus tareas!",
+              message: "¡Así se verán los recordatorios de tus tareas!",
             },
           }).then(({ error }) => {
               if (error) {
@@ -1670,7 +1670,7 @@ const App: React.FC = () => {
                   supabase.functions.invoke('send-pushalert-notification', {
                       body: {
                           title: "Recordatorio de Tarea 🐥",
-                          body: `¡Es hora de empezar con "${task.text}"!`,
+                          message: `¡Es hora de empezar con "${task.text}"!`,
                       },
                   }).then(async ({ error }) => {
                       if (error) {
