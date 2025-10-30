@@ -49,7 +49,7 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- OneSignal Configuration ---
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 // Helper to format date as YYYY-MM-DD key
 const formatDateKey = (date: Date): string => {
@@ -324,7 +324,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         supabase.functions.invoke('send-pushalert-notification', {
             body: {
                 title: "Pomodoro Terminado",
-                message: message,
+                body: message,
             },
         });
       }
@@ -605,7 +605,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             supabase.functions.invoke('send-pushalert-notification', {
                 body: {
                     title: "Pomodoro Terminado",
-                    message: message,
+                    body: message,
                 },
             });
           }
@@ -1632,7 +1632,7 @@ const App: React.FC = () => {
           supabase.functions.invoke('send-pushalert-notification', {
             body: {
               title: "¡Notificación de Prueba! 🐣",
-              message: "¡Así se verán los recordatorios de tus tareas!",
+              body: "¡Así se verán los recordatorios de tus tareas!",
             },
           }).then(({ error }) => {
               if (error) {
@@ -1670,7 +1670,7 @@ const App: React.FC = () => {
                   supabase.functions.invoke('send-pushalert-notification', {
                       body: {
                           title: "Recordatorio de Tarea 🐥",
-                          message: `¡Es hora de empezar con "${task.text}"!`,
+                          body: `¡Es hora de empezar con "${task.text}"!`,
                       },
                   }).then(async ({ error }) => {
                       if (error) {

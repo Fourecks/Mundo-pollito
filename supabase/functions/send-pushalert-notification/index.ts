@@ -17,14 +17,15 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { title, message } = await req.json();
+    const { title, body } = await req.json();
 
     // 1. Verify JWT to get user ID
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing Authorization header');
     const token = authHeader.replace('Bearer ', '');
-    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET'); // Use the correct secret name
-    if (!jwtSecret) throw new Error("Supabase secret 'SUPABASE_JWT_SECRET' is not set.");
+    // FIX: Use 'JWT_SECRET' to match the user's Supabase secrets configuration.
+    const jwtSecret = Deno.env.get('JWT_SECRET'); 
+    if (!jwtSecret) throw new Error("Supabase secret 'JWT_SECRET' is not set.");
     
     const key = await crypto.subtle.importKey(
         "raw", new TextEncoder().encode(jwtSecret),
@@ -46,7 +47,7 @@ serve(async (req: Request) => {
       app_id: ONE_SIGNAL_APP_ID,
       include_external_user_ids: [userId], // This is the recommended method from the guide
       headings: { en: title },
-      contents: { en: message },
+      contents: { en: body },
       web_url: Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.onrender.com') || 'https://pollito-productivo.onrender.com',
     };
 
