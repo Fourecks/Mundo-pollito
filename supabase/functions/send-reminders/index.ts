@@ -1,4 +1,15 @@
 // supabase/functions/send-reminders/index.ts
+
+// ⚠️ DEPLOYMENT INSTRUCTION
+// This function is triggered by a cron job and runs without a user context.
+// By default, Supabase functions require user authentication (a JWT), which causes a 401 Unauthorized error for cron jobs.
+// To fix this, you MUST deploy this function with the `--no-verify-jwt` flag.
+//
+// Run this command in your terminal:
+// supabase functions deploy send-reminders --no-verify-jwt
+//
+// This tells Supabase to allow this specific function to be executed by the cron scheduler.
+
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
