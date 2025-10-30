@@ -38,7 +38,7 @@ interface CustomizationPanelProps {
 
   // Color Props
   colors: ThemeColors;
-  onColorChange: (colorName: keyof ThemeColors, value: string) => void;
+  onThemeColorChange: (colorName: keyof ThemeColors, value: string) => void;
   onReset: () => void;
   
   // Background Props
@@ -281,7 +281,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
             </div>
 
             <div className="flex-grow overflow-y-auto custom-scrollbar">
-                {activeTab === 'colores' && <ThemeCustomizer colors={props.colors} onColorChange={props.onColorChange} onReset={props.onReset} />}
+                {activeTab === 'colores' && <ThemeCustomizer colors={props.colors} onThemeColorChange={props.onThemeColorChange} onReset={props.onReset} />}
                 {activeTab === 'fondos' && <BackgroundsTab {...props} />}
                 {activeTab === 'ambiente' && <AmbienceTab {...props} />}
             </div>

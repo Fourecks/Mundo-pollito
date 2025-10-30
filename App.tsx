@@ -461,7 +461,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         onAuthClick={handleAuthClick}
         isGapiReady={props.gapiReady}
         colors={themeColors}
-        onColorChange={onThemeColorChange}
+        onThemeColorChange={onThemeColorChange}
         onReset={onResetThemeColors}
         activeBackground={activeBackground}
         userBackgrounds={userBackgrounds}
@@ -777,7 +777,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               onAuthClick={handleAuthClick}
               isGapiReady={props.gapiReady}
               colors={themeColors}
-              onColorChange={onThemeColorChange}
+              onThemeColorChange={onThemeColorChange}
               onReset={onResetThemeColors}
               activeBackground={activeBackground}
               userBackgrounds={userBackgrounds}
