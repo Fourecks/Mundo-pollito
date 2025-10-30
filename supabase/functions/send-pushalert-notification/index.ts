@@ -2,7 +2,7 @@
 // It sends a push notification to a specific user via the OneSignal REST API.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,35 +17,40 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { title, message } = await req.json();
-
-    // 1. Verify JWT to get user ID
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Missing Authorization header');
-    const token = authHeader.replace('Bearer ', '');
-    // FIX: Use 'JWT_SECRET' to match the user's Supabase secrets configuration.
-    const jwtSecret = Deno.env.get('JWT_SECRET'); 
-    if (!jwtSecret) throw new Error("Supabase secret 'JWT_SECRET' is not set.");
-    
-    const key = await crypto.subtle.importKey(
-        "raw", new TextEncoder().encode(jwtSecret),
-        { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+    // 1. Create a Supabase client with the user's auth context
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
     );
-    const payload = await verify(token, key);
-    const userId = payload.sub;
-    if (!userId) throw new Error('Could not extract user ID from token');
 
-    // 2. Get OneSignal secrets from environment variables
+    // 2. Get the user from the token using the Supabase client
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError) throw userError;
+    if (!user) throw new Error('User not authenticated.');
+    const userId = user.id;
+
+    // 3. Get notification content from the request body
+    const { title, message } = await req.json();
+    if (!title || !message) {
+      throw new Error("Request body must contain 'title' and 'message'.");
+    }
+    
+    // 4. Get OneSignal secrets from environment variables
     const ONE_SIGNAL_APP_ID = Deno.env.get('ONE_SIGNAL_APP_ID');
     const ONE_SIGNAL_REST_API_KEY = Deno.env.get('ONE_SIGNAL_REST_API_KEY');
     if (!ONE_SIGNAL_APP_ID || !ONE_SIGNAL_REST_API_KEY) {
       throw new Error("OneSignal secrets (ONE_SIGNAL_APP_ID, ONE_SIGNAL_REST_API_KEY) are not set.");
     }
 
-    // 3. Prepare and send the request to OneSignal API, targeting the external user ID
+    // 5. Prepare and send the request to the OneSignal API
     const oneSignalPayload = {
       app_id: ONE_SIGNAL_APP_ID,
-      include_external_user_ids: [userId], // This is the recommended method from the guide
+      include_external_user_ids: [userId],
       headings: { en: title },
       contents: { en: message },
       web_url: Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.onrender.com') || 'https://pollito-productivo.onrender.com',
@@ -74,7 +79,7 @@ serve(async (req: Request) => {
     });
 
   } catch (err) {
-    console.error('Critical error in send-onesignal-notification function:', err);
+    console.error('Critical error in send-pushalert-notification function:', err);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
