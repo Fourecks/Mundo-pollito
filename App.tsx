@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -47,7 +48,7 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- OneSignal Configuration ---
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 // Helper to format date as YYYY-MM-DD key
 const formatDateKey = (date: Date): string => {
@@ -1648,52 +1649,62 @@ const App: React.FC = () => {
   
   // --- Client-side Reminder Logic ---
   useEffect(() => {
-      const checkReminders = () => {
-          if (!isSubscribed || !user) return;
-          const now = new Date();
-          // FIX: Cast the result of `Object.values(allTodos).flat()` to `Todo[]` to resolve a TypeScript type inference issue.
-          const allTasks: Todo[] = Object.values(allTodos).flat() as Todo[];
-          
-          allTasks.forEach(task => {
-              if (task.completed || !task.due_date || !task.start_time || !task.reminder_offset || task.notification_sent) {
-                  return;
-              }
-              const [hour, minute] = task.start_time.split(':').map(Number);
-              const [year, month, day] = task.due_date.split('-').map(Number);
-              const startTime = new Date(year, month - 1, day, hour, minute);
-              const reminderTime = new Date(startTime.getTime() - task.reminder_offset * 60 * 1000);
-              
-              // Check if the reminder time is in the past
-              if (reminderTime <= now) {
-                  supabase.functions.invoke('send-pushalert-notification', {
-                      body: {
-                          title: "Recordatorio de Tarea 🐥",
-                          message: `¡Es hora de empezar con "${task.text}"!`,
-                      },
-                  }).then(async ({ error }) => {
-                      if (error) {
-                          console.error("Error sending reminder:", error);
-                      } else {
-                          const { error: updateError } = await supabase.from('todos').update({ notification_sent: true }).eq('id', task.id);
-                          if (!updateError) {
-                              setAllTodos(current => {
-                                  const newAllTodos = { ...current };
-                                  const dateKey = task.due_date!;
-                                  newAllTodos[dateKey] = newAllTodos[dateKey].map(t => t.id === task.id ? { ...t, notification_sent: true } : t);
-                                  return newAllTodos;
-                              });
-                          }
-                      }
-                  });
-              }
-          });
-      };
-      // Check every minute
-      const intervalId = setInterval(checkReminders, 60 * 1000);
-      // Run once on startup as well
-      checkReminders(); 
+    const checkReminders = () => {
+        if (!isSubscribed || !user) return;
+        const now = new Date();
+        const allTasks: Todo[] = Object.values(allTodos).flat() as Todo[];
 
-      return () => clearInterval(intervalId);
+        // Find the first task that needs a reminder to avoid spamming requests
+        const taskToSend = allTasks.find(task => {
+            if (task.completed || !task.due_date || !task.start_time || !task.reminder_offset || task.notification_sent) {
+                return false;
+            }
+            const [hour, minute] = task.start_time.split(':').map(Number);
+            const [year, month, day] = task.due_date.split('-').map(Number);
+            const startTime = new Date(year, month - 1, day, hour, minute);
+            const reminderTime = new Date(startTime.getTime() - task.reminder_offset * 60 * 1000);
+            
+            return reminderTime <= now;
+        });
+
+        if (taskToSend) {
+            supabase.functions.invoke('send-pushalert-notification', {
+                body: {
+                    title: "Recordatorio de Tarea 🐥",
+                    message: `¡Es hora de empezar con "${taskToSend.text}"!`,
+                },
+            }).then(async ({ error }) => {
+                if (error) {
+                    console.error("Error sending reminder:", error);
+                } else {
+                    // Mark as sent to prevent re-sending
+                    const { error: updateError } = await supabase.from('todos').update({ notification_sent: true }).eq('id', taskToSend.id);
+                    if (!updateError) {
+                        setAllTodos(current => {
+                            const newAllTodos = { ...current };
+                            const dateKey = taskToSend.due_date!;
+                            if (newAllTodos[dateKey]) {
+                                newAllTodos[dateKey] = newAllTodos[dateKey].map(t => 
+                                    t.id === taskToSend.id ? { ...t, notification_sent: true } : t
+                                );
+                            }
+                            return newAllTodos;
+                        });
+                    }
+                }
+            });
+        }
+    };
+    
+    // Check every minute
+    const intervalId = setInterval(checkReminders, 60 * 1000);
+    // Run once on startup as well, after a short delay to allow data to load
+    const startupTimeout = setTimeout(checkReminders, 5000);
+
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(startupTimeout);
+    };
   }, [allTodos, isSubscribed, user]);
 
 
