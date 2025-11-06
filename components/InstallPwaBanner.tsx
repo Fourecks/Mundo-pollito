@@ -17,7 +17,7 @@ const InstallPwaBanner: React.FC<InstallPwaBannerProps> = ({ isIos, show, onInst
 
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-[80000] bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-4 animate-pop-in"
+      className="fixed bottom-24 left-4 right-4 mx-auto max-w-md z-[80000] bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-4 animate-pop-in"
       role="dialog"
       aria-labelledby="pwa-install-title"
       aria-describedby="pwa-install-description"
