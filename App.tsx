@@ -599,7 +599,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
           pomodoroAudioRef.current?.play();
           const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
-          const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
+          const message = pomodoroState.mode === 'work' ? "¡Tiempo de descansar! Bien hecho pollito." : "¡Se acabó el descanso! Tú puedes.";
           
           if (isSubscribed) {
             supabase.functions.invoke('send-pushalert-notification', {
