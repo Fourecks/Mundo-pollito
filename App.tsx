@@ -1165,7 +1165,7 @@ const App: React.FC = () => {
   const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    const newTodo: Omit<Todo, 'id' | 'created_at'> = { text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id };
+    const newTodo: Omit<Todo, 'id' | 'created_at'> = { text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id, timezone_offset: new Date().getTimezoneOffset() };
     const { data, error } = await supabase.from('todos').insert(newTodo).select('*, subtasks(*)').single();
     if (error) console.error("Error adding todo:", error);
     else if (data) {

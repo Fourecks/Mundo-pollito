@@ -94,7 +94,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             reminder_offset: reminderOffset,
             recurrence,
             subtasks,
-            notification_sent: todo.reminder_offset !== reminderOffset ? false : todo.notification_sent
+            notification_sent: todo.reminder_offset !== reminderOffset ? false : todo.notification_sent,
+            timezone_offset: new Date().getTimezoneOffset(),
         });
         onClose();
     };

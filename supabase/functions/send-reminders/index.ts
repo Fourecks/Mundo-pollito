@@ -73,7 +73,7 @@ serve(async (req) => {
     // 1. Fetch all tasks that could potentially need a reminder.
     const { data: candidateTodos, error: fetchError } = await supabaseAdmin
       .from('todos')
-      .select('id, user_id, text, due_date, start_time, reminder_offset')
+      .select('id, user_id, text, due_date, start_time, reminder_offset, timezone_offset')
       .eq('completed', false)
       .eq('notification_sent', false)
       .gt('reminder_offset', 0)
@@ -86,11 +86,19 @@ serve(async (req) => {
 
     const todosToSend: any[] = [];
     for (const todo of candidateTodos) {
-      // Calculate the exact reminder time in UTC.
+      // Calculate the exact reminder time, accounting for the user's timezone.
       const [year, month, day] = todo.due_date.split('-').map(Number);
       const [hour, minute] = todo.start_time.split(':').map(Number);
       
-      const startTime = new Date(Date.UTC(year, month - 1, day, hour, minute));
+      // Create a date object as if the local time parts were UTC
+      const localTimeAsUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
+      
+      // Get the user's timezone offset (in minutes) from when they saved the task.
+      // getTimezoneOffset() is positive for timezones behind UTC (e.g., Americas).
+      // We need to ADD this offset to our wrongly interpreted UTC time to get the correct UTC time.
+      const userOffsetMinutes = todo.timezone_offset || 0;
+      const startTime = new Date(localTimeAsUTC.getTime() + userOffsetMinutes * 60 * 1000);
+      
       const reminderTime = new Date(startTime.getTime() - todo.reminder_offset * 60 * 1000);
 
       // Check if the reminder time is in the past.
