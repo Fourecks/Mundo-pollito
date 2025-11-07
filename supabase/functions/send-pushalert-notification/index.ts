@@ -54,6 +54,7 @@ serve(async (req: Request) => {
       headings: { en: title },
       contents: { en: message },
       web_url: Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.onrender.com') || 'https://pollito-productivo.onrender.com',
+      chrome_web_icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png",
     };
 
     const response = await fetch('https://onesignal.com/api/v1/notifications', {
