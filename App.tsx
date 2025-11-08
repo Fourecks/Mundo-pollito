@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -50,6 +51,8 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
 const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const silentAudioSrc = "data:audio/mp3;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIMKpIE5DSCBTb2Z0d2FyZQBUSVQyAAAABgAAAzIyMzUAVFNTRQAAAA8AAANMYXZmNTcuODMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV-";
+
 
 // Helper to format date as YYYY-MM-DD key
 const formatDateKey = (date: Date): string => {
@@ -296,6 +299,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 
   const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
   const ambientAudioRef = useRef<HTMLAudioElement>(null);
+  const silentAudioRef = useRef<HTMLAudioElement>(null);
   
   const handleShowCompletionModal = (quote: string) => {
     setCompletionQuote(quote);
@@ -308,36 +312,65 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
   const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
 
-  // Pomodoro Timer Effect
-  useEffect(() => {
-    let timer: number | undefined;
-    if (pomodoroState.isActive && pomodoroState.timeLeft > 0) {
-      timer = window.setInterval(() => {
-        setPomodoroState(s => ({ ...s, timeLeft: s.timeLeft - 1 }));
-      }, 1000);
-    } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
-      pomodoroAudioRef.current?.play();
-      const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
-      const message = pomodoroState.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
-      
+  // Pomodoro Timer Logic
+  const handleTimerCompletion = useCallback(() => {
+    pomodoroAudioRef.current?.play();
+    silentAudioRef.current?.pause();
+
+    setPomodoroState(s => {
+      const newMode = s.mode === 'work' ? 'break' : 'work';
+      const message = s.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
+
       if (isSubscribed) {
         supabase.functions.invoke('send-pushalert-notification', {
-            body: {
-                title: "Pomodoro Terminado",
-                message: message,
-            },
+          body: { title: "Pomodoro Terminado", message: message },
         });
       }
 
-      setPomodoroState(s => ({
-          ...s,
-          mode: newMode,
-          timeLeft: s.durations[newMode],
-          isActive: true
-      }));
+      const newDuration = s.durations[newMode];
+      silentAudioRef.current?.play().catch(e => console.error("Silent audio play failed on auto-restart:", e));
+      return {
+        ...s,
+        mode: newMode,
+        timeLeft: newDuration,
+        isActive: true,
+        endTime: Date.now() + newDuration * 1000,
+      };
+    });
+  }, [isSubscribed, setPomodoroState]);
+
+  useEffect(() => {
+    let timer: number | undefined;
+
+    if (pomodoroState.isActive && pomodoroState.endTime) {
+      timer = window.setInterval(() => {
+        const remaining = pomodoroState.endTime! - Date.now();
+        if (remaining > 0) {
+          setPomodoroState(s => ({ ...s, timeLeft: Math.ceil(remaining / 1000) }));
+        } else {
+          handleTimerCompletion();
+        }
+      }, 250);
     }
-    return () => clearInterval(timer);
-  }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState, isSubscribed]);
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && pomodoroState.isActive && pomodoroState.endTime) {
+        const remaining = pomodoroState.endTime - Date.now();
+        if (remaining <= 0) {
+          handleTimerCompletion();
+        } else {
+          setPomodoroState(s => ({ ...s, timeLeft: Math.ceil(remaining / 1000) }));
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [pomodoroState.isActive, pomodoroState.endTime, handleTimerCompletion, setPomodoroState]);
 
   // Ambient Sound Effect
   useEffect(() => {
@@ -379,11 +412,20 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const handlePomodoroToggle = () => {
     setPomodoroState(s => {
       const isStarting = !s.isActive;
-      if (isStarting && !pomodoroStartedRef.current) {
-        pomodoroStartedRef.current = true;
-        return { ...s, isActive: true, showBackgroundTimer: true };
+      if (isStarting) {
+        silentAudioRef.current?.play().catch(e => console.error("Silent audio play failed:", e));
+        const endTime = Date.now() + s.timeLeft * 1000;
+        if (!pomodoroStartedRef.current) {
+          pomodoroStartedRef.current = true;
+          return { ...s, isActive: true, endTime, showBackgroundTimer: true };
+        }
+        return { ...s, isActive: true, endTime };
+      } else {
+        silentAudioRef.current?.pause();
+        // Preserve timeLeft when pausing
+        const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
+        return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
       }
-      return { ...s, isActive: isStarting };
     });
   };
   
@@ -515,7 +557,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
           {openWindows.includes('pomodoro') && (
               <ModalWindow isOpen onClose={() => toggleWindow('pomodoro')} title="Pomodoro" isDraggable isResizable zIndex={focusedWindow === 'pomodoro' ? 50 : 40} onFocus={() => bringToFront('pomodoro')} className="w-80 h-96" windowState={windowStates.pomodoro} onStateChange={s => setWindowStates(ws => ({...ws, pomodoro: s}))}>
-                  <Pomodoro timeLeft={pomodoroState.timeLeft} isActive={pomodoroState.isActive} mode={pomodoroState.mode} durations={pomodoroState.durations} onToggle={handlePomodoroToggle} onReset={() => setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false }))} onSwitchMode={(mode) => setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false }))} onSaveSettings={(d) => setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false }))} showBackgroundTimer={pomodoroState.showBackgroundTimer} onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))} backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity} onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))} />
+                  <Pomodoro timeLeft={pomodoroState.timeLeft} isActive={pomodoroState.isActive} mode={pomodoroState.mode} durations={pomodoroState.durations} onToggle={handlePomodoroToggle} onReset={() => { silentAudioRef.current?.pause(); setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }} onSwitchMode={(mode) => { silentAudioRef.current?.pause(); setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null })); }} onSaveSettings={(d) => { silentAudioRef.current?.pause(); setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null })); }} showBackgroundTimer={pomodoroState.showBackgroundTimer} onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))} backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity} onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))} />
               </ModalWindow>
           )}
            {openWindows.includes('music') && (
@@ -548,6 +590,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 
       <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
       <audio ref={ambientAudioRef} />
+      <audio ref={silentAudioRef} src={silentAudioSrc} loop playsInline />
     </div>
   );
 };
@@ -580,6 +623,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
     const ambientAudioRef = useRef<HTMLAudioElement>(null);
+    const silentAudioRef = useRef<HTMLAudioElement>(null);
 
     const handleShowCompletionModal = (quote: string) => {
         setCompletionQuote(quote);
@@ -591,29 +635,66 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
     const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
     
-    // Pomodoro Timer Effect
+    // Pomodoro Timer Logic
+    const handleTimerCompletion = useCallback(() => {
+        pomodoroAudioRef.current?.play();
+        silentAudioRef.current?.pause();
+
+        setPomodoroState(s => {
+            const newMode = s.mode === 'work' ? 'break' : 'work';
+            const message = s.mode === 'work' ? "¡Tiempo de descansar! Bien hecho pollito." : "¡Se acabó el descanso! Tú puedes.";
+
+            if (isSubscribed) {
+                supabase.functions.invoke('send-pushalert-notification', {
+                    body: { title: "Pomodoro Terminado", message: message },
+                });
+            }
+
+            const newDuration = s.durations[newMode];
+            silentAudioRef.current?.play().catch(e => console.error("Silent audio play failed on auto-restart:", e));
+            return {
+                ...s,
+                mode: newMode,
+                timeLeft: newDuration,
+                isActive: true,
+                endTime: Date.now() + newDuration * 1000,
+            };
+        });
+    }, [isSubscribed, setPomodoroState]);
+
     useEffect(() => {
         let timer: number | undefined;
-        if (pomodoroState.isActive && pomodoroState.timeLeft > 0) {
-          timer = window.setInterval(() => setPomodoroState(s => ({ ...s, timeLeft: s.timeLeft - 1 })), 1000);
-        } else if (pomodoroState.isActive && pomodoroState.timeLeft <= 0) {
-          pomodoroAudioRef.current?.play();
-          const newMode = pomodoroState.mode === 'work' ? 'break' : 'work';
-          const message = pomodoroState.mode === 'work' ? "¡Tiempo de descansar! Bien hecho pollito." : "¡Se acabó el descanso! Tú puedes.";
-          
-          if (isSubscribed) {
-            supabase.functions.invoke('send-pushalert-notification', {
-                body: {
-                    title: "Pomodoro Terminado",
-                    message: message,
-                },
-            });
-          }
-          
-          setPomodoroState(s => ({ ...s, mode: newMode, timeLeft: s.durations[newMode], isActive: true }));
+
+        if (pomodoroState.isActive && pomodoroState.endTime) {
+            timer = window.setInterval(() => {
+                const remaining = pomodoroState.endTime! - Date.now();
+                if (remaining > 0) {
+                    setPomodoroState(s => ({ ...s, timeLeft: Math.ceil(remaining / 1000) }));
+                } else {
+                    handleTimerCompletion();
+                }
+            }, 250);
         }
-        return () => clearInterval(timer);
-    }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode, pomodoroState.durations, setPomodoroState, isSubscribed]);
+
+        const handleVisibilityChange = () => {
+            if (!document.hidden && pomodoroState.isActive && pomodoroState.endTime) {
+                const remaining = pomodoroState.endTime - Date.now();
+                if (remaining <= 0) {
+                    handleTimerCompletion();
+                } else {
+                    setPomodoroState(s => ({ ...s, timeLeft: Math.ceil(remaining / 1000) }));
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [pomodoroState.isActive, pomodoroState.endTime, handleTimerCompletion, setPomodoroState]);
+
 
     // Ambient Sound Effect
     useEffect(() => {
@@ -640,7 +721,19 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       else { setActiveSpotifyTrack({ ...track, queue }); if(activeTrack) setActiveTrack(null); }
     };
 
-    const handlePomodoroToggle = () => setPomodoroState(s => ({ ...s, isActive: !s.isActive }));
+    const handlePomodoroToggle = () => {
+        setPomodoroState(s => {
+            const isStarting = !s.isActive;
+            if (isStarting) {
+                silentAudioRef.current?.play().catch(e => console.error("Silent audio play failed:", e));
+                return { ...s, isActive: true, endTime: Date.now() + s.timeLeft * 1000 };
+            } else {
+                silentAudioRef.current?.pause();
+                const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
+                return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
+            }
+        });
+    };
 
     const capitalizedUserName = useMemo(() => {
         if (!currentUser.email) return 'Pollito';
@@ -811,9 +904,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     mode={pomodoroState.mode}
                     durations={pomodoroState.durations}
                     onToggle={handlePomodoroToggle}
-                    onReset={() => setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false }))}
-                    onSwitchMode={(mode) => setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false }))}
-                    onSaveSettings={(d) => setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false }))}
+                    onReset={() => { silentAudioRef.current?.pause(); setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
+                    onSwitchMode={(mode) => { silentAudioRef.current?.pause(); setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null })); }}
+                    onSaveSettings={(d) => { silentAudioRef.current?.pause(); setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null })); }}
                     showBackgroundTimer={pomodoroState.showBackgroundTimer}
                     onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))}
                     backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity}
@@ -823,6 +916,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
             <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
             <audio ref={ambientAudioRef} />
+            <audio ref={silentAudioRef} src={silentAudioSrc} loop playsInline />
         </div>
     );
 };
@@ -894,6 +988,7 @@ const App: React.FC = () => {
       durations: { work: 25 * 60, break: 5 * 60 },
       showBackgroundTimer: false,
       backgroundTimerOpacity: 50,
+      endTime: null as (number | null),
   });
 
   // Google Drive State
@@ -1127,7 +1222,10 @@ const App: React.FC = () => {
     // Load local settings
     try {
         const storedPomodoro = localStorage.getItem(getUserKey('pomodoroState'));
-        if (storedPomodoro) setPomodoroState(JSON.parse(storedPomodoro));
+        if (storedPomodoro) {
+            const parsed = JSON.parse(storedPomodoro);
+            setPomodoroState(s => ({...s, ...parsed, isActive: false, endTime: null})); // Always start paused on load
+        }
 
         const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
         if (storedActiveBgId) setSavedActiveBgId(storedActiveBgId);
@@ -1153,7 +1251,12 @@ const App: React.FC = () => {
   }, [user, dataLoaded, loadData]);
 
   // --- Settings Persistence ---
-  useEffect(() => { if (user) localStorage.setItem(getUserKey('pomodoroState'), JSON.stringify(pomodoroState)); }, [pomodoroState, getUserKey, user]);
+  useEffect(() => { 
+    if (user) {
+        const { endTime, ...stateToSave } = pomodoroState; // Don't persist endTime
+        localStorage.setItem(getUserKey('pomodoroState'), JSON.stringify(stateToSave));
+    }
+  }, [pomodoroState, getUserKey, user]);
   useEffect(() => { if (user) localStorage.setItem(getUserKey('particleType'), particleType); }, [particleType, getUserKey, user]);
   useEffect(() => { if (user) localStorage.setItem(getUserKey('ambientSound'), JSON.stringify(ambientSound)); }, [ambientSound, getUserKey, user]);
   useEffect(() => { if (user) localStorage.setItem(getUserKey('browserSession'), JSON.stringify(browserSession)); }, [browserSession, getUserKey, user]);
