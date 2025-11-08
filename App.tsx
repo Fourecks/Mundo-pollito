@@ -1088,12 +1088,14 @@ const App: React.FC = () => {
       { data: todosData, error: todosError },
       { data: foldersData, error: foldersError },
       { data: playlistsData, error: playlistsError },
-      { data: quickNotesData, error: quickNotesError }
+      { data: quickNotesData, error: quickNotesError },
+      { data: profileData, error: profileError }
     ] = await Promise.all([
       supabase.from('todos').select('*, subtasks(*)').order('created_at'),
       supabase.from('folders').select('*, notes(*)').order('created_at').order('created_at', { foreignTable: 'notes', ascending: true }),
       supabase.from('playlists').select('*').order('created_at'),
       supabase.from('quick_notes').select('*').order('created_at'),
+      supabase.from('profiles').select('daily_encouragement_hour_utc').eq('id', user.id).single(),
     ]);
 
     if (todosError) console.error("Error loading todos:", todosError);
@@ -1116,6 +1118,12 @@ const App: React.FC = () => {
     if (quickNotesError) console.error("Error loading quick notes:", quickNotesError);
     else setQuickNotes(quickNotesData || []);
     
+    if (profileError && profileError.code !== 'PGRST116') { // Ignore "no rows" error
+      console.error("Error loading profile data:", profileError);
+    } else if (profileData) {
+      setDailyEncouragementHour(profileData.daily_encouragement_hour_utc);
+    }
+    
     // Load local settings
     try {
         const storedPomodoro = localStorage.getItem(getUserKey('pomodoroState'));
@@ -1129,9 +1137,6 @@ const App: React.FC = () => {
         
         const storedAmbience = localStorage.getItem(getUserKey('ambientSound'));
         if (storedAmbience) setAmbientSound(JSON.parse(storedAmbience));
-
-        const storedEncouragement = localStorage.getItem(getUserKey('dailyEncouragement'));
-        if(storedEncouragement) setDailyEncouragementHour(JSON.parse(storedEncouragement));
 
         const storedBrowserSession = localStorage.getItem(getUserKey('browserSession'));
         if (storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
@@ -1153,12 +1158,21 @@ const App: React.FC = () => {
   useEffect(() => { if (user) localStorage.setItem(getUserKey('ambientSound'), JSON.stringify(ambientSound)); }, [ambientSound, getUserKey, user]);
   useEffect(() => { if (user) localStorage.setItem(getUserKey('browserSession'), JSON.stringify(browserSession)); }, [browserSession, getUserKey, user]);
 
-  const handleSetDailyEncouragement = (localHour: number | null) => {
+  const handleSetDailyEncouragement = async (localHour: number | null) => {
+    if (!user) return;
     const offset = new Date().getTimezoneOffset() / 60;
-    const utcHour = localHour !== null ? (localHour - offset + 24) % 24 : null;
+    const utcHour = localHour !== null ? Math.floor((localHour + offset + 24) % 24) : null;
     
+    // Optimistic UI update
     setDailyEncouragementHour(utcHour);
-    if(user) localStorage.setItem(getUserKey('dailyEncouragement'), JSON.stringify(utcHour));
+
+    const { error } = await supabase
+        .from('profiles')
+        .upsert({ id: user.id, daily_encouragement_hour_utc: utcHour });
+
+    if (error) {
+        console.error("Error saving daily encouragement time:", error);
+    }
   }
   
   // --- Data Handlers ---

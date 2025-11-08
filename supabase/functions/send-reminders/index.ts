@@ -11,55 +11,9 @@
 // This tells Supabase to allow this specific function to be executed by the cron scheduler.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-declare const Deno: any;
-
-// Supabase admin client to access all data
-const supabaseAdmin = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
-// Helper function to call OneSignal API
-async function sendOneSignalNotification(userId: string, title: string, message: string) {
-  const ONE_SIGNAL_APP_ID = Deno.env.get('ONE_SIGNAL_APP_ID');
-  const ONE_SIGNAL_REST_API_KEY = Deno.env.get('ONE_SIGNAL_REST_API_KEY');
-
-  if (!ONE_SIGNAL_APP_ID || !ONE_SIGNAL_REST_API_KEY) {
-    console.error("OneSignal secrets are not set in environment variables.");
-    return false; // Don't throw, just fail this one notification
-  }
-  
-  const response = await fetch('https://onesignal.com/api/v1/notifications', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Basic ${ONE_SIGNAL_REST_API_KEY}`
-    },
-    body: JSON.stringify({
-      app_id: ONE_SIGNAL_APP_ID,
-      include_external_user_ids: [userId],
-      headings: { en: title },
-      contents: { en: message },
-      web_url: Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.onrender.com') || 'https://pollito-productivo.onrender.com',
-      chrome_web_icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png",
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error(`OneSignal API Error for user ${userId}:`, errorData);
-    return false;
-  }
-  
-  return true;
-}
+import { corsHeaders } from '../_shared/cors.ts';
+import { supabaseAdmin } from '../_shared/supabase-admin.ts';
+import { sendOneSignalNotification } from '../_shared/onesignal.ts';
 
 serve(async (req) => {
   // This function is designed to be triggered by a cron job.
