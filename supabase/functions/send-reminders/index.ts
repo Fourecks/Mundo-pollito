@@ -27,7 +27,7 @@ serve(async (req) => {
     // 1. Fetch all tasks that could potentially need a reminder.
     const { data: candidateTodos, error: fetchError } = await supabaseAdmin
       .from('todos')
-      .select('id, user_id, text, due_date, start_time, reminder_offset, timezone_offset')
+      .select('id, user_id, text, due_date, start_time, reminder_offset')
       .eq('completed', false)
       .eq('notification_sent', false)
       .gt('reminder_offset', 0)
@@ -37,6 +37,25 @@ serve(async (req) => {
     if (fetchError) {
       throw fetchError;
     }
+    
+    if (!candidateTodos || candidateTodos.length === 0) {
+      return new Response(JSON.stringify({ message: "No reminders to send at this time." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 2. Get unique user IDs and fetch their timezone offsets from profiles
+    const userIds = [...new Set(candidateTodos.map(t => t.user_id))];
+    const { data: profiles, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, timezone_offset')
+      .in('id', userIds);
+      
+    if (profileError) {
+      console.error("Warning: Could not fetch user profiles for timezone data.", profileError.message);
+    }
+    
+    const offsetMap = new Map(profiles?.map(p => [p.id, p.timezone_offset]));
 
     const todosToSend: any[] = [];
     for (const todo of candidateTodos) {
@@ -44,16 +63,14 @@ serve(async (req) => {
       const [year, month, day] = todo.due_date.split('-').map(Number);
       const [hour, minute] = todo.start_time.split(':').map(Number);
       
-      // Create a date object as if the local time parts were UTC
       const localTimeAsUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
       
-      // Get the user's timezone offset (in minutes) from when they saved the task.
-      // getTimezoneOffset() is positive for timezones behind UTC (e.g., Americas).
-      // We need to ADD this offset to our wrongly interpreted UTC time to get the correct UTC time.
-      const userOffsetMinutes = todo.timezone_offset || 0;
+      const userOffsetMinutes = offsetMap.get(todo.user_id) || 0;
       const startTime = new Date(localTimeAsUTC.getTime() + userOffsetMinutes * 60 * 1000);
       
-      const reminderTime = new Date(startTime.getTime() - todo.reminder_offset * 60 * 1000);
+      // FIX: The type of `todo.reminder_offset` is `any`, which can cause type errors in arithmetic operations.
+      // Explicitly cast to Number to ensure it's treated as a number.
+      const reminderTime = new Date(startTime.getTime() - Number(todo.reminder_offset) * 60 * 1000);
 
       // Check if the reminder time is in the past.
       if (reminderTime <= now) {
@@ -67,7 +84,6 @@ serve(async (req) => {
       });
     }
 
-    // 2. Send notifications and collect the IDs of tasks that were successfully notified.
     const sentTodoIds: number[] = [];
     const notificationPromises = todosToSend.map(async (todo) => {
       const success = await sendOneSignalNotification(
@@ -82,7 +98,6 @@ serve(async (req) => {
     
     await Promise.all(notificationPromises);
     
-    // 3. Update the `notification_sent` flag in the database for all sent reminders.
     if (sentTodoIds.length > 0) {
       const { error: updateError } = await supabaseAdmin
         .from('todos')
@@ -90,7 +105,6 @@ serve(async (req) => {
         .in('id', sentTodoIds);
         
       if (updateError) {
-        // This is a critical error to log as it might cause duplicate notifications.
         console.error("CRITICAL: Failed to update notification_sent flag for IDs:", sentTodoIds, updateError);
       }
     }

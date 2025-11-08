@@ -39,7 +39,6 @@ export interface Todo {
   recurrence?: RecurrenceRule;
   reminder_offset?: 0 | 10 | 30 | 60; // In minutes before start_time
   notification_sent?: boolean;
-  timezone_offset?: number;
 }
 
 export interface Note {

@@ -24,41 +24,40 @@ serve(async (req) => {
     // This function is scheduled for HH:30 UTC. We target users at 5:30 AM local time.
     // local_time = utc_time - offset => 5.5 = (currentUTCHour + 0.5) - offset_hours
     // offset_hours = currentUTCHour - 5
+    // The offset from getTimezoneOffset() is the opposite sign of what's intuitive.
+    // e.g., PST is UTC-8, but getTimezoneOffset() returns 480.
+    // The cron runs at HH:30, so it's `currentUTCHour + 0.5`.
+    // user_local_hour = (currentUTCHour + 0.5) - (user_offset_minutes / 60)
+    // We want user_local_hour to be 5.5.
+    // 5.5 = (currentUTCHour + 0.5) - (user_offset_minutes / 60)
+    // user_offset_minutes / 60 = currentUTCHour - 5
+    // user_offset_minutes = (currentUTCHour - 5) * 60
     const targetOffsetMinutes = (currentUTCHour - 5) * 60;
 
-    // 1. Get all todos with a timezone to find the latest offset for each user.
-    const { data: allTimezonedTodos, error: todosFetchError } = await supabaseAdmin
-      .from('todos')
-      .select('user_id, timezone_offset, created_at')
-      .not('timezone_offset', 'is', null);
+    // 1. Get profiles for users in the target timezone.
+    const { data: profiles, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('timezone_offset', targetOffsetMinutes);
 
-    if (todosFetchError) throw todosFetchError;
+    if (profileError) {
+      console.error("Error fetching profiles by timezone. Does 'timezone_offset' column exist in 'profiles' table?", profileError);
+      throw profileError;
+    }
 
-    // 2. Process in memory to find the most recent timezone_offset for each user.
-    const latestUserOffsets = allTimezonedTodos.reduce((acc, todo) => {
-      if (!acc[todo.user_id] || new Date(todo.created_at) > new Date(acc[todo.user_id].created_at)) {
-        acc[todo.user_id] = { offset: todo.timezone_offset, created_at: todo.created_at };
-      }
-      return acc;
-    }, {} as Record<string, { offset: number; created_at: string }>);
-    
-    // 3. Filter for users in the target timezone
-    const usersToNotify = Object.entries(latestUserOffsets)
-      // FIX: Explicitly type the `data` parameter to resolve TypeScript inference error.
-      .filter(([_, data]: [string, { offset: number }]) => data.offset === targetOffsetMinutes)
-      .map(([userId, _]) => userId);
-
-    if (usersToNotify.length === 0) {
+    if (!profiles || profiles.length === 0) {
       return new Response(JSON.stringify({ message: `No users in the target timezone (offset: ${targetOffsetMinutes}).` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
     
-    // 4. Get today's date string for this timezone group
+    const usersToNotify = profiles.map(p => p.id);
+
+    // 2. Get today's date string for this timezone group
     const userLocalTime = new Date(now.getTime() - targetOffsetMinutes * 60 * 1000);
     const dateKey = userLocalTime.toISOString().split('T')[0];
 
-    // 5. Fetch all uncompleted todos for these users for their "today"
+    // 3. Fetch all uncompleted todos for these users for their "today"
     const { data: todos, error: todayTodosError } = await supabaseAdmin
       .from('todos')
       .select('user_id, text')
@@ -73,15 +72,14 @@ serve(async (req) => {
         });
     }
 
-    // 6. Group todos by user
+    // 4. Group todos by user
     const todosByUser = todos.reduce((acc, todo) => {
         if (!acc[todo.user_id]) acc[todo.user_id] = [];
         acc[todo.user_id].push(todo.text);
         return acc;
     }, {} as Record<string, string[]>);
     
-    // 7. Format and send notifications
-    // FIX: Explicitly type the `tasks` parameter to resolve TypeScript inference error.
+    // 5. Format and send notifications
     const notificationPromises = Object.entries(todosByUser).map(([userId, tasks]: [string, string[]]) => {
         const taskCount = tasks.length;
         if (taskCount === 0) return Promise.resolve(true);

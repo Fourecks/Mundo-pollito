@@ -31,10 +31,10 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Get all users and their profiles
+    // 1. Get all users and their profiles with timezone info
     const { data: profiles, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, last_streak_celebration');
+      .select('id, last_streak_celebration, timezone_offset');
 
     if (profileError) throw profileError;
     if (!profiles || profiles.length === 0) {
@@ -42,30 +42,14 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    
-    // 2. Get the latest timezone offset for every user
-    const { data: allTimezonedTodos, error: todosFetchError } = await supabaseAdmin
-      .from('todos')
-      .select('user_id, timezone_offset, created_at')
-      .not('timezone_offset', 'is', null);
-
-    if (todosFetchError) throw todosFetchError;
-
-    const latestUserOffsets = allTimezonedTodos.reduce((acc, todo) => {
-      if (!acc[todo.user_id] || new Date(todo.created_at) > new Date(acc[todo.user_id].created_at)) {
-        acc[todo.user_id] = { offset: todo.timezone_offset, created_at: todo.created_at };
-      }
-      return acc;
-    }, {} as Record<string, { offset: number; created_at: string }>);
-
 
     let notificationsSent = 0;
 
-    // 3. Process each user
+    // 2. Process each user
     for (const profile of profiles) {
       const userId = profile.id;
       const lastCelebratedStreak = profile.last_streak_celebration || 0;
-      const userOffset = latestUserOffsets[userId]?.offset ?? 0; // Default to UTC if no offset found
+      const userOffset = profile.timezone_offset ?? 0; // Use offset directly from profile
 
       // Calculate streak
       let currentStreak = 0;
@@ -102,7 +86,7 @@ serve(async (req) => {
         }
       }
 
-      // 4. Check for celebration and update profile
+      // 3. Check for celebration and update profile
       const achievedMilestone = CELEBRATION_MILESTONES.filter(m => currentStreak >= m).pop() || 0;
 
       if (achievedMilestone > lastCelebratedStreak) {
