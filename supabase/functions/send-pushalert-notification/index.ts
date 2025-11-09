@@ -53,7 +53,7 @@ serve(async (req: Request) => {
       include_external_user_ids: [userId],
       headings: { en: title },
       contents: { en: message },
-      subtitle: { en: " " },
+      subtitle: { en: "" }, // Explicitly set subtitle to empty
       web_url: Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.onrender.com') || 'https://pollito-productivo.onrender.com',
       chrome_web_icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png",
     };
