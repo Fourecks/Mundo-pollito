@@ -208,7 +208,7 @@ interface AppComponentProps {
   activeBackground: Background | null;
   particleType: ParticleType;
   ambientSound: { type: AmbientSoundType; volume: number };
-  dailyEncouragementHour: number | null;
+  dailyEncouragementLocalHour: number | null;
   // Handlers
   handleAddTodo: (text: string) => Promise<void>;
   handleUpdateTodo: (updatedTodo: Todo) => Promise<void>;
@@ -256,7 +256,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
     currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementHour,
+    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
@@ -519,7 +519,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setParticleType={setParticleType}
         ambientSound={ambientSound}
         setAmbientSound={setAmbientSound}
-        dailyEncouragementHour={dailyEncouragementHour}
+        dailyEncouragementLocalHour={dailyEncouragementLocalHour}
         onSetDailyEncouragement={onSetDailyEncouragement}
       />
       
@@ -600,7 +600,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
       currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-      pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementHour,
+      pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
@@ -891,7 +891,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={setParticleType}
               ambientSound={ambientSound}
               setAmbientSound={setAmbientSound}
-              dailyEncouragementHour={dailyEncouragementHour}
+              dailyEncouragementLocalHour={dailyEncouragementLocalHour}
               onSetDailyEncouragement={onSetDailyEncouragement}
             />
             <CompletionModal isOpen={showCompletionModal} onClose={() => setShowCompletionModal(false)} quote={completionQuote}/>
@@ -986,7 +986,7 @@ const App: React.FC = () => {
   const [savedActiveBgId, setSavedActiveBgId] = useState<string | null>(null);
   const [particleType, setParticleType] = useState<ParticleType>('none');
   const [ambientSound, setAmbientSound] = useState<{ type: AmbientSoundType; volume: number }>({ type: 'none', volume: 0.5 });
-  const [dailyEncouragementHour, setDailyEncouragementHour] = useState<number | null>(null);
+  const [dailyEncouragementLocalHour, setDailyEncouragementLocalHour] = useState<number | null>(null);
   const [pomodoroState, setPomodoroState] = useState({
       timeLeft: 25 * 60,
       isActive: false,
@@ -1196,7 +1196,7 @@ const App: React.FC = () => {
       supabase.from('folders').select('*, notes(*)').order('created_at').order('created_at', { foreignTable: 'notes', ascending: true }),
       supabase.from('playlists').select('*').order('created_at'),
       supabase.from('quick_notes').select('*').order('created_at'),
-      supabase.from('profiles').select('daily_encouragement_hour_utc').eq('id', user.id).single(),
+      supabase.from('profiles').select('daily_encouragement_hour_local').eq('id', user.id).single(),
     ]);
 
     // Persist timezone offset to profile
@@ -1231,7 +1231,7 @@ const App: React.FC = () => {
     if (profileError && profileError.code !== 'PGRST116') { // Ignore "no rows" error
       console.error("Error loading profile data:", profileError);
     } else if (profileData) {
-      setDailyEncouragementHour(profileData.daily_encouragement_hour_utc);
+      setDailyEncouragementLocalHour(profileData.daily_encouragement_hour_local);
     }
     
     // Load local settings
@@ -1287,15 +1287,13 @@ const App: React.FC = () => {
 
   const handleSetDailyEncouragement = async (localHour: number | null) => {
     if (!user) return;
-    const offset = new Date().getTimezoneOffset() / 60;
-    const utcHour = localHour !== null ? Math.floor((localHour + offset + 24) % 24) : null;
     
     // Optimistic UI update
-    setDailyEncouragementHour(utcHour);
+    setDailyEncouragementLocalHour(localHour);
 
     const { error } = await supabase
         .from('profiles')
-        .upsert({ id: user.id, daily_encouragement_hour_utc: utcHour });
+        .upsert({ id: user.id, daily_encouragement_hour_local: localHour });
 
     if (error) {
         console.error("Error saving daily encouragement time:", error);
@@ -1820,7 +1818,7 @@ const App: React.FC = () => {
   const appProps: AppComponentProps = {
     currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementHour,
+    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,

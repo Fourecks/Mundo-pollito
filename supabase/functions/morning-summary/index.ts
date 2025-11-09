@@ -1,10 +1,10 @@
 // supabase/functions/morning-summary/index.ts
 
-// ⚠️ DEPLOYMENT INSTRUCTION
-// 1. Deploy this function with the `--no-verify-jwt` flag to allow cron job execution.
+// ⚠️ INSTRUCCIONES DE DESPLIEGUE
+// 1. Despliega esta función con el indicador `--no-verify-jwt` para permitir la ejecución por tarea programada (cron job).
 //    supabase functions deploy morning-summary --no-verify-jwt
-// 2. Schedule a cron job in your Supabase dashboard (Project -> Database -> Cron Jobs) to run every hour at the 30-minute mark.
-//    Schedule: 30 * * * *
+// 2. Asegúrate de que tu cron job en Supabase (Proyecto -> Database -> Cron Jobs) se ejecute cada hora.
+//    Schedule: 30 * * * * (a los 30 minutos de cada hora)
 //    Function: morning-summary
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -18,46 +18,52 @@ serve(async (req) => {
   }
 
   try {
-    const now = new Date();
-    const currentUTCHour = now.getUTCHours();
-    
-    // This function is scheduled for HH:30 UTC. We target users at 5:30 AM local time.
-    // local_time = utc_time - offset => 5.5 = (currentUTCHour + 0.5) - offset_hours
-    // offset_hours = currentUTCHour - 5
-    // The offset from getTimezoneOffset() is the opposite sign of what's intuitive.
-    // e.g., PST is UTC-8, but getTimezoneOffset() returns 480.
-    // The cron runs at HH:30, so it's `currentUTCHour + 0.5`.
-    // user_local_hour = (currentUTCHour + 0.5) - (user_offset_minutes / 60)
-    // We want user_local_hour to be 5.5.
-    // 5.5 = (currentUTCHour + 0.5) - (user_offset_minutes / 60)
-    // user_offset_minutes / 60 = currentUTCHour - 5
-    // user_offset_minutes = (currentUTCHour - 5) * 60
-    const targetOffsetMinutes = (currentUTCHour - 5) * 60;
+    const nowUTC = new Date();
 
-    // 1. Get profiles for users in the target timezone.
+    // 1. Obtener todos los perfiles con una zona horaria configurada.
     const { data: profiles, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id')
-      .eq('timezone_offset', targetOffsetMinutes);
+      .select('id, timezone_offset')
+      .not('timezone_offset', 'is', null);
 
     if (profileError) {
-      console.error("Error fetching profiles by timezone. Does 'timezone_offset' column exist in 'profiles' table?", profileError);
+      console.error("Error al obtener perfiles por zona horaria. ¿Existe la columna 'timezone_offset' en la tabla 'profiles'?", profileError);
       throw profileError;
     }
 
     if (!profiles || profiles.length === 0) {
-      return new Response(JSON.stringify({ message: `No users in the target timezone (offset: ${targetOffsetMinutes}).` }), {
+      return new Response(JSON.stringify({ message: `No se encontraron perfiles con zona horaria configurada.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
     
-    const usersToNotify = profiles.map(p => p.id);
+    const usersToNotify: string[] = [];
 
-    // 2. Get today's date string for this timezone group
-    const userLocalTime = new Date(now.getTime() - targetOffsetMinutes * 60 * 1000);
-    const dateKey = userLocalTime.toISOString().split('T')[0];
+    // 2. Iterar sobre cada perfil para verificar si son las 5 AM en su hora local.
+    for (const profile of profiles) {
+      // El offset de getTimezoneOffset() es opuesto al estándar (ej. UTC-5 es +300). El nuestro está bien.
+      const userOffsetMinutes = profile.timezone_offset;
+      const userLocalTime = new Date(nowUTC.getTime() - userOffsetMinutes * 60 * 1000);
+      
+      // La función cron se ejecuta a HH:30 UTC. Usamos getUTCHours() en la hora local calculada
+      // para evitar problemas con el horario de verano del servidor.
+      if (userLocalTime.getUTCHours() === 5) {
+        usersToNotify.push(profile.id);
+      }
+    }
 
-    // 3. Fetch all uncompleted todos for these users for their "today"
+    if (usersToNotify.length === 0) {
+        return new Response(JSON.stringify({ message: "No hay usuarios en la zona horaria de las 5 AM en este momento." }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+    }
+
+    // 3. Obtener la fecha de "hoy" para los usuarios a notificar.
+    // (Todos tienen la misma fecha local, así que podemos usar el último `userLocalTime` calculado).
+    const lastUserLocalTime = new Date(nowUTC.getTime() - (profiles[profiles.length-1].timezone_offset ?? 0) * 60 * 1000);
+    const dateKey = lastUserLocalTime.toISOString().split('T')[0];
+
+    // 4. Obtener todas las tareas no completadas para esos usuarios en su "hoy".
     const { data: todos, error: todayTodosError } = await supabaseAdmin
       .from('todos')
       .select('user_id, text')
@@ -67,19 +73,19 @@ serve(async (req) => {
 
     if (todayTodosError) throw todayTodosError;
     if (!todos || todos.length === 0) {
-        return new Response(JSON.stringify({ message: "No tasks found for today for the targeted users." }), {
+        return new Response(JSON.stringify({ message: "No se encontraron tareas para hoy para los usuarios seleccionados." }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
 
-    // 4. Group todos by user
+    // 5. Agrupar tareas por usuario.
     const todosByUser = todos.reduce((acc, todo) => {
         if (!acc[todo.user_id]) acc[todo.user_id] = [];
         acc[todo.user_id].push(todo.text);
         return acc;
     }, {} as Record<string, string[]>);
     
-    // 5. Format and send notifications
+    // 6. Formatear y enviar las notificaciones.
     const notificationPromises = Object.entries(todosByUser).map(([userId, tasks]: [string, string[]]) => {
         const taskCount = tasks.length;
         if (taskCount === 0) return Promise.resolve(true);
@@ -99,12 +105,12 @@ serve(async (req) => {
     
     await Promise.all(notificationPromises);
 
-    return new Response(JSON.stringify({ message: `Sent morning summaries to ${Object.keys(todosByUser).length} users.` }), {
+    return new Response(JSON.stringify({ message: `Resúmenes matutinos enviados a ${Object.keys(todosByUser).length} usuarios.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (err) {
-    console.error("Error in morning-summary function:", err);
+    console.error("Error en la función morning-summary:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
