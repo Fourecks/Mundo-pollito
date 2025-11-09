@@ -2,6 +2,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -340,18 +341,75 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     });
   }, [isSubscribed, setPomodoroState]);
 
+  const handlePomodoroToggle = useCallback(() => {
+    setPomodoroState(s => {
+      const isStarting = !s.isActive;
+      if (isStarting) {
+        silentAudioRef.current?.play().catch(e => console.error("Silent audio play failed:", e));
+        const endTime = Date.now() + s.timeLeft * 1000;
+        if (!pomodoroStartedRef.current) {
+          pomodoroStartedRef.current = true;
+          return { ...s, isActive: true, endTime, showBackgroundTimer: true };
+        }
+        return { ...s, isActive: true, endTime };
+      } else {
+        silentAudioRef.current?.pause();
+        // Preserve timeLeft when pausing
+        const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
+        return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
+      }
+    });
+  }, [setPomodoroState]);
+
   useEffect(() => {
     let timer: number | undefined;
+    const originalTitle = 'Pollito Productivo';
+
+    const formatTime = (seconds: number) => {
+      const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const secs = (seconds % 60).toString().padStart(2, '0');
+      return `${mins}:${secs}`;
+    };
 
     if (pomodoroState.isActive && pomodoroState.endTime) {
       timer = window.setInterval(() => {
         const remaining = pomodoroState.endTime! - Date.now();
         if (remaining > 0) {
-          setPomodoroState(s => ({ ...s, timeLeft: Math.ceil(remaining / 1000) }));
+          const timeLeft = Math.ceil(remaining / 1000);
+          setPomodoroState(s => ({ ...s, timeLeft }));
+          
+          const timeString = formatTime(timeLeft);
+          const modeLabel = pomodoroState.mode === 'work' ? 'Concentración' : 'Descanso';
+          document.title = `(${timeString}) ${modeLabel} - ${originalTitle}`;
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: `${modeLabel}: ${timeString}`,
+              artist: 'Pollito Productivo',
+              album: 'Sesión de Pomodoro',
+              artwork: [
+                { src: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png', sizes: '192x192', type: 'image/png' },
+                { src: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-512.png', sizes: '512x512', type: 'image/png' },
+              ]
+            });
+          }
+
         } else {
           handleTimerCompletion();
         }
       }, 250);
+
+      if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'playing';
+          navigator.mediaSession.setActionHandler('play', handlePomodoroToggle);
+          navigator.mediaSession.setActionHandler('pause', handlePomodoroToggle);
+      }
+
+    } else {
+      document.title = originalTitle;
+      if ('mediaSession' in navigator) {
+          navigator.mediaSession.metadata = null;
+          navigator.mediaSession.playbackState = 'none';
+      }
     }
 
     const handleVisibilityChange = () => {
@@ -370,8 +428,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     return () => {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.title = originalTitle;
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = null;
+        navigator.mediaSession.playbackState = 'none';
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+      }
     };
-  }, [pomodoroState.isActive, pomodoroState.endTime, handleTimerCompletion, setPomodoroState]);
+  }, [pomodoroState.isActive, pomodoroState.endTime, pomodoroState.mode, handleTimerCompletion, setPomodoroState, handlePomodoroToggle]);
 
   // Ambient Sound Effect
   useEffect(() => {
@@ -408,26 +473,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           setActiveSpotifyTrack({ ...track, queue });
           if(activeTrack) setActiveTrack(null);
       }
-  };
-  
-  const handlePomodoroToggle = () => {
-    setPomodoroState(s => {
-      const isStarting = !s.isActive;
-      if (isStarting) {
-        silentAudioRef.current?.play().catch(e => console.error("Silent audio play failed:", e));
-        const endTime = Date.now() + s.timeLeft * 1000;
-        if (!pomodoroStartedRef.current) {
-          pomodoroStartedRef.current = true;
-          return { ...s, isActive: true, endTime, showBackgroundTimer: true };
-        }
-        return { ...s, isActive: true, endTime };
-      } else {
-        silentAudioRef.current?.pause();
-        // Preserve timeLeft when pausing
-        const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
-        return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
-      }
-    });
   };
   
   const capitalizedUserName = useMemo(() => {
@@ -663,18 +708,67 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         });
     }, [isSubscribed, setPomodoroState]);
 
+    const handlePomodoroToggle = useCallback(() => {
+        setPomodoroState(s => {
+            const isStarting = !s.isActive;
+            if (isStarting) {
+                silentAudioRef.current?.play().catch(e => console.error("Silent audio play failed:", e));
+                return { ...s, isActive: true, endTime: Date.now() + s.timeLeft * 1000 };
+            } else {
+                silentAudioRef.current?.pause();
+                const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
+                return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
+            }
+        });
+    }, [setPomodoroState]);
+
     useEffect(() => {
         let timer: number | undefined;
+        const originalTitle = 'Pollito Productivo';
+
+        const formatTime = (seconds: number) => {
+            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        };
 
         if (pomodoroState.isActive && pomodoroState.endTime) {
             timer = window.setInterval(() => {
                 const remaining = pomodoroState.endTime! - Date.now();
                 if (remaining > 0) {
-                    setPomodoroState(s => ({ ...s, timeLeft: Math.ceil(remaining / 1000) }));
+                    const timeLeft = Math.ceil(remaining / 1000);
+                    setPomodoroState(s => ({ ...s, timeLeft }));
+
+                    const timeString = formatTime(timeLeft);
+                    const modeLabel = pomodoroState.mode === 'work' ? 'Concentración' : 'Descanso';
+                    document.title = `(${timeString}) ${modeLabel} - ${originalTitle}`;
+                    if ('mediaSession' in navigator) {
+                        navigator.mediaSession.metadata = new MediaMetadata({
+                            title: `${modeLabel}: ${timeString}`,
+                            artist: 'Pollito Productivo',
+                            album: 'Sesión de Pomodoro',
+                            artwork: [
+                                { src: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png', sizes: '192x192', type: 'image/png' },
+                                { src: 'https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-512.png', sizes: '512x512', type: 'image/png' },
+                            ]
+                        });
+                    }
                 } else {
                     handleTimerCompletion();
                 }
             }, 250);
+
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'playing';
+                navigator.mediaSession.setActionHandler('play', handlePomodoroToggle);
+                navigator.mediaSession.setActionHandler('pause', handlePomodoroToggle);
+            }
+        } else {
+            document.title = originalTitle;
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = null;
+                navigator.mediaSession.playbackState = 'none';
+            }
         }
 
         const handleVisibilityChange = () => {
@@ -693,8 +787,15 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         return () => {
             clearInterval(timer);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            document.title = originalTitle;
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = null;
+                navigator.mediaSession.playbackState = 'none';
+                navigator.mediaSession.setActionHandler('play', null);
+                navigator.mediaSession.setActionHandler('pause', null);
+            }
         };
-    }, [pomodoroState.isActive, pomodoroState.endTime, handleTimerCompletion, setPomodoroState]);
+    }, [pomodoroState.isActive, pomodoroState.endTime, pomodoroState.mode, handleTimerCompletion, setPomodoroState, handlePomodoroToggle]);
 
 
     // Ambient Sound Effect
@@ -720,20 +821,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const handleSelectTrack = (track: Playlist, queue: Playlist[]) => {
       if(track.platform === 'youtube') { setActiveTrack({ ...track, queue }); if(activeSpotifyTrack) setActiveSpotifyTrack(null); }
       else { setActiveSpotifyTrack({ ...track, queue }); if(activeTrack) setActiveTrack(null); }
-    };
-
-    const handlePomodoroToggle = () => {
-        setPomodoroState(s => {
-            const isStarting = !s.isActive;
-            if (isStarting) {
-                silentAudioRef.current?.play().catch(e => console.error("Silent audio play failed:", e));
-                return { ...s, isActive: true, endTime: Date.now() + s.timeLeft * 1000 };
-            } else {
-                silentAudioRef.current?.pause();
-                const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
-                return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
-            }
-        });
     };
 
     const capitalizedUserName = useMemo(() => {
