@@ -1239,7 +1239,16 @@ const App: React.FC = () => {
         const storedPomodoro = localStorage.getItem(getUserKey('pomodoroState'));
         if (storedPomodoro) {
             const parsed = JSON.parse(storedPomodoro);
-            setPomodoroState(s => ({...s, ...parsed, isActive: false, endTime: null})); // Always start paused on load
+            const currentMode = parsed.mode || 'work';
+            const newTimeLeft = parsed.durations ? parsed.durations[currentMode] : (25 * 60);
+
+            setPomodoroState(s => ({
+                ...s,
+                ...parsed,
+                timeLeft: newTimeLeft,
+                isActive: false,
+                endTime: null,
+            }));
         }
 
         const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));

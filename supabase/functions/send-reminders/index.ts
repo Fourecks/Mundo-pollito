@@ -66,7 +66,9 @@ serve(async (req) => {
       const localTimeAsUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
       
       const userOffsetMinutes = offsetMap.get(todo.user_id) || 0;
-      const startTime = new Date(localTimeAsUTC.getTime() + userOffsetMinutes * 60 * 1000);
+      // FIX: The type of `userOffsetMinutes` can be `any`, which can cause type errors in arithmetic operations.
+      // Explicitly cast to Number to ensure it's treated as a number.
+      const startTime = new Date(localTimeAsUTC.getTime() + Number(userOffsetMinutes) * 60 * 1000);
       
       // FIX: The type of `todo.reminder_offset` is `any`, which can cause type errors in arithmetic operations.
       // Explicitly cast to Number to ensure it's treated as a number.
