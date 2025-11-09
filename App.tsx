@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -352,52 +351,48 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   }, [setPomodoroState]);
 
   useEffect(() => {
-    let timer: number | undefined;
+    let animationFrameId: number;
     const originalTitle = 'Pollito Productivo';
 
     const formatTime = (seconds: number) => {
-      const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
-      const secs = (seconds % 60).toString().padStart(2, '0');
-      return `${mins}:${secs}`;
+        const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const secs = (seconds % 60).toString().padStart(2, '0');
+        return `${mins}:${secs}`;
     };
 
-    if (pomodoroState.isActive && pomodoroState.endTime) {
-      timer = window.setInterval(() => {
-        const remaining = pomodoroState.endTime! - Date.now();
-        if (remaining > 0) {
-          const timeLeft = Math.ceil(remaining / 1000);
-          setPomodoroState(s => ({ ...s, timeLeft }));
-          
-          const timeString = formatTime(timeLeft);
-          const modeLabel = pomodoroState.mode === 'work' ? 'Concentración' : 'Descanso';
-          document.title = `(${timeString}) ${modeLabel} - ${originalTitle}`;
-        } else {
-          handleTimerCompletion();
+    const tick = () => {
+        const { isActive, endTime, timeLeft, mode } = pomodoroState;
+        if (!isActive || !endTime) {
+            return;
         }
-      }, 250);
+
+        const remaining = endTime - Date.now();
+        if (remaining <= 0) {
+            handleTimerCompletion();
+        } else {
+            const newTimeLeft = Math.ceil(remaining / 1000);
+            if (newTimeLeft !== timeLeft) {
+                setPomodoroState(s => ({ ...s, timeLeft: newTimeLeft }));
+            }
+            const timeString = formatTime(newTimeLeft);
+            const modeLabel = mode === 'work' ? 'Concentración' : 'Descanso';
+            document.title = `(${timeString}) ${modeLabel} - ${originalTitle}`;
+
+            animationFrameId = requestAnimationFrame(tick);
+        }
+    };
+
+    if (pomodoroState.isActive) {
+        animationFrameId = requestAnimationFrame(tick);
     } else {
-      document.title = originalTitle;
+        document.title = originalTitle;
     }
 
-    const handleVisibilityChange = () => {
-      if (!document.hidden && pomodoroState.isActive && pomodoroState.endTime) {
-        const remaining = pomodoroState.endTime - Date.now();
-        if (remaining <= 0) {
-          handleTimerCompletion();
-        } else {
-          setPomodoroState(s => ({ ...s, timeLeft: Math.ceil(remaining / 1000) }));
-        }
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      document.title = originalTitle;
+        cancelAnimationFrame(animationFrameId);
+        document.title = originalTitle;
     };
-  }, [pomodoroState.isActive, pomodoroState.endTime, pomodoroState.mode, handleTimerCompletion, setPomodoroState]);
+  }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
 
   // Ambient Sound Effect
   useEffect(() => {
@@ -678,7 +673,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     }, [setPomodoroState]);
 
     useEffect(() => {
-        let timer: number | undefined;
+        let animationFrameId: number;
         const originalTitle = 'Pollito Productivo';
 
         const formatTime = (seconds: number) => {
@@ -687,43 +682,39 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             return `${mins}:${secs}`;
         };
 
-        if (pomodoroState.isActive && pomodoroState.endTime) {
-            timer = window.setInterval(() => {
-                const remaining = pomodoroState.endTime! - Date.now();
-                if (remaining > 0) {
-                    const timeLeft = Math.ceil(remaining / 1000);
-                    setPomodoroState(s => ({ ...s, timeLeft }));
+        const tick = () => {
+            const { isActive, endTime, timeLeft, mode } = pomodoroState;
+            if (!isActive || !endTime) {
+                return;
+            }
 
-                    const timeString = formatTime(timeLeft);
-                    const modeLabel = pomodoroState.mode === 'work' ? 'Concentración' : 'Descanso';
-                    document.title = `(${timeString}) ${modeLabel} - ${originalTitle}`;
-                } else {
-                    handleTimerCompletion();
+            const remaining = endTime - Date.now();
+            if (remaining <= 0) {
+                handleTimerCompletion();
+            } else {
+                const newTimeLeft = Math.ceil(remaining / 1000);
+                if (newTimeLeft !== timeLeft) {
+                    setPomodoroState(s => ({ ...s, timeLeft: newTimeLeft }));
                 }
-            }, 250);
+                const timeString = formatTime(newTimeLeft);
+                const modeLabel = mode === 'work' ? 'Concentración' : 'Descanso';
+                document.title = `(${timeString}) ${modeLabel} - ${originalTitle}`;
+
+                animationFrameId = requestAnimationFrame(tick);
+            }
+        };
+
+        if (pomodoroState.isActive) {
+            animationFrameId = requestAnimationFrame(tick);
         } else {
             document.title = originalTitle;
         }
 
-        const handleVisibilityChange = () => {
-            if (!document.hidden && pomodoroState.isActive && pomodoroState.endTime) {
-                const remaining = pomodoroState.endTime - Date.now();
-                if (remaining <= 0) {
-                    handleTimerCompletion();
-                } else {
-                    setPomodoroState(s => ({ ...s, timeLeft: Math.ceil(remaining / 1000) }));
-                }
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
         return () => {
-            clearInterval(timer);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            cancelAnimationFrame(animationFrameId);
             document.title = originalTitle;
         };
-    }, [pomodoroState.isActive, pomodoroState.endTime, pomodoroState.mode, handleTimerCompletion, setPomodoroState]);
+    }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
 
 
     // Ambient Sound Effect
