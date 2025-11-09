@@ -92,7 +92,7 @@ serve(async (req) => {
       if (achievedMilestone > lastCelebratedStreak) {
         // Send notification!
         const title = `¡Racha de ${achievedMilestone} días! 🎉`;
-        const message = `¡Eres imparable! Llevas ${achievedMilestone} días seguidos completando todo. ¡Sigue así, pollito campeón!`;
+        const message = `¡Eres imparable! Llevas ${achievedMilestone} días seguidos completando todo. ¡Sigue así!`;
         await sendOneSignalNotification(userId, title, message);
         notificationsSent++;
 

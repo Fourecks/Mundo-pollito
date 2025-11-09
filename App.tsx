@@ -641,7 +641,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
         setPomodoroState(s => {
             const newMode = s.mode === 'work' ? 'break' : 'work';
-            const message = s.mode === 'work' ? "¡Tiempo de descansar! Bien hecho pollito." : "¡Se acabó el descanso! Tú puedes.";
+            const message = s.mode === 'work' ? "¡Tiempo de descansar! ¡Bien hecho!" : "¡Se acabó el descanso! Tú puedes.";
 
             if (isSubscribed) {
                 supabase.functions.invoke('send-pushalert-notification', {

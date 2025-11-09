@@ -90,7 +90,7 @@ serve(async (req) => {
     const notificationPromises = todosToSend.map(async (todo) => {
       const success = await sendOneSignalNotification(
         todo.user_id,
-        "Pollito te recuerda 🐥:",
+        "Recordatorio 🐥:",
         `¡Es hora de empezar con "${todo.text}"!`
       );
       if (success) {

@@ -43,7 +43,7 @@ serve(async (req) => {
     
     // 3. Enviar una notificación a cada usuario inactivo.
     const notificationPromises = inactiveUsers.map(user => {
-        const title = "¡Tu pollito te echa de menos! 🐣";
+        const title = "¡Te echamos de menos! 🐣";
         const message = "¿Volvemos a organizar nuestras tareas juntos?";
         
         return sendOneSignalNotification(user.id, title, message);
