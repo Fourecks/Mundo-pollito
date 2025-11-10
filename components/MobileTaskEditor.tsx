@@ -117,6 +117,14 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             textarea.style.height = `${textarea.scrollHeight}px`;
         }
     }, [text]);
+    
+    const handleToggleTime = (enabled: boolean) => {
+        setHasTime(enabled);
+        if (!enabled) {
+            setStartTime('');
+            setEndTime('');
+        }
+    };
 
     const handleSave = () => {
         if (!todo) return;
@@ -145,7 +153,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             end_date: hasEndDate ? end_date || undefined : undefined,
             completed,
             start_time: hasTime ? start_time || undefined : undefined,
-            end_time: hasTime ? end_time || undefined : undefined,
+            end_time: hasTime && end_time ? end_time : undefined,
             priority,
             reminder_offset: hasReminder && reminderType !== 'custom' ? finalReminderOffset : undefined,
             reminder_at: hasReminder && reminderType === 'custom' ? finalReminderAt : undefined,
@@ -239,7 +247,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                     </div>
                     
                     <div className="space-y-2">
-                        <SettingRow icon={<ClockIcon className="h-5 w-5"/>} label="Añadir hora" enabled={hasTime} onToggle={setHasTime}>
+                        <SettingRow icon={<ClockIcon className="h-5 w-5"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
                             <div className="flex items-center gap-3 text-sm">
                                 <div className="flex-1">
                                     <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>

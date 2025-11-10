@@ -110,6 +110,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             }
         }
     }, [todo]);
+    
+    const handleToggleTime = (enabled: boolean) => {
+        setHasTime(enabled);
+        if (!enabled) {
+            setStartTime('');
+            setEndTime('');
+        }
+    };
 
     const handleSave = async () => {
         if (!todo) return;
@@ -142,7 +150,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             end_date: hasEndDate ? end_date || undefined : undefined,
             completed,
             start_time: hasTime ? start_time || undefined : undefined,
-            end_time: hasTime ? end_time || undefined : undefined,
+            end_time: hasTime && end_time ? end_time : undefined,
             priority,
             reminder_offset: hasReminder && reminderType !== 'custom' ? finalReminderOffset : undefined,
             reminder_at: hasReminder && reminderType === 'custom' ? finalReminderAt : undefined,
@@ -218,7 +226,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 {/* Right Column */}
                 <aside className="md:w-2/5 flex-shrink-0 bg-black/5 dark:bg-black/20 p-3 md:p-4 md:border-l border-yellow-300/50 dark:border-gray-700/50 space-y-3">
                     {/* Date Section */}
-                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 space-y-3">
+                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 space-y-3 divide-y divide-yellow-200/50 dark:divide-gray-600/50">
                         <div>
                             <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5 mb-2"><CalendarIcon className="h-4 w-4" /> Fecha</label>
                             <div className="flex items-center gap-2">
@@ -227,7 +235,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                                 {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>}
                             </div>
                         </div>
-                        <div className="flex items-center justify-between pt-2 border-t border-yellow-200/50 dark:border-gray-600/50">
+                        <div className="flex items-center justify-between pt-3">
                             <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Establecer rango</span>
                             <Switch checked={hasEndDate} onChange={setHasEndDate} />
                         </div>
@@ -244,14 +252,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                      </div>
 
                     {/* Conditional Settings */}
-                    <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={setHasTime}>
+                    <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
                          <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
                                 <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
                                 <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
                             </div>
                              <div>
-                                <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin</label>
+                                <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
                                 <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
                             </div>
                          </div>

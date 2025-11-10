@@ -784,9 +784,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'home':
                 return (
                     <>
-                        <MobileHeader title="Hoy" />
-                        <div className="p-4 space-y-3">
+                        <header className="sticky top-0 bg-yellow-50/80 dark:bg-gray-800/80 backdrop-blur-md p-4 z-30 border-b border-yellow-300/50 dark:border-gray-700/50">
                             <Greeting name={capitalizedUserName} />
+                        </header>
+                        <div className="p-4 space-y-3">
                              <MobilePomodoroWidget 
                                 timeLeft={pomodoroState.timeLeft} 
                                 isActive={pomodoroState.isActive} 
