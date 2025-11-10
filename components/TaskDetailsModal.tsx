@@ -102,7 +102,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 setReminderType('custom');
                 const d = new Date(todo.reminder_at);
                 setCustomReminderDate(d.toISOString().split('T')[0]);
-                setCustomReminderTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+                setCustomReminderTime(`${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`);
             } else {
                 setReminderType(String(todo.reminder_offset || '0'));
                 setCustomReminderDate('');
@@ -119,7 +119,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
 
         if (hasReminder) {
             if (reminderType === 'custom' && customReminderDate && customReminderTime) {
-                finalReminderAt = new Date(`${customReminderDate}T${customReminderTime}:00`).toISOString();
+                const [year, month, day] = customReminderDate.split('-').map(Number);
+                const [hour, minute] = customReminderTime.split(':').map(Number);
+                const reminderDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
+                finalReminderAt = reminderDate.toISOString();
             } else if (reminderType !== 'custom') {
                 finalReminderOffset = Number(reminderType) as Todo['reminder_offset'];
             }
@@ -141,8 +144,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             start_time: hasTime ? start_time || undefined : undefined,
             end_time: hasTime ? end_time || undefined : undefined,
             priority,
-            reminder_offset: finalReminderOffset,
-            reminder_at: finalReminderAt,
+            reminder_offset: hasReminder && reminderType !== 'custom' ? finalReminderOffset : undefined,
+            reminder_at: hasReminder && reminderType === 'custom' ? finalReminderAt : undefined,
             recurrence: hasRecurrence ? recurrence : { frequency: 'none' },
             subtasks,
             notification_sent: reminderChanged ? false : todo.notification_sent,
@@ -215,10 +218,30 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 {/* Right Column */}
                 <aside className="md:w-2/5 flex-shrink-0 bg-black/5 dark:bg-black/20 p-3 md:p-4 md:border-l border-yellow-300/50 dark:border-gray-700/50 space-y-3">
                     {/* Date Section */}
-                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
-                        <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5 mb-2"><CalendarIcon className="h-4 w-4" /> Fecha</label>
-                        <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
+                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 space-y-3">
+                        <div>
+                            <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5 mb-2"><CalendarIcon className="h-4 w-4" /> Fecha</label>
+                            <div className="flex items-center gap-2">
+                                <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
+                                {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
+                                {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-yellow-200/50 dark:border-gray-600/50">
+                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Establecer rango</span>
+                            <Switch checked={hasEndDate} onChange={setHasEndDate} />
+                        </div>
                     </div>
+                    
+                    {/* Priority */}
+                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
+                         <div className="flex items-center gap-2 mb-2"><FlagIcon className="h-4 w-4 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prioridad</span></div>
+                         <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-600/50 p-1 rounded-full">
+                            {(['low', 'medium', 'high'] as Priority[]).map(p => (
+                                <button key={p} onClick={() => setPriority(p)} className={`w-full text-xs py-1 rounded-full transition-colors ${priority === p ? `${priorityMap[p].base} ${priorityMap[p].text} font-semibold shadow` : 'text-gray-900 dark:text-gray-200 hover:bg-yellow-100 dark:hover:bg-gray-600'}`}>{priorityMap[p].label}</button>
+                            ))}
+                        </div>
+                     </div>
 
                     {/* Conditional Settings */}
                     <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={setHasTime}>
@@ -232,13 +255,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                                 <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
                             </div>
                          </div>
-                    </SettingRow>
-
-                     <SettingRow icon={<CalendarIcon className="h-4 w-4"/>} label="Establecer rango" enabled={hasEndDate} onToggle={setHasEndDate}>
-                        <div>
-                            <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fecha de fin</label>
-                            <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                        </div>
                     </SettingRow>
 
                      <SettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" enabled={hasReminder} onToggle={setHasReminder}>
@@ -281,15 +297,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                          </div>
                     </SettingRow>
 
-                    {/* Priority and Status */}
-                     <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
-                         <div className="flex items-center gap-2 mb-2"><FlagIcon className="h-4 w-4 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prioridad</span></div>
-                         <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-600/50 p-1 rounded-full">
-                            {(['low', 'medium', 'high'] as Priority[]).map(p => (
-                                <button key={p} onClick={() => setPriority(p)} className={`w-full text-xs py-1 rounded-full transition-colors ${priority === p ? `${priorityMap[p].base} ${priorityMap[p].text} font-semibold shadow` : 'text-gray-900 dark:text-gray-200 hover:bg-yellow-100 dark:hover:bg-gray-600'}`}>{priorityMap[p].label}</button>
-                            ))}
-                        </div>
-                     </div>
+                    {/* Status */}
                       <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
                           <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Estado</span>
                           <Switch checked={completed} onChange={setCompleted} />

@@ -101,7 +101,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                 setReminderType('custom');
                 const d = new Date(todo.reminder_at);
                 setCustomReminderDate(d.toISOString().split('T')[0]);
-                setCustomReminderTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+                setCustomReminderTime(`${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`);
             } else {
                 setReminderType(String(todo.reminder_offset || '0'));
                 setCustomReminderDate('');
@@ -126,7 +126,10 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
 
         if (hasReminder) {
             if (reminderType === 'custom' && customReminderDate && customReminderTime) {
-                finalReminderAt = new Date(`${customReminderDate}T${customReminderTime}:00`).toISOString();
+                const [year, month, day] = customReminderDate.split('-').map(Number);
+                const [hour, minute] = customReminderTime.split(':').map(Number);
+                const reminderDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
+                finalReminderAt = reminderDate.toISOString();
             } else if (reminderType !== 'custom') {
                 finalReminderOffset = Number(reminderType) as Todo['reminder_offset'];
             }
@@ -144,8 +147,8 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             start_time: hasTime ? start_time || undefined : undefined,
             end_time: hasTime ? end_time || undefined : undefined,
             priority,
-            reminder_offset: finalReminderOffset,
-            reminder_at: finalReminderAt,
+            reminder_offset: hasReminder && reminderType !== 'custom' ? finalReminderOffset : undefined,
+            reminder_at: hasReminder && reminderType === 'custom' ? finalReminderAt : undefined,
             recurrence: hasRecurrence ? recurrence : { frequency: 'none' },
             subtasks,
             notification_sent: reminderChanged ? false : todo.notification_sent,
@@ -206,10 +209,33 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                         </form>
                     </div>
                     
-                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 flex items-center gap-3">
-                        <CalendarIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/>
-                        <label htmlFor="due-date" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Fecha</label>
-                        <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="ml-auto bg-transparent text-gray-700 dark:text-gray-200 text-sm text-right focus:outline-none"/>
+                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl divide-y divide-secondary-light/50 dark:divide-gray-600/50">
+                        <div className="p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <CalendarIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/>
+                                <label htmlFor="due-date" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Fecha</label>
+                            </div>
+                            <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="bg-transparent text-gray-700 dark:text-gray-200 text-sm text-right focus:outline-none"/>
+                        </div>
+                        <div className="p-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Establecer rango</span>
+                                <Switch checked={hasEndDate} onChange={setHasEndDate} />
+                            </div>
+                            {hasEndDate && (
+                                <div className="mt-3 pt-3 border-t border-secondary-light/50 dark:border-gray-600/50 animate-pop-in">
+                                    <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fecha de fin</label>
+                                    <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="mt-1 w-full bg-white/80 dark:bg-gray-700/80 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary"/>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 flex flex-col gap-2">
+                         <div className="flex items-center gap-3"><FlagIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prioridad</span></div>
+                         <div className="flex items-center gap-2 bg-black/5 dark:bg-black/20 p-1 rounded-full">
+                            {(['low', 'medium', 'high'] as Priority[]).map(p => (<button key={p} onClick={() => setPriority(p)} className={`w-full text-xs py-1.5 rounded-full transition-all ${priority === p ? `${priorityMap[p].base} ${priorityMap[p].text} font-semibold shadow-md` : 'text-gray-700 dark:text-gray-300'}`}>{priorityMap[p].label}</button>))}
+                        </div>
                     </div>
                     
                     <div className="space-y-2">
@@ -218,9 +244,6 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                                 <div><label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label><input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary"/></div>
                                 <div><label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin</label><input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary"/></div>
                             </div>
-                        </SettingRow>
-                         <SettingRow icon={<CalendarIcon className="h-5 w-5"/>} label="Establecer rango" enabled={hasEndDate} onToggle={setHasEndDate}>
-                            <div><label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fecha de fin</label><input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary"/></div>
                         </SettingRow>
                         <SettingRow icon={<BellIcon className="h-5 w-5"/>} label="Recordatorio" enabled={hasReminder} onToggle={setHasReminder}>
                             <select value={reminderType} onChange={e => setReminderType(e.target.value)} className="w-full bg-white/80 dark:bg-gray-700/80 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-2 text-sm">
@@ -235,14 +258,6 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                              {hasNotes && <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Añade detalles..." className="w-full bg-white/80 dark:bg-gray-700/80 border-2 border-secondary-light dark:border-gray-600 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-primary text-sm" rows={3}></textarea>}
                         </SettingRow>
                     </div>
-
-                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 flex flex-col gap-2">
-                         <div className="flex items-center gap-3"><FlagIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prioridad</span></div>
-                         <div className="flex items-center gap-2 bg-black/5 dark:bg-black/20 p-1 rounded-full">
-                            {(['low', 'medium', 'high'] as Priority[]).map(p => (<button key={p} onClick={() => setPriority(p)} className={`w-full text-xs py-1.5 rounded-full transition-all ${priority === p ? `${priorityMap[p].base} ${priorityMap[p].text} font-semibold shadow-md` : 'text-gray-700 dark:text-gray-300'}`}>{priorityMap[p].label}</button>))}
-                        </div>
-                    </div>
-
                 </main>
 
                 <footer className="flex-shrink-0 p-4 border-t border-secondary-light/50 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/50">
