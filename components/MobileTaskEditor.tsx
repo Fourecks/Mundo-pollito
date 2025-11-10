@@ -240,9 +240,15 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                     
                     <div className="space-y-2">
                         <SettingRow icon={<ClockIcon className="h-5 w-5"/>} label="Añadir hora" enabled={hasTime} onToggle={setHasTime}>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div><label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label><input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary"/></div>
-                                <div><label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin</label><input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary"/></div>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="flex-1">
+                                    <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
+                                    <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary"/>
+                                </div>
+                                <div className="flex-1">
+                                    <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
+                                    <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary"/>
+                                </div>
                             </div>
                         </SettingRow>
                         <SettingRow icon={<BellIcon className="h-5 w-5"/>} label="Recordatorio" enabled={hasReminder} onToggle={setHasReminder}>

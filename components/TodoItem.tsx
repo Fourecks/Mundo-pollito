@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Todo, Priority, Subtask } from '../types';
 import SubtaskIcon from './icons/SubtaskIcon';
@@ -26,6 +27,14 @@ const formatDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const formatTime = (timeStr: string) => {
+    if (!timeStr) return '';
+    const [hour, minute] = timeStr.split(':');
+    const d = new Date();
+    d.setHours(parseInt(hour), parseInt(minute));
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
 const formatDueDate = (todo: Todo): string => {
     if (!todo.due_date) return '';
     
@@ -33,13 +42,6 @@ const formatDueDate = (todo: Todo): string => {
     const tomorrowDate = new Date();
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowKey = formatDateKey(tomorrowDate);
-
-    const formatTime = (timeStr: string) => {
-        const [hour, minute] = timeStr.split(':');
-        const d = new Date();
-        d.setHours(parseInt(hour), parseInt(minute));
-        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    };
 
     let timeString = '';
     if (todo.start_time && todo.end_time) {
@@ -96,6 +98,11 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
 
         {/* Task Text & Subtask Toggle */}
         <div className="flex-grow flex items-center gap-2 ml-4 min-w-0">
+            {todo.start_time && (
+                <span className={`sm:hidden text-xs font-semibold text-primary-dark dark:text-primary flex-shrink-0 ${todo.completed ? 'opacity-70' : ''}`}>
+                    {formatTime(todo.start_time)}
+                </span>
+            )}
             <span 
                 onClick={() => onEdit(todo)}
                 className={`text-gray-700 dark:text-gray-100 transition-all duration-300 truncate cursor-pointer ${todo.completed ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
