@@ -38,6 +38,8 @@ import { config } from './config';
 import { ensureYoutubeApiReady } from './utils/youtubeApi';
 import BellIcon from './components/icons/BellIcon';
 import InstallPwaBanner from './components/InstallPwaBanner';
+import AddTaskModal from './components/AddTaskModal';
+import PlusIcon from './components/icons/PlusIcon';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -625,6 +627,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isPomodoroModalOpen, setIsPomodoroModalOpen] = useState(false);
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
+    const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
     const ambientAudioRef = useRef<HTMLAudioElement>(null);
@@ -780,6 +783,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 return (
                     <div className="flex flex-col h-full">
                         <TodoListModule isMobile={true} todos={todayTodos} addTodo={handleAddTodo} toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)} deleteTodo={handleDeleteTodo} updateTodo={handleUpdateTodo} onEditTodo={setTaskToEdit} selectedDate={selectedDate} setSelectedDate={setSelectedDate} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} />
+                        <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
+                            <PlusIcon />
+                        </button>
                     </div>
                 );
             case 'notes':
@@ -867,9 +873,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 {renderContent()}
             </main>
             
-            <button onClick={() => setIsAiBrowserOpen(true)} className="mobile-ai-button fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40">
-                <ChickenIcon className="w-6 h-6" />
-            </button>
+            {activeTab !== 'tasks' && (
+              <button onClick={() => setIsAiBrowserOpen(true)} className="mobile-ai-button fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40">
+                  <ChickenIcon className="w-6 h-6" />
+              </button>
+            )}
             
              {(activeTrack || activeSpotifyTrack) && (
                 <div className="fixed bottom-[76px] left-0 right-0 z-50">
@@ -907,6 +915,14 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setAmbientSound={setAmbientSound}
               dailyEncouragementLocalHour={dailyEncouragementLocalHour}
               onSetDailyEncouragement={onSetDailyEncouragement}
+            />
+            <AddTaskModal
+                isOpen={isAddTaskModalOpen}
+                onClose={() => setIsAddTaskModalOpen(false)}
+                onAddTask={(text) => {
+                    handleAddTodo(text);
+                    setIsAddTaskModalOpen(false);
+                }}
             />
             <CompletionModal isOpen={showCompletionModal} onClose={() => setShowCompletionModal(false)} quote={completionQuote}/>
             <TaskDetailsModal isOpen={!!taskToEdit} onClose={() => setTaskToEdit(null)} onSave={handleUpdateTodo} todo={taskToEdit} />

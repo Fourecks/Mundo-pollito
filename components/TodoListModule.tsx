@@ -197,7 +197,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                                 <span className="sm:hidden">{sortBy === 'default' ? 'Original' : sortBy === 'priority' ? 'Prioridad' : 'Fecha'}</span>
                             </button>
                         </div>
-                        <TodoInput onAddTodo={addTodo} />
+                         {!isMobile && <TodoInput onAddTodo={addTodo} />}
                     </div>
                 </div>
               
