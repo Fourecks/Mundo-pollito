@@ -209,6 +209,8 @@ interface AppComponentProps {
   particleType: ParticleType;
   ambientSound: { type: AmbientSoundType; volume: number };
   dailyEncouragementLocalHour: number | null;
+  activeTrack: Playlist | null;
+  activeSpotifyTrack: Playlist | null;
   // Handlers
   handleAddTodo: (text: string) => Promise<void>;
   handleUpdateTodo: (updatedTodo: Todo) => Promise<void>;
@@ -235,6 +237,8 @@ interface AppComponentProps {
   setParticleType: React.Dispatch<React.SetStateAction<ParticleType>>;
   setAmbientSound: React.Dispatch<React.SetStateAction<{ type: AmbientSoundType; volume: number }>>;
   onSetDailyEncouragement: (localHour: number | null) => void;
+  setActiveTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
+  setActiveSpotifyTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
   // Google Drive Props
   gdriveToken: string | null;
   galleryIsLoading: boolean;
@@ -257,11 +261,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
+    activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
+    setActiveTrack, setActiveSpotifyTrack,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
     isSubscribed, isPermissionBlocked, handleNotificationAction
@@ -274,8 +280,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [openWindows, setOpenWindows] = useState<WindowType[]>([]);
   const [windowStates, setWindowStates] = useState<{ [key in WindowType]?: WindowState }>({});
   const [focusedWindow, setFocusedWindow] = useState<WindowType | null>(null);
-  const [activeTrack, setActiveTrack] = useState<Playlist | null>(null);
-  const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
   const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
   const pomodoroStartedRef = useRef(false);
@@ -601,11 +605,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
+      activeTrack, activeSpotifyTrack,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
+      setActiveTrack, setActiveSpotifyTrack,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       isSubscribed, isPermissionBlocked, handleNotificationAction
@@ -615,8 +621,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [activeTab, setActiveTab] = useState('home');
     const [showCompletionModal, setShowCompletionModal] = useState(false);
     const [completionQuote, setCompletionQuote] = useState('');
-    const [activeTrack, setActiveTrack] = useState<Playlist | null>(null);
-    const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
     const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
     const [isPomodoroModalOpen, setIsPomodoroModalOpen] = useState(false);
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
@@ -996,6 +1000,8 @@ const App: React.FC = () => {
       backgroundTimerOpacity: 50,
       endTime: null as (number | null),
   });
+  const [activeTrack, setActiveTrack] = useState<Playlist | null>(null);
+  const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
 
   // Google Drive State
   const [gapiReady, setGapiReady] = useState(false);
@@ -1184,7 +1190,6 @@ const App: React.FC = () => {
   const loadData = useCallback(async () => {
     if (!user) return;
     
-    // Todos, Subtasks, and Folders/Notes
     const [
       { data: todosData, error: todosError },
       { data: foldersData, error: foldersError },
@@ -1196,10 +1201,9 @@ const App: React.FC = () => {
       supabase.from('folders').select('*, notes(*)').order('created_at').order('created_at', { foreignTable: 'notes', ascending: true }),
       supabase.from('playlists').select('*').order('created_at'),
       supabase.from('quick_notes').select('*').order('created_at'),
-      supabase.from('profiles').select('daily_encouragement_hour_local').eq('id', user.id).single(),
+      supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings').eq('id', user.id).single(),
     ]);
 
-    // Persist timezone offset to profile
     const currentUserTimezoneOffset = new Date().getTimezoneOffset();
     const { error: profileUpdateError } = await supabase
         .from('profiles')
@@ -1228,35 +1232,29 @@ const App: React.FC = () => {
     if (quickNotesError) console.error("Error loading quick notes:", quickNotesError);
     else setQuickNotes(quickNotesData || []);
     
-    if (profileError && profileError.code !== 'PGRST116') { // Ignore "no rows" error
+    if (profileError && profileError.code !== 'PGRST116') {
       console.error("Error loading profile data:", profileError);
     } else if (profileData) {
       setDailyEncouragementLocalHour(profileData.daily_encouragement_hour_local);
+      if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
+        const savedSettings = profileData.pomodoro_settings as Partial<typeof pomodoroState>;
+        setPomodoroState(s => {
+            const finalDurations = savedSettings.durations || s.durations;
+            const finalMode = s.mode; 
+            return {
+                ...s,
+                durations: finalDurations,
+                showBackgroundTimer: savedSettings.showBackgroundTimer ?? s.showBackgroundTimer,
+                backgroundTimerOpacity: savedSettings.backgroundTimerOpacity ?? s.backgroundTimerOpacity,
+                timeLeft: finalDurations[finalMode],
+                isActive: false,
+                endTime: null,
+            };
+        });
+      }
     }
     
-    // Load local settings
     try {
-        const storedPomodoro = localStorage.getItem(getUserKey('pomodoroState'));
-        if (storedPomodoro) {
-            const parsed = JSON.parse(storedPomodoro);
-            // FIX: The original logic was subtly flawed. This new implementation is more robust.
-            // It explicitly merges saved durations with defaults and ensures timeLeft is correctly
-            // reset to the full duration based on the final loaded settings.
-            setPomodoroState(s => {
-                const finalDurations = parsed.durations || s.durations;
-                const finalMode = parsed.mode || s.mode;
-                return {
-                    ...s,
-                    ...parsed,
-                    durations: finalDurations,
-                    mode: finalMode,
-                    timeLeft: finalDurations[finalMode],
-                    isActive: false,
-                    endTime: null,
-                };
-            });
-        }
-
         const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
         if (storedActiveBgId) setSavedActiveBgId(storedActiveBgId);
 
@@ -1268,6 +1266,13 @@ const App: React.FC = () => {
 
         const storedBrowserSession = localStorage.getItem(getUserKey('browserSession'));
         if (storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
+        
+        const storedActiveTrack = localStorage.getItem(getUserKey('activeTrack'));
+        if(storedActiveTrack) setActiveTrack(JSON.parse(storedActiveTrack));
+        
+        const storedSpotifyTrack = localStorage.getItem(getUserKey('activeSpotifyTrack'));
+        if(storedSpotifyTrack) setActiveSpotifyTrack(JSON.parse(storedSpotifyTrack));
+
     } catch(e) { console.error("Error parsing settings from localStorage:", e); }
 
     setDataLoaded(true);
@@ -1281,15 +1286,32 @@ const App: React.FC = () => {
   }, [user, dataLoaded, loadData]);
 
   // --- Settings Persistence ---
-  useEffect(() => { 
-    if (user) {
-        const { endTime, ...stateToSave } = pomodoroState; // Don't persist endTime
-        localStorage.setItem(getUserKey('pomodoroState'), JSON.stringify(stateToSave));
+  useEffect(() => {
+    if (user && dataLoaded) {
+      if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+      settingsSaveTimeout.current = window.setTimeout(async () => {
+        const { durations, showBackgroundTimer, backgroundTimerOpacity } = pomodoroState;
+        const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity };
+        const { error } = await supabase
+          .from('profiles')
+          .update({ pomodoro_settings: settingsToSave })
+          .eq('id', user.id);
+        if (error) {
+          console.error("Error saving pomodoro settings:", error);
+        }
+      }, 1500);
     }
-  }, [pomodoroState, getUserKey, user]);
+    return () => {
+      if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+    };
+  }, [pomodoroState, user, dataLoaded]);
+
   useEffect(() => { if (user) localStorage.setItem(getUserKey('particleType'), particleType); }, [particleType, getUserKey, user]);
   useEffect(() => { if (user) localStorage.setItem(getUserKey('ambientSound'), JSON.stringify(ambientSound)); }, [ambientSound, getUserKey, user]);
   useEffect(() => { if (user) localStorage.setItem(getUserKey('browserSession'), JSON.stringify(browserSession)); }, [browserSession, getUserKey, user]);
+  useEffect(() => { if (user) localStorage.setItem(getUserKey('activeTrack'), JSON.stringify(activeTrack)); }, [activeTrack, getUserKey, user]);
+  useEffect(() => { if (user) localStorage.setItem(getUserKey('activeSpotifyTrack'), JSON.stringify(activeSpotifyTrack)); }, [activeSpotifyTrack, getUserKey, user]);
+
 
   const handleSetDailyEncouragement = async (localHour: number | null) => {
     if (!user) return;
@@ -1825,11 +1847,13 @@ const App: React.FC = () => {
     currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
+    activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,
+    setActiveTrack, setActiveSpotifyTrack,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage: (id) => handleDeleteFile(id, 'gallery'),
     handleAddBackground, handleDeleteBackground: (id) => handleDeleteFile(id, 'backgrounds'),
