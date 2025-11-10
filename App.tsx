@@ -282,7 +282,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [focusedWindow, setFocusedWindow] = useState<WindowType | null>(null);
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
   const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
-  const pomodoroStartedRef = useRef(false);
+  
+  const pomodoroWorkerRef = useRef<Worker | null>(null);
+  const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
 
   const getUserKey = useCallback((key: string) => `${currentUser.email}_${key}`, [currentUser]);
   
@@ -297,7 +299,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   useEffect(() => { localStorage.setItem(getUserKey('windowStates'), JSON.stringify(windowStates)); }, [windowStates, getUserKey]);
   useEffect(() => { localStorage.setItem(getUserKey('openWindows'), JSON.stringify(openWindows)); }, [openWindows, getUserKey]);
 
-  const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
   const ambientAudioRef = useRef<HTMLAudioElement>(null);
   
   const handleShowCompletionModal = (quote: string) => {
@@ -311,92 +312,106 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
   const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
 
-  // Pomodoro Timer Logic
-  const handleTimerCompletion = useCallback(() => {
+  // Pomodoro Timer Logic with Web Worker
+  useEffect(() => {
+    pomodoroWorkerRef.current = new Worker(new URL('./pomodoro-worker.js', import.meta.url));
+
+    pomodoroWorkerRef.current.onmessage = (event: MessageEvent) => {
+      const { type, timeLeft, mode } = event.data;
+      if (type === 'tick') {
+        setPomodoroState(s => ({ ...s, timeLeft }));
+      } else if (type === 'completed') {
+        handleTimerCompletion(mode);
+      }
+    };
+
+    return () => {
+      pomodoroWorkerRef.current?.terminate();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTimerCompletion = useCallback((completedMode: 'work' | 'break') => {
     pomodoroAudioRef.current?.play();
 
+    const newMode = completedMode === 'work' ? 'break' : 'work';
+    const message = completedMode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification("Pomodoro Terminado", {
+        body: message,
+        icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png",
+      });
+    }
+
     setPomodoroState(s => {
-      const newMode = s.mode === 'work' ? 'break' : 'work';
-      const message = s.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
-
-      if (isSubscribed) {
-        supabase.functions.invoke('send-pushalert-notification', {
-          body: { title: "Pomodoro Terminado", message: message },
-        });
-      }
-
       const newDuration = s.durations[newMode];
+      pomodoroWorkerRef.current?.postMessage({ type: 'start', timeLeft: newDuration, mode: newMode });
       return {
         ...s,
         mode: newMode,
         timeLeft: newDuration,
         isActive: true,
-        endTime: Date.now() + newDuration * 1000,
       };
     });
-  }, [isSubscribed, setPomodoroState]);
+  }, []);
 
   const handlePomodoroToggle = useCallback(() => {
     setPomodoroState(s => {
       const isStarting = !s.isActive;
       if (isStarting) {
-        const endTime = Date.now() + s.timeLeft * 1000;
-        if (!pomodoroStartedRef.current) {
-          pomodoroStartedRef.current = true;
-          return { ...s, isActive: true, endTime, showBackgroundTimer: true };
-        }
-        return { ...s, isActive: true, endTime };
+        pomodoroWorkerRef.current?.postMessage({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
+        return { ...s, isActive: true, showBackgroundTimer: true };
       } else {
-        // Preserve timeLeft when pausing
-        const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
-        return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
+        pomodoroWorkerRef.current?.postMessage({ type: 'pause' });
+        return { ...s, isActive: false };
       }
     });
-  }, [setPomodoroState]);
+  }, []);
 
+  const handlePomodoroReset = useCallback(() => {
+    pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+    setPomodoroState(s => ({
+      ...s,
+      timeLeft: s.durations[s.mode],
+      isActive: false,
+    }));
+  }, []);
+
+  const handlePomodoroSwitchMode = useCallback((newMode: 'work' | 'break') => {
+    pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+    setPomodoroState(s => ({
+      ...s,
+      mode: newMode,
+      timeLeft: s.durations[newMode],
+      isActive: false,
+    }));
+  }, []);
+  
+  const handlePomodoroSaveSettings = useCallback((newDurations: { work: number; break: number }) => {
+    pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+    setPomodoroState(s => ({
+        ...s,
+        durations: newDurations,
+        timeLeft: newDurations[s.mode],
+        isActive: false
+    }));
+  }, []);
+
+  // Update document title with timer
   useEffect(() => {
-    let animationFrameId: number;
     const originalTitle = 'Pollito Productivo';
-
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
-        const secs = (seconds % 60).toString().padStart(2, '0');
-        return `${mins}:${secs}`;
-    };
-
-    const tick = () => {
-        const { isActive, endTime, timeLeft, mode } = pomodoroState;
-        if (!isActive || !endTime) {
-            return;
-        }
-
-        const remaining = endTime - Date.now();
-        if (remaining <= 0) {
-            handleTimerCompletion();
-        } else {
-            const newTimeLeft = Math.ceil(remaining / 1000);
-            if (newTimeLeft !== timeLeft) {
-                setPomodoroState(s => ({ ...s, timeLeft: newTimeLeft }));
-            }
-            const timeString = formatTime(newTimeLeft);
-            const modeLabel = mode === 'work' ? 'Concentración' : 'Descanso';
-            document.title = `(${timeString}) ${modeLabel} - ${originalTitle}`;
-
-            animationFrameId = requestAnimationFrame(tick);
-        }
-    };
-
     if (pomodoroState.isActive) {
-        animationFrameId = requestAnimationFrame(tick);
+      const mins = Math.floor(pomodoroState.timeLeft / 60).toString().padStart(2, '0');
+      const secs = (pomodoroState.timeLeft % 60).toString().padStart(2, '0');
+      const modeLabel = pomodoroState.mode === 'work' ? 'Concentración' : 'Descanso';
+      document.title = `(${mins}:${secs}) ${modeLabel} - ${originalTitle}`;
     } else {
-        document.title = originalTitle;
+      document.title = originalTitle;
     }
+    return () => { document.title = originalTitle; };
+  }, [pomodoroState.isActive, pomodoroState.timeLeft, pomodoroState.mode]);
 
-    return () => {
-        cancelAnimationFrame(animationFrameId);
-        document.title = originalTitle;
-    };
-  }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
 
   // Ambient Sound Effect
   useEffect(() => {
@@ -563,7 +578,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
           {openWindows.includes('pomodoro') && (
               <ModalWindow isOpen onClose={() => toggleWindow('pomodoro')} title="Pomodoro" isDraggable isResizable zIndex={focusedWindow === 'pomodoro' ? 50 : 40} onFocus={() => bringToFront('pomodoro')} className="w-80 h-96" windowState={windowStates.pomodoro} onStateChange={s => setWindowStates(ws => ({...ws, pomodoro: s}))}>
-                  <Pomodoro timeLeft={pomodoroState.timeLeft} isActive={pomodoroState.isActive} mode={pomodoroState.mode} durations={pomodoroState.durations} onToggle={handlePomodoroToggle} onReset={() => setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null }))} onSwitchMode={(mode) => setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null }))} onSaveSettings={(d) => setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null }))} showBackgroundTimer={pomodoroState.showBackgroundTimer} onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))} backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity} onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))} />
+                  <Pomodoro timeLeft={pomodoroState.timeLeft} isActive={pomodoroState.isActive} mode={pomodoroState.mode} durations={pomodoroState.durations} onToggle={handlePomodoroToggle} onReset={handlePomodoroReset} onSwitchMode={handlePomodoroSwitchMode} onSaveSettings={handlePomodoroSaveSettings} showBackgroundTimer={pomodoroState.showBackgroundTimer} onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))} backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity} onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))} />
               </ModalWindow>
           )}
            {openWindows.includes('music') && (
@@ -626,6 +641,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
     
+    const pomodoroWorkerRef = useRef<Worker | null>(null);
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
     const ambientAudioRef = useRef<HTMLAudioElement>(null);
 
@@ -639,87 +655,91 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
     const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
     
-    // Pomodoro Timer Logic
-    const handleTimerCompletion = useCallback(() => {
+    // Pomodoro Timer Logic with Web Worker
+    useEffect(() => {
+        pomodoroWorkerRef.current = new Worker(new URL('./pomodoro-worker.js', import.meta.url));
+
+        pomodoroWorkerRef.current.onmessage = (event: MessageEvent) => {
+        const { type, timeLeft, mode } = event.data;
+        if (type === 'tick') {
+            setPomodoroState(s => ({ ...s, timeLeft }));
+        } else if (type === 'completed') {
+            handleTimerCompletion(mode);
+        }
+        };
+
+        return () => {
+        pomodoroWorkerRef.current?.terminate();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const handleTimerCompletion = useCallback((completedMode: 'work' | 'break') => {
         pomodoroAudioRef.current?.play();
 
+        const newMode = completedMode === 'work' ? 'break' : 'work';
+        const message = completedMode === 'work' ? "¡Tiempo de descansar! ¡Bien hecho!" : "¡Se acabó el descanso! Tú puedes.";
+        
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification("Pomodoro Terminado", {
+                body: message,
+                icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png",
+            });
+        }
+
         setPomodoroState(s => {
-            const newMode = s.mode === 'work' ? 'break' : 'work';
-            const message = s.mode === 'work' ? "¡Tiempo de descansar! ¡Bien hecho!" : "¡Se acabó el descanso! Tú puedes.";
-
-            if (isSubscribed) {
-                supabase.functions.invoke('send-pushalert-notification', {
-                    body: { title: "Pomodoro Terminado", message: message },
-                });
-            }
-
-            const newDuration = s.durations[newMode];
-            return {
-                ...s,
-                mode: newMode,
-                timeLeft: newDuration,
-                isActive: true,
-                endTime: Date.now() + newDuration * 1000,
-            };
+        const newDuration = s.durations[newMode];
+        pomodoroWorkerRef.current?.postMessage({ type: 'start', timeLeft: newDuration, mode: newMode });
+        return {
+            ...s,
+            mode: newMode,
+            timeLeft: newDuration,
+            isActive: true,
+        };
         });
-    }, [isSubscribed, setPomodoroState]);
+    }, []);
 
     const handlePomodoroToggle = useCallback(() => {
         setPomodoroState(s => {
-            const isStarting = !s.isActive;
-            if (isStarting) {
-                return { ...s, isActive: true, endTime: Date.now() + s.timeLeft * 1000 };
-            } else {
-                const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
-                return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
-            }
-        });
-    }, [setPomodoroState]);
-
-    useEffect(() => {
-        let animationFrameId: number;
-        const originalTitle = 'Pollito Productivo';
-
-        const formatTime = (seconds: number) => {
-            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
-            const secs = (seconds % 60).toString().padStart(2, '0');
-            return `${mins}:${secs}`;
-        };
-
-        const tick = () => {
-            const { isActive, endTime, timeLeft, mode } = pomodoroState;
-            if (!isActive || !endTime) {
-                return;
-            }
-
-            const remaining = endTime - Date.now();
-            if (remaining <= 0) {
-                handleTimerCompletion();
-            } else {
-                const newTimeLeft = Math.ceil(remaining / 1000);
-                if (newTimeLeft !== timeLeft) {
-                    setPomodoroState(s => ({ ...s, timeLeft: newTimeLeft }));
-                }
-                const timeString = formatTime(newTimeLeft);
-                const modeLabel = mode === 'work' ? 'Concentración' : 'Descanso';
-                document.title = `(${timeString}) ${modeLabel} - ${originalTitle}`;
-
-                animationFrameId = requestAnimationFrame(tick);
-            }
-        };
-
-        if (pomodoroState.isActive) {
-            animationFrameId = requestAnimationFrame(tick);
+        const isStarting = !s.isActive;
+        if (isStarting) {
+            pomodoroWorkerRef.current?.postMessage({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
+            return { ...s, isActive: true };
         } else {
-            document.title = originalTitle;
+            pomodoroWorkerRef.current?.postMessage({ type: 'pause' });
+            return { ...s, isActive: false };
         }
+        });
+    }, []);
 
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-            document.title = originalTitle;
-        };
-    }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
+    const handlePomodoroReset = useCallback(() => {
+        pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+        setPomodoroState(s => ({
+            ...s,
+            timeLeft: s.durations[s.mode],
+            isActive: false,
+        }));
+    }, []);
 
+    const handlePomodoroSwitchMode = useCallback((newMode: 'work' | 'break') => {
+        pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+        setPomodoroState(s => ({
+            ...s,
+            mode: newMode,
+            timeLeft: s.durations[newMode],
+            isActive: false,
+        }));
+    }, []);
+
+    const handlePomodoroSaveSettings = useCallback((newDurations: { work: number; break: number }) => {
+        pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+        setPomodoroState(s => ({
+            ...s,
+            durations: newDurations,
+            timeLeft: newDurations[s.mode],
+            isActive: false
+        }));
+    }, []);
 
     // Ambient Sound Effect
     useEffect(() => {
@@ -915,9 +935,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     mode={pomodoroState.mode}
                     durations={pomodoroState.durations}
                     onToggle={handlePomodoroToggle}
-                    onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
-                    onSwitchMode={(mode) => { setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null })); }}
-                    onSaveSettings={(d) => { setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null })); }}
+                    onReset={handlePomodoroReset}
+                    onSwitchMode={handlePomodoroSwitchMode}
+                    onSaveSettings={handlePomodoroSaveSettings}
                     showBackgroundTimer={pomodoroState.showBackgroundTimer}
                     onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))}
                     backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity}
@@ -998,7 +1018,6 @@ const App: React.FC = () => {
       durations: { work: 25 * 60, break: 5 * 60 },
       showBackgroundTimer: false,
       backgroundTimerOpacity: 50,
-      endTime: null as (number | null),
   });
   const [activeTrack, setActiveTrack] = useState<Playlist | null>(null);
   const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
@@ -1248,7 +1267,6 @@ const App: React.FC = () => {
                 backgroundTimerOpacity: savedSettings.backgroundTimerOpacity ?? s.backgroundTimerOpacity,
                 timeLeft: finalDurations[finalMode],
                 isActive: false,
-                endTime: null,
             };
         });
       }
