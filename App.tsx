@@ -41,6 +41,7 @@ import InstallPwaBanner from './components/InstallPwaBanner';
 import AddTaskModal from './components/AddTaskModal';
 import PlusIcon from './components/icons/PlusIcon';
 import MobileTaskEditor from './components/MobileTaskEditor';
+import MobilePomodoroPanel from './components/MobilePomodoroPanel';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -555,7 +556,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 todos={todayTodos} 
                 addTodo={handleAddTodo} 
                 toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
-                toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
+                toggleSubtask={handleToggleSubtask}
                 deleteTodo={handleDeleteTodo} 
                 updateTodo={handleUpdateTodo} 
                 onEditTodo={setTaskToEdit} 
@@ -800,7 +801,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             todos={todayTodos} 
                             addTodo={handleAddTodo} 
                             toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
-                            toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
+                            toggleSubtask={handleToggleSubtask}
                             deleteTodo={handleDeleteTodo} 
                             updateTodo={handleUpdateTodo} 
                             onEditTodo={setTaskToEdit} 
@@ -966,22 +967,22 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 </div>
             )}
 
-            <ModalWindow isOpen={isPomodoroModalOpen} onClose={() => setIsPomodoroModalOpen(false)} title="Pomodoro" className="w-full max-w-sm" isDraggable={false} isResizable={false}>
-                <Pomodoro
-                    timeLeft={pomodoroState.timeLeft}
-                    isActive={pomodoroState.isActive}
-                    mode={pomodoroState.mode}
-                    durations={pomodoroState.durations}
-                    onToggle={handlePomodoroToggle}
-                    onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
-                    onSwitchMode={(mode) => { setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null })); }}
-                    onSaveSettings={(d) => { setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null })); }}
-                    showBackgroundTimer={pomodoroState.showBackgroundTimer}
-                    onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))}
-                    backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity}
-                    onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))}
-                  />
-            </ModalWindow>
+            <MobilePomodoroPanel
+                isOpen={isPomodoroModalOpen}
+                onClose={() => setIsPomodoroModalOpen(false)}
+                timeLeft={pomodoroState.timeLeft}
+                isActive={pomodoroState.isActive}
+                mode={pomodoroState.mode}
+                durations={pomodoroState.durations}
+                onToggle={handlePomodoroToggle}
+                onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
+                onSwitchMode={(mode) => { setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null })); }}
+                onSaveSettings={(d) => { setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null })); }}
+                showBackgroundTimer={pomodoroState.showBackgroundTimer}
+                onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))}
+                backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity}
+                onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))}
+            />
 
             <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
             <audio ref={ambientAudioRef} />
@@ -1402,67 +1403,76 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTodo = async (updatedTodo: Todo) => {
-      // 1. Update database first
-      const { subtasks, ...todoForUpdate } = updatedTodo;
-      const { error: todoError } = await supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id);
-      if (todoError) { console.error("Error updating todo:", todoError); return; }
+    const { subtasks, ...todoForUpdate } = updatedTodo;
+    const { error: todoError } = await supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id);
+    if (todoError) { console.error("Error updating todo:", todoError); return; }
 
-      if (subtasks) {
-          const updates = subtasks.filter(st => st.id > 0);
-          const inserts = subtasks.filter(st => !st.id || st.id <= 0).map(st => ({ text: st.text, completed: st.completed, todo_id: updatedTodo.id }));
-          
-          if(updates.length > 0) {
-              const { error: subtaskUpdateError } = await supabase.from('subtasks').upsert(updates);
-              if (subtaskUpdateError) console.error("Error updating subtasks:", subtaskUpdateError);
-          }
-          if(inserts.length > 0) {
-              const { error: subtaskInsertError } = await supabase.from('subtasks').insert(inserts);
-              if (subtaskInsertError) console.error("Error inserting subtasks:", subtaskInsertError);
-          }
-      }
+    if (subtasks) {
+        const upserts = subtasks.map(st => {
+            const isNew = st.id > 1000000000;
+            const payload: any = {
+                text: st.text,
+                completed: st.completed,
+                todo_id: updatedTodo.id,
+            };
+            if (!isNew) {
+                payload.id = st.id;
+            }
+            return payload;
+        });
 
-      // 2. Update local state
-      setAllTodos(current => {
+        if (upserts.length > 0) {
+            const { error: subtaskUpsertError } = await supabase.from('subtasks').upsert(upserts);
+            if (subtaskUpsertError) {
+                console.error("Error syncing subtasks:", subtaskUpsertError);
+            }
+        }
+    }
+
+    // After DB operations, fetch the updated todo with fresh subtask IDs and update local state
+    const { data: refreshedTodo, error: refreshError } = await supabase.from('todos').select('*, subtasks(*)').eq('id', updatedTodo.id).single();
+    if (refreshError || !refreshedTodo) {
+        console.error("Error refreshing todo after update:", refreshError);
+        // Fallback to less accurate local update if refresh fails
+        updateLocalTodos(updatedTodo);
+        return;
+    }
+
+    updateLocalTodos(refreshedTodo);
+  };
+  
+  // Helper function to update local state, now separate to handle both optimistic and refreshed data
+  const updateLocalTodos = (todoToUpdate: Todo) => {
+       setAllTodos(current => {
           let originalDateKey: string | null = null;
           
-          // Find the original todo to get its date key
           for (const key in current) {
-              if (current[key].find(t => t.id === updatedTodo.id)) {
+              if (current[key].find(t => t.id === todoToUpdate.id)) {
                   originalDateKey = key;
                   break;
               }
           }
           
-          if (!originalDateKey) {
-            console.warn("Could not find original todo to update. Appending to new date.");
-            const newDateKey = updatedTodo.due_date || formatDateKey(new Date(updatedTodo.created_at!));
-            const newTodosForDate = [...(current[newDateKey] || []), updatedTodo];
-            return { ...current, [newDateKey]: newTodosForDate };
-          }
-
-          const newDateKey = updatedTodo.due_date || formatDateKey(new Date(updatedTodo.created_at!));
+          const newDateKey = todoToUpdate.due_date || formatDateKey(new Date(todoToUpdate.created_at!));
           const newAllTodos = { ...current };
 
-          // If date has changed, move the todo
-          if (originalDateKey !== newDateKey) {
-              const oldTodosForDate = (newAllTodos[originalDateKey] || []).filter(t => t.id !== updatedTodo.id);
-              if (oldTodosForDate.length > 0) {
-                  newAllTodos[originalDateKey] = oldTodosForDate;
-              } else {
-                  delete newAllTodos[originalDateKey];
-              }
-              const newTodosForDate = [...(newAllTodos[newDateKey] || []), updatedTodo];
-              newAllTodos[newDateKey] = newTodosForDate;
-          } else {
-              // Update in place
-              newAllTodos[newDateKey] = (newAllTodos[newDateKey] || []).map(t =>
-                  t.id === updatedTodo.id ? updatedTodo : t
+          if (originalDateKey && originalDateKey !== newDateKey) {
+              newAllTodos[originalDateKey] = (newAllTodos[originalDateKey] || []).filter(t => t.id !== todoToUpdate.id);
+              if (newAllTodos[originalDateKey].length === 0) delete newAllTodos[originalDateKey];
+              
+              newAllTodos[newDateKey] = [...(newAllTodos[newDateKey] || []), todoToUpdate];
+          } else if (originalDateKey) {
+              newAllTodos[originalDateKey] = (newAllTodos[originalDateKey] || []).map(t =>
+                  t.id === todoToUpdate.id ? todoToUpdate : t
               );
+          } else { // Todo not found, likely a new todo or date was changed from a non-loaded date
+              newAllTodos[newDateKey] = [...(newAllTodos[newDateKey] || []), todoToUpdate];
           }
 
           return newAllTodos;
       });
-  };
+  }
+
 
   const handleToggleTodo = async (id: number, onAllCompleted: (quote: string) => void) => {
     let dateKey = '';
@@ -1497,7 +1507,7 @@ const App: React.FC = () => {
     if (error) console.error("Error toggling todo:", error);
     
     if (updatedSubtasks.length > 0) {
-        const subtaskUpdates = updatedSubtasks.map(st => ({ id: st.id, completed: newCompletedState }));
+        const subtaskUpdates = updatedSubtasks.map(st => ({ id: st.id, completed: newCompletedState, todo_id: id }));
         const { error: subtaskError } = await supabase.from('subtasks').upsert(subtaskUpdates);
         if (subtaskError) console.error("Error syncing subtasks:", subtaskError);
     }

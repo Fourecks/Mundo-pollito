@@ -1,6 +1,7 @@
 import React from 'react';
 import PlayIcon from './icons/PlayIcon';
 import PauseIcon from './icons/PauseIcon';
+import SettingsIcon from './icons/SettingsIcon';
 
 interface MobilePomodoroWidgetProps {
   timeLeft: number;
@@ -19,8 +20,15 @@ const formatTime = (seconds: number) => {
 
 const MobilePomodoroWidget: React.FC<MobilePomodoroWidgetProps> = ({ timeLeft, isActive, mode, onToggle, onOpenModal, onSwitchMode }) => {
   return (
-    <div className="w-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg p-3 flex items-center justify-between">
-      <div className="flex items-center gap-3" onClick={onOpenModal}>
+    <div className="w-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg p-3 flex items-center justify-between relative cursor-pointer" onClick={onOpenModal}>
+       <div 
+          className="absolute top-2 right-2 p-1.5 text-gray-400 pointer-events-none"
+          aria-hidden="true"
+        >
+        <SettingsIcon />
+      </div>
+
+      <div className="flex items-center gap-3">
         <div className={`w-2 h-10 rounded-full ${mode === 'work' ? 'bg-red-400' : 'bg-green-400'}`}></div>
         <div>
             <div className="flex items-center gap-2 mb-1">
@@ -37,7 +45,7 @@ const MobilePomodoroWidget: React.FC<MobilePomodoroWidgetProps> = ({ timeLeft, i
                     Descanso
                 </button>
             </div>
-            <p className="text-2xl font-bold text-pink-500 dark:text-pink-400 tracking-wider cursor-pointer">{formatTime(timeLeft)}</p>
+            <p className="text-2xl font-bold text-pink-500 dark:text-pink-400 tracking-wider">{formatTime(timeLeft)}</p>
         </div>
       </div>
       <button 
