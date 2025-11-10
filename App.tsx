@@ -788,6 +788,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             <Greeting name={capitalizedUserName} />
                         </header>
                         <div className="p-4">
+                             <BibleVerse />
                              <MobilePomodoroWidget 
                                 timeLeft={pomodoroState.timeLeft} 
                                 isActive={pomodoroState.isActive} 
@@ -797,7 +798,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 onSwitchMode={handleSwitchMode}
                                 onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
                              />
-                            <BibleVerse />
                             <TodaysAgenda tasks={todayAgendaTasks} onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} quickNotes={quickNotes} onAddQuickNote={handleAddQuickNote} onDeleteQuickNote={handleDeleteQuickNote} onClearAllQuickNotes={handleClearAllQuickNotes} />
                         </div>
                     </>
@@ -1304,7 +1304,7 @@ const App: React.FC = () => {
                 ...s,
                 durations: finalDurations,
                 showBackgroundTimer: savedSettings.showBackgroundTimer ?? s.showBackgroundTimer,
-                backgroundTimerOpacity: savedSettings.backgroundTimerOpacity ?? s.backgroundTimerOpacity,
+                backgroundTimerOpacity: savedSettings.backgroundTimerOpacity ?? s.showBackgroundTimer,
                 timeLeft: finalDurations[finalMode],
                 isActive: false,
                 endTime: null,
