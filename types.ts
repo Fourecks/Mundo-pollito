@@ -22,6 +22,7 @@ export interface RecurrenceRule {
   customDays?: number[]; // For custom frequency, stores selected days (e.g., day of week or day of month)
   id?: string; // A unique ID for a series of recurring tasks
   sourceId?: number; // The ID of the task that generated this one
+  ends_on?: string; // An optional end date for the recurrence
 }
 
 export interface Todo {
@@ -32,6 +33,7 @@ export interface Todo {
   completed: boolean;
   priority: Priority;
   due_date?: string; // Represents the start date of the task
+  end_date?: string; // Represents the end date for a multi-day task
   start_time?: string; // e.g., "14:00"
   end_time?: string;   // e.g., "15:30"
   notes?: string;
