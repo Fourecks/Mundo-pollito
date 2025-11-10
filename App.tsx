@@ -454,7 +454,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 <div key={activeBackground.id} className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-30" style={{ backgroundImage: `url(${activeBackground.url})` }}/>
             )
         ) : (
-            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 -z-30"/>
+            <div className="absolute top-0 left-0 w-full h-full bg-white dark:bg-black -z-30"/>
         )}
         
         {pomodoroState.isActive && pomodoroState.showBackgroundTimer && <BackgroundTimer timeLeft={pomodoroState.timeLeft} opacity={pomodoroState.backgroundTimerOpacity} />}
@@ -784,7 +784,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'home':
                 return (
                     <>
-                        <header className="sticky top-0 bg-yellow-50/80 dark:bg-gray-800/80 backdrop-blur-md p-4 z-30 border-b border-yellow-300/50 dark:border-gray-700/50">
+                        <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-4 z-30 border-b border-gray-200/50 dark:border-gray-700/50">
                             <Greeting name={capitalizedUserName} />
                         </header>
                         <div className="p-4 space-y-3">
@@ -898,7 +898,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     <div key={activeBackground.id} className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-30" style={{ backgroundImage: `url(${activeBackground.url})` }}/>
                 )
             ) : (
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 -z-30"/>
+                <div className="absolute top-0 left-0 w-full h-full bg-white dark:bg-black -z-30"/>
             )}
             <ParticleLayer type={particleType} />
 
@@ -906,7 +906,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 {renderContent()}
             </main>
             
-            {activeTab !== 'tasks' && (
+            {activeTab !== 'tasks' && activeTab !== 'notes' && (
               <button onClick={() => setIsAiBrowserOpen(true)} className="mobile-ai-button fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40">
                   <ChickenIcon className="w-6 h-6" />
               </button>
