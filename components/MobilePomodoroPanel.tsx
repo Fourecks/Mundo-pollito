@@ -102,10 +102,16 @@ const MobilePomodoroPanel: React.FC<MobilePomodoroPanelProps> = (props) => {
                     <span className="text-4xl font-bold text-gray-800 dark:text-gray-100">{formatTime(timeLeft)}</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between w-full max-w-xs mt-6">
-                  <button onClick={onReset} className="p-2.5 bg-white/60 dark:bg-gray-700/60 rounded-full shadow-md text-gray-600 dark:text-gray-200 hover:text-primary-dark dark:hover:text-primary transition-all"><ResetIcon /></button>
-                  <button onClick={onToggle} className="w-16 h-16 bg-primary rounded-full shadow-lg text-white flex items-center justify-center text-2xl hover:bg-primary-dark transition-colors transform active:scale-95">{isActive ? <PauseIcon /> : <PlayIcon />}</button>
-                  <button onClick={() => setView('settings')} className="p-2.5 bg-white/60 dark:bg-gray-700/60 rounded-full shadow-md text-gray-600 dark:text-gray-200 hover:text-primary-dark dark:hover:text-primary transition-all"><SettingsIcon /></button>
+                <div className="flex items-center justify-center w-full gap-6 mt-6">
+                  <button onClick={onReset} className="p-3 bg-white/60 dark:bg-gray-700/60 rounded-full shadow-md text-gray-600 dark:text-gray-200 hover:text-primary-dark dark:hover:text-primary transition-all transform active:scale-90">
+                      <ResetIcon />
+                  </button>
+                  <button onClick={onToggle} className="w-20 h-20 bg-primary rounded-full shadow-lg text-white flex items-center justify-center text-2xl hover:bg-primary-dark transition-colors transform active:scale-95">
+                      {isActive ? <PauseIcon /> : <PlayIcon />}
+                  </button>
+                  <button onClick={() => setView('settings')} className="p-3 bg-white/60 dark:bg-gray-700/60 rounded-full shadow-md text-gray-600 dark:text-gray-200 hover:text-primary-dark dark:hover:text-primary transition-all transform active:scale-90">
+                      <SettingsIcon />
+                  </button>
                 </div>
               </div>
             </main>
