@@ -499,7 +499,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setParticleType={setParticleType}
         ambientSound={ambientSound}
         setAmbientSound={setAmbientSound}
-        dailyEncouragementLocalHour={dailyEncouragementLocalHour}
+        dailyEncouragementHour={dailyEncouragementLocalHour}
         onSetDailyEncouragement={onSetDailyEncouragement}
       />
       
@@ -838,7 +838,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={setParticleType}
               ambientSound={ambientSound}
               setAmbientSound={setAmbientSound}
-              dailyEncouragementLocalHour={dailyEncouragementLocalHour}
+              dailyEncouragementHour={dailyEncouragementLocalHour}
               onSetDailyEncouragement={onSetDailyEncouragement}
             />
             <CompletionModal isOpen={showCompletionModal} onClose={() => setShowCompletionModal(false)} quote={completionQuote}/>
@@ -968,19 +968,11 @@ const App: React.FC = () => {
     if ('serviceWorker' in navigator) {
         const registerServiceWorker = async () => {
             try {
-                // Fetch the worker script as text to create a same-origin Blob URL.
-                // This is a robust way to register a service worker in environments where relative paths might be resolved incorrectly.
-                const response = await fetch('./pomodoro-worker.js');
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch Service Worker script with status: ${response.status}`);
-                }
-                const scriptText = await response.text();
-                const blob = new Blob([scriptText], { type: 'application/javascript' });
-                const scriptURL = URL.createObjectURL(blob);
-
-                await navigator.serviceWorker.register(scriptURL);
+                // Register the service worker using an absolute path from the origin.
+                // This is the most standard and robust way to ensure the correct path is used.
+                const registration = await navigator.serviceWorker.register('/pomodoro-worker.js');
                 await navigator.serviceWorker.ready;
-                console.log('Service Worker is ready and controlling the page.');
+                console.log('Service Worker registered successfully with scope:', registration.scope);
             } catch (error) {
                 console.error('Service Worker registration failed:', error);
             }
