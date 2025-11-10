@@ -47,7 +47,7 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- OneSignal Configuration ---
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 
 // Helper to format date as YYYY-MM-DD key
@@ -229,6 +229,11 @@ interface AppComponentProps {
   handleAddQuickNote: (text: string) => Promise<void>;
   handleDeleteQuickNote: (id: number) => Promise<void>;
   handleClearAllQuickNotes: () => Promise<void>;
+  // Pomodoro Handlers
+  handlePomodoroToggle: () => void;
+  handlePomodoroReset: () => void;
+  handlePomodoroSwitchMode: (newMode: 'work' | 'break') => void;
+  handlePomodoroSaveSettings: (newDurations: { work: number; break: number; }) => void;
   // Setters for shared state
   setBrowserSession: React.Dispatch<React.SetStateAction<BrowserSession>>;
   setSelectedDate: React.Dispatch<React.SetStateAction<Date>>;
@@ -266,6 +271,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
+    handlePomodoroToggle, handlePomodoroReset, handlePomodoroSwitchMode, handlePomodoroSaveSettings,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
     setActiveTrack, setActiveSpotifyTrack,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
@@ -308,56 +314,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
   const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
   const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
-
-  // Pomodoro Timer Logic with Service Worker
-  const postToSW = (message: any) => {
-    if (navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage(message);
-    } else {
-      console.error("Service Worker not in control. Cannot send message.");
-    }
-  };
-
-  const handlePomodoroToggle = useCallback(() => {
-    setPomodoroState(s => {
-      const isStarting = !s.isActive;
-      if (isStarting) {
-        postToSW({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
-      } else {
-        postToSW({ type: 'pause' });
-      }
-      return { ...s, isActive: isStarting, showBackgroundTimer: isStarting };
-    });
-  }, [setPomodoroState]);
-
-  const handlePomodoroReset = useCallback(() => {
-    postToSW({ type: 'reset' });
-    setPomodoroState(s => ({
-      ...s,
-      timeLeft: s.durations[s.mode],
-      isActive: false,
-    }));
-  }, [setPomodoroState]);
-
-  const handlePomodoroSwitchMode = useCallback((newMode: 'work' | 'break') => {
-    postToSW({ type: 'reset' });
-    setPomodoroState(s => ({
-      ...s,
-      mode: newMode,
-      timeLeft: s.durations[newMode],
-      isActive: false,
-    }));
-  }, [setPomodoroState]);
-  
-  const handlePomodoroSaveSettings = useCallback((newDurations: { work: number; break: number }) => {
-    postToSW({ type: 'reset' });
-    setPomodoroState(s => ({
-        ...s,
-        durations: newDurations,
-        timeLeft: newDurations[s.mode],
-        isActive: false
-    }));
-  }, [setPomodoroState]);
 
   // Update document title with timer
   useEffect(() => {
@@ -586,6 +542,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
+      handlePomodoroToggle, handlePomodoroReset, handlePomodoroSwitchMode, handlePomodoroSaveSettings,
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
       setActiveTrack, setActiveSpotifyTrack,
       gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
@@ -613,56 +570,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
     const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
     const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
-    
-    // Pomodoro Timer Logic with Service Worker
-    const postToSW = (message: any) => {
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage(message);
-      } else {
-        console.error("Service Worker not in control. Cannot send message.");
-      }
-    };
-
-    const handlePomodoroToggle = useCallback(() => {
-        setPomodoroState(s => {
-          const isStarting = !s.isActive;
-          if (isStarting) {
-            postToSW({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
-          } else {
-            postToSW({ type: 'pause' });
-          }
-          return { ...s, isActive: isStarting };
-        });
-      }, [setPomodoroState]);
-
-    const handlePomodoroReset = useCallback(() => {
-        postToSW({ type: 'reset' });
-        setPomodoroState(s => ({
-            ...s,
-            timeLeft: s.durations[s.mode],
-            isActive: false,
-        }));
-    }, [setPomodoroState]);
-
-    const handlePomodoroSwitchMode = useCallback((newMode: 'work' | 'break') => {
-        postToSW({ type: 'reset' });
-        setPomodoroState(s => ({
-            ...s,
-            mode: newMode,
-            timeLeft: s.durations[newMode],
-            isActive: false,
-        }));
-    }, [setPomodoroState]);
-
-    const handlePomodoroSaveSettings = useCallback((newDurations: { work: number; break: number }) => {
-        postToSW({ type: 'reset' });
-        setPomodoroState(s => ({
-            ...s,
-            durations: newDurations,
-            timeLeft: newDurations[s.mode],
-            isActive: false
-        }));
-    }, [setPomodoroState]);
 
     // Ambient Sound Effect
     useEffect(() => {
@@ -963,13 +870,27 @@ const App: React.FC = () => {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isIos, setIsIos] = useState(false);
 
+  // --- Robust Service Worker Communication ---
+  const postToSW = useCallback(async (message: any) => {
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (registration.active) {
+          registration.active.postMessage(message);
+        } else {
+          console.error("Service worker is not active.");
+        }
+      } catch (error) {
+        console.error("Service Worker not ready, cannot send message:", error);
+      }
+    }
+  }, []);
+
   // --- Service Worker Pomodoro Logic ---
   useEffect(() => {
     if ('serviceWorker' in navigator) {
         const registerServiceWorker = async () => {
             try {
-                // Register the service worker using an absolute path from the origin.
-                // This is the most standard and robust way to ensure the correct path is used.
                 const registration = await navigator.serviceWorker.register('/pomodoro-worker.js');
                 await navigator.serviceWorker.ready;
                 console.log('Service Worker registered successfully with scope:', registration.scope);
@@ -993,9 +914,7 @@ const App: React.FC = () => {
                 setPomodoroState(s => {
                     const newMode = mode === 'work' ? 'break' : 'work';
                     const newDuration = s.durations[newMode];
-                    if (navigator.serviceWorker.controller) {
-                       navigator.serviceWorker.controller.postMessage({ type: 'start', timeLeft: newDuration, mode: newMode });
-                    }
+                    postToSW({ type: 'start', timeLeft: newDuration, mode: newMode });
                     return { ...s, mode: newMode, timeLeft: newDuration, isActive: true };
                 });
             }
@@ -1007,7 +926,49 @@ const App: React.FC = () => {
             navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
         };
     }
-  }, []); // Empty array ensures this runs only once.
+  }, [postToSW]);
+
+  // --- Centralized Pomodoro Handlers ---
+  const handlePomodoroToggle = useCallback(() => {
+    setPomodoroState(s => {
+      const isStarting = !s.isActive;
+      if (isStarting) {
+        postToSW({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
+      } else {
+        postToSW({ type: 'pause' });
+      }
+      return { ...s, isActive: isStarting, showBackgroundTimer: isStarting };
+    });
+  }, [postToSW]);
+
+  const handlePomodoroReset = useCallback(() => {
+    postToSW({ type: 'reset' });
+    setPomodoroState(s => ({
+      ...s,
+      timeLeft: s.durations[s.mode],
+      isActive: false,
+    }));
+  }, [postToSW]);
+
+  const handlePomodoroSwitchMode = useCallback((newMode: 'work' | 'break') => {
+    postToSW({ type: 'reset' });
+    setPomodoroState(s => ({
+      ...s,
+      mode: newMode,
+      timeLeft: s.durations[newMode],
+      isActive: false,
+    }));
+  }, [postToSW]);
+  
+  const handlePomodoroSaveSettings = useCallback((newDurations: { work: number; break: number }) => {
+    postToSW({ type: 'reset' });
+    setPomodoroState(s => ({
+        ...s,
+        durations: newDurations,
+        timeLeft: newDurations[s.mode],
+        isActive: false
+    }));
+  }, [postToSW]);
 
 
   useEffect(() => {
@@ -1840,6 +1801,7 @@ const App: React.FC = () => {
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
+    handlePomodoroToggle, handlePomodoroReset, handlePomodoroSwitchMode, handlePomodoroSaveSettings,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,
     setActiveTrack, setActiveSpotifyTrack,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
