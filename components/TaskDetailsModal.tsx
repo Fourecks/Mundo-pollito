@@ -72,7 +72,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             // Reminder logic
             if (todo.reminder_at && todo.due_date) {
                 setIsCustomReminder(true);
-                setCustomReminderTime(todo.reminder_at.split('T')[1]);
+                const timePart = todo.reminder_at.split('T')[1]; // e.g., "20:55:00+00:00"
+                const [hour, minute] = timePart.split(':'); // Extracts "20" and "55"
+                setCustomReminderTime(`${hour}:${minute}`); // Sets "20:55"
                 setReminderOffset(0);
             } else {
                 setIsCustomReminder(false);
@@ -97,8 +99,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         let finalReminderOffset: Todo['reminder_offset'] = 0;
 
         if (isCustomReminder && customReminderTime && due_date) {
-            finalReminderAt = `${due_date}T${customReminderTime}`;
-        } else if (!isCustomReminder) {
+            finalReminderAt = `${due_date}T${customReminderTime}:00`;
+            finalReminderOffset = 0;
+        } else {
             finalReminderOffset = reminderOffset;
         }
 

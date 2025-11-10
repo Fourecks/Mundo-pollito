@@ -63,23 +63,20 @@ serve(async (req) => {
       
       // Priority 1: Absolute reminder time
       if (todo.reminder_at) {
-          // The reminder_at is stored as "YYYY-MM-DDTHH:mm". We treat this as the user's local time.
-          const [datePart, timePart] = todo.reminder_at.split('T');
-          const [year, month, day] = datePart.split('-').map(Number);
-          const [hour, minute] = timePart.split(':').map(Number);
-          
-          // Create a UTC date from parts, then adjust it to the real UTC time based on user's offset.
-          const localTimeAsUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
-          reminderTime = new Date(localTimeAsUTC.getTime() + Number(userOffsetMinutes) * 60 * 1000);
+          // The reminder_at from Supabase is a full ISO 8601 string (e.g., '2025-11-10T20:55:00+00:00').
+          // The JavaScript Date constructor can parse this directly into the correct point in time (UTC).
+          // No manual calculation is needed.
+          reminderTime = new Date(todo.reminder_at);
           
       // Priority 2: Offset-based reminder time
       } else if (todo.due_date && todo.start_time && todo.reminder_offset > 0) {
           const [year, month, day] = todo.due_date.split('-').map(Number);
           const [hour, minute] = todo.start_time.split(':').map(Number);
           
+          // Create a UTC date from the task's local time parts, then adjust to the real UTC time based on user's offset.
           const localTimeAsUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
-          const startTime = new Date(localTimeAsUTC.getTime() + Number(userOffsetMinutes) * 60 * 1000);
-          reminderTime = new Date(startTime.getTime() - Number(todo.reminder_offset) * 60 * 1000);
+          const startTimeInCorrectUTC = new Date(localTimeAsUTC.getTime() + Number(userOffsetMinutes) * 60 * 1000);
+          reminderTime = new Date(startTimeInCorrectUTC.getTime() - Number(todo.reminder_offset) * 60 * 1000);
       }
 
       // Check if the calculated reminder time is in the past.
