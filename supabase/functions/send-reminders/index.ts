@@ -91,7 +91,7 @@ serve(async (req) => {
       const success = await sendOneSignalNotification(
         todo.user_id,
         "Recordatorio 🐥:",
-        todo.text // The message is now just the task's text.
+        `${todo.text}`
       );
       if (success) {
         sentTodoIds.push(todo.id);
