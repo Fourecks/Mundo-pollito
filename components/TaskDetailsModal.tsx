@@ -72,9 +72,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             // Reminder logic
             if (todo.reminder_at && todo.due_date) {
                 setIsCustomReminder(true);
-                const timePart = todo.reminder_at.split('T')[1]; // e.g., "20:55:00+00:00"
-                const [hour, minute] = timePart.split(':'); // Extracts "20" and "55"
-                setCustomReminderTime(`${hour}:${minute}`); // Sets "20:55"
+                const reminderDate = new Date(todo.reminder_at);
+                const localHours = String(reminderDate.getHours()).padStart(2, '0');
+                const localMinutes = String(reminderDate.getMinutes()).padStart(2, '0');
+                setCustomReminderTime(`${localHours}:${localMinutes}`);
                 setReminderOffset(0);
             } else {
                 setIsCustomReminder(false);
@@ -99,8 +100,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         let finalReminderOffset: Todo['reminder_offset'] = 0;
 
         if (isCustomReminder && customReminderTime && due_date) {
-            finalReminderAt = `${due_date}T${customReminderTime}:00`;
-            finalReminderOffset = 0;
+            // Create a date object from the user's local date and time input.
+            // Then, convert it to a full ISO string (in UTC) for the database.
+            finalReminderAt = new Date(`${due_date}T${customReminderTime}:00`).toISOString();
+            finalReminderOffset = 0; // Clear offset when custom time is set.
         } else {
             finalReminderOffset = reminderOffset;
         }
