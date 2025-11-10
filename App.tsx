@@ -1239,16 +1239,22 @@ const App: React.FC = () => {
         const storedPomodoro = localStorage.getItem(getUserKey('pomodoroState'));
         if (storedPomodoro) {
             const parsed = JSON.parse(storedPomodoro);
-            const currentMode = parsed.mode || 'work';
-            const newTimeLeft = parsed.durations ? parsed.durations[currentMode] : (25 * 60);
-
-            setPomodoroState(s => ({
-                ...s,
-                ...parsed,
-                timeLeft: newTimeLeft,
-                isActive: false,
-                endTime: null,
-            }));
+            // FIX: The original logic was subtly flawed. This new implementation is more robust.
+            // It explicitly merges saved durations with defaults and ensures timeLeft is correctly
+            // reset to the full duration based on the final loaded settings.
+            setPomodoroState(s => {
+                const finalDurations = parsed.durations || s.durations;
+                const finalMode = parsed.mode || s.mode;
+                return {
+                    ...s,
+                    ...parsed,
+                    durations: finalDurations,
+                    mode: finalMode,
+                    timeLeft: finalDurations[finalMode],
+                    isActive: false,
+                    endTime: null,
+                };
+            });
         }
 
         const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
