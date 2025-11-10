@@ -10,6 +10,7 @@ interface TodoItemProps {
   onDelete: (id: number) => void;
   onUpdate: (todo: Todo) => void;
   onEdit: (todo: Todo) => void;
+  onToggleSubtask: (taskId: number, subtaskId: number) => void;
 }
 
 const priorityMap: { [key in Priority]: { color: string; label: string, borderColor: string } } = {
@@ -60,22 +61,11 @@ const formatDueDate = (todo: Todo): string => {
 };
 
 
-const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate, onEdit }) => {
+const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate, onEdit, onToggleSubtask }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleSubtaskToggle = (subtaskId: number) => {
-    const newSubtasks = todo.subtasks?.map(st => 
-        st.id === subtaskId ? { ...st, completed: !st.completed } : st
-    );
-
-    if (newSubtasks) {
-      const allSubtasksCompleted = newSubtasks.every(st => st.completed);
-      
-      // If all subtasks are complete, the parent is complete. Otherwise, it's not.
-      const parentCompleted = allSubtasksCompleted;
-
-      onUpdate({ ...todo, subtasks: newSubtasks, completed: parentCompleted });
-    }
+    onToggleSubtask(todo.id, subtaskId);
   };
 
   const hasSubtasks = todo.subtasks && todo.subtasks.length > 0;

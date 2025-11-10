@@ -14,6 +14,7 @@ interface TodoListModuleProps {
     todos: Todo[];
     addTodo: (text: string) => void;
     toggleTodo: (id: number) => void;
+    toggleSubtask: (taskId: number, subtaskId: number) => void;
     deleteTodo: (id: number) => void;
     updateTodo: (todo: Todo) => void;
     onEditTodo: (todo: Todo) => void;
@@ -30,6 +31,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     todos,
     addTodo,
     toggleTodo,
+    toggleSubtask,
     deleteTodo,
     updateTodo,
     onEditTodo,
@@ -251,6 +253,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                         key={todo.id}
                         todo={todo}
                         onToggle={toggleTodo}
+                        onToggleSubtask={toggleSubtask}
                         onDelete={deleteTodo}
                         onUpdate={updateTodo}
                         onEdit={onEditTodo}

@@ -551,7 +551,19 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         <main className={`${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {openWindows.includes('todo') && (
             <ModalWindow isOpen={true} onClose={() => toggleWindow('todo')} title="Lista de Tareas" isDraggable isResizable zIndex={focusedWindow === 'todo' ? 50 : 40} onFocus={() => bringToFront('todo')} className="w-full max-w-3xl h-[80vh]" windowState={windowStates.todo} onStateChange={s => setWindowStates(ws => ({...ws, todo: s}))}>
-              <TodoListModule todos={todayTodos} addTodo={handleAddTodo} toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)} deleteTodo={handleDeleteTodo} updateTodo={handleUpdateTodo} onEditTodo={setTaskToEdit} selectedDate={selectedDate} setSelectedDate={setSelectedDate} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} />
+              <TodoListModule 
+                todos={todayTodos} 
+                addTodo={handleAddTodo} 
+                toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
+                toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
+                deleteTodo={handleDeleteTodo} 
+                updateTodo={handleUpdateTodo} 
+                onEditTodo={setTaskToEdit} 
+                selectedDate={selectedDate} 
+                setSelectedDate={setSelectedDate} 
+                datesWithTasks={datesWithTasks} 
+                datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
+              />
             </ModalWindow>
           )}
           {openWindows.includes('notes') && (
@@ -783,7 +795,20 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'tasks':
                 return (
                     <div className="flex flex-col h-full">
-                        <TodoListModule isMobile={true} todos={todayTodos} addTodo={handleAddTodo} toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)} deleteTodo={handleDeleteTodo} updateTodo={handleUpdateTodo} onEditTodo={setTaskToEdit} selectedDate={selectedDate} setSelectedDate={setSelectedDate} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} />
+                        <TodoListModule 
+                            isMobile={true} 
+                            todos={todayTodos} 
+                            addTodo={handleAddTodo} 
+                            toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
+                            toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
+                            deleteTodo={handleDeleteTodo} 
+                            updateTodo={handleUpdateTodo} 
+                            onEditTodo={setTaskToEdit} 
+                            selectedDate={selectedDate} 
+                            setSelectedDate={setSelectedDate} 
+                            datesWithTasks={datesWithTasks} 
+                            datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
+                        />
                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
                         </button>
