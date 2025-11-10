@@ -1406,44 +1406,67 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTodo = async (updatedTodo: Todo) => {
-    const { subtasks, ...todoForUpdate } = updatedTodo;
-    const { error: todoError } = await supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id);
-    if (todoError) { console.error("Error updating todo:", todoError); return; }
-
-    if (subtasks) {
-        const upserts = subtasks.map(st => {
-            const isNew = st.id > 1000000000;
-            const payload: any = {
-                text: st.text,
-                completed: st.completed,
-                todo_id: updatedTodo.id,
-            };
-            if (!isNew) {
-                payload.id = st.id;
-            }
-            return payload;
-        });
-
-        if (upserts.length > 0) {
-            const { error: subtaskUpsertError } = await supabase.from('subtasks').upsert(upserts);
-            if (subtaskUpsertError) {
-                console.error("Error syncing subtasks:", subtaskUpsertError);
-            }
-        }
+    // 1. Find original todo to compare subtasks
+    let originalTodo: Todo | undefined;
+    for (const key in allTodos) {
+        originalTodo = allTodos[key].find(t => t.id === updatedTodo.id);
+        if (originalTodo) break;
     }
 
-    // After DB operations, fetch the updated todo with fresh subtask IDs and update local state
+    if (!originalTodo) {
+        console.error("Original todo not found for update.");
+        return; // Or handle error appropriately
+    }
+
+    // 2. Determine which subtasks to delete
+    const originalSubtaskIds = new Set(originalTodo.subtasks?.map(st => st.id) || []);
+    const newSubtaskIds = new Set(updatedTodo.subtasks?.map(st => st.id).filter(id => id < 1000000000) || []); // Filter out temporary new IDs
+    const subtasksToDelete = [...originalSubtaskIds].filter(id => !newSubtaskIds.has(id));
+
+    // 3. Prepare all DB operations
+    const dbPromises = [];
+
+    // Delete subtasks
+    if (subtasksToDelete.length > 0) {
+        dbPromises.push(supabase.from('subtasks').delete().in('id', subtasksToDelete));
+    }
+
+    // Upsert remaining/new subtasks
+    if (updatedTodo.subtasks && updatedTodo.subtasks.length > 0) {
+        const upserts = updatedTodo.subtasks.map(st => ({
+            ...(st.id < 1000000000 && { id: st.id }), // Only include ID if it's not a temporary new one
+            text: st.text,
+            completed: st.completed,
+            todo_id: updatedTodo.id,
+        }));
+        dbPromises.push(supabase.from('subtasks').upsert(upserts));
+    }
+    
+    // Update the main todo item (excluding subtasks)
+    const { subtasks, ...todoForUpdate } = updatedTodo;
+    dbPromises.push(supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id));
+
+    // 4. Execute all operations and handle errors
+    const results = await Promise.all(dbPromises);
+    results.forEach(result => {
+        if (result.error) {
+            console.error("Error during batch todo update:", result.error);
+            // Optionally, handle rollback or error notification
+        }
+    });
+
+    // 5. Refresh local state from DB to ensure consistency
     const { data: refreshedTodo, error: refreshError } = await supabase.from('todos').select('*, subtasks(*)').eq('id', updatedTodo.id).single();
+    
     if (refreshError || !refreshedTodo) {
         console.error("Error refreshing todo after update:", refreshError);
-        // Fallback to less accurate local update if refresh fails
-        updateLocalTodos(updatedTodo);
+        updateLocalTodos(updatedTodo); // Fallback to optimistic update if refresh fails
         return;
     }
 
     updateLocalTodos(refreshedTodo);
-  };
-  
+};
+
   // Helper function to update local state, now separate to handle both optimistic and refreshed data
   const updateLocalTodos = (todoToUpdate: Todo) => {
        setAllTodos(current => {

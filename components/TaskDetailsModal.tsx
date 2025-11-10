@@ -122,42 +122,52 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const handleSave = async () => {
         if (!todo) return;
 
-        let finalReminderAt: string | undefined = undefined;
-        let finalReminderOffset: Todo['reminder_offset'] = 0;
+        if (hasReminder && 'Notification' in window && Notification.permission !== 'granted') {
+             alert("Para recibir recordatorios, activa las notificaciones usando el ícono de la campana en la pantalla principal.");
+        }
+
+        const updatedTodoPayload: Partial<Todo> = { ...todo };
+
+        updatedTodoPayload.text = text;
+        updatedTodoPayload.completed = completed;
+        updatedTodoPayload.priority = priority;
+        updatedTodoPayload.subtasks = subtasks;
+
+        updatedTodoPayload.due_date = due_date || null;
+        updatedTodoPayload.end_date = hasEndDate ? (end_date || null) : null;
+        updatedTodoPayload.start_time = hasTime ? (start_time || null) : null;
+        updatedTodoPayload.end_time = hasTime ? (end_time || null) : null;
+        updatedTodoPayload.notes = hasNotes ? notes : null;
+        updatedTodoPayload.recurrence = hasRecurrence ? recurrence : { frequency: 'none' };
+        
+        let reminderChanged = false;
 
         if (hasReminder) {
             if (reminderType === 'custom' && customReminderDate && customReminderTime) {
                 const [year, month, day] = customReminderDate.split('-').map(Number);
                 const [hour, minute] = customReminderTime.split(':').map(Number);
-                const reminderDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
-                finalReminderAt = reminderDate.toISOString();
+                const localReminderDate = new Date(year, month - 1, day, hour, minute);
+                
+                updatedTodoPayload.reminder_at = localReminderDate.toISOString();
+                updatedTodoPayload.reminder_offset = null;
             } else if (reminderType !== 'custom') {
-                finalReminderOffset = Number(reminderType) as Todo['reminder_offset'];
+                updatedTodoPayload.reminder_offset = Number(reminderType) as Todo['reminder_offset'];
+                updatedTodoPayload.reminder_at = null;
+            } else {
+                updatedTodoPayload.reminder_offset = null;
+                updatedTodoPayload.reminder_at = null;
             }
-        }
-        
-        if (hasReminder && 'Notification' in window && Notification.permission !== 'granted') {
-             alert("Para recibir recordatorios, activa las notificaciones usando el ícono de la campana en la pantalla principal.");
+        } else {
+            updatedTodoPayload.reminder_offset = null;
+            updatedTodoPayload.reminder_at = null;
         }
 
-        const reminderChanged = todo.reminder_at !== finalReminderAt || todo.reminder_offset !== finalReminderOffset;
+        if (todo.reminder_at !== updatedTodoPayload.reminder_at || todo.reminder_offset !== updatedTodoPayload.reminder_offset) {
+            reminderChanged = true;
+        }
+        updatedTodoPayload.notification_sent = reminderChanged ? false : todo.notification_sent;
 
-        onSave({
-            ...todo,
-            text,
-            notes: hasNotes ? notes : undefined,
-            due_date: due_date || undefined,
-            end_date: hasEndDate ? end_date || undefined : undefined,
-            completed,
-            start_time: hasTime ? start_time || undefined : undefined,
-            end_time: hasTime && end_time ? end_time : undefined,
-            priority,
-            reminder_offset: hasReminder && reminderType !== 'custom' ? finalReminderOffset : undefined,
-            reminder_at: hasReminder && reminderType === 'custom' ? finalReminderAt : undefined,
-            recurrence: hasRecurrence ? recurrence : { frequency: 'none' },
-            subtasks,
-            notification_sent: reminderChanged ? false : todo.notification_sent,
-        });
+        onSave(updatedTodoPayload as Todo);
         onClose();
     };
 
