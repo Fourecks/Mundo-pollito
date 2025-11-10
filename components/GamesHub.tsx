@@ -113,7 +113,7 @@ const GamesHub: React.FC<GamesHubProps> = ({ galleryImages, isMobile, currentUse
 
     return (
         <>
-            <div className="w-full h-full flex flex-col p-4 md:p-8 bg-transparent overflow-y-auto">
+            <div className="w-full h-full flex flex-col p-4 pt-8 md:p-8 bg-transparent overflow-y-auto">
                 <div className="w-full max-w-3xl mx-auto">
                     <div className="text-center mb-8">
                         <h1 className="text-2xl md:text-3xl font-bold text-primary-dark dark:text-primary">Centro de Juegos</h1>

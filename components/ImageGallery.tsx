@@ -160,7 +160,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, onAddImages, onDele
 
   return (
     <div
-      className="flex flex-col h-full w-full p-2 relative"
+      className="flex flex-col h-full w-full p-2 pt-8 relative"
       onDragEnter={handleDragEnter}
     >
         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden"/>

@@ -195,7 +195,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
             return (
                 <>
                     <div className="flex flex-col h-full w-full bg-transparent dark:bg-transparent animate-fade-in">
-                        <main className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                        <main className="flex-grow overflow-y-auto p-3 pt-8 space-y-2 custom-scrollbar">
                             {folders.map(folder => (
                             <div key={folder.id} className="relative">
                                     {editingFolder?.id === folder.id ? (
@@ -252,7 +252,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                             {folders.length === 0 && <p className="text-center text-sm text-gray-500 dark:text-gray-400 pt-10">Crea tu primera carpeta.</p>}
                         </main>
                     </div>
-                     <button onClick={() => onAddFolder('Nueva Carpeta')} className="fixed bottom-24 right-20 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
+                     <button onClick={() => onAddFolder('Nueva Carpeta')} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                         <PlusIcon />
                     </button>
                     <ConfirmationModal isOpen={!!folderToDelete} onClose={() => setFolderToDelete(null)} onConfirm={confirmDeleteFolder} title="Eliminar Carpeta" message="¿Seguro que quieres eliminar esta carpeta y todas sus notas?" />
@@ -261,37 +261,41 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         } else if (selectedFolderId && !selectedNoteId) {
             // NOTE LIST VIEW
             return (
-                <div className="flex flex-col h-full w-full bg-transparent dark:bg-transparent animate-fade-in">
-                    <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-3 z-10 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2">
-                        <button onClick={() => setSelectedFolderId(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                        <input type="text" placeholder={selectedFolder?.name || "Buscar..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent text-lg font-bold text-pink-500 dark:text-pink-400 w-full focus:outline-none" />
-                        <button onClick={handleAddNewNote} className="p-2 rounded-full bg-primary text-white shadow-md flex-shrink-0"><PlusIcon /></button>
-                    </header>
-                    <main className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
-                        {filteredNotes.map(note => (
-                            <div key={note.id} className="relative group">
-                                <button onClick={() => handleSelectNote(note.id)} className="w-full text-left p-3 rounded-xl bg-white/70 dark:bg-gray-700/60 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95">
-                                    <h4 className="font-bold text-md truncate text-gray-800 dark:text-gray-100 pr-6">{note.title || 'Nota sin título'}</h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1 pr-6">{note.content.substring(0, 80) || 'Sin contenido'}</p>
-                                </button>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setNoteToDelete(note); }}
-                                    className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 rounded-full text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                                    title="Eliminar nota"
-                                >
-                                    <TrashIcon className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ))}
-                        {filteredNotes.length === 0 && <p className="text-center text-sm text-gray-500 dark:text-gray-400 pt-10">Crea tu primera nota en esta carpeta.</p>}
-                    </main>
+                <>
+                    <div className="flex flex-col h-full w-full bg-transparent dark:bg-transparent animate-fade-in">
+                        <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-3 z-10 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2">
+                            <button onClick={() => setSelectedFolderId(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
+                            <input type="text" placeholder={selectedFolder?.name || "Buscar..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent text-lg font-bold text-pink-500 dark:text-pink-400 w-full focus:outline-none" />
+                        </header>
+                        <main className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                            {filteredNotes.map(note => (
+                                <div key={note.id} className="relative group">
+                                    <button onClick={() => handleSelectNote(note.id)} className="w-full text-left p-3 rounded-xl bg-white/70 dark:bg-gray-700/60 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95">
+                                        <h4 className="font-bold text-md truncate text-gray-800 dark:text-gray-100 pr-6">{note.title || 'Nota sin título'}</h4>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1 pr-6">{note.content.substring(0, 80) || 'Sin contenido'}</p>
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setNoteToDelete(note); }}
+                                        className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 rounded-full text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                                        title="Eliminar nota"
+                                    >
+                                        <TrashIcon className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            {filteredNotes.length === 0 && <p className="text-center text-sm text-gray-500 dark:text-gray-400 pt-10">Crea tu primera nota en esta carpeta.</p>}
+                        </main>
+                    </div>
+                    <button onClick={handleAddNewNote} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
+                        <PlusIcon />
+                    </button>
                     <ConfirmationModal isOpen={!!noteToDelete} onClose={() => setNoteToDelete(null)} onConfirm={confirmDeleteNote} title="Eliminar Nota" message="¿Seguro que quieres eliminar esta nota?" />
-                </div>
+                </>
             );
         } else { // NOTE EDITOR VIEW
             return (
                  <div className="flex flex-col h-full w-full bg-transparent dark:bg-transparent animate-fade-in">
-                    <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-3 z-10 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-3 z-10 border-b border-gray-200 dark:border-gray-700/50 flex items-center justify-between">
                         <button onClick={() => setSelectedNoteId(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
                         <div className="flex items-center gap-2">
                              <button onClick={handleMagicNote} disabled={isAiLoading || !activeNoteContent} className="p-2 rounded-full text-gray-500 hover:text-primary-dark disabled:opacity-50" title="Resumen Mágico">
