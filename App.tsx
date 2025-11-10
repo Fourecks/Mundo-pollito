@@ -1377,28 +1377,66 @@ const App: React.FC = () => {
   };
 
   const handleUpdateTodo = async (updatedTodo: Todo) => {
+      // 1. Update database first
       const { subtasks, ...todoForUpdate } = updatedTodo;
-      const { error } = await supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id);
-      if (error) { console.error("Error updating todo:", error); return; }
-
-      const dateKey = updatedTodo.due_date || formatDateKey(new Date(updatedTodo.created_at!));
-      setAllTodos(current => {
-          const newAllTodos = JSON.parse(JSON.stringify(current));
-          const todosForDate = newAllTodos[dateKey] || [];
-          const index = todosForDate.findIndex((t: Todo) => t.id === updatedTodo.id);
-          if (index > -1) {
-              todosForDate[index] = updatedTodo;
-              newAllTodos[dateKey] = todosForDate;
-          }
-          return newAllTodos;
-      });
+      const { error: todoError } = await supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id);
+      if (todoError) { console.error("Error updating todo:", todoError); return; }
 
       if (subtasks) {
           const updates = subtasks.filter(st => st.id > 0);
-          const inserts = subtasks.filter(st => st.id <= 0).map(st => ({ text: st.text, completed: st.completed, todo_id: updatedTodo.id }));
-          if(updates.length > 0) await supabase.from('subtasks').upsert(updates);
-          if(inserts.length > 0) await supabase.from('subtasks').insert(inserts);
+          const inserts = subtasks.filter(st => !st.id || st.id <= 0).map(st => ({ text: st.text, completed: st.completed, todo_id: updatedTodo.id }));
+          
+          if(updates.length > 0) {
+              const { error: subtaskUpdateError } = await supabase.from('subtasks').upsert(updates);
+              if (subtaskUpdateError) console.error("Error updating subtasks:", subtaskUpdateError);
+          }
+          if(inserts.length > 0) {
+              const { error: subtaskInsertError } = await supabase.from('subtasks').insert(inserts);
+              if (subtaskInsertError) console.error("Error inserting subtasks:", subtaskInsertError);
+          }
       }
+
+      // 2. Update local state
+      setAllTodos(current => {
+          let originalDateKey: string | null = null;
+          
+          // Find the original todo to get its date key
+          for (const key in current) {
+              if (current[key].find(t => t.id === updatedTodo.id)) {
+                  originalDateKey = key;
+                  break;
+              }
+          }
+          
+          if (!originalDateKey) {
+            console.warn("Could not find original todo to update. Appending to new date.");
+            const newDateKey = updatedTodo.due_date || formatDateKey(new Date(updatedTodo.created_at!));
+            const newTodosForDate = [...(current[newDateKey] || []), updatedTodo];
+            return { ...current, [newDateKey]: newTodosForDate };
+          }
+
+          const newDateKey = updatedTodo.due_date || formatDateKey(new Date(updatedTodo.created_at!));
+          const newAllTodos = { ...current };
+
+          // If date has changed, move the todo
+          if (originalDateKey !== newDateKey) {
+              const oldTodosForDate = (newAllTodos[originalDateKey] || []).filter(t => t.id !== updatedTodo.id);
+              if (oldTodosForDate.length > 0) {
+                  newAllTodos[originalDateKey] = oldTodosForDate;
+              } else {
+                  delete newAllTodos[originalDateKey];
+              }
+              const newTodosForDate = [...(newAllTodos[newDateKey] || []), updatedTodo];
+              newAllTodos[newDateKey] = newTodosForDate;
+          } else {
+              // Update in place
+              newAllTodos[newDateKey] = (newAllTodos[newDateKey] || []).map(t =>
+                  t.id === updatedTodo.id ? updatedTodo : t
+              );
+          }
+
+          return newAllTodos;
+      });
   };
 
   const handleToggleTodo = async (id: number, onAllCompleted: (quote: string) => void) => {
@@ -1414,18 +1452,30 @@ const App: React.FC = () => {
     }
     if (!todoToToggle || !dateKey) return;
     
-    const wasCompleted = todoToToggle.completed;
-    const newCompletedState = !wasCompleted;
+    const newCompletedState = !todoToToggle.completed;
 
-    const updatedTodo = { ...todoToToggle, completed: newCompletedState };
-    setAllTodos(current => {
-      const newAllTodos = { ...current };
-      newAllTodos[dateKey] = newAllTodos[dateKey].map(t => t.id === id ? updatedTodo : t);
-      return newAllTodos;
-    });
+    // Sync subtasks completion state with parent
+    const updatedSubtasks = (todoToToggle.subtasks || []).map(st => ({ ...st, completed: newCompletedState }));
+    const updatedTodo = { ...todoToToggle, completed: newCompletedState, subtasks: updatedSubtasks };
 
+    // Create the new list for the date to use for confetti check
+    const newTodosForDate = allTodos[dateKey].map(t => t.id === id ? updatedTodo : t);
+    
+    // Optimistic UI update
+    setAllTodos(current => ({
+      ...current,
+      [dateKey]: newTodosForDate,
+    }));
+
+    // Update database for both parent and subtasks
     const { error } = await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id);
     if (error) console.error("Error toggling todo:", error);
+    
+    if (updatedSubtasks.length > 0) {
+        const subtaskUpdates = updatedSubtasks.map(st => ({ id: st.id, completed: newCompletedState }));
+        const { error: subtaskError } = await supabase.from('subtasks').upsert(subtaskUpdates);
+        if (subtaskError) console.error("Error syncing subtasks:", subtaskError);
+    }
 
     // Generate recurring tasks if needed
     if (newCompletedState && updatedTodo.recurrence && updatedTodo.recurrence.frequency !== 'none') {
@@ -1433,7 +1483,8 @@ const App: React.FC = () => {
         setAllTodos(newTodos);
     }
     
-    if (newCompletedState && allTodos[dateKey].every(t => (t.id === id ? newCompletedState : t.completed))) {
+    // Check for confetti using the new list
+    if (newCompletedState && newTodosForDate.every(t => t.completed)) {
         triggerConfetti();
         onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
     }
@@ -1452,50 +1503,72 @@ const App: React.FC = () => {
       }
       if (!todoToUpdate || !dateKey) return;
 
-      const newSubtasks = todoToUpdate.subtasks?.map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st);
-      if (!newSubtasks) return;
+      const newSubtasks = (todoToUpdate.subtasks || []).map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st);
       
-      const allSubtasksCompleted = newSubtasks.every(st => st.completed);
+      const allSubtasksCompleted = newSubtasks.length > 0 && newSubtasks.every(st => st.completed);
       const parentCompleted = allSubtasksCompleted;
 
       const updatedTodo = { ...todoToUpdate, subtasks: newSubtasks, completed: parentCompleted };
 
+      // Create the new list for the date to avoid stale state issues with confetti
+      const newTodosForDate = allTodos[dateKey].map(t => t.id === taskId ? updatedTodo : t);
+
+      // Optimistic UI update
       setAllTodos(current => ({
           ...current,
-          [dateKey]: current[dateKey].map(t => t.id === taskId ? updatedTodo : t),
+          [dateKey]: newTodosForDate,
       }));
       
+      // Update database for subtask
       const subtaskToUpdate = newSubtasks.find(st => st.id === subtaskId);
       if (subtaskToUpdate) {
           const { error } = await supabase.from('subtasks').update({ completed: subtaskToUpdate.completed }).eq('id', subtaskId);
           if (error) console.error("Error updating subtask:", error);
       }
       
+      // Update database for parent task if its state changed
       if (todoToUpdate.completed !== parentCompleted) {
           const { error: todoError } = await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId);
           if (todoError) console.error("Error updating parent todo status:", todoError);
+      }
 
-          if (parentCompleted && allTodos[dateKey].every(t => (t.id === taskId ? parentCompleted : t.completed))) {
-              triggerConfetti();
-              onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
-          }
+      // Check for confetti with the updated list to ensure correctness
+      if (parentCompleted && newTodosForDate.every(t => t.completed)) {
+          triggerConfetti();
+          onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
       }
   };
 
   const handleDeleteTodo = async (id: number) => {
-      const { error } = await supabase.from('todos').delete().eq('id', id);
-      if (error) {
-          console.error("Error deleting todo:", error);
-      } else {
-          setAllTodos(currentTodos => {
-              const newAllTodos = { ...currentTodos };
-              for (const dateKey in newAllTodos) {
-                  const initialLength = newAllTodos[dateKey].length;
-                  newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => t.id !== id);
-                  if (newAllTodos[dateKey].length !== initialLength) break;
+      // Optimistically find which date array the todo is in
+      let dateKeyToDelete: string | null = null;
+      for(const key in allTodos) {
+          if(allTodos[key].some(t => t.id === id)) {
+              dateKeyToDelete = key;
+              break;
+          }
+      }
+
+      // Optimistic UI update
+      if (dateKeyToDelete) {
+          setAllTodos(current => {
+              const newAllTodos = { ...current };
+              const updatedTodosForDate = newAllTodos[dateKeyToDelete!].filter(t => t.id !== id);
+              
+              if (updatedTodosForDate.length > 0) {
+                  newAllTodos[dateKeyToDelete!] = updatedTodosForDate;
+              } else {
+                  delete newAllTodos[dateKeyToDelete!]; // Clean up empty array
               }
               return newAllTodos;
           });
+      }
+
+      // Update database
+      const { error } = await supabase.from('todos').delete().eq('id', id);
+      if (error) {
+          console.error("Error deleting todo:", error);
+          // TODO: Add logic to revert the optimistic update if needed
       }
   };
 
