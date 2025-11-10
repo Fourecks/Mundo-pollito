@@ -40,6 +40,7 @@ import BellIcon from './components/icons/BellIcon';
 import InstallPwaBanner from './components/InstallPwaBanner';
 import AddTaskModal from './components/AddTaskModal';
 import PlusIcon from './components/icons/PlusIcon';
+import MobileTaskEditor from './components/MobileTaskEditor';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -925,7 +926,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 }}
             />
             <CompletionModal isOpen={showCompletionModal} onClose={() => setShowCompletionModal(false)} quote={completionQuote}/>
-            <TaskDetailsModal isOpen={!!taskToEdit} onClose={() => setTaskToEdit(null)} onSave={handleUpdateTodo} todo={taskToEdit} />
+            <MobileTaskEditor 
+                isOpen={!!taskToEdit} 
+                onClose={() => setTaskToEdit(null)} 
+                onSave={handleUpdateTodo}
+                onDelete={handleDeleteTodo} 
+                todo={taskToEdit} 
+            />
             
             {isAiBrowserOpen && (
                 <div className="fixed inset-0 bg-secondary-lighter/90 dark:bg-gray-900 z-[100] animate-deploy">
