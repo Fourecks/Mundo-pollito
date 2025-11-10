@@ -527,7 +527,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setParticleType={setParticleType}
         ambientSound={ambientSound}
         setAmbientSound={setAmbientSound}
-        dailyEncouragementLocalHour={dailyEncouragementLocalHour}
+        dailyEncouragementHour={dailyEncouragementLocalHour}
         onSetDailyEncouragement={onSetDailyEncouragement}
       />
       
@@ -833,21 +833,18 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'gallery':
                 return (
                     <div className="flex flex-col h-full">
-                        <MobileHeader title="Galería" />
                         <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!gdriveToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
                     </div>
                 );
             case 'games':
                 return (
                     <div className="h-full">
-                        <MobileHeader title="Centro de Juegos" />
                         <GamesHub galleryImages={galleryImages} isMobile={true} currentUser={capitalizedUserName} />
                     </div>
                 );
             case 'more':
                 return (
                      <>
-                        <MobileHeader title="Más Opciones" />
                         <div className="p-4 space-y-4">
                             <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg flex justify-between items-center">
                                 <h3 className="font-bold text-primary-dark dark:text-primary">Tema</h3>
@@ -1643,8 +1640,24 @@ const App: React.FC = () => {
       }
       return null;
   };
-  const handleUpdateFolder = async (folderId: number, name: string) => {};
-  const handleDeleteFolder = async (folderId: number) => {};
+  const handleUpdateFolder = async (folderId: number, name: string) => {
+      if (!user) return;
+      const { error } = await supabase.from('folders').update({ name }).eq('id', folderId);
+      if (error) {
+          console.error("Error updating folder:", error);
+      } else {
+          setFolders(f => f.map(folder => folder.id === folderId ? { ...folder, name } : folder));
+      }
+  };
+  const handleDeleteFolder = async (folderId: number) => {
+      if (!user) return;
+      const { error } = await supabase.from('folders').delete().eq('id', folderId);
+      if (error) {
+          console.error("Error deleting folder:", error);
+      } else {
+          setFolders(f => f.filter(folder => folder.id !== folderId));
+      }
+  };
   
   const handleAddNote = async (folderId: number): Promise<Note | null> => {
     if (!user) return null;

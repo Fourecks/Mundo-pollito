@@ -7,6 +7,7 @@ import SparklesIcon from './icons/SparklesIcon';
 import { GoogleGenAI } from "@google/genai";
 import ConfirmationModal from './ConfirmationModal';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
+import DotsVerticalIcon from './icons/DotsVerticalIcon';
 
 // Debounce helper
 const useDebounce = (value: string, delay: number) => {
@@ -54,10 +55,14 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
     const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
 
+    const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
+    const [editingFolder, setEditingFolder] = useState<{ id: number; name: string } | null>(null);
+
     const debouncedContent = useDebounce(activeNoteContent, 1000);
     const debouncedTitle = useDebounce(activeNoteTitle, 1000);
 
     const editorInitialized = useRef(false);
+    const menuRef = useRef<HTMLDivElement>(null);
     
     useEffect(() => {
         if (!isMobile && !selectedFolderId && folders.length > 0) {
@@ -97,6 +102,16 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [debouncedTitle, debouncedContent]);
 
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setMenuOpenFor(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const handleSelectNote = (noteId: number) => {
         editorInitialized.current = false;
         setSelectedNoteId(noteId);
@@ -132,7 +147,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         if (folderToDelete) {
             await onDeleteFolder(folderToDelete.id);
             if(selectedFolderId === folderToDelete.id) {
-                setSelectedFolderId(folders.length > 0 ? folders[0].id : null);
+                setSelectedFolderId(folders.length > 1 ? folders.find(f => f.id !== folderToDelete.id)!.id : null);
             }
             setFolderToDelete(null);
         }
@@ -160,6 +175,13 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         }
     };
 
+    const handleSaveFolderName = () => {
+        if (editingFolder && editingFolder.name.trim()) {
+            onUpdateFolder(editingFolder.id, editingFolder.name.trim());
+        }
+        setEditingFolder(null);
+    };
+
     const filteredNotes = selectedFolder?.notes.filter(note =>
         note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         note.content.toLowerCase().includes(searchTerm.toLowerCase())
@@ -171,27 +193,70 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         if (!selectedFolderId) {
             // FOLDER LIST VIEW
             return (
-                <div className="flex flex-col h-full w-full bg-secondary-lighter dark:bg-gray-900 animate-fade-in">
-                    <header className="sticky top-0 bg-yellow-50/80 dark:bg-gray-800/80 backdrop-blur-md p-3 z-10 border-b border-yellow-300/50 dark:border-gray-700/50 flex items-center justify-between">
-                        <h1 className="text-xl font-bold text-pink-500 dark:text-pink-400">Carpetas</h1>
-                        <button onClick={() => onAddFolder('Nueva Carpeta')} className="p-2 rounded-full bg-primary text-white shadow-md"><PlusIcon /></button>
-                    </header>
-                    <main className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
-                        {folders.map(folder => (
-                            <button
-                                key={folder.id}
-                                onClick={() => handleSelectFolder(folder.id)}
-                                className="w-full text-left p-4 rounded-xl flex items-center gap-4 bg-white/70 dark:bg-gray-700/60 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
-                            >
-                                <FolderIcon />
-                                <span className="truncate flex-grow font-semibold text-gray-700 dark:text-gray-200">{folder.name}</span>
-                                <span className="text-sm font-bold text-gray-400 dark:text-gray-500 bg-black/5 dark:bg-black/20 px-2 py-0.5 rounded-full">{folder.notes.length}</span>
-                            </button>
-                        ))}
-                        {folders.length === 0 && <p className="text-center text-sm text-gray-500 dark:text-gray-400 pt-10">Crea tu primera carpeta.</p>}
-                    </main>
+                <>
+                    <div className="flex flex-col h-full w-full bg-secondary-lighter dark:bg-gray-900 animate-fade-in">
+                        <main className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                            {folders.map(folder => (
+                            <div key={folder.id} className="relative">
+                                    {editingFolder?.id === folder.id ? (
+                                        <div className="w-full text-left p-4 rounded-xl flex items-center gap-4 bg-white dark:bg-gray-700 shadow-md">
+                                            <FolderIcon />
+                                            <input
+                                                type="text"
+                                                value={editingFolder.name}
+                                                onChange={(e) => setEditingFolder(f => f ? { ...f, name: e.target.value } : null)}
+                                                onBlur={handleSaveFolderName}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFolderName(); }}
+                                                className="flex-grow font-semibold text-gray-700 dark:text-gray-200 bg-transparent focus:outline-none focus:ring-1 focus:ring-primary rounded"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="group">
+                                            <button
+                                                onClick={() => handleSelectFolder(folder.id)}
+                                                className="w-full text-left p-4 rounded-xl flex items-center gap-4 bg-white/70 dark:bg-gray-700/60 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+                                            >
+                                                <FolderIcon />
+                                                <span className="truncate flex-grow font-semibold text-gray-700 dark:text-gray-200">{folder.name}</span>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    <span className="text-sm font-bold text-gray-400 dark:text-gray-500 bg-black/5 dark:bg-black/20 px-2 py-0.5 rounded-full">{folder.notes.length}</span>
+                                                    <div className="w-9 h-9 flex items-center justify-center">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setMenuOpenFor(folder.id);
+                                                            }}
+                                                            className="p-2 rounded-full text-gray-500 hover:bg-black/10 dark:hover:bg-white/10 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                                                            aria-label={`Opciones para ${folder.name}`}
+                                                        >
+                                                            <DotsVerticalIcon />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    )}
+                                    {menuOpenFor === folder.id && (
+                                        <div ref={menuRef} className="absolute right-4 top-full -mt-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl z-20 animate-pop-in origin-top-right p-1">
+                                            <button onClick={() => { setEditingFolder({ id: folder.id, name: folder.name }); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
+                                                Renombrar
+                                            </button>
+                                            <button onClick={() => { setFolderToDelete(folder); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">
+                                                Eliminar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {folders.length === 0 && <p className="text-center text-sm text-gray-500 dark:text-gray-400 pt-10">Crea tu primera carpeta.</p>}
+                        </main>
+                    </div>
+                     <button onClick={() => onAddFolder('Nueva Carpeta')} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
+                        <PlusIcon />
+                    </button>
                     <ConfirmationModal isOpen={!!folderToDelete} onClose={() => setFolderToDelete(null)} onConfirm={confirmDeleteFolder} title="Eliminar Carpeta" message="¿Seguro que quieres eliminar esta carpeta y todas sus notas?" />
-                </div>
+                </>
             );
         } else if (selectedFolderId && !selectedNoteId) {
             // NOTE LIST VIEW
@@ -204,13 +269,23 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     </header>
                     <main className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
                         {filteredNotes.map(note => (
-                            <button key={note.id} onClick={() => handleSelectNote(note.id)} className="w-full text-left p-3 rounded-xl bg-white/70 dark:bg-gray-700/60 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95">
-                                <h4 className="font-bold text-md truncate text-gray-800 dark:text-gray-100">{note.title || 'Nota sin título'}</h4>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">{note.content.substring(0, 80) || 'Sin contenido'}</p>
-                            </button>
+                            <div key={note.id} className="relative group">
+                                <button onClick={() => handleSelectNote(note.id)} className="w-full text-left p-3 rounded-xl bg-white/70 dark:bg-gray-700/60 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95">
+                                    <h4 className="font-bold text-md truncate text-gray-800 dark:text-gray-100 pr-6">{note.title || 'Nota sin título'}</h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1 pr-6">{note.content.substring(0, 80) || 'Sin contenido'}</p>
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setNoteToDelete(note); }}
+                                    className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 rounded-full text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-500 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                                    title="Eliminar nota"
+                                >
+                                    <TrashIcon className="h-4 w-4" />
+                                </button>
+                            </div>
                         ))}
                         {filteredNotes.length === 0 && <p className="text-center text-sm text-gray-500 dark:text-gray-400 pt-10">Crea tu primera nota en esta carpeta.</p>}
                     </main>
+                    <ConfirmationModal isOpen={!!noteToDelete} onClose={() => setNoteToDelete(null)} onConfirm={confirmDeleteNote} title="Eliminar Nota" message="¿Seguro que quieres eliminar esta nota?" />
                 </div>
             );
         } else { // NOTE EDITOR VIEW
