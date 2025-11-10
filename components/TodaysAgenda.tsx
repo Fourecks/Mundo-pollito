@@ -196,7 +196,7 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = ({
     const [activeView, setActiveView] = useState<'agenda' | 'notes'>('agenda');
     
     return (
-        <div className="w-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg p-2">
+        <div className="w-full md:bg-white/70 md:dark:bg-gray-800/70 md:backdrop-blur-sm md:rounded-2xl md:shadow-lg p-2">
              <div className="flex border-b border-yellow-200/50 dark:border-gray-700/50 mb-2">
                 <button 
                     onClick={() => setActiveView('agenda')} 

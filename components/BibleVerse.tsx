@@ -103,7 +103,7 @@ const BibleVerse: React.FC = () => {
     const currentVerse = verses[verseIndex];
 
     return (
-        <div className="w-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg p-2 text-center">
+        <div className="w-full md:bg-white/70 md:dark:bg-gray-800/70 md:backdrop-blur-sm md:rounded-2xl md:shadow-lg p-4 text-center border-b border-black/5 dark:border-white/5 md:border-none">
             <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">Texto Diario</h3>
             <div>
                 <p className="text-gray-600 dark:text-gray-100 italic text-xs">“{currentVerse.text}”</p>

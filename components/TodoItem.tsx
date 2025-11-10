@@ -73,8 +73,8 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
   const hasSubtasks = todo.subtasks && todo.subtasks.length > 0;
 
   return (
-    <div className={`bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 border-l-4 ${todo.completed ? 'opacity-70' : ''} ${priorityMap[todo.priority].borderColor}`}>
-      <div className="flex items-center p-2">
+    <div className={`md:bg-white/70 md:dark:bg-gray-800/60 md:backdrop-blur-sm md:rounded-xl md:shadow-sm md:hover:shadow-md md:transition-shadow duration-200 border-b md:border-b-0 border-black/5 dark:border-white/10 border-l-4 ${todo.completed ? 'opacity-70' : ''} ${priorityMap[todo.priority].borderColor}`}>
+      <div className="flex items-center p-3 md:p-2">
         {/* Checkbox */}
         <div className="flex-shrink-0">
             <label className="flex items-center cursor-pointer">

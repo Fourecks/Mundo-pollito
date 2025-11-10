@@ -36,7 +36,7 @@ const Switch: React.FC<{ checked: boolean; onChange: (checked: boolean) => void;
 );
 
 const SettingRow: React.FC<{ icon: ReactNode; label: string; enabled: boolean; onToggle: (enabled: boolean) => void; children: ReactNode; isSimple?: boolean;}> = ({ icon, label, enabled, onToggle, children, isSimple = false }) => (
-    <div className={`bg-white/60 dark:bg-gray-700/60 rounded-xl ${isSimple ? '' : 'divide-y divide-secondary-light/50 dark:divide-gray-600/50'}`}>
+    <div className={`border-b border-black/5 dark:border-white/10 ${isSimple ? '' : 'divide-y divide-secondary-light/50 dark:divide-gray-600/50'}`}>
         <div className="p-3 flex items-center justify-between cursor-pointer" onClick={() => onToggle(!enabled)}>
             <div className="flex items-center gap-3">
                 <span className="text-gray-500 dark:text-gray-400">{icon}</span>
@@ -53,7 +53,7 @@ const SettingRow: React.FC<{ icon: ReactNode; label: string; enabled: boolean; o
 );
 
 const NavSettingRow: React.FC<{ icon: ReactNode; label: string; value: string; onClick: () => void;}> = ({ icon, label, value, onClick }) => (
-    <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3">
+    <div className="border-b border-black/5 dark:border-white/10 p-3">
         <div className="flex items-center justify-between cursor-pointer" onClick={onClick}>
             <div className="flex items-center gap-3">
                 <span className="text-gray-500 dark:text-gray-400">{icon}</span>
@@ -257,7 +257,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
 
             <div className="space-y-2">
                 {subtasks.map(st => (
-                    <div key={st.id} className="flex items-center bg-white/60 dark:bg-gray-700/60 p-2 rounded-lg group">
+                    <div key={st.id} className="flex items-center p-2 group border-b border-black/5 dark:border-white/5">
                         <input type="checkbox" id={`ms-${st.id}`} checked={st.completed} onChange={() => handleToggleSubtask(st.id)} className="sr-only"/>
                         <label htmlFor={`ms-${st.id}`} className={`w-5 h-5 rounded-md border-2 shrink-0 transition-all duration-200 cursor-pointer ${st.completed ? 'bg-primary/70 border-primary/70' : 'bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500'}`}>{st.completed && <svg className="w-full h-full text-white p-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}</label>
                         <span className={`ml-3 flex-grow text-sm truncate ${st.completed ? 'line-through text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>{st.text}</span>
@@ -270,7 +270,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                 </form>
             </div>
             
-            <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl divide-y divide-secondary-light/50 dark:divide-gray-600/50">
+            <div className="border-y border-black/5 dark:border-white/10 divide-y divide-secondary-light/50 dark:divide-gray-600/50">
                 <div className="p-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <CalendarIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/>
@@ -292,14 +292,14 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                 </div>
             </div>
 
-            <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 flex flex-col gap-2">
+            <div className="p-3 flex flex-col gap-2 border-b border-black/5 dark:border-white/10">
                     <div className="flex items-center gap-3"><FlagIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prioridad</span></div>
                     <div className="flex items-center gap-2 bg-black/5 dark:bg-black/20 p-1 rounded-full">
                     {(['low', 'medium', 'high'] as Priority[]).map(p => (<button key={p} onClick={() => setPriority(p)} className={`w-full text-xs py-1.5 rounded-full transition-all ${priority === p ? `${priorityMap[p].base} ${priorityMap[p].text} font-semibold shadow-md` : 'text-gray-700 dark:text-gray-300'}`}>{priorityMap[p].label}</button>))}
                 </div>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-0">
                 <SettingRow icon={<ClockIcon className="h-5 w-5"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
                     <div className="flex items-center gap-3 text-sm">
                         <div className="flex-1">

@@ -787,7 +787,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                         <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-4 z-30 border-b border-gray-200/50 dark:border-gray-700/50">
                             <Greeting name={capitalizedUserName} />
                         </header>
-                        <div className="p-4 space-y-3">
+                        <div className="p-4">
                              <MobilePomodoroWidget 
                                 timeLeft={pomodoroState.timeLeft} 
                                 isActive={pomodoroState.isActive} 
@@ -826,19 +826,19 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 );
             case 'notes':
                 return (
-                    <div className="h-full">
+                    <div className="h-full pt-8">
                       <NotesSection isMobile={true} folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
                     </div>
                 );
             case 'gallery':
                 return (
-                    <div className="flex flex-col h-full">
+                    <div className="flex flex-col h-full pt-8">
                         <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!gdriveToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
                     </div>
                 );
             case 'games':
                 return (
-                    <div className="h-full">
+                    <div className="h-full pt-8">
                         <GamesHub galleryImages={galleryImages} isMobile={true} currentUser={capitalizedUserName} />
                     </div>
                 );
@@ -846,11 +846,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 return (
                      <>
                         <div className="p-4 pt-8 space-y-4">
-                            <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg flex justify-between items-center">
+                            <div className="p-4 flex justify-between items-center border-b border-black/5 dark:border-white/10">
                                 <h3 className="font-bold text-primary-dark dark:text-primary">Tema</h3>
                                 <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
                             </div>
-                             <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg">
+                             <div className="p-4 border-b border-black/5 dark:border-white/10">
                                 <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left">
                                   <div>
                                     <h3 className="font-bold text-primary-dark dark:text-primary">Personalización</h3>
@@ -859,7 +859,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                   <ChevronRightIcon />
                                 </button>
                             </div>
-                            <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-2xl shadow-lg">
+                            <div className="p-4 border-b border-black/5 dark:border-white/10">
                                 <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left" disabled={isPermissionBlocked}>
                                     <div>
                                         <h3 className={`font-bold transition-colors ${

@@ -21,7 +21,7 @@ const formatTime = (seconds: number) => {
 
 const MobilePomodoroWidget: React.FC<MobilePomodoroWidgetProps> = ({ timeLeft, isActive, mode, onToggle, onOpenModal, onSwitchMode, onReset }) => {
   return (
-    <div className="w-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg p-3 flex items-center justify-between relative cursor-pointer" onClick={onOpenModal}>
+    <div className="w-full p-4 flex items-center justify-between relative cursor-pointer border-b border-black/5 dark:border-white/5" onClick={onOpenModal}>
       <div className="flex items-center gap-3">
         <div className={`w-2 h-10 rounded-full ${mode === 'work' ? 'bg-red-400' : 'bg-green-400'}`}></div>
         <div>

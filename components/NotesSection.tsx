@@ -195,11 +195,11 @@ const NotesSection: React.FC<NotesSectionProps> = ({
             return (
                 <>
                     <div className="flex flex-col h-full w-full bg-transparent dark:bg-transparent animate-fade-in">
-                        <main className="flex-grow overflow-y-auto p-3 pt-8 space-y-2 custom-scrollbar">
+                        <main className="flex-grow overflow-y-auto px-4 pt-8 custom-scrollbar">
                             {folders.map(folder => (
                             <div key={folder.id} className="relative">
                                     {editingFolder?.id === folder.id ? (
-                                        <div className="w-full text-left p-4 rounded-xl flex items-center gap-4 bg-white dark:bg-gray-700 shadow-md">
+                                        <div className="w-full text-left p-4 flex items-center gap-4 border-b border-black/5 dark:border-white/10">
                                             <FolderIcon />
                                             <input
                                                 type="text"
@@ -215,12 +215,12 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                                         <div className="group">
                                             <button
                                                 onClick={() => handleSelectFolder(folder.id)}
-                                                className="w-full text-left p-4 rounded-xl flex items-center gap-4 bg-white/70 dark:bg-gray-700/60 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+                                                className="w-full text-left p-4 flex items-center gap-4 border-b border-black/5 dark:border-white/10 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
                                             >
                                                 <FolderIcon />
                                                 <span className="truncate flex-grow font-semibold text-gray-700 dark:text-gray-200">{folder.name}</span>
                                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                                    <span className="text-sm font-bold text-gray-400 dark:text-gray-500 bg-black/5 dark:bg-black/20 px-2 py-0.5 rounded-full">{folder.notes.length}</span>
+                                                    <span className="text-sm font-bold text-gray-400 dark:text-gray-500">{folder.notes.length}</span>
                                                     <div className="w-9 h-9 flex items-center justify-center">
                                                         <button
                                                             onClick={(e) => {
@@ -267,10 +267,10 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                             <button onClick={() => setSelectedFolderId(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
                             <input type="text" placeholder={selectedFolder?.name || "Buscar..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent text-lg font-bold text-pink-500 dark:text-pink-400 w-full focus:outline-none" />
                         </header>
-                        <main className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                        <main className="flex-grow overflow-y-auto px-2 custom-scrollbar">
                             {filteredNotes.map(note => (
                                 <div key={note.id} className="relative group">
-                                    <button onClick={() => handleSelectNote(note.id)} className="w-full text-left p-3 rounded-xl bg-white/70 dark:bg-gray-700/60 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95">
+                                    <button onClick={() => handleSelectNote(note.id)} className="w-full text-left p-4 border-b border-black/5 dark:border-white/10 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
                                         <h4 className="font-bold text-md truncate text-gray-800 dark:text-gray-100 pr-6">{note.title || 'Nota sin título'}</h4>
                                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1 pr-6">{note.content.substring(0, 80) || 'Sin contenido'}</p>
                                     </button>
