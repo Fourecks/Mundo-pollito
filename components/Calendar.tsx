@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
@@ -91,7 +89,7 @@ const Calendar: React.FC<CalendarProps> = ({ selectedDate, setDate, datesWithTas
   const weekdays = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
 
   return (
-    <div className="px-2 select-none h-full flex flex-col justify-center">
+    <div className="px-2 select-none flex flex-col justify-center">
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-primary-dark dark:text-primary">

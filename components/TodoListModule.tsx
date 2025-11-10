@@ -8,6 +8,7 @@ import SortIcon from './icons/SortIcon';
 import Calendar from './Calendar';
 import CalendarIcon from './icons/CalendarIcon';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
+import ChevronRightIcon from './icons/ChevronRightIcon';
 
 interface TodoListModuleProps {
     todos: Todo[];
@@ -44,6 +45,18 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     const [isCalendarPanelVisible, setIsCalendarPanelVisible] = useState(true);
     const [isNarrow, setIsNarrow] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const handlePrevDay = () => {
+      const newDate = new Date(selectedDate);
+      newDate.setDate(newDate.getDate() - 1);
+      setSelectedDate(newDate);
+    };
+
+    const handleNextDay = () => {
+        const newDate = new Date(selectedDate);
+        newDate.setDate(newDate.getDate() + 1);
+        setSelectedDate(newDate);
+    };
 
     useEffect(() => {
         const observer = new ResizeObserver(entries => {
@@ -146,26 +159,56 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
 
                 <div className={`flex-shrink-0 ${isMobile ? 'sticky top-0 bg-secondary-lighter/80 dark:bg-gray-800/80 backdrop-blur-md z-20 border-b border-secondary-light/50 dark:border-gray-700/50' : ''}`}>
                     <div className="p-3 md:p-4">
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setIsCalendarPanelVisible(!isCalendarPanelVisible)}
-                                    className="hidden md:flex p-2 items-center justify-center rounded-full hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-primary-dark transition-colors"
-                                    aria-label={isCalendarPanelVisible ? 'Ocultar calendario' : 'Mostrar calendario'}
-                                >
-                                    <ChevronLeftIcon className={`h-5 w-5 transition-transform duration-300 ${!isCalendarPanelVisible ? 'rotate-180' : ''}`}/>
+                         {isMobile ? (
+                            <div className="flex justify-between items-center">
+                                <button onClick={handlePrevDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día anterior">
+                                    <ChevronLeftIcon />
                                 </button>
-                                <h2 className="text-lg sm:text-xl font-bold text-primary-dark dark:text-primary">{formattedDate}</h2>
+                                <button onClick={() => setCalendarVisible(true)} className="px-3 py-1.5 rounded-full hover:bg-white/70 dark:hover:bg-gray-700/70 transition-colors">
+                                    <h2 className="text-lg font-bold text-primary-dark dark:text-primary text-center">
+                                        {formattedDate}
+                                    </h2>
+                                </button>
+                                <button onClick={handleNextDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día siguiente">
+                                    <ChevronRightIcon />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setCalendarVisible(true)}
-                                className="md:hidden flex items-center gap-2 bg-white/70 dark:bg-gray-700/70 backdrop-blur-sm p-2 rounded-full shadow-sm text-primary dark:text-primary-dark hover:bg-primary-light/50 dark:hover:bg-primary/20 transition-colors"
-                                aria-label="Abrir calendario"
-                            >
-                                <CalendarIcon />
-                            </button>
-                        </div>
-                        <p className="text-gray-500 dark:text-gray-300 text-sm mt-1">
+                        ) : (
+                             <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                    <button
+                                        onClick={() => setIsCalendarPanelVisible(!isCalendarPanelVisible)}
+                                        className="hidden md:flex p-2 items-center justify-center rounded-full hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-primary-dark transition-colors"
+                                        aria-label={isCalendarPanelVisible ? 'Ocultar calendario' : 'Mostrar calendario'}
+                                    >
+                                        <ChevronLeftIcon className={`h-5 w-5 transition-transform duration-300 ${!isCalendarPanelVisible ? 'rotate-180' : ''}`}/>
+                                    </button>
+                                    
+                                    <div className="flex items-center">
+                                        <button onClick={handlePrevDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día anterior">
+                                            <ChevronLeftIcon />
+                                        </button>
+                                        <h2 className="text-lg sm:text-xl font-bold text-primary-dark dark:text-primary text-center w-40 sm:w-auto flex-shrink-0">
+                                            {formattedDate}
+                                        </h2>
+                                        <button onClick={handleNextDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día siguiente">
+                                            <ChevronRightIcon />
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <button
+                                    onClick={() => setCalendarVisible(true)}
+                                    className="md:hidden flex items-center gap-2 bg-white/70 dark:bg-gray-700/70 backdrop-blur-sm p-2 rounded-full shadow-sm text-primary dark:text-primary-dark hover:bg-primary-light/50 dark:hover:bg-primary/20 transition-colors"
+                                    aria-label="Abrir calendario"
+                                >
+                                    <CalendarIcon />
+                                </button>
+                            </div>
+                        )}
+
+
+                        <p className="text-gray-500 dark:text-gray-300 text-sm mt-1 text-center md:text-left">
                             {totalCount > 0 ? `${completedCount} de ${totalCount} tareas completadas.` : '¡Añade una tarea para empezar!'}
                         </p>
                         <ProgressBar completed={completedCount} total={totalCount} />
