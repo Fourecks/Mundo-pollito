@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Todo, Subtask, Priority, RecurrenceRule } from '../types';
 import CloseIcon from './icons/CloseIcon';
@@ -47,6 +45,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const [notes, setNotes] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
     const [reminderOffset, setReminderOffset] = useState<Todo['reminder_offset']>(0);
+    const [isCustomReminder, setIsCustomReminder] = useState(false);
+    const [customReminderTime, setCustomReminderTime] = useState('');
     const [recurrence, setRecurrence] = useState<RecurrenceRule>({ frequency: 'none', customDays: [] });
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
     const [newSubtaskText, setNewSubtaskText] = useState('');
@@ -62,25 +62,47 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             setText(todo.text || '');
             setNotes(todo.notes || '');
             setPriority(todo.priority || 'medium');
-            setReminderOffset(todo.reminder_offset || 0);
             setRecurrence(todo.recurrence || { frequency: 'none', customDays: [] });
             setSubtasks(todo.subtasks || []);
             setStartTimeParts(from24h(todo.start_time || ''));
             setEndTimeParts(from24h(todo.end_time || ''));
             setDueDate(todo.due_date || '');
             setCompleted(todo.completed || false);
+            
+            // Reminder logic
+            if (todo.reminder_at && todo.due_date) {
+                setIsCustomReminder(true);
+                setCustomReminderTime(todo.reminder_at.split('T')[1]);
+                setReminderOffset(0);
+            } else {
+                setIsCustomReminder(false);
+                setCustomReminderTime('');
+                setReminderOffset(todo.reminder_offset || 0);
+            }
         }
     }, [todo]);
 
     const handleSave = async () => {
         if (!todo) return;
         
-        if (reminderOffset !== 0 && 'Notification' in window && Notification.permission !== 'granted') {
+        const isReminderSet = (reminderOffset !== 0 || (isCustomReminder && customReminderTime));
+        if (isReminderSet && 'Notification' in window && Notification.permission !== 'granted') {
             alert("Para recibir recordatorios, por favor, primero activa las notificaciones usando el ícono de la campana en la pantalla principal.");
         }
         
         const finalStartTime = to24h(startTimeParts.hour, startTimeParts.minute, startTimeParts.period) || undefined;
         const finalEndTime = to24h(endTimeParts.hour, endTimeParts.minute, endTimeParts.period) || undefined;
+
+        let finalReminderAt: string | undefined = undefined;
+        let finalReminderOffset: Todo['reminder_offset'] = 0;
+
+        if (isCustomReminder && customReminderTime && due_date) {
+            finalReminderAt = `${due_date}T${customReminderTime}`;
+        } else if (!isCustomReminder) {
+            finalReminderOffset = reminderOffset;
+        }
+
+        const reminderChanged = todo.reminder_at !== finalReminderAt || todo.reminder_offset !== finalReminderOffset;
 
         onSave({
             ...todo,
@@ -91,10 +113,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             start_time: finalStartTime,
             end_time: finalEndTime,
             priority,
-            reminder_offset: reminderOffset,
+            reminder_offset: finalReminderOffset,
+            reminder_at: finalReminderAt,
             recurrence,
             subtasks,
-            notification_sent: todo.reminder_offset !== reminderOffset ? false : todo.notification_sent,
+            notification_sent: reminderChanged ? false : todo.notification_sent,
         });
         onClose();
     };
@@ -126,6 +149,17 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 : [...currentDays, dayIndex];
             return { ...prev, customDays: newDays.sort((a,b) => a - b) };
         });
+    };
+    
+    const handleReminderChange = (value: string) => {
+        if (value === 'custom') {
+            setIsCustomReminder(true);
+            setReminderOffset(0);
+        } else {
+            setIsCustomReminder(false);
+            setCustomReminderTime('');
+            setReminderOffset(Number(value) as Todo['reminder_offset']);
+        }
     };
 
     if (!isOpen || !todo) return null;
@@ -263,12 +297,23 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         </div>
                         <div>
                             <label htmlFor="reminder" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><BellIcon className="h-4 w-4"/> Recordatorio</label>
-                            <select id="reminder" value={reminderOffset} onChange={e => setReminderOffset(Number(e.target.value) as Todo['reminder_offset'])} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm appearance-none">
+                            <select id="reminder" value={isCustomReminder ? 'custom' : reminderOffset} onChange={e => handleReminderChange(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm appearance-none">
                                 <option value="0">Nunca</option>
                                 <option value="10">10 min antes</option>
                                 <option value="30">30 min antes</option>
                                 <option value="60">1 hora antes</option>
+                                <option value="custom">Hora personalizada...</option>
                             </select>
+                            {isCustomReminder && (
+                                <input 
+                                    type="time"
+                                    value={customReminderTime}
+                                    onChange={e => setCustomReminderTime(e.target.value)}
+                                    disabled={!due_date}
+                                    className="mt-2 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm disabled:opacity-50"
+                                    title={!due_date ? "Establece una fecha para la tarea primero" : ""}
+                                />
+                            )}
                         </div>
                          <div>
                             <label htmlFor="recurrence" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><RefreshIcon className="h-4 w-4"/> Repetir</label>

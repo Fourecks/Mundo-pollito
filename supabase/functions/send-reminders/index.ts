@@ -25,14 +25,13 @@ serve(async (req) => {
     const now = new Date();
     
     // 1. Fetch all tasks that could potentially need a reminder.
+    // Fetches tasks that have either an offset-based reminder OR an absolute time reminder.
     const { data: candidateTodos, error: fetchError } = await supabaseAdmin
       .from('todos')
-      .select('id, user_id, text, due_date, start_time, reminder_offset')
+      .select('id, user_id, text, due_date, start_time, reminder_offset, reminder_at')
       .eq('completed', false)
       .eq('notification_sent', false)
-      .gt('reminder_offset', 0)
-      .not('start_time', 'is', null)
-      .not('due_date', 'is', null);
+      .or('reminder_offset.gt.0,reminder_at.not.is.null');
 
     if (fetchError) {
       throw fetchError;
@@ -59,23 +58,32 @@ serve(async (req) => {
 
     const todosToSend: any[] = [];
     for (const todo of candidateTodos) {
-      // Calculate the exact reminder time, accounting for the user's timezone.
-      const [year, month, day] = todo.due_date.split('-').map(Number);
-      const [hour, minute] = todo.start_time.split(':').map(Number);
-      
-      const localTimeAsUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
-      
+      let reminderTime: Date | null = null;
       const userOffsetMinutes = offsetMap.get(todo.user_id) || 0;
-      // FIX: The type of `userOffsetMinutes` can be `any`, which can cause type errors in arithmetic operations.
-      // Explicitly cast to Number to ensure it's treated as a number.
-      const startTime = new Date(localTimeAsUTC.getTime() + Number(userOffsetMinutes) * 60 * 1000);
       
-      // FIX: The type of `todo.reminder_offset` is `any`, which can cause type errors in arithmetic operations.
-      // Explicitly cast to Number to ensure it's treated as a number.
-      const reminderTime = new Date(startTime.getTime() - Number(todo.reminder_offset) * 60 * 1000);
+      // Priority 1: Absolute reminder time
+      if (todo.reminder_at) {
+          // The reminder_at is stored as "YYYY-MM-DDTHH:mm". We treat this as the user's local time.
+          const [datePart, timePart] = todo.reminder_at.split('T');
+          const [year, month, day] = datePart.split('-').map(Number);
+          const [hour, minute] = timePart.split(':').map(Number);
+          
+          // Create a UTC date from parts, then adjust it to the real UTC time based on user's offset.
+          const localTimeAsUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
+          reminderTime = new Date(localTimeAsUTC.getTime() + Number(userOffsetMinutes) * 60 * 1000);
+          
+      // Priority 2: Offset-based reminder time
+      } else if (todo.due_date && todo.start_time && todo.reminder_offset > 0) {
+          const [year, month, day] = todo.due_date.split('-').map(Number);
+          const [hour, minute] = todo.start_time.split(':').map(Number);
+          
+          const localTimeAsUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
+          const startTime = new Date(localTimeAsUTC.getTime() + Number(userOffsetMinutes) * 60 * 1000);
+          reminderTime = new Date(startTime.getTime() - Number(todo.reminder_offset) * 60 * 1000);
+      }
 
-      // Check if the reminder time is in the past.
-      if (reminderTime <= now) {
+      // Check if the calculated reminder time is in the past.
+      if (reminderTime && reminderTime <= now) {
         todosToSend.push(todo);
       }
     }

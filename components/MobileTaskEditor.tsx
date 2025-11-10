@@ -29,6 +29,8 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
     const [notes, setNotes] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
     const [reminderOffset, setReminderOffset] = useState<Todo['reminder_offset']>(0);
+    const [isCustomReminder, setIsCustomReminder] = useState(false);
+    const [customReminderTime, setCustomReminderTime] = useState('');
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
     const [newSubtaskText, setNewSubtaskText] = useState('');
     const [due_date, setDueDate] = useState('');
@@ -43,10 +45,20 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             setText(todo.text || '');
             setNotes(todo.notes || '');
             setPriority(todo.priority || 'medium');
-            setReminderOffset(todo.reminder_offset || 0);
             setSubtasks(todo.subtasks || []);
             setDueDate(todo.due_date || '');
             setStartTime(todo.start_time || '');
+            
+            // Reminder logic
+            if (todo.reminder_at && todo.due_date) {
+                setIsCustomReminder(true);
+                setCustomReminderTime(todo.reminder_at.split('T')[1]);
+                setReminderOffset(0);
+            } else {
+                setIsCustomReminder(false);
+                setCustomReminderTime('');
+                setReminderOffset(todo.reminder_offset || 0);
+            }
         }
     }, [todo]);
 
@@ -61,6 +73,18 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
 
     const handleSave = () => {
         if (!todo) return;
+        
+        let finalReminderAt: string | undefined = undefined;
+        let finalReminderOffset: Todo['reminder_offset'] = 0;
+
+        if (isCustomReminder && customReminderTime && due_date) {
+            finalReminderAt = `${due_date}T${customReminderTime}`;
+        } else if (!isCustomReminder) {
+            finalReminderOffset = reminderOffset;
+        }
+
+        const reminderChanged = todo.reminder_at !== finalReminderAt || todo.reminder_offset !== finalReminderOffset;
+
         onSave({
             ...todo,
             text,
@@ -68,8 +92,10 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             due_date,
             start_time: start_time || undefined,
             priority,
-            reminder_offset: reminderOffset,
+            reminder_offset: finalReminderOffset,
+            reminder_at: finalReminderAt,
             subtasks,
+            notification_sent: reminderChanged ? false : todo.notification_sent,
         });
         onClose();
     };
@@ -99,6 +125,17 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
 
     const handleDeleteSubtask = (id: number) => {
         setSubtasks(subtasks.filter(st => st.id !== id));
+    };
+    
+    const handleReminderChange = (value: string) => {
+        if (value === 'custom') {
+            setIsCustomReminder(true);
+            setReminderOffset(0);
+        } else {
+            setIsCustomReminder(false);
+            setCustomReminderTime('');
+            setReminderOffset(Number(value) as Todo['reminder_offset']);
+        }
     };
 
     if (!isOpen) return null;
@@ -171,12 +208,28 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                                 ))}
                             </div>
                         </div>
-                        <div className="p-3 flex items-center gap-3">
-                            <BellIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/>
-                            <label htmlFor="reminder" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Recordatorio</label>
-                            <select id="reminder" value={reminderOffset} onChange={e => setReminderOffset(Number(e.target.value) as Todo['reminder_offset'])} className="ml-auto bg-transparent text-gray-700 dark:text-gray-200 text-sm text-right focus:outline-none appearance-none">
-                                <option value="0">Nunca</option><option value="10">10 min antes</option><option value="30">30 min antes</option><option value="60">1 hora antes</option>
-                            </select>
+                        <div className="p-3">
+                            <div className="flex items-center gap-3">
+                                <BellIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/>
+                                <label htmlFor="reminder" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Recordatorio</label>
+                                <select id="reminder" value={isCustomReminder ? 'custom' : reminderOffset} onChange={e => handleReminderChange(e.target.value)} className="ml-auto bg-transparent text-gray-700 dark:text-gray-200 text-sm text-right focus:outline-none appearance-none">
+                                    <option value="0">Nunca</option>
+                                    <option value="10">10 min antes</option>
+                                    <option value="30">30 min antes</option>
+                                    <option value="60">1 hora antes</option>
+                                    <option value="custom">Hora personalizada...</option>
+                                </select>
+                            </div>
+                            {isCustomReminder && (
+                                <input 
+                                    type="time"
+                                    value={customReminderTime}
+                                    onChange={e => setCustomReminderTime(e.target.value)}
+                                    disabled={!due_date}
+                                    className="mt-2 w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm disabled:opacity-50"
+                                    title={!due_date ? "Establece una fecha para la tarea primero" : ""}
+                                />
+                            )}
                         </div>
                     </div>
 
