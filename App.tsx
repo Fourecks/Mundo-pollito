@@ -47,7 +47,7 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- OneSignal Configuration ---
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 
 // Helper to format date as YYYY-MM-DD key
@@ -283,9 +283,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
   const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
   
-  const pomodoroWorkerRef = useRef<Worker | null>(null);
-  const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
-
   const getUserKey = useCallback((key: string) => `${currentUser.email}_${key}`, [currentUser]);
   
   // Load/Save local UI state from localStorage
@@ -312,91 +309,55 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
   const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
 
-  // Pomodoro Timer Logic with Web Worker
-  useEffect(() => {
-    pomodoroWorkerRef.current = new Worker(new URL('./pomodoro-worker.js', import.meta.url));
-
-    pomodoroWorkerRef.current.onmessage = (event: MessageEvent) => {
-      const { type, timeLeft, mode } = event.data;
-      if (type === 'tick') {
-        setPomodoroState(s => ({ ...s, timeLeft }));
-      } else if (type === 'completed') {
-        handleTimerCompletion(mode);
-      }
-    };
-
-    return () => {
-      pomodoroWorkerRef.current?.terminate();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleTimerCompletion = useCallback((completedMode: 'work' | 'break') => {
-    pomodoroAudioRef.current?.play();
-
-    const newMode = completedMode === 'work' ? 'break' : 'work';
-    const message = completedMode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
-
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification("Pomodoro Terminado", {
-        body: message,
-        icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png",
-      });
+  // Pomodoro Timer Logic with Service Worker
+  const postToSW = (message: any) => {
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage(message);
+    } else {
+      console.error("Service Worker not in control. Cannot send message.");
     }
-
-    setPomodoroState(s => {
-      const newDuration = s.durations[newMode];
-      pomodoroWorkerRef.current?.postMessage({ type: 'start', timeLeft: newDuration, mode: newMode });
-      return {
-        ...s,
-        mode: newMode,
-        timeLeft: newDuration,
-        isActive: true,
-      };
-    });
-  }, []);
+  };
 
   const handlePomodoroToggle = useCallback(() => {
     setPomodoroState(s => {
       const isStarting = !s.isActive;
       if (isStarting) {
-        pomodoroWorkerRef.current?.postMessage({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
-        return { ...s, isActive: true, showBackgroundTimer: true };
+        postToSW({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
       } else {
-        pomodoroWorkerRef.current?.postMessage({ type: 'pause' });
-        return { ...s, isActive: false };
+        postToSW({ type: 'pause' });
       }
+      return { ...s, isActive: isStarting, showBackgroundTimer: isStarting };
     });
-  }, []);
+  }, [setPomodoroState]);
 
   const handlePomodoroReset = useCallback(() => {
-    pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+    postToSW({ type: 'reset' });
     setPomodoroState(s => ({
       ...s,
       timeLeft: s.durations[s.mode],
       isActive: false,
     }));
-  }, []);
+  }, [setPomodoroState]);
 
   const handlePomodoroSwitchMode = useCallback((newMode: 'work' | 'break') => {
-    pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+    postToSW({ type: 'reset' });
     setPomodoroState(s => ({
       ...s,
       mode: newMode,
       timeLeft: s.durations[newMode],
       isActive: false,
     }));
-  }, []);
+  }, [setPomodoroState]);
   
   const handlePomodoroSaveSettings = useCallback((newDurations: { work: number; break: number }) => {
-    pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+    postToSW({ type: 'reset' });
     setPomodoroState(s => ({
         ...s,
         durations: newDurations,
         timeLeft: newDurations[s.mode],
         isActive: false
     }));
-  }, []);
+  }, [setPomodoroState]);
 
   // Update document title with timer
   useEffect(() => {
@@ -609,7 +570,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         <Dock onButtonClick={toggleWindow} openWindows={openWindows} />
       </div>
 
-      <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
+      <audio id="pomodoro-audio" src={pomodoroAudioSrc} />
       <audio ref={ambientAudioRef} />
     </div>
   );
@@ -641,8 +602,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
     
-    const pomodoroWorkerRef = useRef<Worker | null>(null);
-    const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
     const ambientAudioRef = useRef<HTMLAudioElement>(null);
 
     const handleShowCompletionModal = (quote: string) => {
@@ -655,91 +614,55 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
     const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
     
-    // Pomodoro Timer Logic with Web Worker
-    useEffect(() => {
-        pomodoroWorkerRef.current = new Worker(new URL('./pomodoro-worker.js', import.meta.url));
-
-        pomodoroWorkerRef.current.onmessage = (event: MessageEvent) => {
-        const { type, timeLeft, mode } = event.data;
-        if (type === 'tick') {
-            setPomodoroState(s => ({ ...s, timeLeft }));
-        } else if (type === 'completed') {
-            handleTimerCompletion(mode);
-        }
-        };
-
-        return () => {
-        pomodoroWorkerRef.current?.terminate();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const handleTimerCompletion = useCallback((completedMode: 'work' | 'break') => {
-        pomodoroAudioRef.current?.play();
-
-        const newMode = completedMode === 'work' ? 'break' : 'work';
-        const message = completedMode === 'work' ? "¡Tiempo de descansar! ¡Bien hecho!" : "¡Se acabó el descanso! Tú puedes.";
-        
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification("Pomodoro Terminado", {
-                body: message,
-                icon: "https://pbtdzkpympdfemnejpwj.supabase.co/storage/v1/object/public/Sonido-ambiente/pollito-icon-192.png",
-            });
-        }
-
-        setPomodoroState(s => {
-        const newDuration = s.durations[newMode];
-        pomodoroWorkerRef.current?.postMessage({ type: 'start', timeLeft: newDuration, mode: newMode });
-        return {
-            ...s,
-            mode: newMode,
-            timeLeft: newDuration,
-            isActive: true,
-        };
-        });
-    }, []);
+    // Pomodoro Timer Logic with Service Worker
+    const postToSW = (message: any) => {
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage(message);
+      } else {
+        console.error("Service Worker not in control. Cannot send message.");
+      }
+    };
 
     const handlePomodoroToggle = useCallback(() => {
         setPomodoroState(s => {
-        const isStarting = !s.isActive;
-        if (isStarting) {
-            pomodoroWorkerRef.current?.postMessage({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
-            return { ...s, isActive: true };
-        } else {
-            pomodoroWorkerRef.current?.postMessage({ type: 'pause' });
-            return { ...s, isActive: false };
-        }
+          const isStarting = !s.isActive;
+          if (isStarting) {
+            postToSW({ type: 'start', timeLeft: s.timeLeft, mode: s.mode });
+          } else {
+            postToSW({ type: 'pause' });
+          }
+          return { ...s, isActive: isStarting };
         });
-    }, []);
+      }, [setPomodoroState]);
 
     const handlePomodoroReset = useCallback(() => {
-        pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+        postToSW({ type: 'reset' });
         setPomodoroState(s => ({
             ...s,
             timeLeft: s.durations[s.mode],
             isActive: false,
         }));
-    }, []);
+    }, [setPomodoroState]);
 
     const handlePomodoroSwitchMode = useCallback((newMode: 'work' | 'break') => {
-        pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+        postToSW({ type: 'reset' });
         setPomodoroState(s => ({
             ...s,
             mode: newMode,
             timeLeft: s.durations[newMode],
             isActive: false,
         }));
-    }, []);
+    }, [setPomodoroState]);
 
     const handlePomodoroSaveSettings = useCallback((newDurations: { work: number; break: number }) => {
-        pomodoroWorkerRef.current?.postMessage({ type: 'reset' });
+        postToSW({ type: 'reset' });
         setPomodoroState(s => ({
             ...s,
             durations: newDurations,
             timeLeft: newDurations[s.mode],
             isActive: false
         }));
-    }, []);
+    }, [setPomodoroState]);
 
     // Ambient Sound Effect
     useEffect(() => {
@@ -945,7 +868,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                   />
             </ModalWindow>
 
-            <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
+            <audio id="pomodoro-audio" src={pomodoroAudioSrc} />
             <audio ref={ambientAudioRef} />
         </div>
     );
@@ -1039,6 +962,61 @@ const App: React.FC = () => {
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isIos, setIsIos] = useState(false);
+
+  // --- Service Worker Pomodoro Logic ---
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+        const registerServiceWorker = async () => {
+            try {
+                // Fetch the worker script as text to create a same-origin Blob URL.
+                // This is a robust way to register a service worker in environments where relative paths might be resolved incorrectly.
+                const response = await fetch('./pomodoro-worker.js');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch Service Worker script with status: ${response.status}`);
+                }
+                const scriptText = await response.text();
+                const blob = new Blob([scriptText], { type: 'application/javascript' });
+                const scriptURL = URL.createObjectURL(blob);
+
+                await navigator.serviceWorker.register(scriptURL);
+                await navigator.serviceWorker.ready;
+                console.log('Service Worker is ready and controlling the page.');
+            } catch (error) {
+                console.error('Service Worker registration failed:', error);
+            }
+        };
+        registerServiceWorker();
+
+        const handleServiceWorkerMessage = (event: MessageEvent) => {
+            if (!event.data || !event.data.type) return;
+
+            const { type, timeLeft, mode } = event.data;
+
+            if (type === 'tick') {
+                setPomodoroState(s => ({ ...s, timeLeft }));
+            } else if (type === 'completed') {
+                const pomodoroAudio = document.getElementById('pomodoro-audio');
+                if (pomodoroAudio) (pomodoroAudio as HTMLAudioElement).play();
+
+                setPomodoroState(s => {
+                    const newMode = mode === 'work' ? 'break' : 'work';
+                    const newDuration = s.durations[newMode];
+                    if (navigator.serviceWorker.controller) {
+                       navigator.serviceWorker.controller.postMessage({ type: 'start', timeLeft: newDuration, mode: newMode });
+                    }
+                    return { ...s, mode: newMode, timeLeft: newDuration, isActive: true };
+                });
+            }
+        };
+
+        navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+        
+        return () => {
+            navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+        };
+    }
+  }, []); // Empty array ensures this runs only once.
+
 
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
