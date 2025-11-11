@@ -1115,13 +1115,22 @@ const App: React.FC = () => {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isIos, setIsIos] = useState(false);
   
+  const foldersWithNotes = useMemo(() => {
+    return folders.map(folder => ({
+        ...folder,
+        notes: notes.filter(note => note.folder_id === folder.id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    }));
+  }, [folders, notes]);
+
     // --- Offline Functionality ---
     useEffect(() => {
         // Register Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
-                .then(registration => console.log('Service Worker registered with scope:', registration.scope))
-                .catch(error => console.error('Service Worker registration failed:', error));
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => console.log('Service Worker registered with scope:', registration.scope))
+                    .catch(error => console.error('Service Worker registration failed:', error));
+            });
         }
 
         // Network status listeners
@@ -1234,19 +1243,19 @@ const App: React.FC = () => {
         applyThemeColors(newColors);
         if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
         settingsSaveTimeout.current = window.setTimeout(() => {
-          if (user) {
+          if (user && dataLoaded) {
               set('settings', { key: 'themeColors', value: newColors });
           }
         }, 500);
         return newColors;
     });
-  }, [applyThemeColors, user]);
+  }, [applyThemeColors, user, dataLoaded]);
 
   const handleResetThemeColors = useCallback(() => {
     setThemeColors(DEFAULT_COLORS);
     applyThemeColors(DEFAULT_COLORS);
-    if(user) set('settings', { key: 'themeColors', value: DEFAULT_COLORS });
-  }, [applyThemeColors, user]);
+    if(user && dataLoaded) set('settings', { key: 'themeColors', value: DEFAULT_COLORS });
+  }, [applyThemeColors, user, dataLoaded]);
   
   // Initialize theme on load
   useEffect(() => {
@@ -1968,13 +1977,6 @@ const App: React.FC = () => {
     return <Login onLogin={() => {}} />;
   }
   
-    const foldersWithNotes = useMemo(() => {
-        return folders.map(folder => ({
-            ...folder,
-            notes: notes.filter(note => note.folder_id === folder.id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-        }));
-    }, [folders, notes]);
-
   const appProps: AppComponentProps = {
     isOnline, currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders: foldersWithNotes, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
