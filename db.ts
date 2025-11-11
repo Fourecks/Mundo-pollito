@@ -178,14 +178,27 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                 case 'CREATE': {
                     const tempId = op.payload.id;
                     const { id, ...insertData } = op.payload;
-                    
+
+                    // FIX: Clean the payload before sending to Supabase.
+                    // The frontend state might have relational fields (like 'subtasks' or 'notes')
+                    // that don't exist as columns in the database table. Supabase insert will fail if they are present.
+                    const relationalFields = ['subtasks', 'notes'];
+                    relationalFields.forEach(field => {
+                        if (insertData.hasOwnProperty(field)) {
+                            delete insertData[field];
+                        }
+                    });
+
                     let selectClause = '*';
                     if (op.tableName === 'todos') {
                         selectClause = '*, subtasks(*)';
                     }
 
                     const { data: newRecord, error } = await supabase.from(op.tableName).insert(insertData).select(selectClause).single();
-                    if (error) throw error;
+                    if (error) {
+                        console.error(`Supabase CREATE error on table '${op.tableName}':`, error);
+                        throw new Error(`Supabase CREATE error: ${error.message}`);
+                    }
                     
                     if (tempId < 0) tempIdMap.set(tempId, newRecord.id);
                     await remove(op.tableName, tempId);
@@ -206,11 +219,9 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
 
                     const { id, ...updateData } = payload;
                     
-                    // Exclude relational fields that are part of the frontend model but not DB columns
                     const relationalFields = ['subtasks', 'notes'];
                     relationalFields.forEach(field => delete updateData[field]);
 
-                    // Exclude fields managed by the database
                     delete updateData.created_at;
                     delete updateData.user_id;
 
