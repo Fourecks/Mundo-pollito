@@ -110,6 +110,9 @@ const generateRecurringTasks = async (sourceTodo: Todo, currentTodos: { [key: st
         }
         
         if (foundNext && nextDueDate) {
+            if (nextDueDate > finalLimitDate) { // Post-check to ensure we don't go past the end date
+                break;
+            }
             potentialDates.push(nextDueDate);
             lastDueDate = nextDueDate;
         } else {
@@ -1500,66 +1503,79 @@ const App: React.FC = () => {
     await syncableCreate('todos', newTodo);
   };
 
-  const updateLocalTodos = (todoToUpdate: Todo) => {
-       setAllTodos(current => {
-          let originalDateKey: string | null = null;
-          let newAllTodos = { ...current };
-          
-          for (const key in current) { if (current[key].find(t => t.id === todoToUpdate.id)) { originalDateKey = key; break; } }
-          
-          const newDateKey = todoToUpdate.due_date || formatDateKey(new Date(todoToUpdate.created_at!));
+  const getUpdatedTodosState = (current: { [key: string]: Todo[] }, todoToUpdate: Todo): { [key: string]: Todo[] } => {
+      const newAllTodos = JSON.parse(JSON.stringify(current));
+      
+      // Find and remove the original task
+      for (const key in newAllTodos) {
+          const index = newAllTodos[key].findIndex(t => t.id === todoToUpdate.id);
+          if (index !== -1) {
+              newAllTodos[key].splice(index, 1);
+              if (newAllTodos[key].length === 0) {
+                  delete newAllTodos[key];
+              }
+              break;
+          }
+      }
 
-          if (originalDateKey) { newAllTodos[originalDateKey] = (newAllTodos[originalDateKey] || []).filter(t => t.id !== todoToUpdate.id); if (newAllTodos[originalDateKey].length === 0) delete newAllTodos[originalDateKey]; }
-          
-          newAllTodos[newDateKey] = [...(newAllTodos[newDateKey] || []), todoToUpdate];
-          
-          return newAllTodos;
-      });
+      // Add the updated task to the correct date key
+      const newDateKey = todoToUpdate.due_date || formatDateKey(new Date(todoToUpdate.created_at!));
+      if (!newAllTodos[newDateKey]) {
+          newAllTodos[newDateKey] = [];
+      }
+      newAllTodos[newDateKey].push(todoToUpdate);
+      
+      return newAllTodos;
   }
 
   const handleUpdateTodo = async (updatedTodo: Todo) => {
-    updateLocalTodos(updatedTodo);
+    setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
     await syncableUpdate('todos', updatedTodo);
   };
 
   const handleToggleTodo = async (id: number, onAllCompleted: (quote: string) => void) => {
-    let dateKey = '';
     let todoToToggle: Todo | undefined;
-    for (const key in allTodos) { const foundTodo = allTodos[key].find(t => t.id === id); if (foundTodo) { dateKey = key; todoToToggle = foundTodo; break; } }
-    if (!todoToToggle || !dateKey) return;
+    let originalDateKey: string | null = null;
+    for (const key in allTodos) { const foundTodo = allTodos[key].find(t => t.id === id); if (foundTodo) { originalDateKey = key; todoToToggle = foundTodo; break; } }
+    if (!todoToToggle || !originalDateKey) return;
+    
     const newCompletedState = !todoToToggle.completed;
     const updatedSubtasks = (todoToToggle.subtasks || []).map(st => ({ ...st, completed: newCompletedState }));
     const updatedTodo = { ...todoToToggle, completed: newCompletedState, subtasks: updatedSubtasks };
     
-    updateLocalTodos(updatedTodo);
-    await syncableUpdate('todos', updatedTodo);
+    let nextState = getUpdatedTodosState(allTodos, updatedTodo);
     
     if (newCompletedState && todoToToggle.recurrence && todoToToggle.recurrence.frequency !== 'none') {
-        const newAllTodosState = await generateRecurringTasks(updatedTodo, allTodos);
-        setAllTodos(newAllTodosState);
+        nextState = await generateRecurringTasks(updatedTodo, nextState);
     }
     
-    if (newCompletedState && allTodos[dateKey].every(t => t.id === id ? newCompletedState : t.completed)) {
+    setAllTodos(nextState);
+    await syncableUpdate('todos', updatedTodo);
+    
+    const dateKeyForCompletionCheck = updatedTodo.due_date || originalDateKey;
+    if (newCompletedState && nextState[dateKeyForCompletionCheck]?.every(t => t.completed)) {
         triggerConfetti();
         onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
     }
   };
   
   const handleToggleSubtask = async (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => {
-      let dateKey = '';
       let todoToUpdate: Todo | undefined;
-      for (const key in allTodos) { const foundTodo = allTodos[key].find(t => t.id === taskId); if (foundTodo) { dateKey = key; todoToUpdate = foundTodo; break; } }
-      if (!todoToUpdate || !dateKey) return;
+      let originalDateKey: string | null = null;
+      for (const key in allTodos) { const foundTodo = allTodos[key].find(t => t.id === taskId); if (foundTodo) { originalDateKey = key; todoToUpdate = foundTodo; break; } }
+      if (!todoToUpdate || !originalDateKey) return;
       
       const newSubtasks = (todoToUpdate.subtasks || []).map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st);
       const allSubtasksCompleted = newSubtasks.length > 0 && newSubtasks.every(st => st.completed);
       const parentCompleted = allSubtasksCompleted;
       const updatedTodo = { ...todoToUpdate, subtasks: newSubtasks, completed: parentCompleted };
       
-      updateLocalTodos(updatedTodo);
+      const nextState = getUpdatedTodosState(allTodos, updatedTodo);
+      setAllTodos(nextState);
       await syncableUpdate('todos', updatedTodo);
 
-      if (parentCompleted && allTodos[dateKey].every(t => t.id === taskId ? parentCompleted : t.completed)) {
+      const dateKeyForCompletionCheck = updatedTodo.due_date || originalDateKey;
+      if (parentCompleted && nextState[dateKeyForCompletionCheck]?.every(t => t.completed)) {
           triggerConfetti();
           onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
       }
