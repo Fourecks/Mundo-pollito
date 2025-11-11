@@ -178,7 +178,13 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                 case 'CREATE': {
                     const tempId = op.payload.id;
                     const { id, ...insertData } = op.payload;
-                    const { data: newRecord, error } = await supabase.from(op.tableName).insert(insertData).select('*, subtasks(*)').single();
+                    
+                    let selectClause = '*';
+                    if (op.tableName === 'todos') {
+                        selectClause = '*, subtasks(*)';
+                    }
+
+                    const { data: newRecord, error } = await supabase.from(op.tableName).insert(insertData).select(selectClause).single();
                     if (error) throw error;
                     
                     if (tempId < 0) tempIdMap.set(tempId, newRecord.id);
@@ -198,9 +204,16 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                         }
                     }
 
-                    // Supabase update payload should not contain the primary key or read-only fields.
-                    const { id, created_at, user_id, subtasks, notes, ...updateData } = payload;
+                    const { id, ...updateData } = payload;
                     
+                    // Exclude relational fields that are part of the frontend model but not DB columns
+                    const relationalFields = ['subtasks', 'notes'];
+                    relationalFields.forEach(field => delete updateData[field]);
+
+                    // Exclude fields managed by the database
+                    delete updateData.created_at;
+                    delete updateData.user_id;
+
                     const { error } = await supabase.from(op.tableName).update(updateData).eq('id', recordId);
                     if (error) throw error;
                     

@@ -1304,7 +1304,7 @@ const App: React.FC = () => {
     if (error) console.error('Error logging out:', error.message);
   }, []);
   
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (networkMode: 'fetch' | 'cache-only' = 'fetch') => {
     if (!user) return;
     
     // Load from cache first for instant UI
@@ -1337,8 +1337,7 @@ const App: React.FC = () => {
     
     setDataLoaded(true);
 
-    // If online, fetch from network and update cache
-    if (navigator.onLine) {
+    if (networkMode === 'fetch' && navigator.onLine) {
       console.log("Fetching fresh data from server...");
       setIsSyncing(true);
       const [
@@ -1402,7 +1401,7 @@ const App: React.FC = () => {
 
   // --- Offline Functionality & Initial Load ---
   useEffect(() => {
-    if (!user) return; // Only run when user is logged in
+    if (!user) return;
 
     const handleOnline = async () => {
       setIsOnline(true);
@@ -1412,7 +1411,7 @@ const App: React.FC = () => {
       setIsSyncing(false);
       if (success) {
         console.log("Sync successful. Reloading data from server.");
-        loadData();
+        loadData('fetch');
       } else {
         console.error("Sync failed with errors:", errors);
         alert("Hubo un problema al sincronizar tus cambios.");
@@ -1435,16 +1434,20 @@ const App: React.FC = () => {
         setIsOnline(true);
         console.log("App starting online. Syncing pending changes...");
         setIsSyncing(true);
-        await processSyncQueue();
+        const { success } = await processSyncQueue();
         setIsSyncing(false);
+        if (success) {
+          console.log("Initial sync successful.");
+          await loadData('fetch');
+        } else {
+          console.error("Initial sync failed. Loading from cache only. Will retry on next online event.");
+          await loadData('cache-only');
+        }
       } else {
         setIsOnline(false);
         console.log("App starting offline.");
+        await loadData('cache-only');
       }
-      
-      // Load data after initial sync attempt.
-      // loadData will fetch from network if online, or just from cache.
-      await loadData();
     };
 
     if (!dataLoaded) {
