@@ -1,5 +1,7 @@
 {
   "name": "Lista de Tareas",
   "description": "A cheerful, chicken-themed to-do list application with a built-in Pomodoro timer to help you organize your tasks and stay focused. Your tasks and timer state are saved in your browser.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
