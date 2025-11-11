@@ -1119,7 +1119,7 @@ const App: React.FC = () => {
     useEffect(() => {
         // Register Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js', { scope: '/' })
+            navigator.serviceWorker.register('./sw.js')
                 .then(registration => console.log('Service Worker registered with scope:', registration.scope))
                 .catch(error => console.error('Service Worker registration failed:', error));
         }
@@ -1418,31 +1418,31 @@ const App: React.FC = () => {
       if (user && !dataLoaded) {
           initDB(user.email!).then(() => {
               loadData();
+          }).catch(err => {
+              console.error("Failed to initialize DB:", err);
           });
       }
   }, [user, dataLoaded, loadData]);
 
   // --- Settings Persistence ---
   useEffect(() => {
-    if (user && dataLoaded) {
+    if (user && dataLoaded && isOnline) {
       if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
       settingsSaveTimeout.current = window.setTimeout(async () => {
         const { durations, showBackgroundTimer, backgroundTimerOpacity } = pomodoroState;
         const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity };
         set('settings', { key: 'pomodoroState', value: settingsToSave });
-        if(isOnline) {
-          await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
-        }
+        await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
       }, 1500);
     }
     return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
   }, [pomodoroState, user, dataLoaded, isOnline]);
 
-  useEffect(() => { if (user) set('settings', { key: 'particleType', value: particleType }); }, [particleType, user]);
-  useEffect(() => { if (user) set('settings', { key: 'ambientSound', value: ambientSound }); }, [ambientSound, user]);
-  useEffect(() => { if (user) set('settings', { key: getUserKey('browserSession'), value: browserSession }); }, [browserSession, getUserKey, user]);
-  useEffect(() => { if (user) set('settings', { key: getUserKey('activeTrack'), value: activeTrack }); }, [activeTrack, getUserKey, user]);
-  useEffect(() => { if (user) set('settings', { key: getUserKey('activeSpotifyTrack'), value: activeSpotifyTrack }); }, [activeSpotifyTrack, getUserKey, user]);
+  useEffect(() => { if (user && dataLoaded) set('settings', { key: 'particleType', value: particleType }); }, [particleType, user, dataLoaded]);
+  useEffect(() => { if (user && dataLoaded) set('settings', { key: 'ambientSound', value: ambientSound }); }, [ambientSound, user, dataLoaded]);
+  useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('browserSession'), value: browserSession }); }, [browserSession, getUserKey, user, dataLoaded]);
+  useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeTrack'), value: activeTrack }); }, [activeTrack, getUserKey, user, dataLoaded]);
+  useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeSpotifyTrack'), value: activeSpotifyTrack }); }, [activeSpotifyTrack, getUserKey, user, dataLoaded]);
 
   const handleSetDailyEncouragement = mutationGuard(async (localHour: number | null) => {
     if (!user) return;
@@ -1866,11 +1866,11 @@ const App: React.FC = () => {
   
   // Active Background Persistence
   useEffect(() => {
-    if (user) {
+    if (user && dataLoaded) {
         if(activeBackground) set('settings', { key: 'activeBackgroundId', value: activeBackground.id });
         else set('settings', { key: 'activeBackgroundId', value: null });
     }
-  }, [activeBackground, user]);
+  }, [activeBackground, user, dataLoaded]);
 
   // --- OneSignal / Notifications ---
   useEffect(() => {
