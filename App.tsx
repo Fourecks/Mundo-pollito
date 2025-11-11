@@ -1138,36 +1138,6 @@ const App: React.FC = () => {
     }));
   }, [folders, notes]);
 
-    // --- Offline Functionality ---
-    useEffect(() => {
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(registration => console.log('Service Worker registered with scope:', registration.scope))
-                    .catch(error => console.error('Service Worker registration failed:', error));
-            });
-        }
-        
-        const handleOnline = async () => {
-            setIsOnline(true);
-            setIsSyncing(true);
-            const { success, errors } = await processSyncQueue();
-            setIsSyncing(false);
-            if (!success) console.error("Sync failed with errors:", errors);
-            else loadData(); // Refresh data from source of truth after successful sync
-        };
-
-        const handleOffline = () => setIsOnline(false);
-
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
-    }, []);
-
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     if (isStandalone) {
@@ -1364,9 +1334,12 @@ const App: React.FC = () => {
         if (s.key === 'particleType') setParticleType(s.value);
         if (s.key === 'ambientSound') setAmbientSound(s.value);
     });
+    
+    setDataLoaded(true);
 
     // If online, fetch from network and update cache
-    if (isOnline) {
+    if (navigator.onLine) {
+      console.log("Fetching fresh data from server...");
       setIsSyncing(true);
       const [
         { data: todosData },
@@ -1425,21 +1398,63 @@ const App: React.FC = () => {
         if(storedActiveTrack) setActiveTrack(storedActiveTrack.value);
         if(storedSpotifyTrack) setActiveSpotifyTrack(storedSpotifyTrack.value);
     } catch(e) { console.error("Error parsing settings from IndexedDB:", e); }
+  }, [user, getUserKey]);
 
-    setDataLoaded(true);
-  }, [user, getUserKey, isOnline]);
-
+  // --- Offline Functionality & Initial Load ---
   useEffect(() => {
-      if (user && !dataLoaded) {
-          initDB(user.email!).then(() => {
-              loadData();
-              if (navigator.onLine) {
-                  setIsOnline(true);
-              }
-          }).catch(err => {
-              console.error("Failed to initialize DB:", err);
-          });
+    if (!user) return; // Only run when user is logged in
+
+    const handleOnline = async () => {
+      setIsOnline(true);
+      console.log("Connection restored. Processing sync queue...");
+      setIsSyncing(true);
+      const { success, errors } = await processSyncQueue();
+      setIsSyncing(false);
+      if (success) {
+        console.log("Sync successful. Reloading data from server.");
+        loadData();
+      } else {
+        console.error("Sync failed with errors:", errors);
+        alert("Hubo un problema al sincronizar tus cambios.");
       }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      console.log("Connection lost. Working offline.");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const startup = async () => {
+      await initDB(user.email!);
+      console.log("DB Initialized.");
+
+      if (navigator.onLine) {
+        setIsOnline(true);
+        console.log("App starting online. Syncing pending changes...");
+        setIsSyncing(true);
+        await processSyncQueue();
+        setIsSyncing(false);
+      } else {
+        setIsOnline(false);
+        console.log("App starting offline.");
+      }
+      
+      // Load data after initial sync attempt.
+      // loadData will fetch from network if online, or just from cache.
+      await loadData();
+    };
+
+    if (!dataLoaded) {
+      startup();
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, [user, dataLoaded, loadData]);
 
   // --- Settings Persistence ---

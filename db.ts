@@ -23,6 +23,9 @@ interface SyncOperation {
 // --- DB Initialization ---
 export const initDB = (username: string): Promise<IDBDatabase> => {
     return new Promise((resolve, reject) => {
+        if (db) {
+            return resolve(db);
+        }
         const dbName = `${DB_NAME_PREFIX}_${username}`;
         const request = indexedDB.open(dbName, DB_VERSION);
 
@@ -133,23 +136,29 @@ export const clearAndPutAll = <T>(storeName: string, data: T[]): Promise<void> =
 // --- Offline Sync Queue Logic ---
 
 const queueMutation = async (op: Omit<SyncOperation, 'id'>) => {
-    switch (op.type) {
-        case 'CREATE': await add(op.tableName, op.payload); break;
-        case 'UPDATE': await set(op.tableName, op.payload); break;
-        case 'DELETE': await remove(op.tableName, op.key!); break;
-        case 'DELETE_ALL': await clearStore(op.tableName); break;
-    }
     await add('sync_queue', op);
 };
 
-export const syncableCreate = (tableName: string, payload: any) => queueMutation({ type: 'CREATE', tableName, payload });
-export const syncableUpdate = (tableName: string, payload: any) => queueMutation({ type: 'UPDATE', tableName, payload });
-export const syncableDelete = (tableName: string, key: number | string) => queueMutation({ type: 'DELETE', tableName, key });
-export const syncableDeleteAll = (tableName: string, userId: string) => queueMutation({ type: 'DELETE_ALL', tableName, userId });
+export const syncableCreate = async (tableName: string, payload: any) => {
+    await add(tableName, payload);
+    await queueMutation({ type: 'CREATE', tableName, payload });
+};
+export const syncableUpdate = async (tableName: string, payload: any) => {
+    await set(tableName, payload);
+    await queueMutation({ type: 'UPDATE', tableName, payload });
+};
+export const syncableDelete = async (tableName: string, key: number | string) => {
+    await remove(tableName, key);
+    await queueMutation({ type: 'DELETE', tableName, key });
+};
+export const syncableDeleteAll = async (tableName: string, userId: string) => {
+    await clearStore(tableName);
+    await queueMutation({ type: 'DELETE_ALL', tableName, userId });
+};
 
 let isSyncing = false;
 export const processSyncQueue = async (): Promise<{ success: boolean; errors: any[] }> => {
-    if (isSyncing) return { success: true, errors: [] };
+    if (isSyncing || !navigator.onLine) return { success: true, errors: [] };
     isSyncing = true;
     console.log("Starting sync process...");
 
@@ -179,17 +188,28 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                 }
                 case 'UPDATE': {
                     let payload = { ...op.payload };
-                    if (payload.id < 0 && tempIdMap.has(payload.id)) {
-                        payload.id = tempIdMap.get(payload.id);
+                    let recordId = payload.id;
+                    
+                    if (typeof recordId === 'number' && recordId < 0) {
+                        if (tempIdMap.has(recordId)) {
+                            recordId = tempIdMap.get(recordId);
+                        } else {
+                            console.warn(`Could not find server ID for temp ID ${recordId}. This may happen if a record is updated before its create operation is synced. The update will be attempted with the temp ID.`);
+                        }
                     }
-                    const { error } = await supabase.from(op.tableName).update(payload).eq('id', payload.id);
+
+                    // Supabase update payload should not contain the primary key or read-only fields.
+                    const { id, created_at, user_id, subtasks, notes, ...updateData } = payload;
+                    
+                    const { error } = await supabase.from(op.tableName).update(updateData).eq('id', recordId);
                     if (error) throw error;
+                    
                     break;
                 }
                 case 'DELETE': {
                     let key = op.key!;
                     if (typeof key === 'number' && key < 0 && tempIdMap.has(key)) {
-                        // This item was created and deleted offline before a sync. Don't try to delete from server.
+                        // This item was created and deleted offline before a sync. No need to delete from server.
                     } else {
                         const { error } = await supabase.from(op.tableName).delete().eq('id', key);
                         if (error) throw error;
