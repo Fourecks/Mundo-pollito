@@ -16,7 +16,7 @@ import FloatingPlayer from './components/FloatingPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
-import { initDB } from './db';
+import { initDB, getAll, clearAndPutAll, get, set } from './db';
 import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
 import Browser from './components/Browser';
@@ -51,7 +51,7 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- OneSignal Configuration ---
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 
 // Helper to format date as YYYY-MM-DD key
@@ -190,6 +190,7 @@ const useMediaQuery = (query: string) => {
 };
 
 interface AppComponentProps {
+  isOnline: boolean;
   currentUser: SupabaseUser;
   onLogout: () => void;
   // Theme
@@ -262,7 +263,7 @@ interface AppComponentProps {
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
-    currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
+    isOnline, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,
@@ -461,6 +462,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         <ParticleLayer type={particleType} />
 
       <header className="fixed top-4 right-4 z-[70000] flex flex-col items-end gap-3">
+        {!isOnline && (
+            <div className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                Sin conexión
+            </div>
+        )}
         <div className={`transition-opacity duration-300 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <button onClick={onLogout} className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-100 hover:text-red-500 p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110" aria-label="Cerrar sesión">
             <LogoutIcon />
@@ -618,7 +624,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 
 const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
-      currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
+      isOnline, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
       activeTrack, activeSpotifyTrack,
@@ -921,6 +927,12 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 <div className="absolute top-0 left-0 w-full h-full bg-gray-50 dark:bg-gray-950 -z-30"/>
             )}
             <ParticleLayer type={particleType} />
+            
+            {!isOnline && (
+                <div className="fixed top-0 left-0 right-0 bg-red-500 text-white text-xs font-bold text-center py-1 z-[90000]">
+                    Sin conexión
+                </div>
+            )}
 
             <main className="flex-grow overflow-y-auto pb-28">
                 {renderContent()}
@@ -1054,12 +1066,17 @@ const App: React.FC = () => {
   
   const settingsSaveTimeout = useRef<number | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   
   // --- ALL SHARED STATE MOVED HERE ---
+  // Data state
   const [allTodos, setAllTodos] = useState<{ [key: string]: Todo[] }>({});
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
+  
+  // UI state
   const [browserSession, setBrowserSession] = useState<BrowserSession>({});
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -1097,6 +1114,26 @@ const App: React.FC = () => {
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isIos, setIsIos] = useState(false);
+  
+    // --- Offline Functionality ---
+    useEffect(() => {
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js', { scope: '/' })
+                .then(registration => console.log('Service Worker registered with scope:', registration.scope))
+                .catch(error => console.error('Service Worker registration failed:', error));
+        }
+
+        // Network status listeners
+        const goOnline = () => setIsOnline(true);
+        const goOffline = () => setIsOnline(false);
+        window.addEventListener('online', goOnline);
+        window.addEventListener('offline', goOffline);
+        return () => {
+            window.removeEventListener('online', goOnline);
+            window.removeEventListener('offline', goOffline);
+        };
+    }, []);
 
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -1195,22 +1232,21 @@ const App: React.FC = () => {
     setThemeColors(prev => {
         const newColors = { ...prev, [colorName]: value };
         applyThemeColors(newColors);
-        // Debounce saving to localStorage
         if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
         settingsSaveTimeout.current = window.setTimeout(() => {
           if (user) {
-              localStorage.setItem(getUserKey('themeColors'), JSON.stringify(newColors));
+              set('settings', { key: 'themeColors', value: newColors });
           }
         }, 500);
         return newColors;
     });
-  }, [applyThemeColors, getUserKey, user]);
+  }, [applyThemeColors, user]);
 
   const handleResetThemeColors = useCallback(() => {
     setThemeColors(DEFAULT_COLORS);
     applyThemeColors(DEFAULT_COLORS);
-    if(user) localStorage.removeItem(getUserKey('themeColors'));
-  }, [applyThemeColors, getUserKey, user]);
+    if(user) set('settings', { key: 'themeColors', value: DEFAULT_COLORS });
+  }, [applyThemeColors, user]);
   
   // Initialize theme on load
   useEffect(() => {
@@ -1226,14 +1262,15 @@ const App: React.FC = () => {
     }
 
     if (user) {
-        const savedColors = localStorage.getItem(getUserKey('themeColors'));
-        const initialColors = savedColors ? JSON.parse(savedColors) : DEFAULT_COLORS;
-        setThemeColors(initialColors);
-        applyThemeColors(initialColors);
+        get<{key: string, value: ThemeColors}>('settings', 'themeColors').then(savedColors => {
+            const initialColors = savedColors ? savedColors.value : DEFAULT_COLORS;
+            setThemeColors(initialColors);
+            applyThemeColors(initialColors);
+        });
     } else {
         applyThemeColors(DEFAULT_COLORS);
     }
-}, [user, getUserKey, applyThemeColors]);
+}, [user, applyThemeColors]);
 
   // --- Auth & Data Loading ---
   useEffect(() => {
@@ -1249,7 +1286,7 @@ const App: React.FC = () => {
         if(!session) { // If logged out
             setDataLoaded(false);
             // Reset all state
-            setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]);
+            setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
             setGalleryImages([]); setUserBackgrounds([]);
             setActiveBackground(null); setSavedActiveBgId(null);
             setGdriveToken(null);
@@ -1263,102 +1300,125 @@ const App: React.FC = () => {
     const { error } = await supabase.auth.signOut();
     if (error) console.error('Error logging out:', error.message);
   }, []);
+  
+   const showOfflineWarning = () => {
+        alert("Estás sin conexión. No puedes guardar cambios hasta que vuelvas a tener internet.");
+    };
+
+    const mutationGuard = (func: Function) => async (...args: any[]) => {
+        if (!isOnline) {
+            showOfflineWarning();
+            return;
+        }
+        return func(...args);
+    };
 
   const loadData = useCallback(async () => {
     if (!user) return;
     
-    const [
-      { data: todosData, error: todosError },
-      { data: foldersData, error: foldersError },
-      { data: playlistsData, error: playlistsError },
-      { data: quickNotesData, error: quickNotesError },
-      { data: profileData, error: profileError }
-    ] = await Promise.all([
-      supabase.from('todos').select('*, subtasks(*)').order('created_at'),
-      supabase.from('folders').select('*, notes(*)').order('created_at').order('created_at', { foreignTable: 'notes', ascending: true }),
-      supabase.from('playlists').select('*').order('created_at'),
-      supabase.from('quick_notes').select('*').order('created_at'),
-      supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings').eq('id', user.id).single(),
+    // 1. Load from cache first for instant UI
+    const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedSettings] = await Promise.all([
+        getAll<Todo>('todos'),
+        getAll<Folder>('folders'),
+        getAll<Note>('notes'),
+        getAll<Playlist>('playlists'),
+        getAll<QuickNote>('quick_notes'),
+        getAll<{key: string, value: any}>('settings'),
     ]);
 
-    const currentUserTimezoneOffset = new Date().getTimezoneOffset();
-    const { error: profileUpdateError } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, timezone_offset: currentUserTimezoneOffset });
-    if (profileUpdateError) {
-        console.error("Error saving user timezone:", profileUpdateError);
-    }
+    const todosByDate: { [key: string]: Todo[] } = {};
+    cachedTodos.forEach(todo => {
+        const dateKey = todo.due_date ? todo.due_date : formatDateKey(new Date(todo.created_at!));
+        if (!todosByDate[dateKey]) todosByDate[dateKey] = [];
+        todosByDate[dateKey].push(todo);
+    });
+    setAllTodos(todosByDate);
+    setFolders(cachedFolders);
+    setNotes(cachedNotes);
+    setPlaylists(cachedPlaylists);
+    setQuickNotes(cachedQuickNotes);
 
-    if (todosError) console.error("Error loading todos:", todosError);
-    else if (todosData) {
-        const todosByDate: { [key: string]: Todo[] } = {};
+    // Apply cached settings
+    cachedSettings.forEach(s => {
+        if (s.key === 'pomodoroState') setPomodoroState(p => ({...p, ...s.value, isActive: false, endTime: null}));
+        if (s.key === 'particleType') setParticleType(s.value);
+        if (s.key === 'ambientSound') setAmbientSound(s.value);
+    });
+
+    // 2. If online, fetch from network and update cache
+    if (isOnline) {
+      const [
+        { data: todosData, error: todosError },
+        { data: foldersData, error: foldersError },
+        { data: notesData, error: notesError },
+        { data: playlistsData, error: playlistsError },
+        { data: quickNotesData, error: quickNotesError },
+        { data: profileData, error: profileError }
+      ] = await Promise.all([
+        supabase.from('todos').select('*, subtasks(*)').order('created_at'),
+        supabase.from('folders').select('*').order('created_at'),
+        supabase.from('notes').select('*').order('created_at'),
+        supabase.from('playlists').select('*').order('created_at'),
+        supabase.from('quick_notes').select('*').order('created_at'),
+        supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings').eq('id', user.id).single(),
+      ]);
+      
+      if (todosData) {
+        const networkTodosByDate: { [key: string]: Todo[] } = {};
         todosData.forEach(todo => {
             const dateKey = todo.due_date ? todo.due_date : formatDateKey(new Date(todo.created_at));
-            if (!todosByDate[dateKey]) todosByDate[dateKey] = [];
-            todosByDate[dateKey].push(todo);
+            if (!networkTodosByDate[dateKey]) networkTodosByDate[dateKey] = [];
+            networkTodosByDate[dateKey].push(todo);
         });
-        setAllTodos(todosByDate);
-    }
-    
-    if (foldersError) console.error("Error loading folders:", foldersError);
-    else setFolders(foldersData || []);
+        setAllTodos(networkTodosByDate);
+        clearAndPutAll('todos', todosData);
+      }
+      if(foldersData) { setFolders(foldersData); clearAndPutAll('folders', foldersData); }
+      if(notesData) { setNotes(notesData); clearAndPutAll('notes', notesData); }
+      if(playlistsData) { setPlaylists(playlistsData); clearAndPutAll('playlists', playlistsData); }
+      if(quickNotesData) { setQuickNotes(quickNotesData); clearAndPutAll('quick_notes', quickNotesData); }
 
-    if (playlistsError) console.error("Error loading playlists:", playlistsError);
-    else setPlaylists(playlistsData || []);
-    
-    if (quickNotesError) console.error("Error loading quick notes:", quickNotesError);
-    else setQuickNotes(quickNotesData || []);
-    
-    if (profileError && profileError.code !== 'PGRST116') {
-      console.error("Error loading profile data:", profileError);
-    } else if (profileData) {
-      setDailyEncouragementLocalHour(profileData.daily_encouragement_hour_local);
-      if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
-        const savedSettings = profileData.pomodoro_settings as Partial<typeof pomodoroState>;
-        setPomodoroState(s => {
-            const finalDurations = savedSettings.durations || s.durations;
-            const finalMode = s.mode; 
-            return {
+      if(profileData) {
+        setDailyEncouragementLocalHour(profileData.daily_encouragement_hour_local);
+        if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
+            const savedSettings = profileData.pomodoro_settings as Partial<typeof pomodoroState>;
+            setPomodoroState(s => ({
                 ...s,
-                durations: finalDurations,
+                durations: savedSettings.durations || s.durations,
                 showBackgroundTimer: savedSettings.showBackgroundTimer ?? s.showBackgroundTimer,
                 backgroundTimerOpacity: savedSettings.backgroundTimerOpacity ?? s.showBackgroundTimer,
-                timeLeft: finalDurations[finalMode],
-                isActive: false,
-                endTime: null,
-            };
-        });
+                timeLeft: (savedSettings.durations || s.durations)[s.mode],
+                isActive: false, endTime: null,
+            }));
+        }
       }
     }
     
     try {
-        const storedActiveBgId = localStorage.getItem(getUserKey('activeBackgroundId'));
-        if (storedActiveBgId) setSavedActiveBgId(storedActiveBgId);
-
-        const storedParticles = localStorage.getItem(getUserKey('particleType'));
-        if (storedParticles) setParticleType(storedParticles as ParticleType);
-        
-        const storedAmbience = localStorage.getItem(getUserKey('ambientSound'));
-        if (storedAmbience) setAmbientSound(JSON.parse(storedAmbience));
-
-        const storedBrowserSession = localStorage.getItem(getUserKey('browserSession'));
-        if (storedBrowserSession) setBrowserSession(JSON.parse(storedBrowserSession));
-        
-        const storedActiveTrack = localStorage.getItem(getUserKey('activeTrack'));
-        if(storedActiveTrack) setActiveTrack(JSON.parse(storedActiveTrack));
-        
-        const storedSpotifyTrack = localStorage.getItem(getUserKey('activeSpotifyTrack'));
-        if(storedSpotifyTrack) setActiveSpotifyTrack(JSON.parse(storedSpotifyTrack));
-
-    } catch(e) { console.error("Error parsing settings from localStorage:", e); }
+        const [ storedActiveBgId, storedParticles, storedAmbience, storedBrowser, storedActiveTrack, storedSpotifyTrack] = await Promise.all([
+            get<{key: string, value: string}>('settings', 'activeBackgroundId'),
+            get<{key: string, value: ParticleType}>('settings', 'particleType'),
+            get<{key: string, value: any}>('settings', 'ambientSound'),
+            get<{key: string, value: BrowserSession}>('settings', getUserKey('browserSession')),
+            get<{key: string, value: Playlist}>('settings', getUserKey('activeTrack')),
+            get<{key: string, value: Playlist}>('settings', getUserKey('activeSpotifyTrack')),
+        ]);
+        if (storedActiveBgId) setSavedActiveBgId(storedActiveBgId.value);
+        if (storedParticles) setParticleType(storedParticles.value);
+        if (storedAmbience) setAmbientSound(storedAmbience.value);
+        if (storedBrowser) setBrowserSession(storedBrowser.value);
+        if(storedActiveTrack) setActiveTrack(storedActiveTrack.value);
+        if(storedSpotifyTrack) setActiveSpotifyTrack(storedSpotifyTrack.value);
+    } catch(e) { console.error("Error parsing settings from IndexedDB:", e); }
 
     setDataLoaded(true);
-  }, [user, getUserKey]);
+  }, [user, getUserKey, isOnline]);
 
   useEffect(() => {
       if (user && !dataLoaded) {
-          initDB(user.email!);
-          loadData();
+          initDB(user.email!).then(() => {
+              loadData();
+          });
       }
   }, [user, dataLoaded, loadData]);
 
@@ -1369,376 +1429,245 @@ const App: React.FC = () => {
       settingsSaveTimeout.current = window.setTimeout(async () => {
         const { durations, showBackgroundTimer, backgroundTimerOpacity } = pomodoroState;
         const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity };
-        const { error } = await supabase
-          .from('profiles')
-          .update({ pomodoro_settings: settingsToSave })
-          .eq('id', user.id);
-        if (error) {
-          console.error("Error saving pomodoro settings:", error);
+        set('settings', { key: 'pomodoroState', value: settingsToSave });
+        if(isOnline) {
+          await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
         }
       }, 1500);
     }
-    return () => {
-      if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-    };
-  }, [pomodoroState, user, dataLoaded]);
+    return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
+  }, [pomodoroState, user, dataLoaded, isOnline]);
 
-  useEffect(() => { if (user) localStorage.setItem(getUserKey('particleType'), particleType); }, [particleType, getUserKey, user]);
-  useEffect(() => { if (user) localStorage.setItem(getUserKey('ambientSound'), JSON.stringify(ambientSound)); }, [ambientSound, getUserKey, user]);
-  useEffect(() => { if (user) localStorage.setItem(getUserKey('browserSession'), JSON.stringify(browserSession)); }, [browserSession, getUserKey, user]);
-  useEffect(() => { if (user) localStorage.setItem(getUserKey('activeTrack'), JSON.stringify(activeTrack)); }, [activeTrack, getUserKey, user]);
-  useEffect(() => { if (user) localStorage.setItem(getUserKey('activeSpotifyTrack'), JSON.stringify(activeSpotifyTrack)); }, [activeSpotifyTrack, getUserKey, user]);
+  useEffect(() => { if (user) set('settings', { key: 'particleType', value: particleType }); }, [particleType, user]);
+  useEffect(() => { if (user) set('settings', { key: 'ambientSound', value: ambientSound }); }, [ambientSound, user]);
+  useEffect(() => { if (user) set('settings', { key: getUserKey('browserSession'), value: browserSession }); }, [browserSession, getUserKey, user]);
+  useEffect(() => { if (user) set('settings', { key: getUserKey('activeTrack'), value: activeTrack }); }, [activeTrack, getUserKey, user]);
+  useEffect(() => { if (user) set('settings', { key: getUserKey('activeSpotifyTrack'), value: activeSpotifyTrack }); }, [activeSpotifyTrack, getUserKey, user]);
 
-
-  const handleSetDailyEncouragement = async (localHour: number | null) => {
+  const handleSetDailyEncouragement = mutationGuard(async (localHour: number | null) => {
     if (!user) return;
-    
-    // Optimistic UI update
     setDailyEncouragementLocalHour(localHour);
-
-    const { error } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, daily_encouragement_hour_local: localHour });
-
-    if (error) {
-        console.error("Error saving daily encouragement time:", error);
-    }
-  }
+    await supabase.from('profiles').upsert({ id: user.id, daily_encouragement_hour_local: localHour });
+  });
   
   // --- Data Handlers ---
-  const handleAddTodo = async (text: string) => {
+  const handleAddTodo = mutationGuard(async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
     const newTodo: Omit<Todo, 'id' | 'created_at'> = { text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id };
     const { data, error } = await supabase.from('todos').insert(newTodo).select('*, subtasks(*)').single();
     if (error) console.error("Error adding todo:", error);
     else if (data) {
-        setAllTodos(currentTodos => ({
-            ...currentTodos,
-            [dateKey]: [...(currentTodos[dateKey] || []), data]
-        }));
+        setAllTodos(currentTodos => ({ ...currentTodos, [dateKey]: [...(currentTodos[dateKey] || []), data] }));
+        getAll<Todo>('todos').then(todos => clearAndPutAll('todos', [...todos, data]));
     }
-  };
+  });
 
-  const handleUpdateTodo = async (updatedTodo: Todo) => {
-    // 1. Find original todo to compare subtasks
+  const handleUpdateTodo = mutationGuard(async (updatedTodo: Todo) => {
     let originalTodo: Todo | undefined;
     for (const key in allTodos) {
         originalTodo = allTodos[key].find(t => t.id === updatedTodo.id);
         if (originalTodo) break;
     }
+    if (!originalTodo) { console.error("Original todo not found for update."); return; }
 
-    if (!originalTodo) {
-        console.error("Original todo not found for update.");
-        return; // Or handle error appropriately
-    }
-
-    // 2. Determine which subtasks to delete
     const originalSubtaskIds = new Set(originalTodo.subtasks?.map(st => st.id) || []);
-    const newSubtaskIds = new Set(updatedTodo.subtasks?.map(st => st.id).filter(id => id < 1000000000) || []); // Filter out temporary new IDs
+    const newSubtaskIds = new Set(updatedTodo.subtasks?.map(st => st.id).filter(id => id < 1000000000) || []);
     const subtasksToDelete = [...originalSubtaskIds].filter(id => !newSubtaskIds.has(id));
 
-    // 3. Prepare all DB operations
-    const dbPromises = [];
-
-    // Delete subtasks
-    if (subtasksToDelete.length > 0) {
-        dbPromises.push(supabase.from('subtasks').delete().in('id', subtasksToDelete));
-    }
-
-    // Upsert remaining/new subtasks
+    if (subtasksToDelete.length > 0) await supabase.from('subtasks').delete().in('id', subtasksToDelete);
     if (updatedTodo.subtasks && updatedTodo.subtasks.length > 0) {
-        const upserts = updatedTodo.subtasks.map(st => ({
-            ...(st.id < 1000000000 && { id: st.id }), // Only include ID if it's not a temporary new one
-            text: st.text,
-            completed: st.completed,
-            todo_id: updatedTodo.id,
-        }));
-        dbPromises.push(supabase.from('subtasks').upsert(upserts));
+        const upserts = updatedTodo.subtasks.map(st => ({ ...(st.id < 1000000000 && { id: st.id }), text: st.text, completed: st.completed, todo_id: updatedTodo.id, }));
+        await supabase.from('subtasks').upsert(upserts);
     }
     
-    // Update the main todo item (excluding subtasks)
     const { subtasks, ...todoForUpdate } = updatedTodo;
-    dbPromises.push(supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id));
+    await supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id);
 
-    // 4. Execute all operations and handle errors
-    const results = await Promise.all(dbPromises);
-    results.forEach(result => {
-        if (result.error) {
-            console.error("Error during batch todo update:", result.error);
-            // Optionally, handle rollback or error notification
-        }
-    });
-
-    // 5. Refresh local state from DB to ensure consistency
     const { data: refreshedTodo, error: refreshError } = await supabase.from('todos').select('*, subtasks(*)').eq('id', updatedTodo.id).single();
-    
-    if (refreshError || !refreshedTodo) {
-        console.error("Error refreshing todo after update:", refreshError);
-        updateLocalTodos(updatedTodo); // Fallback to optimistic update if refresh fails
-        return;
-    }
-
+    if (refreshError || !refreshedTodo) { updateLocalTodos(updatedTodo); return; }
     updateLocalTodos(refreshedTodo);
-};
+});
 
-  // Helper function to update local state, now separate to handle both optimistic and refreshed data
   const updateLocalTodos = (todoToUpdate: Todo) => {
        setAllTodos(current => {
           let originalDateKey: string | null = null;
+          let newAllTodos = { ...current };
           
-          for (const key in current) {
-              if (current[key].find(t => t.id === todoToUpdate.id)) {
-                  originalDateKey = key;
-                  break;
-              }
-          }
+          for (const key in current) { if (current[key].find(t => t.id === todoToUpdate.id)) { originalDateKey = key; break; } }
           
           const newDateKey = todoToUpdate.due_date || formatDateKey(new Date(todoToUpdate.created_at!));
-          const newAllTodos = { ...current };
 
-          if (originalDateKey && originalDateKey !== newDateKey) {
-              newAllTodos[originalDateKey] = (newAllTodos[originalDateKey] || []).filter(t => t.id !== todoToUpdate.id);
-              if (newAllTodos[originalDateKey].length === 0) delete newAllTodos[originalDateKey];
-              
-              newAllTodos[newDateKey] = [...(newAllTodos[newDateKey] || []), todoToUpdate];
-          } else if (originalDateKey) {
-              newAllTodos[originalDateKey] = (newAllTodos[originalDateKey] || []).map(t =>
-                  t.id === todoToUpdate.id ? todoToUpdate : t
-              );
-          } else { // Todo not found, likely a new todo or date was changed from a non-loaded date
-              newAllTodos[newDateKey] = [...(newAllTodos[newDateKey] || []), todoToUpdate];
-          }
-
+          if (originalDateKey) { newAllTodos[originalDateKey] = (newAllTodos[originalDateKey] || []).filter(t => t.id !== todoToUpdate.id); if (newAllTodos[originalDateKey].length === 0) delete newAllTodos[originalDateKey]; }
+          
+          newAllTodos[newDateKey] = [...(newAllTodos[newDateKey] || []), todoToUpdate];
+          
+          getAll<Todo>('todos').then(todos => {
+              const updatedCache = todos.filter(t => t.id !== todoToUpdate.id);
+              updatedCache.push(todoToUpdate);
+              clearAndPutAll('todos', updatedCache);
+          });
           return newAllTodos;
       });
   }
 
-
-  const handleToggleTodo = async (id: number, onAllCompleted: (quote: string) => void) => {
+  const handleToggleTodo = mutationGuard(async (id: number, onAllCompleted: (quote: string) => void) => {
     let dateKey = '';
     let todoToToggle: Todo | undefined;
-    for (const key in allTodos) {
-      const foundTodo = allTodos[key].find(t => t.id === id);
-      if (foundTodo) {
-        dateKey = key;
-        todoToToggle = foundTodo;
-        break;
-      }
-    }
+    for (const key in allTodos) { const foundTodo = allTodos[key].find(t => t.id === id); if (foundTodo) { dateKey = key; todoToToggle = foundTodo; break; } }
     if (!todoToToggle || !dateKey) return;
-    
     const newCompletedState = !todoToToggle.completed;
-
-    // Sync subtasks completion state with parent
     const updatedSubtasks = (todoToToggle.subtasks || []).map(st => ({ ...st, completed: newCompletedState }));
     const updatedTodo = { ...todoToToggle, completed: newCompletedState, subtasks: updatedSubtasks };
-
-    // Create the new list for the date to use for confetti check
     const newTodosForDate = allTodos[dateKey].map(t => t.id === id ? updatedTodo : t);
-    
-    // Optimistic UI update
-    setAllTodos(current => ({
-      ...current,
-      [dateKey]: newTodosForDate,
-    }));
+    setAllTodos(current => ({ ...current, [dateKey]: newTodosForDate }));
+    updateLocalTodos(updatedTodo);
 
-    // Update database for both parent and subtasks
-    const { error } = await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id);
-    if (error) console.error("Error toggling todo:", error);
-    
+    await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id);
     if (updatedSubtasks.length > 0) {
         const subtaskUpdates = updatedSubtasks.map(st => ({ id: st.id, completed: newCompletedState, todo_id: id }));
-        const { error: subtaskError } = await supabase.from('subtasks').upsert(subtaskUpdates);
-        if (subtaskError) console.error("Error syncing subtasks:", subtaskError);
+        await supabase.from('subtasks').upsert(subtaskUpdates);
     }
 
-    // Generate recurring tasks if needed
     if (newCompletedState && updatedTodo.recurrence && updatedTodo.recurrence.frequency !== 'none') {
         const newTodos = await generateRecurringTasks(updatedTodo, allTodos);
         setAllTodos(newTodos);
     }
     
-    // Check for confetti using the new list
     if (newCompletedState && newTodosForDate.every(t => t.completed)) {
         triggerConfetti();
         onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
     }
-  };
+  });
   
-  const handleToggleSubtask = async (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => {
+  const handleToggleSubtask = mutationGuard(async (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => {
       let dateKey = '';
       let todoToUpdate: Todo | undefined;
-      for (const key in allTodos) {
-          const foundTodo = allTodos[key].find(t => t.id === taskId);
-          if (foundTodo) {
-              dateKey = key;
-              todoToUpdate = foundTodo;
-              break;
-          }
-      }
+      for (const key in allTodos) { const foundTodo = allTodos[key].find(t => t.id === taskId); if (foundTodo) { dateKey = key; todoToUpdate = foundTodo; break; } }
       if (!todoToUpdate || !dateKey) return;
-
       const newSubtasks = (todoToUpdate.subtasks || []).map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st);
-      
       const allSubtasksCompleted = newSubtasks.length > 0 && newSubtasks.every(st => st.completed);
       const parentCompleted = allSubtasksCompleted;
-
       const updatedTodo = { ...todoToUpdate, subtasks: newSubtasks, completed: parentCompleted };
-
-      // Create the new list for the date to avoid stale state issues with confetti
       const newTodosForDate = allTodos[dateKey].map(t => t.id === taskId ? updatedTodo : t);
-
-      // Optimistic UI update
-      setAllTodos(current => ({
-          ...current,
-          [dateKey]: newTodosForDate,
-      }));
+      setAllTodos(current => ({ ...current, [dateKey]: newTodosForDate, }));
+      updateLocalTodos(updatedTodo);
       
-      // Update database for subtask
       const subtaskToUpdate = newSubtasks.find(st => st.id === subtaskId);
-      if (subtaskToUpdate) {
-          const { error } = await supabase.from('subtasks').update({ completed: subtaskToUpdate.completed }).eq('id', subtaskId);
-          if (error) console.error("Error updating subtask:", error);
-      }
-      
-      // Update database for parent task if its state changed
-      if (todoToUpdate.completed !== parentCompleted) {
-          const { error: todoError } = await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId);
-          if (todoError) console.error("Error updating parent todo status:", todoError);
-      }
+      if (subtaskToUpdate) await supabase.from('subtasks').update({ completed: subtaskToUpdate.completed }).eq('id', subtaskId);
+      if (todoToUpdate.completed !== parentCompleted) await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId);
 
-      // Check for confetti with the updated list to ensure correctness
       if (parentCompleted && newTodosForDate.every(t => t.completed)) {
           triggerConfetti();
           onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
       }
-  };
+  });
 
-  const handleDeleteTodo = async (id: number) => {
-      // Optimistically find which date array the todo is in
+  const handleDeleteTodo = mutationGuard(async (id: number) => {
       let dateKeyToDelete: string | null = null;
-      for(const key in allTodos) {
-          if(allTodos[key].some(t => t.id === id)) {
-              dateKeyToDelete = key;
-              break;
-          }
-      }
-
-      // Optimistic UI update
+      for(const key in allTodos) { if(allTodos[key].some(t => t.id === id)) { dateKeyToDelete = key; break; } }
       if (dateKeyToDelete) {
           setAllTodos(current => {
               const newAllTodos = { ...current };
               const updatedTodosForDate = newAllTodos[dateKeyToDelete!].filter(t => t.id !== id);
-              
-              if (updatedTodosForDate.length > 0) {
-                  newAllTodos[dateKeyToDelete!] = updatedTodosForDate;
-              } else {
-                  delete newAllTodos[dateKeyToDelete!]; // Clean up empty array
-              }
+              if (updatedTodosForDate.length > 0) newAllTodos[dateKeyToDelete!] = updatedTodosForDate;
+              else delete newAllTodos[dateKeyToDelete!];
               return newAllTodos;
           });
       }
+      await supabase.from('todos').delete().eq('id', id);
+      getAll<Todo>('todos').then(todos => clearAndPutAll('todos', todos.filter(t => t.id !== id)));
+  });
 
-      // Update database
-      const { error } = await supabase.from('todos').delete().eq('id', id);
-      if (error) {
-          console.error("Error deleting todo:", error);
-          // TODO: Add logic to revert the optimistic update if needed
-      }
-  };
-
-  const handleAddFolder = async (name: string): Promise<Folder | null> => {
+  const handleAddFolder = mutationGuard(async (name: string): Promise<Folder | null> => {
       if (!user) return null;
       const { data, error } = await supabase.from('folders').insert({ name, user_id: user.id }).select().single();
       if (error) { console.error("Error adding folder:", error); return null; }
       if (data) {
           setFolders(f => [...f, { ...data, notes: [] }]);
+          getAll<Folder>('folders').then(folders => clearAndPutAll('folders', [...folders, data]));
           return { ...data, notes: [] };
       }
       return null;
-  };
-  const handleUpdateFolder = async (folderId: number, name: string) => {
+  });
+  const handleUpdateFolder = mutationGuard(async (folderId: number, name: string) => {
       if (!user) return;
-      const { error } = await supabase.from('folders').update({ name }).eq('id', folderId);
-      if (error) {
-          console.error("Error updating folder:", error);
-      } else {
-          setFolders(f => f.map(folder => folder.id === folderId ? { ...folder, name } : folder));
-      }
-  };
-  const handleDeleteFolder = async (folderId: number) => {
+      await supabase.from('folders').update({ name }).eq('id', folderId);
+      setFolders(f => f.map(folder => folder.id === folderId ? { ...folder, name } : folder));
+      getAll<Folder>('folders').then(folders => clearAndPutAll('folders', folders.map(f => f.id === folderId ? {...f, name} : f)));
+  });
+  const handleDeleteFolder = mutationGuard(async (folderId: number) => {
       if (!user) return;
-      const { error } = await supabase.from('folders').delete().eq('id', folderId);
-      if (error) {
-          console.error("Error deleting folder:", error);
-      } else {
-          setFolders(f => f.filter(folder => folder.id !== folderId));
-      }
-  };
+      await supabase.from('folders').delete().eq('id', folderId);
+      setFolders(f => f.filter(folder => folder.id !== folderId));
+      getAll<Folder>('folders').then(folders => clearAndPutAll('folders', folders.filter(f => f.id !== folderId)));
+  });
   
-  const handleAddNote = async (folderId: number): Promise<Note | null> => {
+  const handleAddNote = mutationGuard(async (folderId: number): Promise<Note | null> => {
     if (!user) return null;
     const newNote = { folder_id: folderId, user_id: user.id, title: 'Nueva Nota', content: '' };
     const { data, error } = await supabase.from('notes').insert(newNote).select().single();
     if (error) { console.error("Error adding note:", error); return null; }
     if (data) {
-        setFolders(currentFolders => currentFolders.map(f => f.id === folderId ? { ...f, notes: [...f.notes, data] } : f));
+        setNotes(n => [...n, data]);
+        getAll<Note>('notes').then(notes => clearAndPutAll('notes', [...notes, data]));
         return data;
     }
     return null;
-  };
+  });
 
-  const handleUpdateNote = async (note: Note) => {
-    const { error } = await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id);
-    if (error) { console.error("Error updating note:", error); }
-    else {
-        setFolders(currentFolders => currentFolders.map(f => f.id === note.folder_id ? { ...f, notes: f.notes.map(n => n.id === note.id ? note : n) } : f));
-    }
-  };
+  const handleUpdateNote = mutationGuard(async (note: Note) => {
+    await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id);
+    setNotes(n => n.map(item => item.id === note.id ? note : item));
+    getAll<Note>('notes').then(notes => clearAndPutAll('notes', notes.map(n => n.id === note.id ? note : n)));
+  });
 
-  const handleDeleteNote = async (noteId: number, folderId: number) => {
-    const { error } = await supabase.from('notes').delete().eq('id', noteId);
-    if (error) { console.error("Error deleting note:", error); }
-    else {
-        setFolders(currentFolders => currentFolders.map(f => f.id === folderId ? { ...f, notes: f.notes.filter(n => n.id !== noteId) } : f));
-    }
-  };
+  const handleDeleteNote = mutationGuard(async (noteId: number, folderId: number) => {
+    await supabase.from('notes').delete().eq('id', noteId);
+    setNotes(n => n.filter(item => item.id !== noteId));
+    getAll<Note>('notes').then(notes => clearAndPutAll('notes', notes.filter(n => n.id !== noteId)));
+  });
   
-  const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
+  const handleAddPlaylist = mutationGuard(async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
     if (!user) return;
     const { data, error } = await supabase.from('playlists').insert({...playlistData, user_id: user.id}).select().single();
     if (error) console.error("Error adding playlist:", error);
-    else if(data) setPlaylists(p => [...p, data]);
-  };
-  const handleUpdatePlaylist = async (playlist: Playlist) => {
-      const { error } = await supabase.from('playlists').update(playlist).eq('id', playlist.id);
-      if (error) console.error("Error updating playlist:", error);
-      else setPlaylists(p => p.map(item => item.id === playlist.id ? playlist : item));
-  };
-  const handleDeletePlaylist = async (playlistId: number) => {
-      const { error } = await supabase.from('playlists').delete().eq('id', playlistId);
-      if (error) console.error("Error deleting playlist:", error);
-      else setPlaylists(p => p.filter(item => item.id !== playlistId));
-  };
+    else if(data) {
+        setPlaylists(p => [...p, data]);
+        getAll<Playlist>('playlists').then(playlists => clearAndPutAll('playlists', [...playlists, data]));
+    }
+  });
+  const handleUpdatePlaylist = mutationGuard(async (playlist: Playlist) => {
+      await supabase.from('playlists').update(playlist).eq('id', playlist.id);
+      setPlaylists(p => p.map(item => item.id === playlist.id ? playlist : item));
+      getAll<Playlist>('playlists').then(playlists => clearAndPutAll('playlists', playlists.map(p => p.id === playlist.id ? playlist : p)));
+  });
+  const handleDeletePlaylist = mutationGuard(async (playlistId: number) => {
+      await supabase.from('playlists').delete().eq('id', playlistId);
+      setPlaylists(p => p.filter(item => item.id !== playlistId));
+       getAll<Playlist>('playlists').then(playlists => clearAndPutAll('playlists', playlists.filter(p => p.id !== playlistId)));
+  });
   
-  const handleAddQuickNote = async (text: string) => {
+  const handleAddQuickNote = mutationGuard(async (text: string) => {
       if(!user) return;
       const {data, error} = await supabase.from('quick_notes').insert({text, user_id: user.id}).select().single();
       if(error) console.error("Error adding quick note:", error);
-      else if (data) setQuickNotes(qn => [...qn, data]);
-  };
-  const handleDeleteQuickNote = async (id: number) => {
-      const {error} = await supabase.from('quick_notes').delete().eq('id', id);
-      if(error) console.error("Error deleting quick note:", error);
-      else setQuickNotes(qn => qn.filter(note => note.id !== id));
-  };
-  const handleClearAllQuickNotes = async () => {
+      else if (data) {
+          setQuickNotes(qn => [...qn, data]);
+          getAll<QuickNote>('quick_notes').then(notes => clearAndPutAll('quick_notes', [...notes, data]));
+      }
+  });
+  const handleDeleteQuickNote = mutationGuard(async (id: number) => {
+      await supabase.from('quick_notes').delete().eq('id', id);
+      setQuickNotes(qn => qn.filter(note => note.id !== id));
+      getAll<QuickNote>('quick_notes').then(notes => clearAndPutAll('quick_notes', notes.filter(n => n.id !== id)));
+  });
+  const handleClearAllQuickNotes = mutationGuard(async () => {
     if(!user) return;
-    const {error} = await supabase.from('quick_notes').delete().eq('user_id', user.id);
-    if(error) console.error("Error clearing all quick notes:", error);
-    else setQuickNotes([]);
-  };
+    await supabase.from('quick_notes').delete().eq('user_id', user.id);
+    setQuickNotes([]);
+    clearAndPutAll('quick_notes', []);
+  });
 
   // --- Google Drive Integration ---
   const gapiLoadCallback = useCallback(() => {
@@ -1862,11 +1791,11 @@ const App: React.FC = () => {
   }, [gdriveToken, findOrCreateAppFolder, savedActiveBgId]);
   
   useEffect(() => {
-      if (gdriveToken) {
+      if (gdriveToken && isOnline) {
           loadFilesFromDrive('gallery');
           loadFilesFromDrive('backgrounds');
       }
-  }, [gdriveToken, loadFilesFromDrive]);
+  }, [gdriveToken, loadFilesFromDrive, isOnline]);
   
   const uploadFileToDrive = useCallback(async (file: File, folderName: 'gallery' | 'backgrounds'): Promise<any> => {
       const parentFolderId = await findOrCreateAppFolder();
@@ -1894,7 +1823,7 @@ const App: React.FC = () => {
       return response.json();
   }, [gdriveToken, findOrCreateAppFolder]);
 
-  const handleAddGalleryImages = async (files: File[]) => {
+  const handleAddGalleryImages = mutationGuard(async (files: File[]) => {
       setGalleryIsLoading(true);
       try {
           const uploadPromises = files.map(file => uploadFileToDrive(file, 'gallery'));
@@ -1902,8 +1831,8 @@ const App: React.FC = () => {
           await loadFilesFromDrive('gallery');
       } catch (error) { console.error("Error uploading images:", error); }
       finally { setGalleryIsLoading(false); }
-  };
-  const handleDeleteFile = async (id: string, folderName: 'gallery' | 'backgrounds') => {
+  });
+  const handleDeleteFile = mutationGuard(async (id: string, folderName: 'gallery' | 'backgrounds') => {
       try {
           await window.gapi.client.drive.files.delete({ fileId: id });
           if(folderName === 'gallery') setGalleryImages(i => i.filter(img => img.id !== id));
@@ -1912,17 +1841,17 @@ const App: React.FC = () => {
               if(activeBackground?.id === id) setActiveBackground(null);
           }
       } catch (error) { console.error(`Error deleting ${folderName} item:`, error); }
-  };
+  });
   
-  const handleAddBackground = async (file: File) => {
+  const handleAddBackground = mutationGuard(async (file: File) => {
       setBackgroundsAreLoading(true);
       try {
           await uploadFileToDrive(file, 'backgrounds');
           await loadFilesFromDrive('backgrounds');
       } catch (error) { console.error("Error uploading background:", error); }
       finally { setBackgroundsAreLoading(false); }
-  };
-  const handleToggleFavoriteBackground = async (id: string) => {
+  });
+  const handleToggleFavoriteBackground = mutationGuard(async (id: string) => {
     const bg = userBackgrounds.find(b => b.id === id);
     if (!bg) return;
     const isFavorite = !bg.isFavorite;
@@ -1933,15 +1862,15 @@ const App: React.FC = () => {
         });
         setUserBackgrounds(bgs => bgs.map(b => b.id === id ? { ...b, isFavorite } : b));
     } catch (error) { console.error("Error favoriting background:", error); }
-  };
+  });
   
   // Active Background Persistence
   useEffect(() => {
     if (user) {
-        if(activeBackground) localStorage.setItem(getUserKey('activeBackgroundId'), activeBackground.id);
-        else localStorage.removeItem(getUserKey('activeBackgroundId'));
+        if(activeBackground) set('settings', { key: 'activeBackgroundId', value: activeBackground.id });
+        else set('settings', { key: 'activeBackgroundId', value: null });
     }
-  }, [activeBackground, user, getUserKey]);
+  }, [activeBackground, user]);
 
   // --- OneSignal / Notifications ---
   useEffect(() => {
@@ -1988,7 +1917,7 @@ const App: React.FC = () => {
     };
 }, [user?.id]);
 
-  const handleNotificationAction = async () => {
+  const handleNotificationAction = mutationGuard(async () => {
       const OneSignal = window.OneSignal;
       if (!OneSignal) return;
 
@@ -2008,15 +1937,13 @@ const App: React.FC = () => {
               if (error) {
                   console.error("Error sending test notification:", error);
                   alert("Error al enviar la notificación de prueba.");
-              } else {
-                  // No need for an alert, the push notification is the confirmation
               }
           });
       } else {
           // This will trigger the native browser prompt.
           await OneSignal.User.PushSubscription.optIn();
       }
-  };
+  });
   
 
   if (authLoading || (user && !dataLoaded)) {
@@ -2040,10 +1967,17 @@ const App: React.FC = () => {
   if (!user) {
     return <Login onLogin={() => {}} />;
   }
+  
+    const foldersWithNotes = useMemo(() => {
+        return folders.map(folder => ({
+            ...folder,
+            notes: notes.filter(note => note.folder_id === folder.id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        }));
+    }, [folders, notes]);
 
   const appProps: AppComponentProps = {
-    currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
-    allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    isOnline, currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
+    allTodos, folders: foldersWithNotes, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
