@@ -68,12 +68,12 @@ const generateRecurringTasks = async (sourceTodo: Todo, currentTodos: { [key: st
     }
 
     const allTasksFlat: Todo[] = Object.values(currentTodos).flat() as Todo[];
-    const { frequency, customDays } = sourceTodo.recurrence;
+    const { frequency, customDays, ends_on } = sourceTodo.recurrence;
     const recurrenceId = sourceTodo.recurrence.id!;
 
     // 1. Calculate all potential future dates
     let lastDueDate = new Date(sourceTodo.due_date + 'T00:00:00Z');
-    const limitDate = new Date();
+    let limitDate = new Date();
     switch (frequency) {
         case 'daily': limitDate.setMonth(limitDate.getMonth() + 1); break;
         case 'weekly': case 'biweekly': case 'custom': limitDate.setMonth(limitDate.getMonth() + 3); break;
@@ -81,9 +81,12 @@ const generateRecurringTasks = async (sourceTodo: Todo, currentTodos: { [key: st
         default: limitDate.setDate(limitDate.getDate() + 90);
     }
 
+    const recurrenceEndDate = ends_on ? new Date(ends_on + 'T00:00:00Z') : null;
+    const finalLimitDate = (recurrenceEndDate && recurrenceEndDate < limitDate) ? recurrenceEndDate : limitDate;
+
     const potentialDates: Date[] = [];
     let loopGuard = 0; // Prevent infinite loops
-    while (lastDueDate < limitDate && loopGuard < 365) {
+    while (lastDueDate < finalLimitDate && loopGuard < 365) {
         let nextDueDate: Date | null = new Date(lastDueDate.valueOf());
         let foundNext = false;
 
@@ -1530,6 +1533,11 @@ const App: React.FC = () => {
     
     updateLocalTodos(updatedTodo);
     await syncableUpdate('todos', updatedTodo);
+    
+    if (newCompletedState && todoToToggle.recurrence && todoToToggle.recurrence.frequency !== 'none') {
+        const newAllTodosState = await generateRecurringTasks(updatedTodo, allTodos);
+        setAllTodos(newAllTodosState);
+    }
     
     if (newCompletedState && allTodos[dateKey].every(t => t.id === id ? newCompletedState : t.completed)) {
         triggerConfetti();

@@ -165,7 +165,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         updatedTodoPayload.start_time = hasTime ? (start_time || null) : null;
         updatedTodoPayload.end_time = hasTime ? (end_time || null) : null;
         updatedTodoPayload.notes = hasNotes ? notes : null;
-        updatedTodoPayload.recurrence = hasRecurrence ? recurrence : { frequency: 'none' };
+
+        const currentRecurrence = { ...recurrence };
+        if (hasRecurrence && !currentRecurrence.id) {
+            currentRecurrence.id = crypto.randomUUID();
+        }
+        updatedTodoPayload.recurrence = hasRecurrence ? currentRecurrence : { frequency: 'none' };
         
         let reminderChanged = false;
 
