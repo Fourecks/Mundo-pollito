@@ -51,7 +51,7 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- OneSignal Configuration ---
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 
 // Helper to format date as YYYY-MM-DD key
@@ -860,6 +860,26 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 </button>
                             </div>
                             <div className="p-4 border-b border-black/5 dark:border-white/10">
+                                <div>
+                                    <h3 className="font-bold text-primary-dark dark:text-primary mb-2">Dosis de Ánimo Diario</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Recibe un versículo cada día a la hora que elijas.</p>
+                                    <select 
+                                        value={dailyEncouragementLocalHour === null ? 'none' : dailyEncouragementLocalHour} 
+                                        onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
+                                        className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
+                                    >
+                                        <option value="none">Desactivado</option>
+                                        {Array.from({length: 24}, (_, i) => i).map(hour => {
+                                            const displayDate = new Date();
+                                            displayDate.setHours(hour, 0, 0);
+                                            return <option key={hour} value={hour}>
+                                                {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
+                                            </option>
+                                        })}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="p-4 border-b border-black/5 dark:border-white/10">
                                 <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left" disabled={isPermissionBlocked}>
                                     <div>
                                         <h3 className={`font-bold transition-colors ${
@@ -946,8 +966,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={setParticleType}
               ambientSound={ambientSound}
               setAmbientSound={setAmbientSound}
-              dailyEncouragementLocalHour={dailyEncouragementLocalHour}
-              onSetDailyEncouragement={onSetDailyEncouragement}
             />
             <AddTaskModal
                 isOpen={isAddTaskModalOpen}

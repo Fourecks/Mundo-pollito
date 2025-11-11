@@ -54,8 +54,8 @@ interface CustomizationPanelProps {
   setParticleType: (type: ParticleType) => void;
   ambientSound: { type: AmbientSoundType; volume: number };
   setAmbientSound: React.Dispatch<React.SetStateAction<{ type: AmbientSoundType; volume: number }>>;
-  dailyEncouragementHour: number | null;
-  onSetDailyEncouragement: (localHour: number | null) => void;
+  dailyEncouragementHour?: number | null;
+  onSetDailyEncouragement?: (localHour: number | null) => void;
 }
 
 const particleOptions: { type: ParticleType; icon: React.FC; label: string }[] = [
@@ -224,24 +224,26 @@ const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setP
                     <input type="range" min="0" max="1" step="0.05" value={ambientSound.volume} onChange={handleVolumeChange} disabled={ambientSound.type === 'none'} className="w-full h-2 bg-secondary-light/80 dark:bg-gray-600/80 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary" />
                  </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-secondary-light/50 dark:border-gray-700/50">
-                <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-2 text-center">Dosis de Ánimo Diario</h4>
-                <select 
-                    value={dailyEncouragementHour === null ? 'none' : dailyEncouragementHour} 
-                    onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
-                    className="w-full bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
-                >
-                    <option value="none">Desactivado</option>
-                    {Array.from({length: 24}, (_, i) => i).map(hour => {
-                        const displayDate = new Date();
-                        displayDate.setHours(hour, 0, 0);
-                        return <option key={hour} value={hour}>
-                            {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
-                        </option>
-                    })}
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">Recibe un versículo cada día a la hora que elijas (en tu hora local).</p>
-            </div>
+            {onSetDailyEncouragement && (
+                <div className="mt-3 pt-3 border-t border-secondary-light/50 dark:border-gray-700/50">
+                    <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-2 text-center">Dosis de Ánimo Diario</h4>
+                    <select 
+                        value={dailyEncouragementHour === null ? 'none' : dailyEncouragementHour} 
+                        onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
+                        className="w-full bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
+                    >
+                        <option value="none">Desactivado</option>
+                        {Array.from({length: 24}, (_, i) => i).map(hour => {
+                            const displayDate = new Date();
+                            displayDate.setHours(hour, 0, 0);
+                            return <option key={hour} value={hour}>
+                                {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
+                            </option>
+                        })}
+                    </select>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">Recibe un versículo cada día a la hora que elijas (en tu hora local).</p>
+                </div>
+            )}
         </div>
     );
 };
