@@ -108,6 +108,7 @@ export interface BrowserSession {
   aiConversation?: AIConversationTurn[];
   aiSettings?: AISettings;
   isComfortModeActive?: boolean;
+  aiContextSummary?: string;
 }
 // --- End Browser Types ---
 

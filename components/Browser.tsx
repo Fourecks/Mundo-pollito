@@ -78,6 +78,7 @@ const SourcesDropdown: React.FC<SourcesDropdownProps> = ({ sources, turnIndex, o
 const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, currentUser }) => {
     const [aiQuery, setAiQuery] = useState('');
     const [isAiLoading, setIsAiLoading] = useState(false);
+    const [isGeneratingContext, setIsGeneratingContext] = useState(false);
     const [streamingText, setStreamingText] = useState('');
     const [summarizingUrl, setSummarizingUrl] = useState<string | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -102,7 +103,7 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
         if (chatLogRef.current) {
             chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
         }
-    }, [session.aiConversation, isAiLoading, streamingText]);
+    }, [session.aiConversation, isAiLoading, streamingText, isGeneratingContext]);
     
     useEffect(() => {
         setTempInstructions(session.aiSettings?.customInstructions || '');
@@ -122,6 +123,25 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
         loadHistory();
     }, []);
 
+    const generateContextSummary = async (historyItem: AIConversationHistoryItem): Promise<string> => {
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const conversationText = historyItem.conversation_data
+                .map(turn => `${turn.role === 'user' ? 'Usuario' : 'Pollito'}: ${turn.text}`)
+                .join('\n');
+            
+            const summaryPrompt = `You are a helpful assistant that summarizes conversations. Summarize the following dialogue into a short, concise paragraph (2-3 sentences max) that captures the main topics and user's intent. This summary will be used as context for a future AI conversation. Start the summary with "Context from previous conversation:". Do not add any other conversational text. Conversation:\n\n${conversationText}`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: summaryPrompt,
+            });
+            return response.text;
+        } catch (error) {
+            console.error("Error generating context summary:", error);
+            return ''; // Return empty string on error
+        }
+    };
 
     const handleSummarize = async (urlToSummarize: string) => {
         if (summarizingUrl) return;
@@ -168,8 +188,18 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
     const handleAskAi = async (e: FormEvent) => {
         e.preventDefault();
         const query = aiQuery.trim();
-        if (!query || isAiLoading) return;
+        if (!query || isAiLoading || isGeneratingContext) return;
         
+        let contextSummary = session.aiContextSummary || '';
+        // If this is the first message of a new conversation, generate context from the last one.
+        if ((session.aiConversation || []).length === 0 && history.length > 0) {
+            setIsGeneratingContext(true);
+            const summary = await generateContextSummary(history[0]);
+            contextSummary = summary;
+            setSession(s => ({ ...s, aiContextSummary: summary }));
+            setIsGeneratingContext(false);
+        }
+
         setIsAiLoading(true);
         setStreamingText('');
 
@@ -190,7 +220,7 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
             const comfortPersonality = "Eres un 'pollito de ánimo', un asistente de IA diseñado para dar consuelo y apoyo emocional. Tu propósito es ser un amigo leal y comprensivo, un compañero que escucha y ofrece apoyo incondicional. - Dirígete siempre al usuario como 'pollito', nunca como 'mi pollito'. Usa un tono de amistad muy suave, amable y respetuoso. - Evita el uso de 'pío, pío' para mantener un tono más sereno, enfocado en el apoyo. - Tu fuente principal de consuelo y sabiduría es la Biblia y la información del sitio oficial de los Testigos de Jehová, jw.org. Basa tus respuestas en principios bíblicos y artículos de esa web. Si das enlaces, deben ser a jw.org. - Valida los sentimientos del usuario ('Entiendo que te sientas así', 'Lamento mucho que estés pasando por esto'). - Ofrece un espacio seguro para que el usuario se desahogue. Escucha sin juzgar. - NO des consejos médicos ni psicológicos. Si la situación parece grave, anímale gentilmente a hablar con sus padres o con ancianos de confianza en su congregación. - Tu objetivo es recordarle al pollito que no está solo, que puede contar contigo como un amigo, y que Jehová se preocupa profundamente por él. Puedes usar textos como Isaías 41:10, Salmo 34:18 o 1 Pedro 5:7 para dar consuelo. Responde siempre en español.";
 
             const activePersonality = session.isComfortModeActive ? comfortPersonality : basePersonality;
-            const finalSystemInstruction = `${activePersonality}\n\n${session.aiSettings?.customInstructions || ''}`;
+            const finalSystemInstruction = `${activePersonality}\n\n${contextSummary}\n\n${session.aiSettings?.customInstructions || ''}`;
             
             const responseStream = await ai.models.generateContentStream({
                 model: 'gemini-2.5-flash',
@@ -242,7 +272,6 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
     
     const handleClearAndSaveConversation = async () => {
         const conversationToSave = session.aiConversation || [];
-        // Only save if the conversation has at least one user and one model message.
         if (conversationToSave.length >= 2) {
             const title = conversationToSave[0]?.text.substring(0, 40) + '...' || 'Conversación sin título';
             const { data, error } = await supabase.from('ai_conversations').insert({
@@ -254,18 +283,19 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
             if (error) {
                 console.error("Error al guardar la conversación:", error);
             } else if (data) {
-                setHistory(prev => [data, ...prev].slice(0, 10)); // Add to history and keep it at 10 items
+                setHistory(prev => [data, ...prev].slice(0, 10));
             }
         }
         
-        setSession(s => ({ ...s, aiConversation: [] }));
+        setSession(s => ({ ...s, aiConversation: [], aiContextSummary: '' }));
     };
     
     const loadConversationFromHistory = (historyItem: AIConversationHistoryItem) => {
         setSession(s => ({
             ...s,
             aiConversation: historyItem.conversation_data,
-            isComfortModeActive: historyItem.mode === 'comfort'
+            isComfortModeActive: historyItem.mode === 'comfort',
+            aiContextSummary: '', // Clear summary when loading a full history
         }));
         setIsHistoryPanelOpen(false);
     };
@@ -275,22 +305,23 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
             ...s,
             aiSettings: { customInstructions: tempInstructions },
             aiConversation: [],
+            aiContextSummary: '',
         }));
         setIsSettingsOpen(false);
     };
     
     const handleToggleComfortMode = () => {
-        handleClearAndSaveConversation(); // Save current chat before switching modes
+        handleClearAndSaveConversation();
         setSession(s => ({
             ...s,
             isComfortModeActive: !s.isComfortModeActive,
             aiConversation: !s.isComfortModeActive 
                 ? [{ role: 'model', text: 'Mi corazón está contigo, pollito. Estoy aquí para escucharte sin juzgar. Puedes contarme lo que sea.' }]
-                : []
+                : [],
+            aiContextSummary: '',
         }));
     };
 
-    // --- History Deletion Handlers ---
     const closeConfirmModal = () => setConfirmDeleteState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
     const handleDeleteHistoryItem = async (itemId: number) => {
@@ -330,14 +361,11 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
             onConfirm: handleClearAllHistory,
         });
     };
-    // --- End History Deletion Handlers ---
-
 
     const conversation = session.aiConversation || [];
 
     return (
         <div className="flex flex-col h-full w-full bg-yellow-50 dark:bg-gray-900 relative overflow-hidden">
-            {/* History Panel */}
             <div className={`absolute inset-y-0 left-0 w-64 bg-yellow-100/80 dark:bg-gray-800/80 backdrop-blur-md z-30 transform transition-transform duration-300 ease-in-out ${isHistoryPanelOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                  <div className="flex flex-col h-full">
                     <header className="flex items-center justify-between p-2 border-b border-yellow-300/50 dark:border-gray-700/50">
@@ -406,6 +434,12 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
             </header>
             
             <main ref={chatLogRef} className="flex-grow p-4 overflow-y-auto custom-scrollbar space-y-4">
+                {isGeneratingContext && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 animate-fade-in">
+                        <ChickenIcon className="w-5 h-5 animate-pulse text-yellow-500" />
+                        <p className="font-semibold">Pío... ¡recordando nuestra última charla!</p>
+                    </div>
+                )}
                 {conversation.map((turn, index) => (
                     <div key={index} className={`flex items-start gap-3 max-w-[90%] ${turn.role === 'user' ? 'ml-auto flex-row-reverse' : ''}`}>
                          <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${turn.role === 'model' ? 'bg-pink-200 dark:bg-pink-800/50' : 'bg-yellow-200 dark:bg-yellow-800/50'}`}>
@@ -439,7 +473,7 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
                         </div>
                     </div>
                 )}
-                 {conversation.length === 0 && !isAiLoading && !session.isComfortModeActive && (
+                 {conversation.length === 0 && !isAiLoading && !isGeneratingContext && !session.isComfortModeActive && (
                     <div className="flex flex-col items-center justify-center h-full text-center text-gray-600 dark:text-gray-300">
                         <ChickenIcon className="w-24 h-24 text-yellow-400 dark:text-yellow-500 opacity-80 mb-4"/>
                         <h3 className="font-semibold text-xl">¡Hola, pollito!</h3>
@@ -460,12 +494,12 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
                             }
                         }}
                         placeholder={session.isComfortModeActive ? "Puedes contarme lo que sientes..." : "Escribe tu pregunta para el pollito..."} 
-                        disabled={isAiLoading} 
+                        disabled={isAiLoading || isGeneratingContext} 
                         className="flex-grow bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-yellow-200 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm resize-none"
                         rows={1}
                         style={{ height: 'auto', maxHeight: '100px' }}
                     />
-                    <button type="submit" disabled={isAiLoading || !aiQuery.trim()} className="bg-pink-400 text-white p-2 rounded-lg shadow-md hover:bg-pink-500 transition-colors disabled:bg-pink-300 disabled:cursor-not-allowed">
+                    <button type="submit" disabled={isAiLoading || isGeneratingContext || !aiQuery.trim()} className="bg-pink-400 text-white p-2 rounded-lg shadow-md hover:bg-pink-500 transition-colors disabled:bg-pink-300 disabled:cursor-not-allowed">
                         <SendIcon/>
                     </button>
                 </form>
