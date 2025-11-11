@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -16,7 +16,7 @@ import FloatingPlayer from './components/FloatingPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
-import { initDB, getAll, clearAndPutAll, get, set } from './db';
+import { initDB, getAll, clearAndPutAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue } from './db';
 import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
 import Browser from './components/Browser';
@@ -191,6 +191,7 @@ const useMediaQuery = (query: string) => {
 
 interface AppComponentProps {
   isOnline: boolean;
+  isSyncing: boolean;
   currentUser: SupabaseUser;
   onLogout: () => void;
   // Theme
@@ -263,7 +264,7 @@ interface AppComponentProps {
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
-    isOnline, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
+    isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,
@@ -462,7 +463,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         <ParticleLayer type={particleType} />
 
       <header className="fixed top-4 right-4 z-[70000] flex flex-col items-end gap-3">
-        {!isOnline && (
+        {isSyncing && (
+            <div className="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-2">
+                <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Sincronizando...
+            </div>
+        )}
+        {!isOnline && !isSyncing && (
             <div className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
                 Sin conexión
             </div>
@@ -624,7 +631,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 
 const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
-      isOnline, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
+      isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
       activeTrack, activeSpotifyTrack,
@@ -928,11 +935,19 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             )}
             <ParticleLayer type={particleType} />
             
-            {!isOnline && (
-                <div className="fixed top-0 left-0 right-0 bg-red-500 text-white text-xs font-bold text-center py-1 z-[90000]">
-                    Sin conexión
-                </div>
-            )}
+            <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[90000] flex items-center gap-2">
+                {isSyncing && (
+                    <div className="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-2">
+                        <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Sincronizando...
+                    </div>
+                )}
+                {!isOnline && !isSyncing && (
+                    <div className="bg-red-500 text-white text-xs font-bold text-center py-1 px-3 rounded-full shadow-lg">
+                        Sin conexión
+                    </div>
+                )}
+            </div>
 
             <main className="flex-grow overflow-y-auto pb-28">
                 {renderContent()}
@@ -1067,6 +1082,7 @@ const App: React.FC = () => {
   const settingsSaveTimeout = useRef<number | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // --- ALL SHARED STATE MOVED HERE ---
   // Data state
@@ -1124,7 +1140,6 @@ const App: React.FC = () => {
 
     // --- Offline Functionality ---
     useEffect(() => {
-        // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
@@ -1132,15 +1147,24 @@ const App: React.FC = () => {
                     .catch(error => console.error('Service Worker registration failed:', error));
             });
         }
+        
+        const handleOnline = async () => {
+            setIsOnline(true);
+            setIsSyncing(true);
+            const { success, errors } = await processSyncQueue();
+            setIsSyncing(false);
+            if (!success) console.error("Sync failed with errors:", errors);
+            else loadData(); // Refresh data from source of truth after successful sync
+        };
 
-        // Network status listeners
-        const goOnline = () => setIsOnline(true);
-        const goOffline = () => setIsOnline(false);
-        window.addEventListener('online', goOnline);
-        window.addEventListener('offline', goOffline);
+        const handleOffline = () => setIsOnline(false);
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        
         return () => {
-            window.removeEventListener('online', goOnline);
-            window.removeEventListener('offline', goOffline);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
         };
     }, []);
 
@@ -1310,22 +1334,10 @@ const App: React.FC = () => {
     if (error) console.error('Error logging out:', error.message);
   }, []);
   
-   const showOfflineWarning = () => {
-        alert("Estás sin conexión. No puedes guardar cambios hasta que vuelvas a tener internet.");
-    };
-
-    const mutationGuard = (func: Function) => async (...args: any[]) => {
-        if (!isOnline) {
-            showOfflineWarning();
-            return;
-        }
-        return func(...args);
-    };
-
   const loadData = useCallback(async () => {
     if (!user) return;
     
-    // 1. Load from cache first for instant UI
+    // Load from cache first for instant UI
     const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedSettings] = await Promise.all([
         getAll<Todo>('todos'),
         getAll<Folder>('folders'),
@@ -1347,22 +1359,22 @@ const App: React.FC = () => {
     setPlaylists(cachedPlaylists);
     setQuickNotes(cachedQuickNotes);
 
-    // Apply cached settings
     cachedSettings.forEach(s => {
         if (s.key === 'pomodoroState') setPomodoroState(p => ({...p, ...s.value, isActive: false, endTime: null}));
         if (s.key === 'particleType') setParticleType(s.value);
         if (s.key === 'ambientSound') setAmbientSound(s.value);
     });
 
-    // 2. If online, fetch from network and update cache
+    // If online, fetch from network and update cache
     if (isOnline) {
+      setIsSyncing(true);
       const [
-        { data: todosData, error: todosError },
-        { data: foldersData, error: foldersError },
-        { data: notesData, error: notesError },
-        { data: playlistsData, error: playlistsError },
-        { data: quickNotesData, error: quickNotesError },
-        { data: profileData, error: profileError }
+        { data: todosData },
+        { data: foldersData },
+        { data: notesData },
+        { data: playlistsData },
+        { data: quickNotesData },
+        { data: profileData }
       ] = await Promise.all([
         supabase.from('todos').select('*, subtasks(*)').order('created_at'),
         supabase.from('folders').select('*').order('created_at'),
@@ -1380,27 +1392,21 @@ const App: React.FC = () => {
             networkTodosByDate[dateKey].push(todo);
         });
         setAllTodos(networkTodosByDate);
-        clearAndPutAll('todos', todosData);
+        await clearAndPutAll('todos', todosData);
       }
-      if(foldersData) { setFolders(foldersData); clearAndPutAll('folders', foldersData); }
-      if(notesData) { setNotes(notesData); clearAndPutAll('notes', notesData); }
-      if(playlistsData) { setPlaylists(playlistsData); clearAndPutAll('playlists', playlistsData); }
-      if(quickNotesData) { setQuickNotes(quickNotesData); clearAndPutAll('quick_notes', quickNotesData); }
+      if(foldersData) { setFolders(foldersData); await clearAndPutAll('folders', foldersData); }
+      if(notesData) { setNotes(notesData); await clearAndPutAll('notes', notesData); }
+      if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
+      if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
 
       if(profileData) {
         setDailyEncouragementLocalHour(profileData.daily_encouragement_hour_local);
         if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
             const savedSettings = profileData.pomodoro_settings as Partial<typeof pomodoroState>;
-            setPomodoroState(s => ({
-                ...s,
-                durations: savedSettings.durations || s.durations,
-                showBackgroundTimer: savedSettings.showBackgroundTimer ?? s.showBackgroundTimer,
-                backgroundTimerOpacity: savedSettings.backgroundTimerOpacity ?? s.showBackgroundTimer,
-                timeLeft: (savedSettings.durations || s.durations)[s.mode],
-                isActive: false, endTime: null,
-            }));
+            setPomodoroState(s => ({ ...s, durations: savedSettings.durations || s.durations, timeLeft: (savedSettings.durations || s.durations)[s.mode], isActive: false, endTime: null }));
         }
       }
+      setIsSyncing(false);
     }
     
     try {
@@ -1427,6 +1433,9 @@ const App: React.FC = () => {
       if (user && !dataLoaded) {
           initDB(user.email!).then(() => {
               loadData();
+              if (navigator.onLine) {
+                  setIsOnline(true);
+              }
           }).catch(err => {
               console.error("Failed to initialize DB:", err);
           });
@@ -1435,13 +1444,13 @@ const App: React.FC = () => {
 
   // --- Settings Persistence ---
   useEffect(() => {
-    if (user && dataLoaded && isOnline) {
+    if (user && dataLoaded) {
       if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
       settingsSaveTimeout.current = window.setTimeout(async () => {
         const { durations, showBackgroundTimer, backgroundTimerOpacity } = pomodoroState;
         const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity };
-        set('settings', { key: 'pomodoroState', value: settingsToSave });
-        await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
+        await set('settings', { key: 'pomodoroState', value: settingsToSave });
+        if(isOnline) await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
       }, 1500);
     }
     return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
@@ -1453,50 +1462,22 @@ const App: React.FC = () => {
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeTrack'), value: activeTrack }); }, [activeTrack, getUserKey, user, dataLoaded]);
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeSpotifyTrack'), value: activeSpotifyTrack }); }, [activeSpotifyTrack, getUserKey, user, dataLoaded]);
 
-  const handleSetDailyEncouragement = mutationGuard(async (localHour: number | null) => {
+  const handleSetDailyEncouragement = async (localHour: number | null) => {
     if (!user) return;
     setDailyEncouragementLocalHour(localHour);
-    await supabase.from('profiles').upsert({ id: user.id, daily_encouragement_hour_local: localHour });
-  });
+    await syncableUpdate('profiles', { id: user.id, daily_encouragement_hour_local: localHour });
+  };
   
-  // --- Data Handlers ---
-  const handleAddTodo = mutationGuard(async (text: string) => {
+  // --- Data Handlers (Now with Offline Support) ---
+  const handleAddTodo = async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
-    const newTodo: Omit<Todo, 'id' | 'created_at'> = { text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id };
-    const { data, error } = await supabase.from('todos').insert(newTodo).select('*, subtasks(*)').single();
-    if (error) console.error("Error adding todo:", error);
-    else if (data) {
-        setAllTodos(currentTodos => ({ ...currentTodos, [dateKey]: [...(currentTodos[dateKey] || []), data] }));
-        getAll<Todo>('todos').then(todos => clearAndPutAll('todos', [...todos, data]));
-    }
-  });
-
-  const handleUpdateTodo = mutationGuard(async (updatedTodo: Todo) => {
-    let originalTodo: Todo | undefined;
-    for (const key in allTodos) {
-        originalTodo = allTodos[key].find(t => t.id === updatedTodo.id);
-        if (originalTodo) break;
-    }
-    if (!originalTodo) { console.error("Original todo not found for update."); return; }
-
-    const originalSubtaskIds = new Set(originalTodo.subtasks?.map(st => st.id) || []);
-    const newSubtaskIds = new Set(updatedTodo.subtasks?.map(st => st.id).filter(id => id < 1000000000) || []);
-    const subtasksToDelete = [...originalSubtaskIds].filter(id => !newSubtaskIds.has(id));
-
-    if (subtasksToDelete.length > 0) await supabase.from('subtasks').delete().in('id', subtasksToDelete);
-    if (updatedTodo.subtasks && updatedTodo.subtasks.length > 0) {
-        const upserts = updatedTodo.subtasks.map(st => ({ ...(st.id < 1000000000 && { id: st.id }), text: st.text, completed: st.completed, todo_id: updatedTodo.id, }));
-        await supabase.from('subtasks').upsert(upserts);
-    }
+    const tempId = -Date.now();
+    const newTodo: Todo = { id: tempId, text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id, created_at: new Date().toISOString(), subtasks: [] };
     
-    const { subtasks, ...todoForUpdate } = updatedTodo;
-    await supabase.from('todos').update(todoForUpdate).eq('id', updatedTodo.id);
-
-    const { data: refreshedTodo, error: refreshError } = await supabase.from('todos').select('*, subtasks(*)').eq('id', updatedTodo.id).single();
-    if (refreshError || !refreshedTodo) { updateLocalTodos(updatedTodo); return; }
-    updateLocalTodos(refreshedTodo);
-});
+    setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
+    await syncableCreate('todos', newTodo);
+  };
 
   const updateLocalTodos = (todoToUpdate: Todo) => {
        setAllTodos(current => {
@@ -1511,16 +1492,16 @@ const App: React.FC = () => {
           
           newAllTodos[newDateKey] = [...(newAllTodos[newDateKey] || []), todoToUpdate];
           
-          getAll<Todo>('todos').then(todos => {
-              const updatedCache = todos.filter(t => t.id !== todoToUpdate.id);
-              updatedCache.push(todoToUpdate);
-              clearAndPutAll('todos', updatedCache);
-          });
           return newAllTodos;
       });
   }
 
-  const handleToggleTodo = mutationGuard(async (id: number, onAllCompleted: (quote: string) => void) => {
+  const handleUpdateTodo = async (updatedTodo: Todo) => {
+    updateLocalTodos(updatedTodo);
+    await syncableUpdate('todos', updatedTodo);
+  };
+
+  const handleToggleTodo = async (id: number, onAllCompleted: (quote: string) => void) => {
     let dateKey = '';
     let todoToToggle: Todo | undefined;
     for (const key in allTodos) { const foundTodo = allTodos[key].find(t => t.id === id); if (foundTodo) { dateKey = key; todoToToggle = foundTodo; break; } }
@@ -1528,157 +1509,124 @@ const App: React.FC = () => {
     const newCompletedState = !todoToToggle.completed;
     const updatedSubtasks = (todoToToggle.subtasks || []).map(st => ({ ...st, completed: newCompletedState }));
     const updatedTodo = { ...todoToToggle, completed: newCompletedState, subtasks: updatedSubtasks };
-    const newTodosForDate = allTodos[dateKey].map(t => t.id === id ? updatedTodo : t);
-    setAllTodos(current => ({ ...current, [dateKey]: newTodosForDate }));
-    updateLocalTodos(updatedTodo);
-
-    await supabase.from('todos').update({ completed: newCompletedState }).eq('id', id);
-    if (updatedSubtasks.length > 0) {
-        const subtaskUpdates = updatedSubtasks.map(st => ({ id: st.id, completed: newCompletedState, todo_id: id }));
-        await supabase.from('subtasks').upsert(subtaskUpdates);
-    }
-
-    if (newCompletedState && updatedTodo.recurrence && updatedTodo.recurrence.frequency !== 'none') {
-        const newTodos = await generateRecurringTasks(updatedTodo, allTodos);
-        setAllTodos(newTodos);
-    }
     
-    if (newCompletedState && newTodosForDate.every(t => t.completed)) {
+    updateLocalTodos(updatedTodo);
+    await syncableUpdate('todos', updatedTodo);
+    
+    if (newCompletedState && allTodos[dateKey].every(t => t.id === id ? newCompletedState : t.completed)) {
         triggerConfetti();
         onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
     }
-  });
+  };
   
-  const handleToggleSubtask = mutationGuard(async (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => {
+  const handleToggleSubtask = async (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => {
       let dateKey = '';
       let todoToUpdate: Todo | undefined;
       for (const key in allTodos) { const foundTodo = allTodos[key].find(t => t.id === taskId); if (foundTodo) { dateKey = key; todoToUpdate = foundTodo; break; } }
       if (!todoToUpdate || !dateKey) return;
+      
       const newSubtasks = (todoToUpdate.subtasks || []).map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st);
       const allSubtasksCompleted = newSubtasks.length > 0 && newSubtasks.every(st => st.completed);
       const parentCompleted = allSubtasksCompleted;
       const updatedTodo = { ...todoToUpdate, subtasks: newSubtasks, completed: parentCompleted };
-      const newTodosForDate = allTodos[dateKey].map(t => t.id === taskId ? updatedTodo : t);
-      setAllTodos(current => ({ ...current, [dateKey]: newTodosForDate, }));
-      updateLocalTodos(updatedTodo);
       
-      const subtaskToUpdate = newSubtasks.find(st => st.id === subtaskId);
-      if (subtaskToUpdate) await supabase.from('subtasks').update({ completed: subtaskToUpdate.completed }).eq('id', subtaskId);
-      if (todoToUpdate.completed !== parentCompleted) await supabase.from('todos').update({ completed: parentCompleted }).eq('id', taskId);
+      updateLocalTodos(updatedTodo);
+      await syncableUpdate('todos', updatedTodo);
 
-      if (parentCompleted && newTodosForDate.every(t => t.completed)) {
+      if (parentCompleted && allTodos[dateKey].every(t => t.id === taskId ? parentCompleted : t.completed)) {
           triggerConfetti();
           onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
       }
-  });
+  };
 
-  const handleDeleteTodo = mutationGuard(async (id: number) => {
+  const handleDeleteTodo = async (id: number) => {
       let dateKeyToDelete: string | null = null;
       for(const key in allTodos) { if(allTodos[key].some(t => t.id === id)) { dateKeyToDelete = key; break; } }
       if (dateKeyToDelete) {
           setAllTodos(current => {
               const newAllTodos = { ...current };
-              const updatedTodosForDate = newAllTodos[dateKeyToDelete!].filter(t => t.id !== id);
-              if (updatedTodosForDate.length > 0) newAllTodos[dateKeyToDelete!] = updatedTodosForDate;
-              else delete newAllTodos[dateKeyToDelete!];
+              newAllTodos[dateKeyToDelete!] = newAllTodos[dateKeyToDelete!].filter(t => t.id !== id);
               return newAllTodos;
           });
       }
-      await supabase.from('todos').delete().eq('id', id);
-      getAll<Todo>('todos').then(todos => clearAndPutAll('todos', todos.filter(t => t.id !== id)));
-  });
+      await syncableDelete('todos', id);
+  };
 
-  const handleAddFolder = mutationGuard(async (name: string): Promise<Folder | null> => {
+  const handleAddFolder = async (name: string): Promise<Folder | null> => {
       if (!user) return null;
-      const { data, error } = await supabase.from('folders').insert({ name, user_id: user.id }).select().single();
-      if (error) { console.error("Error adding folder:", error); return null; }
-      if (data) {
-          setFolders(f => [...f, { ...data, notes: [] }]);
-          getAll<Folder>('folders').then(folders => clearAndPutAll('folders', [...folders, data]));
-          return { ...data, notes: [] };
-      }
-      return null;
-  });
-  const handleUpdateFolder = mutationGuard(async (folderId: number, name: string) => {
-      if (!user) return;
-      await supabase.from('folders').update({ name }).eq('id', folderId);
-      setFolders(f => f.map(folder => folder.id === folderId ? { ...folder, name } : folder));
-      getAll<Folder>('folders').then(folders => clearAndPutAll('folders', folders.map(f => f.id === folderId ? {...f, name} : f)));
-  });
-  const handleDeleteFolder = mutationGuard(async (folderId: number) => {
-      if (!user) return;
-      await supabase.from('folders').delete().eq('id', folderId);
+      const tempId = -Date.now();
+      const newFolder: Folder = { id: tempId, name, user_id: user.id, created_at: new Date().toISOString(), notes: [] };
+      setFolders(f => [...f, newFolder]);
+      await syncableCreate('folders', newFolder);
+      return newFolder;
+  };
+  const handleUpdateFolder = async (folderId: number, name: string) => {
+      const folderToUpdate = folders.find(f => f.id === folderId);
+      if(!folderToUpdate) return;
+      const updatedFolder = { ...folderToUpdate, name };
+      setFolders(f => f.map(folder => folder.id === folderId ? updatedFolder : folder));
+      await syncableUpdate('folders', updatedFolder);
+  };
+  const handleDeleteFolder = async (folderId: number) => {
       setFolders(f => f.filter(folder => folder.id !== folderId));
-      getAll<Folder>('folders').then(folders => clearAndPutAll('folders', folders.filter(f => f.id !== folderId)));
-  });
+      await syncableDelete('folders', folderId);
+  };
   
-  const handleAddNote = mutationGuard(async (folderId: number): Promise<Note | null> => {
+  const handleAddNote = async (folderId: number): Promise<Note | null> => {
     if (!user) return null;
-    const newNote = { folder_id: folderId, user_id: user.id, title: 'Nueva Nota', content: '' };
-    const { data, error } = await supabase.from('notes').insert(newNote).select().single();
-    if (error) { console.error("Error adding note:", error); return null; }
-    if (data) {
-        setNotes(n => [...n, data]);
-        getAll<Note>('notes').then(notes => clearAndPutAll('notes', [...notes, data]));
-        return data;
-    }
-    return null;
-  });
+    const tempId = -Date.now();
+    const now = new Date().toISOString();
+    const newNote: Note = { id: tempId, folder_id: folderId, user_id: user.id, title: 'Nueva Nota', content: '', created_at: now, updated_at: now };
+    setNotes(n => [...n, newNote]);
+    await syncableCreate('notes', newNote);
+    return newNote;
+  };
 
-  const handleUpdateNote = mutationGuard(async (note: Note) => {
-    await supabase.from('notes').update({ title: note.title, content: note.content, updated_at: new Date().toISOString() }).eq('id', note.id);
-    setNotes(n => n.map(item => item.id === note.id ? note : item));
-    getAll<Note>('notes').then(notes => clearAndPutAll('notes', notes.map(n => n.id === note.id ? note : n)));
-  });
+  const handleUpdateNote = async (note: Note) => {
+    const updatedNote = { ...note, updated_at: new Date().toISOString() };
+    setNotes(n => n.map(item => item.id === note.id ? updatedNote : item));
+    await syncableUpdate('notes', updatedNote);
+  };
 
-  const handleDeleteNote = mutationGuard(async (noteId: number, folderId: number) => {
-    await supabase.from('notes').delete().eq('id', noteId);
+  const handleDeleteNote = async (noteId: number, folderId: number) => {
     setNotes(n => n.filter(item => item.id !== noteId));
-    getAll<Note>('notes').then(notes => clearAndPutAll('notes', notes.filter(n => n.id !== noteId)));
-  });
+    await syncableDelete('notes', noteId);
+  };
   
-  const handleAddPlaylist = mutationGuard(async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
+  const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
     if (!user) return;
-    const { data, error } = await supabase.from('playlists').insert({...playlistData, user_id: user.id}).select().single();
-    if (error) console.error("Error adding playlist:", error);
-    else if(data) {
-        setPlaylists(p => [...p, data]);
-        getAll<Playlist>('playlists').then(playlists => clearAndPutAll('playlists', [...playlists, data]));
-    }
-  });
-  const handleUpdatePlaylist = mutationGuard(async (playlist: Playlist) => {
-      await supabase.from('playlists').update(playlist).eq('id', playlist.id);
+    const tempId = -Date.now();
+    const newPlaylist = { ...playlistData, id: tempId, user_id: user.id, created_at: new Date().toISOString() };
+    setPlaylists(p => [...p, newPlaylist]);
+    await syncableCreate('playlists', newPlaylist);
+  };
+  const handleUpdatePlaylist = async (playlist: Playlist) => {
       setPlaylists(p => p.map(item => item.id === playlist.id ? playlist : item));
-      getAll<Playlist>('playlists').then(playlists => clearAndPutAll('playlists', playlists.map(p => p.id === playlist.id ? playlist : p)));
-  });
-  const handleDeletePlaylist = mutationGuard(async (playlistId: number) => {
-      await supabase.from('playlists').delete().eq('id', playlistId);
+      await syncableUpdate('playlists', playlist);
+  };
+  const handleDeletePlaylist = async (playlistId: number) => {
       setPlaylists(p => p.filter(item => item.id !== playlistId));
-       getAll<Playlist>('playlists').then(playlists => clearAndPutAll('playlists', playlists.filter(p => p.id !== playlistId)));
-  });
+      await syncableDelete('playlists', playlistId);
+  };
   
-  const handleAddQuickNote = mutationGuard(async (text: string) => {
+  const handleAddQuickNote = async (text: string) => {
       if(!user) return;
-      const {data, error} = await supabase.from('quick_notes').insert({text, user_id: user.id}).select().single();
-      if(error) console.error("Error adding quick note:", error);
-      else if (data) {
-          setQuickNotes(qn => [...qn, data]);
-          getAll<QuickNote>('quick_notes').then(notes => clearAndPutAll('quick_notes', [...notes, data]));
-      }
-  });
-  const handleDeleteQuickNote = mutationGuard(async (id: number) => {
-      await supabase.from('quick_notes').delete().eq('id', id);
+      const tempId = -Date.now();
+      const newNote: QuickNote = { id: tempId, text, user_id: user.id, created_at: new Date().toISOString() };
+      setQuickNotes(qn => [...qn, newNote]);
+      await syncableCreate('quick_notes', newNote);
+  };
+  const handleDeleteQuickNote = async (id: number) => {
       setQuickNotes(qn => qn.filter(note => note.id !== id));
-      getAll<QuickNote>('quick_notes').then(notes => clearAndPutAll('quick_notes', notes.filter(n => n.id !== id)));
-  });
-  const handleClearAllQuickNotes = mutationGuard(async () => {
+      await syncableDelete('quick_notes', id);
+  };
+  const handleClearAllQuickNotes = async () => {
     if(!user) return;
-    await supabase.from('quick_notes').delete().eq('user_id', user.id);
     setQuickNotes([]);
-    clearAndPutAll('quick_notes', []);
-  });
+    await syncableDeleteAll('quick_notes', user.id);
+  };
 
-  // --- Google Drive Integration ---
+  // --- Google Drive Integration (unchanged, as it needs to be online) ---
   const gapiLoadCallback = useCallback(() => {
     window.gapi.load('client', async () => {
       await window.gapi.client.init({
@@ -1832,7 +1780,7 @@ const App: React.FC = () => {
       return response.json();
   }, [gdriveToken, findOrCreateAppFolder]);
 
-  const handleAddGalleryImages = mutationGuard(async (files: File[]) => {
+  const handleAddGalleryImages = async (files: File[]) => {
       setGalleryIsLoading(true);
       try {
           const uploadPromises = files.map(file => uploadFileToDrive(file, 'gallery'));
@@ -1840,8 +1788,8 @@ const App: React.FC = () => {
           await loadFilesFromDrive('gallery');
       } catch (error) { console.error("Error uploading images:", error); }
       finally { setGalleryIsLoading(false); }
-  });
-  const handleDeleteFile = mutationGuard(async (id: string, folderName: 'gallery' | 'backgrounds') => {
+  };
+  const handleDeleteFile = async (id: string, folderName: 'gallery' | 'backgrounds') => {
       try {
           await window.gapi.client.drive.files.delete({ fileId: id });
           if(folderName === 'gallery') setGalleryImages(i => i.filter(img => img.id !== id));
@@ -1850,17 +1798,17 @@ const App: React.FC = () => {
               if(activeBackground?.id === id) setActiveBackground(null);
           }
       } catch (error) { console.error(`Error deleting ${folderName} item:`, error); }
-  });
+  };
   
-  const handleAddBackground = mutationGuard(async (file: File) => {
+  const handleAddBackground = async (file: File) => {
       setBackgroundsAreLoading(true);
       try {
           await uploadFileToDrive(file, 'backgrounds');
           await loadFilesFromDrive('backgrounds');
       } catch (error) { console.error("Error uploading background:", error); }
       finally { setBackgroundsAreLoading(false); }
-  });
-  const handleToggleFavoriteBackground = mutationGuard(async (id: string) => {
+  };
+  const handleToggleFavoriteBackground = async (id: string) => {
     const bg = userBackgrounds.find(b => b.id === id);
     if (!bg) return;
     const isFavorite = !bg.isFavorite;
@@ -1871,7 +1819,7 @@ const App: React.FC = () => {
         });
         setUserBackgrounds(bgs => bgs.map(b => b.id === id ? { ...b, isFavorite } : b));
     } catch (error) { console.error("Error favoriting background:", error); }
-  });
+  };
   
   // Active Background Persistence
   useEffect(() => {
@@ -1926,7 +1874,7 @@ const App: React.FC = () => {
     };
 }, [user?.id]);
 
-  const handleNotificationAction = mutationGuard(async () => {
+  const handleNotificationAction = async () => {
       const OneSignal = window.OneSignal;
       if (!OneSignal) return;
 
@@ -1952,7 +1900,7 @@ const App: React.FC = () => {
           // This will trigger the native browser prompt.
           await OneSignal.User.PushSubscription.optIn();
       }
-  });
+  };
   
 
   if (authLoading || (user && !dataLoaded)) {
@@ -1978,7 +1926,7 @@ const App: React.FC = () => {
   }
   
   const appProps: AppComponentProps = {
-    isOnline, currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
+    isOnline, isSyncing, currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders: foldersWithNotes, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,

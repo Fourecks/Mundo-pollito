@@ -1,11 +1,26 @@
 // db.ts
-// A simple promise-based wrapper for IndexedDB
+// Robust IndexedDB wrapper with offline sync queue functionality.
+
+import { supabase } from './supabaseClient';
+import { Todo } from './types';
 
 let db: IDBDatabase;
 const DB_NAME_PREFIX = 'PollitoProductivoDB';
-const DB_VERSION = 1; // New schema version
-const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings'];
+const DB_VERSION = 2; // Incremented version for new schema
+const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue'];
 
+// --- Types for Sync Queue ---
+interface SyncOperation {
+    id?: number; // Auto-incrementing primary key
+    type: 'CREATE' | 'UPDATE' | 'DELETE' | 'DELETE_ALL';
+    tableName: string;
+    payload?: any; // For CREATE/UPDATE
+    key?: number | string; // For DELETE
+    userId?: string; // For DELETE_ALL
+}
+
+
+// --- DB Initialization ---
 export const initDB = (username: string): Promise<IDBDatabase> => {
     return new Promise((resolve, reject) => {
         const dbName = `${DB_NAME_PREFIX}_${username}`;
@@ -13,16 +28,11 @@ export const initDB = (username: string): Promise<IDBDatabase> => {
 
         request.onupgradeneeded = (event) => {
             const dbInstance = (event.target as IDBOpenDBRequest).result;
-            // Clear old stores if they exist from a previous version
-            Array.from(dbInstance.objectStoreNames).forEach(storeName => {
-                dbInstance.deleteObjectStore(storeName);
-            });
-            
-            // Create new stores
             STORES.forEach(storeName => {
                 if (!dbInstance.objectStoreNames.contains(storeName)) {
                     const keyPath = storeName === 'settings' ? 'key' : 'id';
-                    dbInstance.createObjectStore(storeName, { keyPath });
+                    const autoIncrement = storeName === 'sync_queue';
+                    dbInstance.createObjectStore(storeName, { keyPath, autoIncrement });
                 }
             });
         };
@@ -39,10 +49,10 @@ export const initDB = (username: string): Promise<IDBDatabase> => {
     });
 };
 
+
+// --- Generic DB Helpers ---
 const getStore = (storeName: string, mode: IDBTransactionMode) => {
-    if (!db) {
-        throw new Error("Database is not initialized. Call initDB first.");
-    }
+    if (!db) throw new Error("Database is not initialized. Call initDB first.");
     const tx = db.transaction(storeName, mode);
     return tx.objectStore(storeName);
 };
@@ -67,6 +77,15 @@ export const get = <T>(storeName: string, key: IDBValidKey): Promise<T | undefin
     });
 };
 
+const add = <T>(storeName: string, value: T): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        if (!db) return reject("DB not initialized");
+        const store = getStore(storeName, 'readwrite');
+        const request = store.add(value);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
 
 export const set = <T>(storeName: string, value: T): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -78,6 +97,25 @@ export const set = <T>(storeName: string, value: T): Promise<void> => {
     });
 };
 
+const remove = (storeName: string, key: IDBValidKey): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        if (!db) return reject("DB not initialized");
+        const store = getStore(storeName, 'readwrite');
+        const request = store.delete(key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
+const clearStore = (storeName: string): Promise<void> => {
+     return new Promise((resolve, reject) => {
+        if (!db) return reject("DB not initialized");
+        const store = getStore(storeName, 'readwrite');
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
 
 export const clearAndPutAll = <T>(storeName: string, data: T[]): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -86,8 +124,94 @@ export const clearAndPutAll = <T>(storeName: string, data: T[]): Promise<void> =
         const store = tx.objectStore(storeName);
         store.clear();
         data.forEach(item => store.put(item));
-        
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
     });
+};
+
+
+// --- Offline Sync Queue Logic ---
+
+const queueMutation = async (op: Omit<SyncOperation, 'id'>) => {
+    switch (op.type) {
+        case 'CREATE': await add(op.tableName, op.payload); break;
+        case 'UPDATE': await set(op.tableName, op.payload); break;
+        case 'DELETE': await remove(op.tableName, op.key!); break;
+        case 'DELETE_ALL': await clearStore(op.tableName); break;
+    }
+    await add('sync_queue', op);
+};
+
+export const syncableCreate = (tableName: string, payload: any) => queueMutation({ type: 'CREATE', tableName, payload });
+export const syncableUpdate = (tableName: string, payload: any) => queueMutation({ type: 'UPDATE', tableName, payload });
+export const syncableDelete = (tableName: string, key: number | string) => queueMutation({ type: 'DELETE', tableName, key });
+export const syncableDeleteAll = (tableName: string, userId: string) => queueMutation({ type: 'DELETE_ALL', tableName, userId });
+
+let isSyncing = false;
+export const processSyncQueue = async (): Promise<{ success: boolean; errors: any[] }> => {
+    if (isSyncing) return { success: true, errors: [] };
+    isSyncing = true;
+    console.log("Starting sync process...");
+
+    const operations: SyncOperation[] = await getAll('sync_queue');
+    if (operations.length === 0) {
+        isSyncing = false;
+        console.log("Sync queue is empty.");
+        return { success: true, errors: [] };
+    }
+
+    const errors: any[] = [];
+    const tempIdMap = new Map<number, number>();
+
+    for (const op of operations) {
+        try {
+            switch (op.type) {
+                case 'CREATE': {
+                    const tempId = op.payload.id;
+                    const { id, ...insertData } = op.payload;
+                    const { data: newRecord, error } = await supabase.from(op.tableName).insert(insertData).select('*, subtasks(*)').single();
+                    if (error) throw error;
+                    
+                    if (tempId < 0) tempIdMap.set(tempId, newRecord.id);
+                    await remove(op.tableName, tempId);
+                    await add(op.tableName, newRecord);
+                    break;
+                }
+                case 'UPDATE': {
+                    let payload = { ...op.payload };
+                    if (payload.id < 0 && tempIdMap.has(payload.id)) {
+                        payload.id = tempIdMap.get(payload.id);
+                    }
+                    const { error } = await supabase.from(op.tableName).update(payload).eq('id', payload.id);
+                    if (error) throw error;
+                    break;
+                }
+                case 'DELETE': {
+                    let key = op.key!;
+                    if (typeof key === 'number' && key < 0 && tempIdMap.has(key)) {
+                        // This item was created and deleted offline before a sync. Don't try to delete from server.
+                    } else {
+                        const { error } = await supabase.from(op.tableName).delete().eq('id', key);
+                        if (error) throw error;
+                    }
+                    break;
+                }
+                case 'DELETE_ALL': {
+                    const { error } = await supabase.from(op.tableName).delete().eq('user_id', op.userId!);
+                    if (error) throw error;
+                    break;
+                }
+            }
+            await remove('sync_queue', op.id!);
+        } catch (error) {
+            console.error('Sync operation failed:', op, error);
+            errors.push({ op, error });
+            isSyncing = false;
+            return { success: false, errors };
+        }
+    }
+    
+    console.log("Sync process finished successfully.");
+    isSyncing = false;
+    return { success: true, errors: [] };
 };
