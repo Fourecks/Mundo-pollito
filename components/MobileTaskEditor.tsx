@@ -170,13 +170,19 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
         let reminderChanged = false;
 
         if (hasReminder) {
-            if (reminderType === 'custom' && customReminderDate && customReminderTime) {
-                const [year, month, day] = customReminderDate.split('-').map(Number);
-                const [hour, minute] = customReminderTime.split(':').map(Number);
-                const localReminderDate = new Date(year, month - 1, day, hour, minute);
-                
-                updatedTodoPayload.reminder_at = localReminderDate.toISOString();
-                updatedTodoPayload.reminder_offset = null;
+            if (reminderType === 'custom' && customReminderTime) {
+                const reminderDateStr = customReminderDate || due_date;
+                if (reminderDateStr) {
+                    const [year, month, day] = reminderDateStr.split('-').map(Number);
+                    const [hour, minute] = customReminderTime.split(':').map(Number);
+                    const localReminderDate = new Date(year, month - 1, day, hour, minute);
+                    
+                    updatedTodoPayload.reminder_at = localReminderDate.toISOString();
+                    updatedTodoPayload.reminder_offset = null;
+                } else {
+                    updatedTodoPayload.reminder_at = null;
+                    updatedTodoPayload.reminder_offset = null;
+                }
             } else if (reminderType !== 'custom') {
                 updatedTodoPayload.reminder_offset = Number(reminderType) as Todo['reminder_offset'];
                 updatedTodoPayload.reminder_at = null;
@@ -223,18 +229,26 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
     
     const reminderSummary = useMemo(() => {
         if (!hasReminder) return 'Nunca';
-        if (reminderType === 'custom' && customReminderDate && customReminderTime) {
-            try {
-                const d = new Date(`${customReminderDate}T${customReminderTime}:00`);
-                return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-            } catch (e) {
-                return 'Personalizado';
+
+        if (reminderType === 'custom') {
+            if (customReminderTime) {
+                const timePart = new Date(`1970-01-01T${customReminderTime}:00`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                if (customReminderDate) {
+                    try {
+                        const d = new Date(`${customReminderDate}T${customReminderTime}:00`);
+                        return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ' ' + timePart;
+                    } catch (e) { /* ignore */ }
+                }
+                return `El día de la tarea a las ${timePart}`;
             }
+            return 'Personalizado';
         }
+
         switch(reminderType) {
             case '10': return '10 min antes';
             case '30': return '30 min antes';
             case '60': return '1 hora antes';
+            case '1440': return '1 día antes';
             default: return 'Nunca';
         }
     }, [hasReminder, reminderType, customReminderDate, customReminderTime]);
@@ -338,7 +352,12 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                 {hasReminder && (
                      <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 space-y-3 animate-pop-in">
                         <select value={reminderType} onChange={e => setReminderType(e.target.value)} className="w-full bg-white/80 dark:bg-gray-700/80 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-2 text-sm">
-                            <option value="0">Nunca</option><option value="10">10 min antes</option><option value="30">30 min antes</option><option value="60">1 hora antes</option><option value="custom">Personalizado...</option>
+                            <option value="0">Nunca</option>
+                            <option value="10">10 min antes</option>
+                            <option value="30">30 min antes</option>
+                            <option value="60">1 hora antes</option>
+                            <option value="1440">1 día antes</option>
+                            <option value="custom">Personalizado...</option>
                         </select>
                         {reminderType === 'custom' && (<div className="grid grid-cols-2 gap-2 mt-2"><input type="date" value={customReminderDate} onChange={e => setCustomReminderDate(e.target.value)} disabled={!due_date} className="bg-white/80 dark:bg-gray-700/80 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-1.5 text-sm disabled:opacity-50"/><input type="time" value={customReminderTime} onChange={e => setCustomReminderTime(e.target.value)} disabled={!due_date} className="bg-white/80 dark:bg-gray-700/80 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-1.5 text-sm disabled:opacity-50"/></div>)}
                     </div>

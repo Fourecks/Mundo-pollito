@@ -39,7 +39,7 @@ export interface Todo {
   notes?: string;
   subtasks?: Subtask[];
   recurrence?: RecurrenceRule;
-  reminder_offset?: 0 | 10 | 30 | 60; // In minutes before start_time
+  reminder_offset?: 0 | 10 | 30 | 60 | 1440; // In minutes before start_time
   reminder_at?: string; // ISO string for a specific reminder time, e.g., "2024-10-27T09:00:00"
   notification_sent?: boolean;
 }
