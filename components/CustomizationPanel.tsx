@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Background, ParticleType, AmbientSoundType, ThemeColors } from '../types';
 import CloseIcon from './icons/CloseIcon';
@@ -194,9 +193,6 @@ const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setP
         const newVolume = parseFloat(e.target.value);
         setAmbientSound(prev => ({...prev, volume: newVolume }));
     };
-    
-    const offset = new Date().getTimezoneOffset() / -60;
-    const localHourForEncouragement = dailyEncouragementHour !== null ? (dailyEncouragementHour + offset + 24) % 24 : null;
 
     return (
         <div className="p-3">
@@ -231,7 +227,7 @@ const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setP
             <div className="mt-3 pt-3 border-t border-secondary-light/50 dark:border-gray-700/50">
                 <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-2 text-center">Dosis de Ánimo Diario</h4>
                 <select 
-                    value={localHourForEncouragement === null ? 'none' : localHourForEncouragement} 
+                    value={dailyEncouragementHour === null ? 'none' : dailyEncouragementHour} 
                     onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
                     className="w-full bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
                 >
