@@ -10,10 +10,9 @@ import { supabaseAdmin } from '../_shared/supabase-admin.ts';
 
 // Helper to generate a self-contained, styled HTML response page.
 const createHtmlResponse = (title: string, message: string, taskText?: string) => {
-  const isError = title.includes('&#10060;'); // HTML entity for ❌
-  // Replace special characters with HTML entities for maximum compatibility
-  const finalTitle = title.replace('✅', '&#9989;').replace('❌', '&#10060;');
-  const safeMessage = message.replace(/¡/g, '&#161;').replace(/á/g, '&aacute;').replace(/é/g, '&eacute;').replace(/í/g, '&iacute;').replace(/ó/g, '&oacute;').replace(/ú/g, '&uacute;').replace(/ñ/g, '&ntilde;');
+  const isError = title.includes('❌');
+
+  // Sanitize user-provided taskText to prevent any potential XSS.
   const safeTaskText = taskText?.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
   const body = `
@@ -26,6 +25,10 @@ const createHtmlResponse = (title: string, message: string, taskText?: string) =
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;700&display=swap');
         
+        :root {
+          color-scheme: light;
+        }
+
         body {
           font-family: 'Fredoka', sans-serif;
           margin: 0;
@@ -87,8 +90,8 @@ const createHtmlResponse = (title: string, message: string, taskText?: string) =
     </head>
     <body>
       <div class="card">
-        <h1 class="title">${finalTitle}</h1>
-        <p class="message">${safeMessage}</p>
+        <h1 class="title">${title}</h1>
+        <p class="message">${message}</p>
         ${safeTaskText ? `<p class="task-text">"${safeTaskText}"</p>` : ''}
         <p class="footer-text">Ya puedes cerrar esta ventana.</p>
       </div>
@@ -114,10 +117,10 @@ serve(async (req) => {
     console.log(`[quick-add-task] Received request. UID: ${userId}, Task Param: ${taskTextParam}`);
 
     if (!userId) {
-      return createHtmlResponse('❌ Error de Configuraci&oacute;n', "Falta el ID de usuario en tu URL. Vuelve a copiar la 'URL Pollito' desde la app.");
+      return createHtmlResponse('❌ Error de Configuración', "Falta el ID de usuario en tu URL. Vuelve a copiar la 'URL Pollito' desde la app.");
     }
     if (!taskTextParam) {
-      return createHtmlResponse('❌ Error en el Atajo', "No se recibi&oacute; el texto de la tarea. Aseg&uacute;rate de que la variable 'Entrada proporcionada' est&eacute; conectada a la URL en tu Atajo.");
+      return createHtmlResponse('❌ Error en el Atajo', "No se recibió el texto de la tarea. Asegúrate de que la variable 'Entrada proporcionada' esté conectada a la URL en tu Atajo.");
     }
 
     const decodedText = decodeURIComponent(taskTextParam.replace(/\+/g, ' '));
@@ -139,7 +142,7 @@ serve(async (req) => {
 
     if (error || !data) {
       console.error("[quick-add-task] Supabase insert error:", error);
-      const errorMessage = error ? error.message : "La base de datos no confirm&oacute; el guardado.";
+      const errorMessage = error ? error.message : "La base de datos no confirmó el guardado.";
       return createHtmlResponse('❌ Error al Guardar', `No se pudo guardar la tarea. Error: ${errorMessage}`);
     }
     
@@ -148,6 +151,6 @@ serve(async (req) => {
 
   } catch (err) {
     console.error("[quick-add-task] Critical function error:", err);
-    return createHtmlResponse('❌ Error Inesperado', `Ocurri&oacute; un problema en el servidor: ${err.message}`);
+    return createHtmlResponse('❌ Error Inesperado', `Ocurrió un problema en el servidor: ${err.message}`);
   }
 });
