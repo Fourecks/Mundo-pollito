@@ -15,6 +15,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const prevIsOpen = useRef(isOpen);
   
   useEffect(() => {
     // This effect runs only once to set up the recognition engine
@@ -47,14 +48,19 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
+    // Only clear the text when the modal is first opened, not on every change of `isListening`.
+    if (isOpen && !prevIsOpen.current) {
       setText('');
       setTimeout(() => textareaRef.current?.focus(), 100);
-    } else {
-        if(isListening) {
-            recognitionRef.current?.stop();
-        }
     }
+    
+    // Stop recognition if the modal is closed while listening.
+    if (!isOpen && isListening) {
+      recognitionRef.current?.stop();
+    }
+    
+    // Update the ref for the next render cycle.
+    prevIsOpen.current = isOpen;
   }, [isOpen, isListening]);
   
   // Auto-resize textarea

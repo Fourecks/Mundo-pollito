@@ -66,7 +66,7 @@ serve(async (req) => {
     // 4. Obtener todas las tareas no completadas para esos usuarios en su "hoy".
     const { data: todos, error: todayTodosError } = await supabaseAdmin
       .from('todos')
-      .select('user_id, text')
+      .select('user_id')
       .in('user_id', usersToNotify)
       .eq('due_date', dateKey)
       .eq('completed', false);
@@ -78,27 +78,19 @@ serve(async (req) => {
         });
     }
 
-    // 5. Agrupar tareas por usuario.
+    // 5. Agrupar tareas por usuario y contarlas.
     const todosByUser = todos.reduce((acc, todo) => {
-        if (!acc[todo.user_id]) acc[todo.user_id] = [];
-        acc[todo.user_id].push(todo.text);
+        if (!acc[todo.user_id]) acc[todo.user_id] = 0;
+        acc[todo.user_id]++;
         return acc;
-    }, {} as Record<string, string[]>);
+    }, {} as Record<string, number>);
     
     // 6. Formatear y enviar las notificaciones.
-    const notificationPromises = Object.entries(todosByUser).map(([userId, tasks]: [string, string[]]) => {
-        const taskCount = tasks.length;
+    const notificationPromises = Object.entries(todosByUser).map(([userId, taskCount]: [string, number]) => {
         if (taskCount === 0) return Promise.resolve(true);
         
         const title = "Tu resumen de hoy ☀️";
-        let message = `¡Pío, pío! Tienes ${taskCount} tarea${taskCount > 1 ? 's' : ''} para hoy:`;
-        
-        const tasksToList = tasks.slice(0, 3);
-        message += tasksToList.map(taskText => `\n- ${taskText}`).join('');
-        
-        if (taskCount > 3) {
-            message += `\n...y ${taskCount - 3} más.`;
-        }
+        const message = `¡Pío, pío! Tienes ${taskCount} tarea${taskCount > 1 ? 's' : ''} para hoy. ¡Que tengas un día productivo!`;
         
         return sendOneSignalNotification(userId, title, message);
     });
