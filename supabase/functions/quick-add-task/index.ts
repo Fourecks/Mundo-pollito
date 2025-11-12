@@ -40,6 +40,7 @@ const createHtmlResponse = (title: string, message: string, taskText?: string) =
     </html>
   `;
   return new Response(body, {
+    // FIX: Explicitly set charset to UTF-8 to prevent character encoding issues.
     headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
   });
 };
@@ -64,13 +65,14 @@ serve(async (req) => {
     const decodedText = decodeURIComponent(taskTextParam.replace(/\+/g, ' '));
     const dateKey = new Date().toISOString().split('T')[0];
 
-    const { error } = await supabaseAdmin.from('todos').insert({
+    // FIX: Use an array for the insert payload for robustness with the Supabase client.
+    const { error } = await supabaseAdmin.from('todos').insert([{
         text: decodedText,
         completed: false,
         priority: 'medium',
         due_date: dateKey,
         user_id: userId,
-    });
+    }]);
 
     if (error) {
       console.error("Quick capture - Supabase insert error:", error);
