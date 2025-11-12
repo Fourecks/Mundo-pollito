@@ -40,7 +40,6 @@ const createHtmlResponse = (title: string, message: string, taskText?: string) =
     </html>
   `;
   return new Response(body, {
-    // FIX: Explicitly set charset to UTF-8 to prevent character encoding issues.
     headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
   });
 };
@@ -65,18 +64,21 @@ serve(async (req) => {
     const decodedText = decodeURIComponent(taskTextParam.replace(/\+/g, ' '));
     const dateKey = new Date().toISOString().split('T')[0];
 
-    // FIX: Use an array for the insert payload for robustness with the Supabase client.
-    const { error } = await supabaseAdmin.from('todos').insert([{
-        text: decodedText,
-        completed: false,
-        priority: 'medium',
-        due_date: dateKey,
-        user_id: userId,
-    }]);
+    const { data, error } = await supabaseAdmin
+      .from('todos')
+      .insert([{
+          text: decodedText,
+          completed: false,
+          priority: 'medium',
+          due_date: dateKey,
+          user_id: userId,
+      }])
+      .select();
 
-    if (error) {
+    if (error || !data || data.length === 0) {
       console.error("Quick capture - Supabase insert error:", error);
-      return createHtmlResponse('❌ Error al Guardar', `No se pudo guardar la tarea en la base de datos. Error: ${error.message}`);
+      const errorMessage = error ? error.message : "La base de datos no confirmó el guardado.";
+      return createHtmlResponse('❌ Error al Guardar', `No se pudo guardar la tarea. Error: ${errorMessage}`);
     }
 
     return createHtmlResponse('✅ ¡Tarea Añadida!', "Se ha guardado tu nueva tarea:", decodedText);
