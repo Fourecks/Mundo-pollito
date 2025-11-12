@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1975,27 +1976,24 @@ const App: React.FC = () => {
   }, [user, gisReady, gdriveToken, getUserKey]);
 
   useEffect(() => {
-    const scriptGapi = document.createElement('script');
-    scriptGapi.src = 'https://apis.google.com/js/api.js';
-    scriptGapi.async = true;
-    scriptGapi.defer = true;
-    scriptGapi.onload = gapiLoadCallback;
-    document.body.appendChild(scriptGapi);
+    const gapiPoll = setInterval(() => {
+      if (window.gapi && window.gapi.load) {
+        gapiLoadCallback();
+        clearInterval(gapiPoll);
+      }
+    }, 100);
 
-    const scriptGis = document.createElement('script');
-    scriptGis.src = 'https://accounts.google.com/gsi/client';
-    scriptGis.async = true;
-    scriptGis.defer = true;
-    scriptGis.onload = gisLoadCallback;
-    document.body.appendChild(scriptGis);
+    const gisPoll = setInterval(() => {
+        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+            gisLoadCallback();
+            clearInterval(gisPoll);
+        }
+    }, 100);
 
     return () => {
-        // Find and remove scripts if they exist
-        const gapiScript = document.querySelector('script[src="https://apis.google.com/js/api.js"]');
-        const gisScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
-        if (gapiScript) document.body.removeChild(gapiScript);
-        if (gisScript) document.body.removeChild(gisScript);
-    }
+        clearInterval(gapiPoll);
+        clearInterval(gisPoll);
+    };
   }, [gapiLoadCallback, gisLoadCallback]);
 
   const handleAuthClick = () => {
