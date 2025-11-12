@@ -43,6 +43,7 @@ import PlusIcon from './components/icons/PlusIcon';
 import MobileTaskEditor from './components/MobileTaskEditor';
 import MobilePomodoroPanel from './components/MobilePomodoroPanel';
 import ConfirmationModalWithOptions from './components/ConfirmationModalWithOptions';
+import ConfirmationModal from './components/ConfirmationModal';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -230,6 +231,7 @@ interface AppComponentProps {
   handleToggleTodo: (id: number, onAllCompleted: (quote: string) => void) => Promise<void>;
   handleToggleSubtask: (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => Promise<void>;
   handleDeleteTodo: (id: number) => Promise<void>;
+  onClearPastTodos: () => void;
   handleAddFolder: (name: string) => Promise<Folder | null>;
   handleUpdateFolder: (folderId: number, name: string) => Promise<void>;
   handleDeleteFolder: (folderId: number) => Promise<void>;
@@ -275,7 +277,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,
-    handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
+    handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
@@ -584,6 +586,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 setSelectedDate={setSelectedDate} 
                 datesWithTasks={datesWithTasks} 
                 datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
+                onClearPastTodos={onClearPastTodos}
               />
             </ModalWindow>
           )}
@@ -642,7 +645,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
       activeTrack, activeSpotifyTrack,
-      handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
+      handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
@@ -838,6 +841,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             setSelectedDate={setSelectedDate} 
                             datesWithTasks={datesWithTasks} 
                             datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
+                            onClearPastTodos={onClearPastTodos}
                         />
                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
@@ -1104,6 +1108,8 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [deleteOptions, setDeleteOptions] = useState<{ isOpen: boolean; todo: Todo | null; }>({ isOpen: false, todo: null });
   const [updateOptions, setUpdateOptions] = useState<{ isOpen: boolean; original: Todo | null; updated: Todo | null; }>({ isOpen: false, original: null, updated: null });
+  const [isClearPastConfirmOpen, setIsClearPastConfirmOpen] = useState(false);
+
 
   const [activeBackground, setActiveBackground] = useState<Background | null>(null);
   const [savedActiveBgId, setSavedActiveBgId] = useState<string | null>(null);
@@ -1366,14 +1372,36 @@ const App: React.FC = () => {
       ]);
       
       if (todosData) {
+        const fiveMonthsAgo = new Date();
+        fiveMonthsAgo.setMonth(fiveMonthsAgo.getMonth() - 5);
+        
+        const oldTaskIds: number[] = [];
+        const recentTodosData = todosData.filter(todo => {
+          if (todo.due_date && new Date(todo.due_date) < fiveMonthsAgo) {
+            oldTaskIds.push(todo.id);
+            return false;
+          }
+          return true;
+        });
+
+        if (oldTaskIds.length > 0) {
+            supabase.from('todos').delete().in('id', oldTaskIds).then(({ error }) => {
+                if (error) {
+                    console.error("Failed to auto-delete old tasks from server:", error);
+                } else {
+                    console.log(`Auto-deleted ${oldTaskIds.length} tasks older than 5 months.`);
+                }
+            });
+        }
+        
         const networkTodosByDate: { [key: string]: Todo[] } = {};
-        todosData.forEach(todo => {
+        recentTodosData.forEach(todo => {
             const dateKey = todo.due_date ? todo.due_date : formatDateKey(new Date(todo.created_at));
             if (!networkTodosByDate[dateKey]) networkTodosByDate[dateKey] = [];
             networkTodosByDate[dateKey].push(todo);
         });
         setAllTodos(networkTodosByDate);
-        await clearAndPutAll('todos', todosData);
+        await clearAndPutAll('todos', recentTodosData);
       }
       if(foldersData) { setFolders(foldersData); await clearAndPutAll('folders', foldersData); }
       if(notesData) { setNotes(notesData); await clearAndPutAll('notes', notesData); }
@@ -1709,6 +1737,29 @@ const App: React.FC = () => {
     }
     setDeleteOptions({ isOpen: false, todo: null });
   };
+  
+  const handleClearPastTodos = async () => {
+    const todayKey = formatDateKey(selectedDate);
+    const idsToDelete: number[] = [];
+    
+    const newAllTodos = { ...allTodos };
+
+    for (const dateKey in newAllTodos) {
+        if (dateKey < todayKey) {
+            newAllTodos[dateKey].forEach(todo => idsToDelete.push(todo.id));
+            delete newAllTodos[dateKey];
+        }
+    }
+    
+    if (idsToDelete.length > 0) {
+        setAllTodos(newAllTodos);
+        for (const id of idsToDelete) {
+            syncableDelete('todos', id);
+        }
+    }
+    setIsClearPastConfirmOpen(false);
+  };
+
 
   const handleAddFolder = async (name: string): Promise<Folder | null> => {
       if (!user) return null;
@@ -2088,7 +2139,7 @@ const App: React.FC = () => {
     allTodos, folders: foldersWithNotes, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,
-    handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo,
+    handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos: () => setIsClearPastConfirmOpen(true),
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
@@ -2153,6 +2204,15 @@ const App: React.FC = () => {
                 style: 'primary',
             }
         ]}
+      />
+      <ConfirmationModal
+        isOpen={isClearPastConfirmOpen}
+        onClose={() => setIsClearPastConfirmOpen(false)}
+        onConfirm={handleClearPastTodos}
+        title="Limpiar Tareas Pasadas"
+        message={`¿Seguro que quieres eliminar todas las tareas anteriores al ${selectedDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}? Esta acción es permanente.`}
+        confirmText="Sí, limpiar"
+        cancelText="Cancelar"
       />
     </>
   );

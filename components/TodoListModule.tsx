@@ -9,6 +9,7 @@ import Calendar from './Calendar';
 import CalendarIcon from './icons/CalendarIcon';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
+import TrashIcon from './icons/TrashIcon';
 
 interface TodoListModuleProps {
     todos: Todo[];
@@ -23,6 +24,7 @@ interface TodoListModuleProps {
     datesWithTasks: Set<string>;
     datesWithAllTasksCompleted: Set<string>;
     isMobile?: boolean;
+    onClearPastTodos: () => void;
 }
 
 const priorityOrder: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
@@ -40,6 +42,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     datesWithTasks,
     datesWithAllTasksCompleted,
     isMobile = false,
+    onClearPastTodos,
 }) => {
     const [sortBy, setSortBy] = useState<'default' | 'priority' | 'dueDate'>('default');
     const [hideCompleted, setHideCompleted] = useState(false);
@@ -232,15 +235,25 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                                 </div>
                             </label>
 
-                            <button 
-                                onClick={toggleSort}
-                                className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary transition-colors flex-shrink-0"
-                                aria-label="Cambiar orden de tareas"
-                            >
-                                <SortIcon />
-                                <span className="hidden sm:inline">{getSortButtonText()}</span>
-                                <span className="sm:hidden">{sortBy === 'default' ? 'Original' : sortBy === 'priority' ? 'Prioridad' : 'Fecha'}</span>
-                            </button>
+                            <div className="flex items-center gap-2 sm:gap-4">
+                                <button
+                                    onClick={onClearPastTodos}
+                                    className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-red-100/50 dark:hover:bg-red-900/30"
+                                    title="Limpiar tareas anteriores al día actual"
+                                >
+                                    <TrashIcon className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Limpiar</span>
+                                </button>
+                                <button 
+                                    onClick={toggleSort}
+                                    className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-primary-light/30 dark:hover:bg-primary/10"
+                                    aria-label="Cambiar orden de tareas"
+                                >
+                                    <SortIcon />
+                                    <span className="hidden sm:inline">{getSortButtonText()}</span>
+                                    <span className="sm:hidden">{sortBy === 'default' ? 'Original' : sortBy === 'priority' ? 'Prioridad' : 'Fecha'}</span>
+                                </button>
+                            </div>
                         </div>
                          {!isMobile && <TodoInput onAddTodo={addTodo} />}
                     </div>
