@@ -1474,7 +1474,7 @@ const App: React.FC = () => {
       if(backgroundsData) {
           const processedBgs = backgroundsData.map(bg => {
               const { data: { publicUrl } } = supabase.storage.from('backgrounds').getPublicUrl(bg.path);
-              return { ...bg, url: publicUrl, type: bg.name.toLowerCase().endsWith('.mp4') ? 'video' : 'image' };
+              return { ...bg, url: publicUrl, type: bg.name.toLowerCase().endsWith('.mp4') ? 'video' : 'image', isFavorite: bg.is_favorite };
           });
           setUserBackgrounds(processedBgs);
           await clearAndPutAll('user_backgrounds', processedBgs);
@@ -1538,27 +1538,32 @@ const App: React.FC = () => {
     window.addEventListener('offline', handleOffline);
 
     const startup = async () => {
-      await initDB(user.email!);
-      console.log("DB Initialized.");
+        try {
+            await initDB(user.email!);
+            console.log("DB Initialized.");
 
-      if (navigator.onLine) {
-        setIsOnline(true);
-        console.log("App starting online. Syncing pending changes...");
-        setIsSyncing(true);
-        const { success } = await processSyncQueue();
-        setIsSyncing(false);
-        if (success) {
-          console.log("Initial sync successful.");
-          await loadData('fetch');
-        } else {
-          console.error("Initial sync failed. Loading from cache only. Will retry on next online event.");
-          await loadData('cache-only');
+            if (navigator.onLine) {
+                setIsOnline(true);
+                console.log("App starting online. Syncing pending changes...");
+                setIsSyncing(true);
+                const { success } = await processSyncQueue();
+                setIsSyncing(false);
+                if (success) {
+                    console.log("Initial sync successful.");
+                    await loadData('fetch');
+                } else {
+                    console.error("Initial sync failed. Loading from cache only. Will retry on next online event.");
+                    await loadData('cache-only');
+                }
+            } else {
+                setIsOnline(false);
+                console.log("App starting offline.");
+                await loadData('cache-only');
+            }
+        } catch (error) {
+            console.error("Fatal error during startup:", error);
+            // Optionally, show an error message to the user
         }
-      } else {
-        setIsOnline(false);
-        console.log("App starting offline.");
-        await loadData('cache-only');
-      }
     };
 
     if (!dataLoaded) {
@@ -2214,6 +2219,7 @@ const App: React.FC = () => {
             ...newBgRecord,
             url: publicUrl,
             type: file.name.toLowerCase().endsWith('.mp4') ? 'video' : 'image',
+            isFavorite: newBgRecord.is_favorite
         };
 
         const updatedBgs = [...userBackgrounds, newBg];

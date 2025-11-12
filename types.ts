@@ -69,7 +69,8 @@ export interface Background {
   path: string;
   url: string;
   type: 'video' | 'image';
-  isFavorite: boolean;
+  is_favorite: boolean;
+  isFavorite: boolean; // Keep for local state compatibility
   created_at: string;
 }
 
