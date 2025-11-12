@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1951,30 +1952,30 @@ const App: React.FC = () => {
 
   const gisLoadCallback = useCallback(() => {
     if (!window.google) return;
-    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      callback: (tokenResponse: any) => {
-        const currentUser = userRef.current; // Get latest user from ref
-        if (tokenResponse && tokenResponse.access_token) {
-          setGdriveToken(tokenResponse.access_token);
-          if (currentUser) {
-            localStorage.setItem(`${currentUser.email}_gdrive_authenticated`, 'true');
-          }
+
+    const tokenCallback = (tokenResponse: any) => {
+        const currentUser = userRef.current;
+        if (tokenResponse && tokenResponse.access_token && currentUser) {
+            setGdriveToken(tokenResponse.access_token);
+            localStorage.setItem(getUserKey('gdrive_authenticated'), 'true');
         }
-      },
+    };
+
+    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: tokenCallback,
+        ux_mode: 'redirect',
+        redirect_uri: window.location.origin,
     });
     setGisReady(true);
-  }, []);
-  
-  // Effect to trigger silent GDrive login when ready
-  useEffect(() => {
-    // Attempt silent login only when user is loaded AND gis client is ready, and we don't already have a token.
-    if (user && gisReady && localStorage.getItem(getUserKey('gdrive_authenticated')) === 'true' && !gdriveToken) {
+
+    const currentUser = userRef.current;
+    if (currentUser && localStorage.getItem(getUserKey('gdrive_authenticated')) === 'true') {
         tokenClientRef.current?.requestAccessToken({ prompt: '' });
     }
-  }, [user, gisReady, gdriveToken, getUserKey]);
-
+  }, [getUserKey]);
+  
   useEffect(() => {
     const gapiPoll = setInterval(() => {
       if (window.gapi && window.gapi.load) {
@@ -1995,6 +1996,7 @@ const App: React.FC = () => {
         clearInterval(gisPoll);
     };
   }, [gapiLoadCallback, gisLoadCallback]);
+
 
   const handleAuthClick = () => {
     if (tokenClientRef.current) {
