@@ -1963,6 +1963,18 @@ const App: React.FC = () => {
             scope: SCOPES,
             callback: (tokenResponse: any) => {
                 const currentUser = userRef.current;
+                if (tokenResponse.error) {
+                    // Explicitly handle errors, including silent auth failure ('interaction_required')
+                    console.error("Google Drive auth error. Resetting auth state.", tokenResponse);
+                    setGdriveToken(null);
+                    if (currentUser) {
+                        localStorage.removeItem(getUserKey('gdrive_authenticated'));
+                    }
+                    // This reset should cause the UI to show the "Connect" button again.
+                    // The GIS library might show a transient popup on its own, but our app state will be clean.
+                    return;
+                }
+                
                 if (tokenResponse && tokenResponse.access_token && currentUser) {
                     // Success case
                     console.log("Google Drive token received successfully.");
@@ -1970,8 +1982,8 @@ const App: React.FC = () => {
                     setGdriveToken(tokenResponse.access_token);
                     localStorage.setItem(getUserKey('gdrive_authenticated'), 'true');
                 } else {
-                    // Error/Failure case for silent auth
-                    console.error("Google Drive auth response was invalid or missing token. Resetting auth state.", tokenResponse);
+                    // Fallback for unexpected responses from silent auth
+                    console.warn("Google Drive auth response was invalid or missing token. Resetting auth state.", tokenResponse);
                     setGdriveToken(null);
                     if (currentUser) {
                         localStorage.removeItem(getUserKey('gdrive_authenticated'));
@@ -1985,7 +1997,7 @@ const App: React.FC = () => {
 
     // Robustly wait for both Google scripts to be loaded from index.html
     const checkScriptsInterval = setInterval(() => {
-        if (window.gapi?.load && window.google?.accounts?.oauth2) {
+        if (window.gapi?.load && window.google?.accounts?.oauth2?.initTokenClient) {
             clearInterval(checkScriptsInterval);
             initializeGoogleClients();
         }
@@ -1993,6 +2005,7 @@ const App: React.FC = () => {
 
     return () => clearInterval(checkScriptsInterval);
   }, [getUserKey]);
+
 
   useEffect(() => {
     // This effect handles silent re-authentication on page load.
@@ -2007,6 +2020,7 @@ const App: React.FC = () => {
   const handleAuthClick = () => {
     if (tokenClientRef.current) {
       console.log("Requesting user consent for Google Drive.");
+      // This initiates a user-interactive login flow, which is more robust on mobile and for expired sessions.
       tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
     } else {
       console.error("Google token client not ready.");
@@ -2058,26 +2072,29 @@ const App: React.FC = () => {
 
           const fileDataPromises = files.map(async (file) => {
             try {
+                // This is the correct and robust way to fetch file content.
                 const mediaResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
                     headers: { 'Authorization': `Bearer ${gdriveToken}` }
                 });
                 if (!mediaResponse.ok) {
+                    // If token expires or is invalid, reset the auth state, forcing a re-login.
                     if (mediaResponse.status === 401 || mediaResponse.status === 403) {
                        console.error('GDrive token expired during fetch. Resetting auth.');
                        setGdriveToken(null);
                        localStorage.removeItem(getUserKey('gdrive_authenticated'));
                     }
-                    throw new Error(`Failed to fetch file media for ${file.id}`);
+                    throw new Error(`Failed to fetch file media for ${file.id}, status: ${mediaResponse.status}`);
                 }
                 const blob = await mediaResponse.blob();
                 const url = URL.createObjectURL(blob);
-                return { ...file, url };
+                return { ...file, url }; // Return the GAPI file object with the new blob URL.
             } catch (e) {
                 console.error(`Could not process file ${file.name}:`, e);
-                return null;
+                return null; // Return null on failure so Promise.all doesn't reject.
             }
           });
         
+          // Wait for all fetches and filter out any that failed.
           const processedFiles = (await Promise.all(fileDataPromises)).filter(Boolean);
 
           if(folderName === 'gallery') {
