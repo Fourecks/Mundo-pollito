@@ -1928,6 +1928,15 @@ const App: React.FC = () => {
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
+  // This new effect handles the race condition between getting a token and gapi being ready.
+  useEffect(() => {
+    if (gdriveToken && gapiReady) {
+      if (window.gapi && window.gapi.client) {
+        window.gapi.client.setToken({ access_token: gdriveToken });
+      }
+    }
+  }, [gdriveToken, gapiReady]);
+
   const gapiLoadCallback = useCallback(() => {
     window.gapi.load('client', async () => {
       await window.gapi.client.init({
@@ -1947,7 +1956,7 @@ const App: React.FC = () => {
         const currentUser = userRef.current; // Get latest user from ref
         if (tokenResponse && tokenResponse.access_token) {
           setGdriveToken(tokenResponse.access_token);
-          window.gapi.client.setToken(tokenResponse);
+          // window.gapi.client.setToken is now handled by a useEffect to prevent race conditions
           if (currentUser) {
             localStorage.setItem(`${currentUser.email}_gdrive_authenticated`, 'true');
           }
