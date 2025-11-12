@@ -1524,7 +1524,7 @@ const App: React.FC = () => {
   };
   
   // --- Data Handlers (Now with Offline Support) ---
-  const handleAddTodo = async (text: string) => {
+  const handleAddTodo = useCallback(async (text: string) => {
     if (!user) return;
     const dateKey = formatDateKey(selectedDate);
     const tempId = -Date.now();
@@ -1532,7 +1532,50 @@ const App: React.FC = () => {
     
     setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
     await syncableCreate('todos', newTodo);
-  };
+  }, [user, selectedDate]);
+  
+  // --- Quick Capture from URL ---
+  useEffect(() => {
+    if (!user || !dataLoaded) return;
+
+    const handleUrlTask = async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const taskText = urlParams.get('addTask');
+
+        if (taskText && user) {
+            const decodedText = decodeURIComponent(taskText.replace(/\+/g, ' '));
+            
+            // Logic to add a todo for today
+            const dateKey = formatDateKey(new Date());
+            const tempId = -Date.now();
+            const newTodo: Todo = { 
+                id: tempId, 
+                text: decodedText, 
+                completed: false, 
+                priority: 'medium', 
+                due_date: dateKey, 
+                user_id: user.id, 
+                created_at: new Date().toISOString(), 
+                subtasks: [] 
+            };
+
+            setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
+            await syncableCreate('todos', newTodo);
+            
+            // Set view to today to show the new task
+            setSelectedDate(new Date());
+
+            // Clean the URL to prevent re-adding on refresh
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    };
+    
+    handleUrlTask();
+    // This effect should only run once after the user data is loaded to process the URL.
+    // We disable the exhaustive-deps lint rule because we intentionally want this to run only once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, dataLoaded]);
 
   const getUpdatedTodosState = (current: { [key: string]: Todo[] }, todoToUpdate: Todo): { [key: string]: Todo[] } => {
       const newAllTodos = JSON.parse(JSON.stringify(current));
