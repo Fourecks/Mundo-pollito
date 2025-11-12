@@ -31,7 +31,7 @@ interface CustomizationPanelProps {
   onClose: () => void;
   isMobile?: boolean;
   
-  // Gallery Auth Props
+  // Auth Props
   isSignedIn: boolean;
   onAuthClick: () => void;
   isGapiReady: boolean;
@@ -46,8 +46,8 @@ interface CustomizationPanelProps {
   userBackgrounds: Background[];
   onSelectBackground: (background: Background | null) => void;
   onAddBackground: (file: File) => void;
-  onDeleteBackground: (background: Background) => void;
-  onToggleFavorite: (id: number) => void;
+  onDeleteBackground: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
   backgroundsLoading: boolean;
   
   // Ambience Props
@@ -76,10 +76,10 @@ const soundOptions: { type: AmbientSoundType; icon: React.FC; label: string }[] 
     { type: 'ocean', icon: WaveIcon, label: 'Mar' },
 ];
 
-interface BackgroundsTabProps extends Pick<CustomizationPanelProps, 'activeBackground' | 'userBackgrounds' | 'onSelectBackground' | 'onAddBackground' | 'onDeleteBackground' | 'onToggleFavorite' | 'backgroundsLoading'> {}
+interface BackgroundsTabProps extends Pick<CustomizationPanelProps, 'activeBackground' | 'userBackgrounds' | 'onSelectBackground' | 'onAddBackground' | 'onDeleteBackground' | 'onToggleFavorite' | 'backgroundsLoading' | 'isSignedIn' | 'onAuthClick' | 'isGapiReady'> {}
 
 const BackgroundsTab: React.FC<BackgroundsTabProps> = (props) => {
-    const { activeBackground, userBackgrounds, onSelectBackground, onAddBackground, onDeleteBackground, onToggleFavorite, backgroundsLoading } = props;
+    const { activeBackground, userBackgrounds, onSelectBackground, onAddBackground, onDeleteBackground, onToggleFavorite, backgroundsLoading, isSignedIn, onAuthClick, isGapiReady } = props;
     const [view, setView] = useState<'all' | 'favorites'>('all');
     const [bgToDelete, setBgToDelete] = useState<Background | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,22 +92,35 @@ const BackgroundsTab: React.FC<BackgroundsTabProps> = (props) => {
         if (event.target) event.target.value = '';
     };
 
-    const triggerFileUpload = () => {
-        if (userBackgrounds.length >= 10) {
-            alert("Has alcanzado el límite de 10 fondos. Por favor, elimina uno para poder subir otro.");
-            return;
-        }
-        fileInputRef.current?.click();
-    };
+    const triggerFileUpload = () => fileInputRef.current?.click();
     
     const confirmDelete = () => {
         if(bgToDelete) {
-            onDeleteBackground(bgToDelete);
+            onDeleteBackground(bgToDelete.id);
             setBgToDelete(null);
         }
     };
     
-    const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.is_favorite) : userBackgrounds;
+    const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.isFavorite) : userBackgrounds;
+
+    if (!isSignedIn) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center p-4">
+            <ChickenIcon className="w-16 h-16 text-primary mb-4" />
+            <h3 className="font-bold text-lg text-gray-700 dark:text-gray-300">Conecta tus Fondos</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-xs">
+              Para guardar y sincronizar tus fondos personalizados, conecta tu cuenta de Google Drive.
+            </p>
+            <button
+              onClick={onAuthClick}
+              disabled={!isGapiReady}
+              className="mt-6 bg-primary text-white font-bold rounded-full px-6 py-3 shadow-md hover:bg-primary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 disabled:bg-primary-light disabled:cursor-wait"
+            >
+              {isGapiReady ? 'Conectar con Google Drive' : 'Cargando...'}
+            </button>
+          </div>
+        );
+    }
 
     return (
         <>
@@ -148,8 +161,8 @@ const BackgroundsTab: React.FC<BackgroundsTabProps> = (props) => {
                                     </div>
                                 </button>
                                 <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => onToggleFavorite(bg.id)} className="p-1.5 rounded-full bg-black/30 text-white hover:bg-yellow-500 backdrop-blur-sm" title={bg.is_favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}>
-                                        <StarIcon filled={!!bg.is_favorite} className="h-4 w-4" />
+                                    <button onClick={() => onToggleFavorite(bg.id)} className="p-1.5 rounded-full bg-black/30 text-white hover:bg-yellow-500 backdrop-blur-sm" title={bg.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}>
+                                        <StarIcon filled={!!bg.isFavorite} className="h-4 w-4" />
                                     </button>
                                     <button onClick={() => setBgToDelete(bg)} className="p-1.5 rounded-full bg-black/30 text-white hover:bg-red-500 backdrop-blur-sm" title="Eliminar fondo">
                                         <TrashIcon className="h-4 w-4" />

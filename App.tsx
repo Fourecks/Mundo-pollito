@@ -16,7 +16,7 @@ import FloatingPlayer from './components/FloatingPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
-import { initDB, getAll, clearAndPutAll, get, set, remove, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue } from './db';
+import { initDB, getAll, clearAndPutAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue } from './db';
 import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
 import Browser from './components/Browser';
@@ -255,18 +255,17 @@ interface AppComponentProps {
   onSetDailyEncouragement: (localHour: number | null) => void;
   setActiveTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
   setActiveSpotifyTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
-  // Gallery (G-Drive)
+  // Google Drive Props
   gdriveToken: string | null;
   galleryIsLoading: boolean;
+  backgroundsAreLoading: boolean;
   handleAuthClick: () => void;
   handleAddGalleryImages: (files: File[]) => Promise<void>;
   handleDeleteGalleryImage: (id: string) => Promise<void>;
-  gapiReady: boolean;
-  // Backgrounds (Supabase)
-  backgroundsAreLoading: boolean;
   handleAddBackground: (file: File) => Promise<void>;
-  handleDeleteBackground: (background: Background) => Promise<void>;
-  handleToggleFavoriteBackground: (id: number) => Promise<void>;
+  handleDeleteBackground: (id: string) => Promise<void>;
+  handleToggleFavoriteBackground: (id: string) => Promise<void>;
+  gapiReady: boolean;
   // Notifications
   isSubscribed: boolean;
   isPermissionBlocked: boolean;
@@ -285,9 +284,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
     setActiveTrack, setActiveSpotifyTrack,
-    gdriveToken, galleryIsLoading, handleAuthClick,
-    handleAddGalleryImages, handleDeleteGalleryImage,
-    backgroundsAreLoading, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+    gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
+    handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
     isSubscribed, isPermissionBlocked, handleNotificationAction
   } = props;
   
@@ -654,9 +652,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
       setActiveTrack, setActiveSpotifyTrack,
-      gdriveToken, galleryIsLoading, handleAuthClick,
-      handleAddGalleryImages, handleDeleteGalleryImage,
-      backgroundsAreLoading, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+      gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
+      handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       isSubscribed, isPermissionBlocked, handleNotificationAction
     } = props;
 
@@ -1141,7 +1138,6 @@ const App: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
-  const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
   
   // UI state
   const [browserSession, setBrowserSession] = useState<BrowserSession>({});
@@ -1152,7 +1148,7 @@ const App: React.FC = () => {
 
 
   const [activeBackground, setActiveBackground] = useState<Background | null>(null);
-  const [savedActiveBgId, setSavedActiveBgId] = useState<number | null>(null);
+  const [savedActiveBgId, setSavedActiveBgId] = useState<string | null>(null);
   const [particleType, setParticleType] = useState<ParticleType>('none');
   const [ambientSound, setAmbientSound] = useState<{ type: AmbientSoundType; volume: number }>({ type: 'none', volume: 0.5 });
   const [dailyEncouragementLocalHour, setDailyEncouragementLocalHour] = useState<number | null>(null);
@@ -1168,17 +1164,16 @@ const App: React.FC = () => {
   const [activeTrack, setActiveTrack] = useState<Playlist | null>(null);
   const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
 
-  // Google Drive State (Gallery Only)
+  // Google Drive State
   const [gapiReady, setGapiReady] = useState(false);
   const [gisReady, setGisReady] = useState(false);
   const [gdriveToken, setGdriveToken] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+  const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
   const [galleryIsLoading, setGalleryIsLoading] = useState(false);
+  const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   const tokenClientRef = useRef<any>(null);
-
-  // Supabase Backgrounds State
-  const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
 
   // OneSignal Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -1382,14 +1377,13 @@ const App: React.FC = () => {
     if (!user) return;
     
     // Load from cache first for instant UI
-    const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedSettings, cachedBgs] = await Promise.all([
+    const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedSettings] = await Promise.all([
         getAll<Todo>('todos'),
         getAll<Folder>('folders'),
         getAll<Note>('notes'),
         getAll<Playlist>('playlists'),
         getAll<QuickNote>('quick_notes'),
         getAll<{key: string, value: any}>('settings'),
-        getAll<Background>('user_backgrounds'),
     ]);
 
     const todosByDate: { [key: string]: Todo[] } = {};
@@ -1403,7 +1397,6 @@ const App: React.FC = () => {
     setNotes(cachedNotes);
     setPlaylists(cachedPlaylists);
     setQuickNotes(cachedQuickNotes);
-    if (cachedBgs.length > 0) setUserBackgrounds(cachedBgs);
 
     cachedSettings.forEach(s => {
         if (s.key === 'pomodoroState') setPomodoroState(p => ({...p, ...s.value, isActive: false, endTime: null}));
@@ -1416,15 +1409,13 @@ const App: React.FC = () => {
     if (networkMode === 'fetch' && navigator.onLine) {
       console.log("Fetching fresh data from server...");
       setIsSyncing(true);
-      setBackgroundsAreLoading(true);
       const [
         { data: todosData },
         { data: foldersData },
         { data: notesData },
         { data: playlistsData },
         { data: quickNotesData },
-        { data: profileData },
-        { data: backgroundsData }
+        { data: profileData }
       ] = await Promise.all([
         supabase.from('todos').select('*, subtasks(*)').order('created_at'),
         supabase.from('folders').select('*').order('created_at'),
@@ -1432,7 +1423,6 @@ const App: React.FC = () => {
         supabase.from('playlists').select('*').order('created_at'),
         supabase.from('quick_notes').select('*').order('created_at'),
         supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings').eq('id', user.id).single(),
-        supabase.from('user_backgrounds').select('*').order('created_at'),
       ]);
       
       if (todosData) {
@@ -1471,16 +1461,6 @@ const App: React.FC = () => {
       if(notesData) { setNotes(notesData); await clearAndPutAll('notes', notesData); }
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
-      if(backgroundsData) {
-          const processedBgs = backgroundsData.map(bg => {
-              const { data: { publicUrl } } = supabase.storage.from('backgrounds').getPublicUrl(bg.path);
-              return { ...bg, url: publicUrl, type: bg.name.toLowerCase().endsWith('.mp4') ? 'video' : 'image' };
-          });
-          setUserBackgrounds(processedBgs);
-          await clearAndPutAll('user_backgrounds', processedBgs);
-      }
-      setBackgroundsAreLoading(false);
-
 
       if(profileData) {
         setDailyEncouragementLocalHour(profileData.daily_encouragement_hour_local);
@@ -1494,7 +1474,7 @@ const App: React.FC = () => {
     
     try {
         const [ storedActiveBgId, storedParticles, storedAmbience, storedBrowser, storedActiveTrack, storedSpotifyTrack] = await Promise.all([
-            get<{key: string, value: number}>('settings', 'activeBackgroundId'),
+            get<{key: string, value: string}>('settings', 'activeBackgroundId'),
             get<{key: string, value: ParticleType}>('settings', 'particleType'),
             get<{key: string, value: any}>('settings', 'ambientSound'),
             get<{key: string, value: BrowserSession}>('settings', getUserKey('browserSession')),
@@ -1538,32 +1518,27 @@ const App: React.FC = () => {
     window.addEventListener('offline', handleOffline);
 
     const startup = async () => {
-        try {
-            await initDB(user.email!);
-            console.log("DB Initialized.");
+      await initDB(user.email!);
+      console.log("DB Initialized.");
 
-            if (navigator.onLine) {
-                setIsOnline(true);
-                console.log("App starting online. Syncing pending changes...");
-                setIsSyncing(true);
-                const { success } = await processSyncQueue();
-                setIsSyncing(false);
-                if (success) {
-                    console.log("Initial sync successful.");
-                    await loadData('fetch');
-                } else {
-                    console.error("Initial sync failed. Loading from cache only. Will retry on next online event.");
-                    await loadData('cache-only');
-                }
-            } else {
-                setIsOnline(false);
-                console.log("App starting offline.");
-                await loadData('cache-only');
-            }
-        } catch (error) {
-            console.error("Fatal error during startup:", error);
-            // Optionally, show an error message to the user
+      if (navigator.onLine) {
+        setIsOnline(true);
+        console.log("App starting online. Syncing pending changes...");
+        setIsSyncing(true);
+        const { success } = await processSyncQueue();
+        setIsSyncing(false);
+        if (success) {
+          console.log("Initial sync successful.");
+          await loadData('fetch');
+        } else {
+          console.error("Initial sync failed. Loading from cache only. Will retry on next online event.");
+          await loadData('cache-only');
         }
+      } else {
+        setIsOnline(false);
+        console.log("App starting offline.");
+        await loadData('cache-only');
+      }
     };
 
     if (!dataLoaded) {
@@ -1955,7 +1930,9 @@ const App: React.FC = () => {
 
   // --- Blob URL Cleanup ---
   useEffect(() => {
-    const urlsToClean = galleryImages.map(i => i.url);
+    // This effect runs when the component unmounts or when the dependencies change.
+    // The cleanup function from the *previous* render is called, which has the old URLs.
+    const urlsToClean = [...galleryImages.map(i => i.url), ...userBackgrounds.map(b => b.url)];
     return () => {
         urlsToClean.forEach(url => {
             if (url.startsWith('blob:')) {
@@ -1963,9 +1940,9 @@ const App: React.FC = () => {
             }
         });
     };
-  }, [galleryImages]);
+  }, [galleryImages, userBackgrounds]);
 
-  // --- Google Drive Integration (Gallery) ---
+  // --- Google Drive Integration ---
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
   
@@ -2075,25 +2052,26 @@ const App: React.FC = () => {
     } catch (error) { console.error("Error finding/creating app folder:", error); return null; }
   }, []);
   
-  const loadGalleryFromDrive = useCallback(async () => {
+  const loadFilesFromDrive = useCallback(async (folderName: 'gallery' | 'backgrounds') => {
       if (!gdriveToken) return;
-      setGalleryIsLoading(true);
+      if (folderName === 'gallery') setGalleryIsLoading(true);
+      else setBackgroundsAreLoading(true);
 
       try {
           const parentFolderId = await findOrCreateAppFolder();
           if (!parentFolderId) throw new Error("Could not access app folder.");
           
           let subFolderId: string | null = null;
-          const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='gallery' and trashed=false`, fields: 'files(id)' });
+          const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`, fields: 'files(id)' });
           if(folderResponse.result.files && folderResponse.result.files.length > 0) {
               subFolderId = folderResponse.result.files[0].id!;
           } else {
-              const subFolderMeta = { name: 'gallery', mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
+              const subFolderMeta = { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
               const createSubResponse = await window.gapi.client.drive.files.create({ resource: subFolderMeta, fields: 'id' });
               subFolderId = createSubResponse.result.id!;
           }
 
-          if(!subFolderId) throw new Error(`Could not access gallery folder.`);
+          if(!subFolderId) throw new Error(`Could not access ${folderName} folder.`);
           
           const filesResponse = await window.gapi.client.drive.files.list({ q: `'${subFolderId}' in parents and trashed=false`, fields: 'files(id, name, appProperties)' });
           const files = filesResponse.result.files || [];
@@ -2121,22 +2099,41 @@ const App: React.FC = () => {
           });
         
           const processedFiles = (await Promise.all(fileDataPromises)).filter(Boolean);
-          const images: GalleryImage[] = processedFiles.map(file => ({ id: file!.id!, url: file!.url }));
-          setGalleryImages(images);
 
-      } catch (error) { console.error(`Error loading gallery:`, error); }
+          if(folderName === 'gallery') {
+              const images: GalleryImage[] = processedFiles.map(file => ({ id: file!.id!, url: file!.url }));
+              setGalleryImages(images);
+          } else {
+              const backgrounds: Background[] = processedFiles.map(file => ({
+                  id: file!.id!,
+                  name: file!.name!,
+                  url: file!.url,
+                  type: file!.name!.toLowerCase().endsWith('.mp4') ? 'video' : 'image',
+                  isFavorite: file!.appProperties?.isFavorite === 'true'
+              }));
+              setUserBackgrounds(backgrounds);
+              
+              if(savedActiveBgId) {
+                const bgToActivate = backgrounds.find(bg => bg.id === savedActiveBgId);
+                if(bgToActivate) setActiveBackground(bgToActivate);
+              }
+          }
+
+      } catch (error) { console.error(`Error loading ${folderName}:`, error); }
       finally {
-          setGalleryIsLoading(false);
+          if (folderName === 'gallery') setGalleryIsLoading(false);
+          else setBackgroundsAreLoading(false);
       }
-  }, [gdriveToken, findOrCreateAppFolder, getUserKey]);
+  }, [gdriveToken, findOrCreateAppFolder, savedActiveBgId, getUserKey]);
   
   useEffect(() => {
       if (gdriveToken && isOnline) {
-          loadGalleryFromDrive();
+          loadFilesFromDrive('gallery');
+          loadFilesFromDrive('backgrounds');
       }
-  }, [gdriveToken, loadGalleryFromDrive, isOnline]);
+  }, [gdriveToken, loadFilesFromDrive, isOnline]);
   
-  const uploadFileToDrive = useCallback(async (file: File, folderName: 'gallery'): Promise<any> => {
+  const uploadFileToDrive = useCallback(async (file: File, folderName: 'gallery' | 'backgrounds'): Promise<any> => {
       const parentFolderId = await findOrCreateAppFolder();
       if (!parentFolderId) throw new Error("No parent folder");
       
@@ -2167,120 +2164,43 @@ const App: React.FC = () => {
       try {
           const uploadPromises = files.map(file => uploadFileToDrive(file, 'gallery'));
           await Promise.all(uploadPromises);
-          await loadGalleryFromDrive();
+          await loadFilesFromDrive('gallery');
       } catch (error) { console.error("Error uploading images:", error); }
       finally { setGalleryIsLoading(false); }
   };
-  const handleDeleteGalleryFile = async (id: string) => {
+  const handleDeleteFile = async (id: string, folderName: 'gallery' | 'backgrounds') => {
       try {
           await window.gapi.client.drive.files.delete({ fileId: id });
-          setGalleryImages(i => i.filter(img => img.id !== id));
-      } catch (error) { console.error(`Error deleting gallery item:`, error); }
+          if(folderName === 'gallery') {
+            setGalleryImages(i => i.filter(img => img.id !== id));
+          } else {
+              setUserBackgrounds(bgs => bgs.filter(bg => bg.id !== id));
+              if(activeBackground?.id === id) setActiveBackground(null);
+          }
+      } catch (error) { console.error(`Error deleting ${folderName} item:`, error); }
   };
   
-  // --- Backgrounds (Supabase Storage) ---
   const handleAddBackground = async (file: File) => {
-    if (!user) return;
-    if (!isOnline) {
-        alert("Debes estar en línea para subir fondos.");
-        return;
-    }
-    if (userBackgrounds.length >= 10) {
-        alert("Has alcanzado el límite de 10 fondos. Por favor, elimina uno para poder subir otro.");
-        return;
-    }
-    const fifteenMB = 15 * 1024 * 1024;
-    if (file.size > fifteenMB) {
-        alert("El archivo es demasiado grande. El límite es de 15 MB.");
-        return;
-    }
-
-    setBackgroundsAreLoading(true);
-    try {
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${user.id}/${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-            .from('backgrounds')
-            .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: newBgRecord, error: insertError } = await supabase
-            .from('user_backgrounds')
-            .insert({ user_id: user.id, name: file.name, path: filePath, is_favorite: false })
-            .select()
-            .single();
-        
-        if (insertError) throw insertError;
-        
-        const { data: { publicUrl } } = supabase.storage.from('backgrounds').getPublicUrl(filePath);
-        const newBg: Background = {
-            ...newBgRecord,
-            url: publicUrl,
-            type: file.name.toLowerCase().endsWith('.mp4') ? 'video' : 'image',
-        };
-
-        const updatedBgs = [...userBackgrounds, newBg];
-        setUserBackgrounds(updatedBgs);
-        await set('user_backgrounds', newBg);
-
-    } catch (error) {
-        console.error("Error al subir fondo:", error);
-        alert("Hubo un error al subir tu fondo.");
-    } finally {
-        setBackgroundsAreLoading(false);
-    }
+      setBackgroundsAreLoading(true);
+      try {
+          await uploadFileToDrive(file, 'backgrounds');
+          await loadFilesFromDrive('backgrounds');
+      } catch (error) { console.error("Error uploading background:", error); }
+      finally { setBackgroundsAreLoading(false); }
   };
-
-  const handleDeleteBackground = async (background: Background) => {
-    if (!user || !isOnline) {
-        alert("Debes estar en línea para eliminar fondos.");
-        return;
-    }
-    const originalBgs = [...userBackgrounds];
-    const updatedBgs = userBackgrounds.filter(bg => bg.id !== background.id);
-    setUserBackgrounds(updatedBgs);
-    if (activeBackground?.id === background.id) setActiveBackground(null);
-    
-    try {
-        const { error: storageError } = await supabase.storage.from('backgrounds').remove([background.path]);
-        if (storageError) throw storageError;
-
-        const { error: dbError } = await supabase.from('user_backgrounds').delete().eq('id', background.id);
-        if (dbError) throw dbError;
-        
-        await remove('user_backgrounds', background.id);
-    } catch (error) {
-        console.error("Error al eliminar fondo:", error);
-        alert("No se pudo eliminar el fondo.");
-        setUserBackgrounds(originalBgs);
-    }
-  };
-
-  const handleToggleFavoriteBackground = async (id: number) => {
+  const handleToggleFavoriteBackground = async (id: string) => {
     const bg = userBackgrounds.find(b => b.id === id);
     if (!bg) return;
-
-    const updatedIsFavorite = !bg.is_favorite;
-    const updatedBgs = userBackgrounds.map(b => b.id === id ? { ...b, is_favorite: updatedIsFavorite } : b);
-    setUserBackgrounds(updatedBgs);
-    
-    await set('user_backgrounds', { ...bg, is_favorite: updatedIsFavorite });
-
-    if (!isOnline) {
-        await syncableUpdate('user_backgrounds', { id, is_favorite: updatedIsFavorite });
-        return;
-    }
+    const isFavorite = !bg.isFavorite;
     try {
-        const { error } = await supabase.from('user_backgrounds').update({ is_favorite: updatedIsFavorite }).eq('id', id);
-        if (error) throw error;
-    } catch (error) {
-        console.error("Error al marcar como favorito:", error);
-        setUserBackgrounds(userBackgrounds);
-    }
+        await window.gapi.client.drive.files.update({
+            fileId: id,
+            appProperties: { isFavorite: String(isFavorite) },
+        });
+        setUserBackgrounds(bgs => bgs.map(b => b.id === id ? { ...b, isFavorite } : b));
+    } catch (error) { console.error("Error favoriting background:", error); }
   };
-
+  
   // Active Background Persistence
   useEffect(() => {
     if (user && dataLoaded) {
@@ -2288,14 +2208,6 @@ const App: React.FC = () => {
         else set('settings', { key: 'activeBackgroundId', value: null });
     }
   }, [activeBackground, user, dataLoaded]);
-
-  useEffect(() => {
-    if (savedActiveBgId && userBackgrounds.length > 0) {
-        const bgToActivate = userBackgrounds.find(bg => bg.id === savedActiveBgId);
-        if (bgToActivate) setActiveBackground(bgToActivate);
-    }
-  }, [savedActiveBgId, userBackgrounds]);
-
 
   // --- OneSignal / Notifications ---
   useEffect(() => {
@@ -2403,9 +2315,10 @@ const App: React.FC = () => {
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,
     setActiveTrack, setActiveSpotifyTrack,
-    gdriveToken, galleryIsLoading, handleAuthClick,
-    handleAddGalleryImages, handleDeleteGalleryImage: handleDeleteGalleryFile, gapiReady,
-    backgroundsAreLoading, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+    gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
+    handleAddGalleryImages, handleDeleteGalleryImage: (id) => handleDeleteFile(id, 'gallery'),
+    handleAddBackground, handleDeleteBackground: (id) => handleDeleteFile(id, 'backgrounds'),
+    handleToggleFavoriteBackground, gapiReady,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
   };
 
