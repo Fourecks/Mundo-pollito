@@ -10,10 +10,19 @@ import { supabaseAdmin } from '../_shared/supabase-admin.ts';
 
 // Helper to generate a self-contained, styled HTML response page.
 const createHtmlResponse = (title: string, message: string, taskText?: string) => {
-  const isError = title.includes('❌');
+  const isError = title.includes('&#10060;'); // Check for HTML entity of ❌
 
   // Sanitize user-provided taskText to prevent any potential XSS.
-  const safeTaskText = taskText?.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const safeTaskText = taskText?.replace(/[<>&"']/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return c;
+    }
+  });
 
   const body = `
     <!DOCTYPE html>
@@ -117,10 +126,10 @@ serve(async (req) => {
     console.log(`[quick-add-task] Received request. UID: ${userId}, Task Param: ${taskTextParam}`);
 
     if (!userId) {
-      return createHtmlResponse('❌ Error de Configuración', "Falta el ID de usuario en tu URL. Vuelve a copiar la 'URL Pollito' desde la app.");
+      return createHtmlResponse('&#10060; Error de Configuraci&oacute;n', "Falta el ID de usuario en tu URL. Vuelve a copiar la 'URL Pollito' desde la app.");
     }
     if (!taskTextParam) {
-      return createHtmlResponse('❌ Error en el Atajo', "No se recibió el texto de la tarea. Asegúrate de que la variable 'Entrada proporcionada' esté conectada a la URL en tu Atajo.");
+      return createHtmlResponse('&#10060; Error en el Atajo', "No se recibi&oacute; el texto de la tarea. Aseg&uacute;rate de que la variable 'Entrada proporcionada' est&eacute; conectada a la URL en tu Atajo.");
     }
 
     const decodedText = decodeURIComponent(taskTextParam.replace(/\+/g, ' '));
@@ -142,15 +151,15 @@ serve(async (req) => {
 
     if (error || !data) {
       console.error("[quick-add-task] Supabase insert error:", error);
-      const errorMessage = error ? error.message : "La base de datos no confirmó el guardado.";
-      return createHtmlResponse('❌ Error al Guardar', `No se pudo guardar la tarea. Error: ${errorMessage}`);
+      const errorMessage = error ? error.message : "La base de datos no confirm&oacute; el guardado.";
+      return createHtmlResponse('&#10060; Error al Guardar', `No se pudo guardar la tarea. Error: ${errorMessage}`);
     }
     
     console.log(`[quick-add-task] Successfully inserted new todo with ID: ${data.id}`);
-    return createHtmlResponse('✅ ¡Tarea Añadida!', "Se ha guardado tu nueva tarea:", decodedText);
+    return createHtmlResponse('&#9989; &iexcl;Tarea A&ntilde;adida!', "Se ha guardado tu nueva tarea:", decodedText);
 
   } catch (err) {
     console.error("[quick-add-task] Critical function error:", err);
-    return createHtmlResponse('❌ Error Inesperado', `Ocurrió un problema en el servidor: ${err.message}`);
+    return createHtmlResponse('&#10060; Error Inesperado', `Ocurri&oacute; un problema en el servidor: ${err.message}`);
   }
 });
