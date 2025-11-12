@@ -23,7 +23,10 @@ const TodoInput: React.FC<TodoInputProps> = ({ onAddTodo }) => {
       recognition.lang = 'es-ES';
       recognition.interimResults = false;
 
-      recognition.onstart = () => setIsListening(true);
+      recognition.onstart = () => {
+        setText(''); // Clear text right when listening starts
+        setIsListening(true);
+      };
       recognition.onend = () => setIsListening(false);
       recognition.onresult = (event: any) => {
         const transcript = Array.from(event.results)
@@ -46,7 +49,6 @@ const TodoInput: React.FC<TodoInputProps> = ({ onAddTodo }) => {
     if (isListening) {
       recognitionRef.current?.stop();
     } else {
-      setText(''); // Clear text before starting new dictation
       recognitionRef.current?.start();
     }
   };

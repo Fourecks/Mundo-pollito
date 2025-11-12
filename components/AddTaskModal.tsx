@@ -26,7 +26,10 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
         recognition.lang = 'es-ES';
         recognition.interimResults = false;
 
-        recognition.onstart = () => setIsListening(true);
+        recognition.onstart = () => {
+            setText(''); // Clear text right when listening starts
+            setIsListening(true);
+        };
         recognition.onend = () => setIsListening(false);
         recognition.onresult = (event: any) => {
             const transcript = Array.from(event.results)
@@ -74,7 +77,6 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
     if (isListening) {
       recognitionRef.current?.stop();
     } else {
-      setText('');
       recognitionRef.current?.start();
     }
   };

@@ -1103,6 +1103,7 @@ const App: React.FC = () => {
   const [browserSession, setBrowserSession] = useState<BrowserSession>({});
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [deleteOptions, setDeleteOptions] = useState<{ isOpen: boolean; todo: Todo | null; }>({ isOpen: false, todo: null });
+  const [updateOptions, setUpdateOptions] = useState<{ isOpen: boolean; original: Todo | null; updated: Todo | null; }>({ isOpen: false, original: null, updated: null });
 
   const [activeBackground, setActiveBackground] = useState<Background | null>(null);
   const [savedActiveBgId, setSavedActiveBgId] = useState<string | null>(null);
@@ -1530,10 +1531,70 @@ const App: React.FC = () => {
       return newAllTodos;
   }
 
-  const handleUpdateTodo = async (updatedTodo: Todo) => {
-    setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
-    await syncableUpdate('todos', updatedTodo);
+  const findTodoById = (id: number): Todo | null => {
+    for (const key in allTodos) {
+      const found = allTodos[key].find(t => t.id === id);
+      if (found) return found;
+    }
+    return null;
   };
+  
+  const handleUpdateTodo = async (updatedTodo: Todo) => {
+    const originalTodo = findTodoById(updatedTodo.id);
+    const recurrenceChanged = originalTodo?.recurrence?.id && JSON.stringify(originalTodo.recurrence) !== JSON.stringify(updatedTodo.recurrence);
+    
+    if (recurrenceChanged) {
+        setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
+    } else {
+        setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
+        await syncableUpdate('todos', updatedTodo);
+    }
+  };
+  
+  const handleUpdateThisOccurrenceOnly = async (updatedTodo: Todo) => {
+    const newTodo = { ...updatedTodo, recurrence: { frequency: 'none' as 'none' }};
+    setAllTodos(current => getUpdatedTodosState(current, newTodo));
+    await syncableUpdate('todos', newTodo);
+    setUpdateOptions({ isOpen: false, original: null, updated: null });
+  };
+  
+  const handleUpdateFutureOccurrences = async (updatedTodo: Todo) => {
+    const recurrenceId = updatedTodo.recurrence?.id;
+    if (!recurrenceId || !updatedTodo.due_date) return;
+    
+    const deleteFromDate = updatedTodo.due_date;
+    const idsToDelete: number[] = [];
+    let newAllTodos = { ...allTodos };
+
+    for (const dateKey in newAllTodos) {
+        if(dateKey >= deleteFromDate) {
+            newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => {
+                if (t.recurrence?.id === recurrenceId && t.id !== updatedTodo.id) {
+                    idsToDelete.push(t.id);
+                    return false;
+                }
+                return true;
+            });
+            if (newAllTodos[dateKey].length === 0) {
+                delete newAllTodos[dateKey];
+            }
+        }
+    }
+
+    newAllTodos = getUpdatedTodosState(newAllTodos, updatedTodo);
+    
+    // Generate new recurring tasks from the updated one
+    const finalState = await generateRecurringTasks(updatedTodo, newAllTodos);
+    setAllTodos(finalState);
+
+    // Sync changes
+    for (const id of idsToDelete) {
+        await syncableDelete('todos', id);
+    }
+    await syncableUpdate('todos', updatedTodo);
+    setUpdateOptions({ isOpen: false, original: null, updated: null });
+  };
+
 
   const handleToggleTodo = async (id: number, onAllCompleted: (quote: string) => void) => {
     let todoToToggle: Todo | undefined;
@@ -2068,6 +2129,28 @@ const App: React.FC = () => {
                     if (deleteOptions.todo) handleDeleteFutureOccurrences(deleteOptions.todo);
                 },
                 style: 'danger',
+            }
+        ]}
+      />
+       <ConfirmationModalWithOptions
+        isOpen={updateOptions.isOpen}
+        onClose={() => setUpdateOptions({ isOpen: false, original: null, updated: null })}
+        title="Actualizar Tarea Recurrente"
+        message="Has cambiado la repetición de esta tarea. ¿Cómo quieres aplicar los cambios?"
+        options={[
+            {
+                label: 'Solo esta tarea',
+                onClick: () => {
+                    if (updateOptions.updated) handleUpdateThisOccurrenceOnly(updateOptions.updated);
+                },
+                style: 'default',
+            },
+            {
+                label: 'Esta y las futuras',
+                onClick: () => {
+                    if (updateOptions.updated) handleUpdateFutureOccurrences(updateOptions.updated);
+                },
+                style: 'primary',
             }
         ]}
       />
