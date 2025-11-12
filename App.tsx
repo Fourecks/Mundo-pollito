@@ -1361,7 +1361,7 @@ const App: React.FC = () => {
     }
     setGdriveToken(null);
     if (user) {
-      localStorage.removeItem(getUserKey('gdrive_authenticated'));
+      localStorage.removeItem(getUserKey('gdrive_token'));
     }
     // Also clear the token from the gapi client instance.
     if (window.gapi && window.gapi.client) {
@@ -1948,7 +1948,6 @@ const App: React.FC = () => {
   
   useEffect(() => {
     const initializeGoogleClients = () => {
-        // 1. Initialize GAPI client for Drive API calls
         window.gapi.load('client', async () => {
             await window.gapi.client.init({
                 discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
@@ -1957,36 +1956,32 @@ const App: React.FC = () => {
             setGapiReady(true);
         });
 
-        // 2. Initialize GIS token client for authentication
         tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
             callback: (tokenResponse: any) => {
                 const currentUser = userRef.current;
                 if (tokenResponse.error) {
-                    // Explicitly handle errors, including silent auth failure ('interaction_required')
                     console.error("Google Drive auth error. Resetting auth state.", tokenResponse);
                     setGdriveToken(null);
                     if (currentUser) {
-                        localStorage.removeItem(getUserKey('gdrive_authenticated'));
+                        localStorage.removeItem(getUserKey('gdrive_token'));
                     }
-                    // This reset should cause the UI to show the "Connect" button again.
-                    // The GIS library might show a transient popup on its own, but our app state will be clean.
                     return;
                 }
                 
-                if (tokenResponse && tokenResponse.access_token && currentUser) {
-                    // Success case
+                if (tokenResponse && tokenResponse.access_token && tokenResponse.expires_in && currentUser) {
                     console.log("Google Drive token received successfully.");
+                    const expiryTime = Date.now() + (tokenResponse.expires_in * 1000);
+                    localStorage.setItem(getUserKey('gdrive_token'), JSON.stringify({ token: tokenResponse.access_token, expiry: expiryTime }));
+                    
                     window.gapi.client.setToken({ access_token: tokenResponse.access_token });
                     setGdriveToken(tokenResponse.access_token);
-                    localStorage.setItem(getUserKey('gdrive_authenticated'), 'true');
                 } else {
-                    // Fallback for unexpected responses from silent auth
-                    console.warn("Google Drive auth response was invalid or missing token. Resetting auth state.", tokenResponse);
+                    console.warn("Google Drive auth response was invalid. Resetting auth state.", tokenResponse);
                     setGdriveToken(null);
                     if (currentUser) {
-                        localStorage.removeItem(getUserKey('gdrive_authenticated'));
+                        localStorage.removeItem(getUserKey('gdrive_token'));
                     }
                 }
             },
@@ -1995,7 +1990,6 @@ const App: React.FC = () => {
         setGisReady(true);
     };
 
-    // Robustly wait for both Google scripts to be loaded from index.html
     const checkScriptsInterval = setInterval(() => {
         if (window.gapi?.load && window.google?.accounts?.oauth2?.initTokenClient) {
             clearInterval(checkScriptsInterval);
@@ -2008,20 +2002,31 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    // This effect handles silent re-authentication on page load.
-    if (user && gapiReady && gisReady) {
-        if (localStorage.getItem(getUserKey('gdrive_authenticated')) === 'true') {
-            console.log("Attempting silent Google Drive login...");
-            tokenClientRef.current?.requestAccessToken({ prompt: 'none' });
+    // On app load, check for a stored, unexpired token to avoid re-authentication.
+    if (user && gapiReady) {
+        const storedTokenData = localStorage.getItem(getUserKey('gdrive_token'));
+        if (storedTokenData) {
+            try {
+                const { token, expiry } = JSON.parse(storedTokenData);
+                // Use token if it's not expiring in the next 5 minutes
+                if (token && expiry && expiry > Date.now() + (5 * 60 * 1000)) {
+                    console.log("Re-using stored Google Drive token.");
+                    window.gapi.client.setToken({ access_token: token });
+                    setGdriveToken(token);
+                } else {
+                    console.log("Stored Google Drive token expired or is missing.");
+                    localStorage.removeItem(getUserKey('gdrive_token'));
+                }
+            } catch (e) {
+                localStorage.removeItem(getUserKey('gdrive_token'));
+            }
         }
     }
-  }, [gapiReady, gisReady, user, getUserKey]);
+  }, [user, gapiReady, getUserKey]);
 
   const handleAuthClick = () => {
     if (tokenClientRef.current) {
       console.log("Requesting user consent for Google Drive.");
-      // Use the default prompt which may reuse existing grants without forcing consent every time.
-      // This might lead to a smoother, non-redirecting flow on mobile.
       tokenClientRef.current.requestAccessToken({});
     } else {
       console.error("Google token client not ready.");
@@ -2073,29 +2078,26 @@ const App: React.FC = () => {
 
           const fileDataPromises = files.map(async (file) => {
             try {
-                // This is the correct and robust way to fetch file content.
                 const mediaResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
                     headers: { 'Authorization': `Bearer ${gdriveToken}` }
                 });
                 if (!mediaResponse.ok) {
-                    // If token expires or is invalid, reset the auth state, forcing a re-login.
                     if (mediaResponse.status === 401 || mediaResponse.status === 403) {
                        console.error('GDrive token expired during fetch. Resetting auth.');
                        setGdriveToken(null);
-                       localStorage.removeItem(getUserKey('gdrive_authenticated'));
+                       localStorage.removeItem(getUserKey('gdrive_token'));
                     }
                     throw new Error(`Failed to fetch file media for ${file.id}, status: ${mediaResponse.status}`);
                 }
                 const blob = await mediaResponse.blob();
                 const url = URL.createObjectURL(blob);
-                return { ...file, url }; // Return the GAPI file object with the new blob URL.
+                return { ...file, url };
             } catch (e) {
                 console.error(`Could not process file ${file.name}:`, e);
-                return null; // Return null on failure so Promise.all doesn't reject.
+                return null;
             }
           });
         
-          // Wait for all fetches and filter out any that failed.
           const processedFiles = (await Promise.all(fileDataPromises)).filter(Boolean);
 
           if(folderName === 'gallery') {
