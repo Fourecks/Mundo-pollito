@@ -39,7 +39,11 @@ const createHtmlResponse = (title: string, message: string, taskText?: string) =
     </body>
     </html>
   `;
-  return new Response(body, {
+  
+  // Explicitly encode the string to a UTF-8 Uint8Array to prevent encoding issues.
+  const bodyBytes = new TextEncoder().encode(body);
+
+  return new Response(bodyBytes, {
     headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
   });
 };
@@ -73,9 +77,10 @@ serve(async (req) => {
           due_date: dateKey,
           user_id: userId,
       }])
-      .select();
+      .select()
+      .single(); // Use single() for better error checking on insert
 
-    if (error || !data || data.length === 0) {
+    if (error || !data) {
       console.error("Quick capture - Supabase insert error:", error);
       const errorMessage = error ? error.message : "La base de datos no confirmó el guardado.";
       return createHtmlResponse('❌ Error al Guardar', `No se pudo guardar la tarea. Error: ${errorMessage}`);
