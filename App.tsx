@@ -1943,29 +1943,17 @@ const App: React.FC = () => {
         });
 
         // 2. Initialize GIS token client for authentication
-        const tokenCallback = (tokenResponse: any) => {
-            const currentUser = userRef.current;
-            if (tokenResponse?.access_token && currentUser) {
-                // This is the single point where we receive a token.
-                // It handles initial login, redirect flows, and silent refresh.
-                
-                // A. Authenticate the GAPI client IMMEDIATELY. This fixes image loading.
-                window.gapi.client.setToken({ access_token: tokenResponse.access_token });
-                
-                // B. Update React state to trigger UI changes and data loading.
-                setGdriveToken(tokenResponse.access_token);
-                
-                // C. Set persistence flag.
-                localStorage.setItem(getUserKey('gdrive_authenticated'), 'true');
-            }
-        };
-
         tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
-            callback: tokenCallback,
-            ux_mode: 'redirect',
-            redirect_uri: window.location.origin, // Explicitly set for PWA robustness
+            callback: (tokenResponse: any) => {
+                const currentUser = userRef.current;
+                if (tokenResponse?.access_token && currentUser) {
+                    window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+                    setGdriveToken(tokenResponse.access_token);
+                    localStorage.setItem(getUserKey('gdrive_authenticated'), 'true');
+                }
+            },
         });
         setGisReady(true);
     };
@@ -1982,12 +1970,12 @@ const App: React.FC = () => {
   }, [getUserKey]);
 
   useEffect(() => {
-    // This effect handles silent re-authentication and the PWA redirect response.
+    // This effect handles silent re-authentication on page load.
     if (user && gapiReady && gisReady) {
         if (localStorage.getItem(getUserKey('gdrive_authenticated')) === 'true') {
-            // The GIS library automatically handles parsing credentials from the URL if this
-            // is a redirect. Calling requestAccessToken with 'none' triggers that check
-            // AND performs a silent token refresh on normal page loads.
+            // This is the silent login attempt. It will not show a popup.
+            // The GIS library also automatically handles parsing credentials from the URL
+            // if this is a redirect, which solves the PWA issue.
             tokenClientRef.current?.requestAccessToken({ prompt: 'none' });
         }
     }
@@ -1995,7 +1983,7 @@ const App: React.FC = () => {
 
   const handleAuthClick = () => {
     if (tokenClientRef.current) {
-      // For manual sign-in, request user consent. This will trigger the redirect flow.
+      // For manual sign-in, request user consent. This can show a popup.
       tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
     }
   };
