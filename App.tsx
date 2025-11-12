@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1172,7 +1173,8 @@ const App: React.FC = () => {
   const [galleryIsLoading, setGalleryIsLoading] = useState(false);
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
-  
+  const tokenClientRef = useRef<any>(null);
+
   // OneSignal Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
@@ -1351,9 +1353,21 @@ const App: React.FC = () => {
   }, []);
   
   const handleLogout = useCallback(async () => {
+    // Google Drive logout
+    if (gdriveToken && window.google?.accounts?.oauth2) {
+      window.google.accounts.oauth2.revoke(gdriveToken, () => {
+        console.log('Google Drive token revoked.');
+      });
+    }
+    setGdriveToken(null);
+    if (user) {
+      localStorage.removeItem(getUserKey('gdrive_authenticated'));
+    }
+
+    // Supabase logout
     const { error } = await supabase.auth.signOut();
     if (error) console.error('Error logging out:', error.message);
-  }, []);
+  }, [gdriveToken, user, getUserKey]);
   
   const loadData = useCallback(async (networkMode: 'fetch' | 'cache-only' = 'fetch') => {
     if (!user) return;
@@ -1910,7 +1924,10 @@ const App: React.FC = () => {
     await syncableDeleteAll('quick_notes', user.id);
   };
 
-  // --- Google Drive Integration (unchanged, as it needs to be online) ---
+  // --- Google Drive Integration (now with persistence) ---
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   const gapiLoadCallback = useCallback(() => {
     window.gapi.load('client', async () => {
       await window.gapi.client.init({
@@ -1922,17 +1939,26 @@ const App: React.FC = () => {
   }, []);
 
   const gisLoadCallback = useCallback(() => {
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+    if (!window.google) return;
+    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: (tokenResponse: any) => {
+        const currentUser = userRef.current; // Get latest user from ref
         if (tokenResponse && tokenResponse.access_token) {
           setGdriveToken(tokenResponse.access_token);
           window.gapi.client.setToken(tokenResponse);
+          if (currentUser) {
+            localStorage.setItem(`${currentUser.email}_gdrive_authenticated`, 'true');
+          }
         }
       },
     });
-    (window as any).tokenClient = tokenClient;
+    // Trigger silent login attempt after client is initialized
+    const currentUser = userRef.current;
+    if (currentUser && localStorage.getItem(`${currentUser.email}_gdrive_authenticated`) === 'true') {
+        tokenClientRef.current.requestAccessToken({ prompt: '' });
+    }
   }, []);
   
   useEffect(() => {
@@ -1951,14 +1977,17 @@ const App: React.FC = () => {
     document.body.appendChild(scriptGis);
 
     return () => {
-        document.body.removeChild(scriptGapi);
-        document.body.removeChild(scriptGis);
+        // Find and remove scripts if they exist
+        const gapiScript = document.querySelector('script[src="https://apis.google.com/js/api.js"]');
+        const gisScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+        if (gapiScript) document.body.removeChild(gapiScript);
+        if (gisScript) document.body.removeChild(gisScript);
     }
   }, [gapiLoadCallback, gisLoadCallback]);
 
   const handleAuthClick = () => {
-    if ((window as any).tokenClient) {
-      (window as any).tokenClient.requestAccessToken({ prompt: 'consent' });
+    if (tokenClientRef.current) {
+      tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
     }
   };
 
