@@ -1474,7 +1474,7 @@ const App: React.FC = () => {
       if(backgroundsData) {
           const processedBgs = backgroundsData.map(bg => {
               const { data: { publicUrl } } = supabase.storage.from('backgrounds').getPublicUrl(bg.path);
-              return { ...bg, url: publicUrl, type: bg.name.toLowerCase().endsWith('.mp4') ? 'video' : 'image', isFavorite: bg.is_favorite };
+              return { ...bg, url: publicUrl, type: bg.name.toLowerCase().endsWith('.mp4') ? 'video' : 'image' };
           });
           setUserBackgrounds(processedBgs);
           await clearAndPutAll('user_backgrounds', processedBgs);
@@ -2219,7 +2219,6 @@ const App: React.FC = () => {
             ...newBgRecord,
             url: publicUrl,
             type: file.name.toLowerCase().endsWith('.mp4') ? 'video' : 'image',
-            isFavorite: newBgRecord.is_favorite
         };
 
         const updatedBgs = [...userBackgrounds, newBg];
@@ -2263,11 +2262,11 @@ const App: React.FC = () => {
     const bg = userBackgrounds.find(b => b.id === id);
     if (!bg) return;
 
-    const updatedIsFavorite = !bg.isFavorite;
-    const updatedBgs = userBackgrounds.map(b => b.id === id ? { ...b, isFavorite: updatedIsFavorite } : b);
+    const updatedIsFavorite = !bg.is_favorite;
+    const updatedBgs = userBackgrounds.map(b => b.id === id ? { ...b, is_favorite: updatedIsFavorite } : b);
     setUserBackgrounds(updatedBgs);
     
-    await set('user_backgrounds', { ...bg, isFavorite: updatedIsFavorite });
+    await set('user_backgrounds', { ...bg, is_favorite: updatedIsFavorite });
 
     if (!isOnline) {
         await syncableUpdate('user_backgrounds', { id, is_favorite: updatedIsFavorite });
