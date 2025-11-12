@@ -2020,8 +2020,9 @@ const App: React.FC = () => {
   const handleAuthClick = () => {
     if (tokenClientRef.current) {
       console.log("Requesting user consent for Google Drive.");
-      // This initiates a user-interactive login flow, which is more robust on mobile and for expired sessions.
-      tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
+      // Use the default prompt which may reuse existing grants without forcing consent every time.
+      // This might lead to a smoother, non-redirecting flow on mobile.
+      tokenClientRef.current.requestAccessToken({});
     } else {
       console.error("Google token client not ready.");
     }
