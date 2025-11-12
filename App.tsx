@@ -1167,6 +1167,7 @@ const App: React.FC = () => {
 
   // Google Drive State
   const [gapiReady, setGapiReady] = useState(false);
+  const [gisReady, setGisReady] = useState(false);
   const [gdriveToken, setGdriveToken] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
@@ -1928,7 +1929,7 @@ const App: React.FC = () => {
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
-  // This new effect handles the race condition between getting a token and gapi being ready.
+  // This effect handles the race condition between getting a token and gapi being ready.
   useEffect(() => {
     if (gdriveToken && gapiReady) {
       if (window.gapi && window.gapi.client) {
@@ -1956,20 +1957,23 @@ const App: React.FC = () => {
         const currentUser = userRef.current; // Get latest user from ref
         if (tokenResponse && tokenResponse.access_token) {
           setGdriveToken(tokenResponse.access_token);
-          // window.gapi.client.setToken is now handled by a useEffect to prevent race conditions
           if (currentUser) {
             localStorage.setItem(`${currentUser.email}_gdrive_authenticated`, 'true');
           }
         }
       },
     });
-    // Trigger silent login attempt after client is initialized
-    const currentUser = userRef.current;
-    if (currentUser && localStorage.getItem(`${currentUser.email}_gdrive_authenticated`) === 'true') {
-        tokenClientRef.current.requestAccessToken({ prompt: '' });
-    }
+    setGisReady(true);
   }, []);
   
+  // Effect to trigger silent GDrive login when ready
+  useEffect(() => {
+    // Attempt silent login only when user is loaded AND gis client is ready, and we don't already have a token.
+    if (user && gisReady && localStorage.getItem(getUserKey('gdrive_authenticated')) === 'true' && !gdriveToken) {
+        tokenClientRef.current?.requestAccessToken({ prompt: '' });
+    }
+  }, [user, gisReady, gdriveToken, getUserKey]);
+
   useEffect(() => {
     const scriptGapi = document.createElement('script');
     scriptGapi.src = 'https://apis.google.com/js/api.js';
