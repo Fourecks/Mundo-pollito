@@ -9,8 +9,9 @@ interface QuickCaptureSetupModalProps {
 }
 
 const QuickCaptureSetupModal: React.FC<QuickCaptureSetupModalProps> = ({ isOpen, onClose, userId }) => {
-    const baseUrl = window.location.origin;
-    const shortcutUrl = `${baseUrl}/?uid=${userId}&task=`;
+    // FIX: The URL now points directly to the Supabase function endpoint.
+    const baseUrl = "https://pbtdzkpympdfemnejpwj.supabase.co/functions/v1/quick-add-task";
+    const shortcutUrl = `${baseUrl}?uid=${userId}&task=`;
     const [copySuccess, setCopySuccess] = useState(false);
 
     const copyToClipboard = () => {
@@ -60,12 +61,13 @@ const QuickCaptureSetupModal: React.FC<QuickCaptureSetupModalProps> = ({ isOpen,
                         <div className="space-y-2">
                              <h4 className="font-bold text-primary-dark dark:text-primary">Paso 2: Crea el Atajo</h4>
                              <ol className="list-decimal list-inside space-y-2 text-xs bg-white/60 dark:bg-gray-700/60 p-3 rounded-lg">
-                                <li>Abre la app <strong>Atajos</strong> en tu iPhone.</li>
-                                <li>Toca el botón <strong>"+"</strong> para crear uno nuevo.</li>
-                                <li>Toca <strong>"Añadir acción"</strong> y busca <strong>"Solicitar entrada"</strong>. En la pregunta, escribe algo como "¿Qué tarea quieres añadir?".</li>
-                                <li>Añade otra acción: busca <strong>"URL"</strong>. Pega tu URL pollito que copiaste antes.</li>
-                                <li>Después de la URL, toca la variable azul <strong>"Entrada proporcionada"</strong> para que se añada al final.</li>
-                                <li>Añade la última acción: busca <strong>"Abrir URL"</strong>.</li>
+                                <li>Abre la app <strong>Atajos</strong> y toca el botón <strong>"+"</strong>.</li>
+                                <li><strong>Acción 1:</strong> Busca y añade <strong>"Solicitar entrada"</strong>. En "Pregunta", escribe: <i>¿Qué tarea quieres añadir?</i></li>
+                                <li><strong>Acción 2:</strong> Busca y añade <strong>"Texto"</strong>.</li>
+                                <li>En el campo de texto, <strong>pega tu URL Pollito</strong>.</li>
+                                <li><strong>MUY IMPORTANTE:</strong> Justo después de la URL, <strong>toca la variable azul "Entrada proporcionada"</strong> que aparece sobre el teclado.</li>
+                                <li><strong>Acción 3:</strong> Busca y añade <strong>"URL-codificar"</strong>. Asegúrate de que codifique la variable "Texto".</li>
+                                <li><strong>Acción 4:</strong> Busca y añade <strong>"Abrir URL"</strong>. Esta debe abrir la variable "URL-codificada".</li>
                                 <li>¡Listo! Nombra tu atajo (ej. "Añadir Tarea") y añádelo a tu pantalla de inicio o de bloqueo como un widget.</li>
                              </ol>
                         </div>
