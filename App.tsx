@@ -1363,6 +1363,10 @@ const App: React.FC = () => {
     if (user) {
       localStorage.removeItem(getUserKey('gdrive_authenticated'));
     }
+    // Also clear the token from the gapi client instance.
+    if (window.gapi && window.gapi.client) {
+        window.gapi.client.setToken(null);
+    }
 
     // Supabase logout
     const { error } = await supabase.auth.signOut();
@@ -1928,31 +1932,30 @@ const App: React.FC = () => {
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
   
-  // This effect initializes the GAPI and GIS clients once the scripts are loaded from index.html.
   useEffect(() => {
-    // These callbacks will be used either immediately if scripts are loaded, or as event listeners.
-    const gapiLoadCallback = () => {
-        if (window.gapi?.load) {
-            window.gapi.load('client', async () => {
-                await window.gapi.client.init({
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-                });
-                setGapiReady(true);
+    const initializeGoogleClients = () => {
+        // 1. Initialize GAPI client for Drive API calls
+        window.gapi.load('client', async () => {
+            await window.gapi.client.init({
+                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
             });
-        }
-    };
+            setGapiReady(true);
+        });
 
-    const gisLoadCallback = () => {
-        if (!window.google?.accounts?.oauth2) return;
-
+        // 2. Initialize GIS token client for authentication
         const tokenCallback = (tokenResponse: any) => {
             const currentUser = userRef.current;
-            if (tokenResponse && tokenResponse.access_token && currentUser) {
+            if (tokenResponse?.access_token && currentUser) {
+                // This is the single point where we receive a token.
+                // It handles initial login, redirect flows, and silent refresh.
+                
+                // A. Authenticate the GAPI client IMMEDIATELY. This fixes image loading.
+                window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+                
+                // B. Update React state to trigger UI changes and data loading.
                 setGdriveToken(tokenResponse.access_token);
-                // Immediately authenticate the GAPI client upon receiving a token. This is a key fix.
-                if (window.gapi && window.gapi.client) {
-                    window.gapi.client.setToken({ access_token: tokenResponse.access_token });
-                }
+                
+                // C. Set persistence flag.
                 localStorage.setItem(getUserKey('gdrive_authenticated'), 'true');
             }
         };
@@ -1961,44 +1964,38 @@ const App: React.FC = () => {
             client_id: CLIENT_ID,
             scope: SCOPES,
             callback: tokenCallback,
-            ux_mode: 'redirect', // Crucial for PWA environments.
-            redirect_uri: window.location.origin, // Explicitly set for robustness.
+            ux_mode: 'redirect',
+            redirect_uri: window.location.origin, // Explicitly set for PWA robustness
         });
         setGisReady(true);
     };
 
-    const gapiScript = document.querySelector('script[src="https://apis.google.com/js/api.js"]');
-    const gisScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    // Robustly wait for both Google scripts to be loaded from index.html
+    const checkScriptsInterval = setInterval(() => {
+        if (window.gapi?.load && window.google?.accounts?.oauth2) {
+            clearInterval(checkScriptsInterval);
+            initializeGoogleClients();
+        }
+    }, 100);
 
-    // Check if scripts are already loaded, otherwise add event listeners.
-    if (window.gapi?.load) gapiLoadCallback();
-    else gapiScript?.addEventListener('load', gapiLoadCallback);
-
-    if (window.google?.accounts?.oauth2) gisLoadCallback();
-    else gisScript?.addEventListener('load', gisLoadCallback);
-    
-    // Cleanup listeners on component unmount.
-    return () => {
-        gapiScript?.removeEventListener('load', gapiLoadCallback);
-        gisScript?.removeEventListener('load', gisLoadCallback);
-    };
+    return () => clearInterval(checkScriptsInterval);
   }, [getUserKey]);
 
-  // This effect handles silent sign-in or processing the redirect response once clients are ready.
   useEffect(() => {
-    if (gapiReady && gisReady && user) {
-        // If the user was previously authenticated, attempt a silent token request.
-        // The Google library will automatically handle parsing credentials from the URL
-        // if this is a redirect, making this single call work for both cases.
+    // This effect handles silent re-authentication and the PWA redirect response.
+    if (user && gapiReady && gisReady) {
         if (localStorage.getItem(getUserKey('gdrive_authenticated')) === 'true') {
-             tokenClientRef.current?.requestAccessToken({ prompt: 'none' }); // 'none' is crucial for no-popup experience.
+            // The GIS library automatically handles parsing credentials from the URL if this
+            // is a redirect. Calling requestAccessToken with 'none' triggers that check
+            // AND performs a silent token refresh on normal page loads.
+            tokenClientRef.current?.requestAccessToken({ prompt: 'none' });
         }
     }
   }, [gapiReady, gisReady, user, getUserKey]);
 
   const handleAuthClick = () => {
     if (tokenClientRef.current) {
-      // For manual sign-in, request user consent.
+      // For manual sign-in, request user consent. This will trigger the redirect flow.
       tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
     }
   };
