@@ -1928,7 +1928,21 @@ const App: React.FC = () => {
     await syncableDeleteAll('quick_notes', user.id);
   };
 
-  // --- Google Drive Integration (now with persistence) ---
+  // --- Blob URL Cleanup ---
+  useEffect(() => {
+    // This effect runs when the component unmounts or when the dependencies change.
+    // The cleanup function from the *previous* render is called, which has the old URLs.
+    const urlsToClean = [...galleryImages.map(i => i.url), ...userBackgrounds.map(b => b.url)];
+    return () => {
+        urlsToClean.forEach(url => {
+            if (url.startsWith('blob:')) {
+                URL.revokeObjectURL(url);
+            }
+        });
+    };
+  }, [galleryImages, userBackgrounds]);
+
+  // --- Google Drive Integration ---
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
   
@@ -1939,6 +1953,7 @@ const App: React.FC = () => {
             await window.gapi.client.init({
                 discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
             });
+            console.log("GAPI client initialized.");
             setGapiReady(true);
         });
 
@@ -1948,13 +1963,23 @@ const App: React.FC = () => {
             scope: SCOPES,
             callback: (tokenResponse: any) => {
                 const currentUser = userRef.current;
-                if (tokenResponse?.access_token && currentUser) {
+                if (tokenResponse && tokenResponse.access_token && currentUser) {
+                    // Success case
+                    console.log("Google Drive token received successfully.");
                     window.gapi.client.setToken({ access_token: tokenResponse.access_token });
                     setGdriveToken(tokenResponse.access_token);
                     localStorage.setItem(getUserKey('gdrive_authenticated'), 'true');
+                } else {
+                    // Error/Failure case for silent auth
+                    console.error("Google Drive auth response was invalid or missing token. Resetting auth state.", tokenResponse);
+                    setGdriveToken(null);
+                    if (currentUser) {
+                        localStorage.removeItem(getUserKey('gdrive_authenticated'));
+                    }
                 }
             },
         });
+        console.log("GIS token client initialized.");
         setGisReady(true);
     };
 
@@ -1973,9 +1998,7 @@ const App: React.FC = () => {
     // This effect handles silent re-authentication on page load.
     if (user && gapiReady && gisReady) {
         if (localStorage.getItem(getUserKey('gdrive_authenticated')) === 'true') {
-            // This is the silent login attempt. It will not show a popup.
-            // The GIS library also automatically handles parsing credentials from the URL
-            // if this is a redirect, which solves the PWA issue.
+            console.log("Attempting silent Google Drive login...");
             tokenClientRef.current?.requestAccessToken({ prompt: 'none' });
         }
     }
@@ -1983,8 +2006,10 @@ const App: React.FC = () => {
 
   const handleAuthClick = () => {
     if (tokenClientRef.current) {
-      // For manual sign-in, request user consent. This can show a popup.
+      console.log("Requesting user consent for Google Drive.");
       tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
+    } else {
+      console.error("Google token client not ready.");
     }
   };
 
@@ -2028,19 +2053,43 @@ const App: React.FC = () => {
 
           if(!subFolderId) throw new Error(`Could not access ${folderName} folder.`);
           
-          const filesResponse = await window.gapi.client.drive.files.list({ q: `'${subFolderId}' in parents and trashed=false`, fields: 'files(id, name, webViewLink, appProperties)' });
+          const filesResponse = await window.gapi.client.drive.files.list({ q: `'${subFolderId}' in parents and trashed=false`, fields: 'files(id, name, appProperties)' });
           const files = filesResponse.result.files || [];
 
+          const fileDataPromises = files.map(async (file) => {
+            try {
+                const mediaResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+                    headers: { 'Authorization': `Bearer ${gdriveToken}` }
+                });
+                if (!mediaResponse.ok) {
+                    if (mediaResponse.status === 401 || mediaResponse.status === 403) {
+                       console.error('GDrive token expired during fetch. Resetting auth.');
+                       setGdriveToken(null);
+                       localStorage.removeItem(getUserKey('gdrive_authenticated'));
+                    }
+                    throw new Error(`Failed to fetch file media for ${file.id}`);
+                }
+                const blob = await mediaResponse.blob();
+                const url = URL.createObjectURL(blob);
+                return { ...file, url };
+            } catch (e) {
+                console.error(`Could not process file ${file.name}:`, e);
+                return null;
+            }
+          });
+        
+          const processedFiles = (await Promise.all(fileDataPromises)).filter(Boolean);
+
           if(folderName === 'gallery') {
-              const images: GalleryImage[] = files.map(file => ({ id: file.id!, url: file.webViewLink!.replace('view?usp=drivesdk', 'uc?export=view&id=') }));
+              const images: GalleryImage[] = processedFiles.map(file => ({ id: file!.id!, url: file!.url }));
               setGalleryImages(images);
           } else {
-              const backgrounds: Background[] = files.map(file => ({
-                  id: file.id!,
-                  name: file.name!,
-                  url: file.webViewLink!.replace('view?usp=drivesdk', 'uc?export=view&id='),
-                  type: file.name!.toLowerCase().endsWith('.mp4') ? 'video' : 'image',
-                  isFavorite: file.appProperties?.isFavorite === 'true'
+              const backgrounds: Background[] = processedFiles.map(file => ({
+                  id: file!.id!,
+                  name: file!.name!,
+                  url: file!.url,
+                  type: file!.name!.toLowerCase().endsWith('.mp4') ? 'video' : 'image',
+                  isFavorite: file!.appProperties?.isFavorite === 'true'
               }));
               setUserBackgrounds(backgrounds);
               
@@ -2055,7 +2104,7 @@ const App: React.FC = () => {
           if (folderName === 'gallery') setGalleryIsLoading(false);
           else setBackgroundsAreLoading(false);
       }
-  }, [gdriveToken, findOrCreateAppFolder, savedActiveBgId]);
+  }, [gdriveToken, findOrCreateAppFolder, savedActiveBgId, getUserKey]);
   
   useEffect(() => {
       if (gdriveToken && isOnline) {
@@ -2102,8 +2151,9 @@ const App: React.FC = () => {
   const handleDeleteFile = async (id: string, folderName: 'gallery' | 'backgrounds') => {
       try {
           await window.gapi.client.drive.files.delete({ fileId: id });
-          if(folderName === 'gallery') setGalleryImages(i => i.filter(img => img.id !== id));
-          else {
+          if(folderName === 'gallery') {
+            setGalleryImages(i => i.filter(img => img.id !== id));
+          } else {
               setUserBackgrounds(bgs => bgs.filter(bg => bg.id !== id));
               if(activeBackground?.id === id) setActiveBackground(null);
           }
