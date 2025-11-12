@@ -42,6 +42,7 @@ import AddTaskModal from './components/AddTaskModal';
 import PlusIcon from './components/icons/PlusIcon';
 import MobileTaskEditor from './components/MobileTaskEditor';
 import MobilePomodoroPanel from './components/MobilePomodoroPanel';
+import ConfirmationModalWithOptions from './components/ConfirmationModalWithOptions';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -1101,6 +1102,7 @@ const App: React.FC = () => {
   // UI state
   const [browserSession, setBrowserSession] = useState<BrowserSession>({});
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [deleteOptions, setDeleteOptions] = useState<{ isOpen: boolean; todo: Todo | null; }>({ isOpen: false, todo: null });
 
   const [activeBackground, setActiveBackground] = useState<Background | null>(null);
   const [savedActiveBgId, setSavedActiveBgId] = useState<string | null>(null);
@@ -1582,16 +1584,69 @@ const App: React.FC = () => {
   };
 
   const handleDeleteTodo = async (id: number) => {
-      let dateKeyToDelete: string | null = null;
-      for(const key in allTodos) { if(allTodos[key].some(t => t.id === id)) { dateKeyToDelete = key; break; } }
-      if (dateKeyToDelete) {
-          setAllTodos(current => {
-              const newAllTodos = { ...current };
-              newAllTodos[dateKeyToDelete!] = newAllTodos[dateKeyToDelete!].filter(t => t.id !== id);
-              return newAllTodos;
-          });
-      }
-      await syncableDelete('todos', id);
+    let todoToDelete: Todo | null = null;
+    for(const key in allTodos) { 
+        const found = allTodos[key].find(t => t.id === id);
+        if(found) { todoToDelete = found; break; }
+    }
+    
+    if (!todoToDelete) return;
+
+    if (todoToDelete.recurrence && todoToDelete.recurrence.frequency !== 'none') {
+        setDeleteOptions({ isOpen: true, todo: todoToDelete });
+    } else {
+        handleDeleteThisOccurrence(id);
+    }
+  };
+
+  const handleDeleteThisOccurrence = async (id: number) => {
+    let dateKeyToDeleteFrom: string | null = null;
+    for(const key in allTodos) { if(allTodos[key].some(t => t.id === id)) { dateKeyToDeleteFrom = key; break; } }
+    
+    if (dateKeyToDeleteFrom) {
+        setAllTodos(current => {
+            const newDateTodos = current[dateKeyToDeleteFrom!].filter(t => t.id !== id);
+            if(newDateTodos.length > 0) {
+                return { ...current, [dateKeyToDeleteFrom!]: newDateTodos };
+            } else {
+                const { [dateKeyToDeleteFrom!]: _, ...rest } = current;
+                return rest;
+            }
+        });
+    }
+    await syncableDelete('todos', id);
+    setDeleteOptions({ isOpen: false, todo: null });
+  };
+  
+  const handleDeleteFutureOccurrences = async (todoToDelete: Todo) => {
+    const { id: recurrenceId } = todoToDelete.recurrence!;
+    const deleteFromDate = todoToDelete.due_date!;
+
+    const idsToDelete: number[] = [];
+    const newAllTodos = { ...allTodos };
+
+    for (const dateKey in newAllTodos) {
+        if(dateKey >= deleteFromDate) {
+            const dateTodos = newAllTodos[dateKey];
+            const remainingTodos = dateTodos.filter(t => {
+                const shouldDelete = t.recurrence?.id === recurrenceId;
+                if(shouldDelete) idsToDelete.push(t.id);
+                return !shouldDelete;
+            });
+            
+            if (remainingTodos.length > 0) {
+                newAllTodos[dateKey] = remainingTodos;
+            } else {
+                delete newAllTodos[dateKey];
+            }
+        }
+    }
+    
+    setAllTodos(newAllTodos);
+    for (const id of idsToDelete) {
+        await syncableDelete('todos', id);
+    }
+    setDeleteOptions({ isOpen: false, todo: null });
   };
 
   const handleAddFolder = async (name: string): Promise<Folder | null> => {
@@ -1993,6 +2048,28 @@ const App: React.FC = () => {
         isIos={isIos} 
         onInstall={handleInstallPwa} 
         onDismiss={handleDismissPwaBanner} 
+      />
+      <ConfirmationModalWithOptions
+        isOpen={deleteOptions.isOpen}
+        onClose={() => setDeleteOptions({ isOpen: false, todo: null })}
+        title="Eliminar Tarea Recurrente"
+        message="Esta tarea se repite. ¿Cómo quieres eliminarla?"
+        options={[
+            {
+                label: 'Eliminar solo esta tarea',
+                onClick: () => {
+                    if (deleteOptions.todo) handleDeleteThisOccurrence(deleteOptions.todo.id);
+                },
+                style: 'default',
+            },
+            {
+                label: 'Eliminar esta y las futuras',
+                onClick: () => {
+                    if (deleteOptions.todo) handleDeleteFutureOccurrences(deleteOptions.todo);
+                },
+                style: 'danger',
+            }
+        ]}
       />
     </>
   );

@@ -26,8 +26,13 @@ const TodoInput: React.FC<TodoInputProps> = ({ onAddTodo }) => {
       recognition.onstart = () => setIsListening(true);
       recognition.onend = () => setIsListening(false);
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setText(transcript);
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0])
+          .map((result: any) => result.transcript)
+          .join('');
+        if (transcript) {
+            setText(transcript);
+        }
       };
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error', event.error);
@@ -77,7 +82,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ onAddTodo }) => {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="¿Qué necesitas hacer?"
+          placeholder="¿Tienes algo en mente, pollito?"
           className="w-full bg-white/80 dark:bg-gray-800/50 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 resize-none overflow-hidden pr-12"
           rows={1}
         />
