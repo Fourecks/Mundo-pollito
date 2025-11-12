@@ -109,7 +109,11 @@ const createHtmlResponse = (title: string, message: string, taskText?: string) =
   `;
 
   return new Response(body, {
-    headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+    headers: { 
+      ...corsHeaders, 
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;"
+    },
   });
 };
 
