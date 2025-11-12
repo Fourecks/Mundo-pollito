@@ -7,7 +7,7 @@ import { Todo } from './types';
 let db: IDBDatabase;
 const DB_NAME_PREFIX = 'PollitoProductivoDB';
 const DB_VERSION = 2; // Incremented version for new schema
-const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue'];
+const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'user_backgrounds'];
 
 // --- Types for Sync Queue ---
 interface SyncOperation {
@@ -100,7 +100,8 @@ export const set = <T>(storeName: string, value: T): Promise<void> => {
     });
 };
 
-const remove = (storeName: string, key: IDBValidKey): Promise<void> => {
+// FIX: Export the 'remove' function so it can be used in other modules.
+export const remove = (storeName: string, key: IDBValidKey): Promise<void> => {
     return new Promise((resolve, reject) => {
         if (!db) return reject("DB not initialized");
         const store = getStore(storeName, 'readwrite');

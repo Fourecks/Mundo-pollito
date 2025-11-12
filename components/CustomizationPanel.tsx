@@ -31,7 +31,7 @@ interface CustomizationPanelProps {
   onClose: () => void;
   isMobile?: boolean;
   
-  // Auth Props
+  // Gallery Auth Props
   isSignedIn: boolean;
   onAuthClick: () => void;
   isGapiReady: boolean;
@@ -46,8 +46,8 @@ interface CustomizationPanelProps {
   userBackgrounds: Background[];
   onSelectBackground: (background: Background | null) => void;
   onAddBackground: (file: File) => void;
-  onDeleteBackground: (id: string) => void;
-  onToggleFavorite: (id: string) => void;
+  onDeleteBackground: (background: Background) => void;
+  onToggleFavorite: (id: number) => void;
   backgroundsLoading: boolean;
   
   // Ambience Props
@@ -76,10 +76,10 @@ const soundOptions: { type: AmbientSoundType; icon: React.FC; label: string }[] 
     { type: 'ocean', icon: WaveIcon, label: 'Mar' },
 ];
 
-interface BackgroundsTabProps extends Pick<CustomizationPanelProps, 'activeBackground' | 'userBackgrounds' | 'onSelectBackground' | 'onAddBackground' | 'onDeleteBackground' | 'onToggleFavorite' | 'backgroundsLoading' | 'isSignedIn' | 'onAuthClick' | 'isGapiReady'> {}
+interface BackgroundsTabProps extends Pick<CustomizationPanelProps, 'activeBackground' | 'userBackgrounds' | 'onSelectBackground' | 'onAddBackground' | 'onDeleteBackground' | 'onToggleFavorite' | 'backgroundsLoading'> {}
 
 const BackgroundsTab: React.FC<BackgroundsTabProps> = (props) => {
-    const { activeBackground, userBackgrounds, onSelectBackground, onAddBackground, onDeleteBackground, onToggleFavorite, backgroundsLoading, isSignedIn, onAuthClick, isGapiReady } = props;
+    const { activeBackground, userBackgrounds, onSelectBackground, onAddBackground, onDeleteBackground, onToggleFavorite, backgroundsLoading } = props;
     const [view, setView] = useState<'all' | 'favorites'>('all');
     const [bgToDelete, setBgToDelete] = useState<Background | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,35 +92,22 @@ const BackgroundsTab: React.FC<BackgroundsTabProps> = (props) => {
         if (event.target) event.target.value = '';
     };
 
-    const triggerFileUpload = () => fileInputRef.current?.click();
+    const triggerFileUpload = () => {
+        if (userBackgrounds.length >= 10) {
+            alert("Has alcanzado el límite de 10 fondos. Por favor, elimina uno para poder subir otro.");
+            return;
+        }
+        fileInputRef.current?.click();
+    };
     
     const confirmDelete = () => {
         if(bgToDelete) {
-            onDeleteBackground(bgToDelete.id);
+            onDeleteBackground(bgToDelete);
             setBgToDelete(null);
         }
     };
     
     const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.isFavorite) : userBackgrounds;
-
-    if (!isSignedIn) {
-        return (
-          <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <ChickenIcon className="w-16 h-16 text-primary mb-4" />
-            <h3 className="font-bold text-lg text-gray-700 dark:text-gray-300">Conecta tus Fondos</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-xs">
-              Para guardar y sincronizar tus fondos personalizados, conecta tu cuenta de Google Drive.
-            </p>
-            <button
-              onClick={onAuthClick}
-              disabled={!isGapiReady}
-              className="mt-6 bg-primary text-white font-bold rounded-full px-6 py-3 shadow-md hover:bg-primary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 disabled:bg-primary-light disabled:cursor-wait"
-            >
-              {isGapiReady ? 'Conectar con Google Drive' : 'Cargando...'}
-            </button>
-          </div>
-        );
-    }
 
     return (
         <>

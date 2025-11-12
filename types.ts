@@ -63,11 +63,14 @@ export interface Folder {
 }
 
 export interface Background {
-  id: string;
+  id: number;
+  user_id: string;
   name: string;
+  path: string;
   url: string;
   type: 'video' | 'image';
-  isFavorite?: boolean;
+  isFavorite: boolean;
+  created_at: string;
 }
 
 export interface GalleryImage {
