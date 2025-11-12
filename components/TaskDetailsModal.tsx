@@ -146,6 +146,27 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         }
     };
 
+    const handleToggleNotes = (enabled: boolean) => {
+        setHasNotes(enabled);
+        if (!enabled) setNotes('');
+    };
+
+    const handleToggleReminder = (enabled: boolean) => {
+        setHasReminder(enabled);
+        if (!enabled) {
+            setReminderType('0');
+            setCustomReminderDate('');
+            setCustomReminderTime('');
+        }
+    };
+
+    const handleToggleRecurrence = (enabled: boolean) => {
+        setHasRecurrence(enabled);
+        if (!enabled) {
+            setRecurrence({ frequency: 'none' });
+        }
+    };
+
     const handleSave = async () => {
         if (!todo) return;
 
@@ -308,7 +329,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
 
             <NavSettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" value={reminderSummary} onClick={() => setActiveSubView('reminder')} />
             
-            <SettingRow icon={<NotesIcon />} label="Añadir notas" enabled={hasNotes} onToggle={setHasNotes}><div/></SettingRow>
+            <SettingRow icon={<NotesIcon />} label="Añadir notas" enabled={hasNotes} onToggle={handleToggleNotes}><div/></SettingRow>
 
             <NavSettingRow icon={<RefreshIcon className="h-4 w-4"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
             
@@ -328,7 +349,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             <div className="space-y-3">
                 <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Activar recordatorio</span>
-                    <Switch checked={hasReminder} onChange={setHasReminder} />
+                    <Switch checked={hasReminder} onChange={handleToggleReminder} />
                 </div>
                 {hasReminder && (
                      <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 space-y-2 animate-pop-in">
@@ -361,7 +382,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             <div className="space-y-3">
                 <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Repetir tarea</span>
-                    <Switch checked={hasRecurrence} onChange={setHasRecurrence} />
+                    <Switch checked={hasRecurrence} onChange={handleToggleRecurrence} />
                 </div>
                  {hasRecurrence && (
                     <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 space-y-3 animate-pop-in">

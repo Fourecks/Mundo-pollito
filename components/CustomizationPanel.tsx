@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Background, ParticleType, AmbientSoundType, ThemeColors } from '../types';
 import CloseIcon from './icons/CloseIcon';
 import ThemeCustomizer from './ThemeCustomizer';
@@ -24,6 +24,7 @@ import CoffeeIcon from './icons/CoffeeIcon';
 import WaveIcon from './icons/WaveIcon';
 import SoundOffIcon from './icons/SoundOffIcon';
 import VolumeIcon from './icons/VolumeIcon';
+import ChevronRightIcon from './icons/ChevronRightIcon';
 
 interface CustomizationPanelProps {
   isOpen: boolean;
@@ -185,6 +186,15 @@ const BackgroundsTab: React.FC<BackgroundsTabProps> = (props) => {
 };
 
 const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setParticleType' | 'ambientSound' | 'setAmbientSound' | 'dailyEncouragementHour' | 'onSetDailyEncouragement'>> = ({ particleType, setParticleType, ambientSound, setAmbientSound, dailyEncouragementHour, onSetDailyEncouragement }) => {
+    const [isDoseSettingsOpen, setIsDoseSettingsOpen] = useState(false);
+    
+    const doseSummary = useMemo(() => {
+        if (dailyEncouragementHour === null) return 'Desactivado';
+        const d = new Date();
+        d.setHours(dailyEncouragementHour, 0, 0);
+        return d.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true });
+    }, [dailyEncouragementHour]);
+
     const handleSoundSelect = (type: AmbientSoundType) => {
         setAmbientSound(prev => ({ ...prev, type }));
     };
@@ -226,22 +236,32 @@ const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setP
             </div>
             {onSetDailyEncouragement && (
                 <div className="mt-3 pt-3 border-t border-secondary-light/50 dark:border-gray-700/50">
-                    <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-2 text-center">Dosis de Ánimo Diario</h4>
-                    <select 
-                        value={dailyEncouragementHour === null ? 'none' : dailyEncouragementHour} 
-                        onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
-                        className="w-full bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
-                    >
-                        <option value="none">Desactivado</option>
-                        {Array.from({length: 24}, (_, i) => i).map(hour => {
-                            const displayDate = new Date();
-                            displayDate.setHours(hour, 0, 0);
-                            return <option key={hour} value={hour}>
-                                {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
-                            </option>
-                        })}
-                    </select>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">Recibe un versículo cada día a la hora que elijas (en tu hora local).</p>
+                    <button onClick={() => setIsDoseSettingsOpen(s => !s)} className="w-full flex justify-between items-center text-left p-1">
+                        <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm">Dosis de Ánimo</h4>
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{doseSummary}</span>
+                            <ChevronRightIcon className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isDoseSettingsOpen ? 'rotate-90' : ''}`} />
+                        </div>
+                    </button>
+                    {isDoseSettingsOpen && (
+                        <div className="mt-2 animate-pop-in">
+                            <select 
+                                value={dailyEncouragementHour === null ? 'none' : dailyEncouragementHour} 
+                                onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
+                                className="w-full bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
+                            >
+                                <option value="none">Desactivado</option>
+                                {Array.from({length: 24}, (_, i) => i).map(hour => {
+                                    const displayDate = new Date();
+                                    displayDate.setHours(hour, 0, 0);
+                                    return <option key={hour} value={hour}>
+                                        {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
+                                    </option>
+                                })}
+                            </select>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">Recibe un versículo cada día a la hora que elijas.</p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -667,6 +667,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     const [isQuickCaptureSetupOpen, setIsQuickCaptureSetupOpen] = useState(false);
+    const [isDailyDoseSettingsOpen, setIsDailyDoseSettingsOpen] = useState(false);
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
     const ambientAudioRef = useRef<HTMLAudioElement>(null);
@@ -681,6 +682,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const todayTodos = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
     const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
     
+    const doseSummary = useMemo(() => {
+        if (dailyEncouragementLocalHour === null) return 'Desactivado';
+        const d = new Date();
+        d.setHours(dailyEncouragementLocalHour, 0, 0);
+        return d.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true });
+    }, [dailyEncouragementLocalHour]);
+
     // Pomodoro Timer Logic
     const handleTimerCompletion = useCallback(() => {
         pomodoroAudioRef.current?.play();
@@ -895,24 +903,36 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 </button>
                             </div>
                             <div className="p-4 border-b border-black/5 dark:border-white/10">
-                                <div>
-                                    <h3 className="font-bold text-primary-dark dark:text-primary mb-2">Dosis de Ánimo Diario</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Recibe un versículo cada día a la hora que elijas.</p>
-                                    <select 
-                                        value={dailyEncouragementLocalHour === null ? 'none' : dailyEncouragementLocalHour} 
-                                        onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
-                                        className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
-                                    >
-                                        <option value="none">Desactivado</option>
-                                        {Array.from({length: 24}, (_, i) => i).map(hour => {
-                                            const displayDate = new Date();
-                                            displayDate.setHours(hour, 0, 0);
-                                            return <option key={hour} value={hour}>
-                                                {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
-                                            </option>
-                                        })}
-                                    </select>
-                                </div>
+                                <button onClick={() => setIsDailyDoseSettingsOpen(s => !s)} className="w-full text-left">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h3 className="font-bold text-primary-dark dark:text-primary">Dosis de Ánimo Diario</h3>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recibe un versículo cada día a la hora que elijas.</p>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">{doseSummary}</span>
+                                            <ChevronRightIcon className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isDailyDoseSettingsOpen ? 'rotate-90' : ''}`} />
+                                        </div>
+                                    </div>
+                                </button>
+                                {isDailyDoseSettingsOpen && (
+                                    <div className="mt-3 animate-pop-in">
+                                        <select 
+                                            value={dailyEncouragementLocalHour === null ? 'none' : dailyEncouragementLocalHour} 
+                                            onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
+                                            className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
+                                        >
+                                            <option value="none">Desactivado</option>
+                                            {Array.from({length: 24}, (_, i) => i).map(hour => {
+                                                const displayDate = new Date();
+                                                displayDate.setHours(hour, 0, 0);
+                                                return <option key={hour} value={hour}>
+                                                    {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
+                                                </option>
+                                            })}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                             <div className="p-4 border-b border-black/5 dark:border-white/10">
                                 <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left" disabled={isPermissionBlocked}>

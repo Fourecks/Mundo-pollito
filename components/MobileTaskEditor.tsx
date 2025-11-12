@@ -150,6 +150,27 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
         }
     };
 
+    const handleToggleNotes = (enabled: boolean) => {
+        setHasNotes(enabled);
+        if (!enabled) setNotes('');
+    };
+
+    const handleToggleReminder = (enabled: boolean) => {
+        setHasReminder(enabled);
+        if (!enabled) {
+            setReminderType('0');
+            setCustomReminderDate('');
+            setCustomReminderTime('');
+        }
+    };
+
+    const handleToggleRecurrence = (enabled: boolean) => {
+        setHasRecurrence(enabled);
+        if (!enabled) {
+            setRecurrence({ frequency: 'none' });
+        }
+    };
+
     const handleSave = () => {
         if (!todo) return;
         
@@ -331,7 +352,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                 
                 <NavSettingRow icon={<RefreshIcon className="h-5 w-5"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
                 
-                <SettingRow icon={<NotesIcon />} label="Añadir notas" enabled={hasNotes} onToggle={setHasNotes} isSimple={true}>
+                <SettingRow icon={<NotesIcon />} label="Añadir notas" enabled={hasNotes} onToggle={handleToggleNotes} isSimple={true}>
                         {hasNotes && <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Añade detalles..." className="w-full bg-white/80 dark:bg-gray-700/80 border-2 border-secondary-light dark:border-gray-600 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-primary text-sm" rows={3}></textarea>}
                 </SettingRow>
             </div>
@@ -347,7 +368,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             <div className="py-4 space-y-4 flex-grow">
                  <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Activar recordatorio</span>
-                    <Switch checked={hasReminder} onChange={setHasReminder} />
+                    <Switch checked={hasReminder} onChange={handleToggleReminder} />
                 </div>
                 {hasReminder && (
                      <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 space-y-3 animate-pop-in">
@@ -375,7 +396,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             <div className="py-4 space-y-4 flex-grow">
                 <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Repetir tarea</span>
-                    <Switch checked={hasRecurrence} onChange={setHasRecurrence} />
+                    <Switch checked={hasRecurrence} onChange={handleToggleRecurrence} />
                 </div>
                  {hasRecurrence && (
                     <div className="bg-white/60 dark:bg-gray-700/60 rounded-xl p-3 space-y-3 animate-pop-in">
