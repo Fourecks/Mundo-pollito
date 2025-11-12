@@ -1083,6 +1083,9 @@ const adjustBrightness = (hex: string, percent: number) => {
 // --- End Color Helpers ---
 
 const App: React.FC = () => {
+  const [isQuickCapturePage, setIsQuickCapturePage] = useState(false);
+  const [quickCaptureStatus, setQuickCaptureStatus] = useState<{ status: 'loading' | 'success' | 'error'; text: string }>({ status: 'loading', text: '' });
+
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -1152,6 +1155,50 @@ const App: React.FC = () => {
         notes: notes.filter(note => note.folder_id === folder.id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     }));
   }, [folders, notes]);
+
+   useEffect(() => {
+    // This effect should only run once on mount to handle browser-based quick capture.
+    const checkQuickCapture = async () => {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        const urlParams = new URLSearchParams(window.location.search);
+        const taskParam = urlParams.get('addTask');
+
+        if (taskParam && !isStandalone) {
+            const decodedText = decodeURIComponent(taskParam.replace(/\+/g, ' '));
+            setIsQuickCapturePage(true);
+            setQuickCaptureStatus({ status: 'loading', text: decodedText });
+
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                setQuickCaptureStatus(s => ({ ...s, status: 'error' }));
+                return;
+            }
+
+            const dateKey = formatDateKey(new Date());
+            const newTodo = {
+                text: decodedText,
+                completed: false,
+                priority: 'medium' as Priority,
+                due_date: dateKey,
+                user_id: session.user.id,
+                created_at: new Date().toISOString(),
+            };
+
+            const { error } = await supabase.from('todos').insert(newTodo);
+
+            if (error) {
+                console.error("Quick capture save error:", error);
+                setQuickCaptureStatus(s => ({ ...s, status: 'error' }));
+            } else {
+                setQuickCaptureStatus(s => ({ ...s, status: 'success' }));
+            }
+
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    };
+    checkQuickCapture();
+  }, []); // Empty array ensures it runs only once.
 
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -1536,16 +1583,16 @@ const App: React.FC = () => {
   
   // --- Quick Capture from URL ---
   useEffect(() => {
-    if (!user || !dataLoaded) return;
+    if (!user || !dataLoaded || isQuickCapturePage) return;
 
     const handleUrlTask = async () => {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
         const urlParams = new URLSearchParams(window.location.search);
         const taskText = urlParams.get('addTask');
 
-        if (taskText && user) {
+        if (taskText && user && isStandalone) {
             const decodedText = decodeURIComponent(taskText.replace(/\+/g, ' '));
             
-            // Logic to add a todo for today
             const dateKey = formatDateKey(new Date());
             const tempId = -Date.now();
             const newTodo: Todo = { 
@@ -1562,20 +1609,16 @@ const App: React.FC = () => {
             setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
             await syncableCreate('todos', newTodo);
             
-            // Set view to today to show the new task
             setSelectedDate(new Date());
 
-            // Clean the URL to prevent re-adding on refresh
             const newUrl = window.location.pathname;
             window.history.replaceState({}, document.title, newUrl);
         }
     };
     
     handleUrlTask();
-    // This effect should only run once after the user data is loaded to process the URL.
-    // We disable the exhaustive-deps lint rule because we intentionally want this to run only once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, dataLoaded]);
+  }, [user, dataLoaded, isQuickCapturePage]);
 
   const getUpdatedTodosState = (current: { [key: string]: Todo[] }, todoToUpdate: Todo): { [key: string]: Todo[] } => {
       const newAllTodos = JSON.parse(JSON.stringify(current));
@@ -2154,6 +2197,33 @@ const App: React.FC = () => {
       }
   };
   
+  if (isQuickCapturePage) {
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-secondary-light to-primary-light flex items-center justify-center p-4">
+            <div className="bg-white/80 dark:bg-gray-800/80 rounded-2xl shadow-xl p-8 text-center animate-pop-in">
+                {quickCaptureStatus.status === 'loading' && (
+                    <>
+                        <ChickenIcon className="w-16 h-16 text-primary mx-auto animate-pulse" />
+                        <p className="mt-4 font-semibold text-gray-700 dark:text-gray-300">Añadiendo tarea...</p>
+                    </>
+                )}
+                {quickCaptureStatus.status === 'success' && (
+                    <>
+                        <h1 className="text-2xl font-bold text-primary-dark dark:text-primary">✅ ¡Tarea Añadida!</h1>
+                        <p className="mt-2 text-gray-600 dark:text-gray-300">"{quickCaptureStatus.text}" se ha guardado.</p>
+                        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Ya puedes cerrar esta ventana.</p>
+                    </>
+                )}
+                {quickCaptureStatus.status === 'error' && (
+                    <>
+                         <h1 className="text-2xl font-bold text-red-500">❌ Error al Añadir</h1>
+                        <p className="mt-2 text-gray-600 dark:text-gray-300">No se pudo guardar la tarea. Asegúrate de haber iniciado sesión en la app e inténtalo de nuevo.</p>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+  }
 
   if (authLoading || (user && !dataLoaded)) {
     return (
