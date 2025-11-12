@@ -44,6 +44,7 @@ import MobileTaskEditor from './components/MobileTaskEditor';
 import MobilePomodoroPanel from './components/MobilePomodoroPanel';
 import ConfirmationModalWithOptions from './components/ConfirmationModalWithOptions';
 import ConfirmationModal from './components/ConfirmationModal';
+import QuickCaptureSetupModal from './components/QuickCaptureSetupModal';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -665,6 +666,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+    const [isQuickCaptureSetupOpen, setIsQuickCaptureSetupOpen] = useState(false);
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
     const ambientAudioRef = useRef<HTMLAudioElement>(null);
@@ -884,6 +886,15 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 </button>
                             </div>
                             <div className="p-4 border-b border-black/5 dark:border-white/10">
+                                <button onClick={() => setIsQuickCaptureSetupOpen(true)} className="w-full flex justify-between items-center text-left">
+                                  <div>
+                                    <h3 className="font-bold text-primary-dark dark:text-primary">Captura Rápida</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Configura un Atajo de iPhone para añadir tareas.</p>
+                                  </div>
+                                  <ChevronRightIcon />
+                                </button>
+                            </div>
+                            <div className="p-4 border-b border-black/5 dark:border-white/10">
                                 <div>
                                     <h3 className="font-bold text-primary-dark dark:text-primary mb-2">Dosis de Ánimo Diario</h3>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Recibe un versículo cada día a la hora que elijas.</p>
@@ -1012,6 +1023,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     handleAddTodo(text);
                     setIsAddTaskModalOpen(false);
                 }}
+            />
+            <QuickCaptureSetupModal
+                isOpen={isQuickCaptureSetupOpen}
+                onClose={() => setIsQuickCaptureSetupOpen(false)}
+                userId={currentUser.id}
             />
             <CompletionModal isOpen={showCompletionModal} onClose={() => setShowCompletionModal(false)} quote={completionQuote}/>
             <MobileTaskEditor 
@@ -1157,48 +1173,42 @@ const App: React.FC = () => {
   }, [folders, notes]);
 
    useEffect(() => {
-    // This effect should only run once on mount to handle browser-based quick capture.
     const checkQuickCapture = async () => {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
         const urlParams = new URLSearchParams(window.location.search);
-        const taskParam = urlParams.get('addTask');
+        const taskParam = urlParams.get('task');
+        const uidParam = urlParams.get('uid');
 
-        if (taskParam && !isStandalone) {
-            const decodedText = decodeURIComponent(taskParam.replace(/\+/g, ' '));
+        if (taskParam && uidParam && !isStandalone) {
             setIsQuickCapturePage(true);
+            const decodedText = decodeURIComponent(taskParam.replace(/\+/g, ' '));
             setQuickCaptureStatus({ status: 'loading', text: decodedText });
 
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                setQuickCaptureStatus(s => ({ ...s, status: 'error' }));
-                return;
-            }
+            try {
+                // Invoke the new serverless function for secure task creation
+                const { error } = await supabase.functions.invoke('quick-add-task', {
+                    queryString: `?uid=${uidParam}&task=${encodeURIComponent(decodedText)}`
+                });
 
-            const dateKey = formatDateKey(new Date());
-            const newTodo = {
-                text: decodedText,
-                completed: false,
-                priority: 'medium' as Priority,
-                due_date: dateKey,
-                user_id: session.user.id,
-                created_at: new Date().toISOString(),
-            };
-
-            const { error } = await supabase.from('todos').insert(newTodo);
-
-            if (error) {
-                console.error("Quick capture save error:", error);
-                setQuickCaptureStatus(s => ({ ...s, status: 'error' }));
-            } else {
+                if (error) {
+                    throw new Error(error.message);
+                }
+                
                 setQuickCaptureStatus(s => ({ ...s, status: 'success' }));
-            }
 
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, newUrl);
+            } catch (e: any) {
+                 console.error("Quick capture invocation error:", e);
+                 setQuickCaptureStatus(s => ({ ...s, status: 'error' }));
+            } finally {
+                // Clean up URL to prevent re-adding on refresh
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
         }
     };
     checkQuickCapture();
-  }, []); // Empty array ensures it runs only once.
+  }, []); // Empty array ensures it runs only once on mount.
+
 
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -1581,7 +1591,7 @@ const App: React.FC = () => {
     await syncableCreate('todos', newTodo);
   }, [user, selectedDate]);
   
-  // --- Quick Capture from URL ---
+  // --- Quick Capture from URL (PWA only) ---
   useEffect(() => {
     if (!user || !dataLoaded || isQuickCapturePage) return;
 
@@ -2217,7 +2227,7 @@ const App: React.FC = () => {
                 {quickCaptureStatus.status === 'error' && (
                     <>
                          <h1 className="text-2xl font-bold text-red-500">❌ Error al Añadir</h1>
-                        <p className="mt-2 text-gray-600 dark:text-gray-300">No se pudo guardar la tarea. Asegúrate de haber iniciado sesión en la app e inténtalo de nuevo.</p>
+                        <p className="mt-2 text-gray-600 dark:text-gray-300">No se pudo guardar la tarea. Revisa tu conexión e inténtalo de nuevo.</p>
                     </>
                 )}
             </div>
