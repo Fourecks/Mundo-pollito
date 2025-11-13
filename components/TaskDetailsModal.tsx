@@ -125,9 +125,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             if (todo.reminder_at) {
                 setReminderType('custom');
                 try {
-                    const d = new Date(todo.reminder_at);
-                    setCustomReminderDate(d.toISOString().split('T')[0]);
-                    setCustomReminderTime(`${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`);
+                    const d = new Date(todo.reminder_at); // d is a Date object representing UTC time
+                    // CONVERT TO LOCAL FOR DISPLAY
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const hour = String(d.getHours()).padStart(2, '0');
+                    const minute = String(d.getMinutes()).padStart(2, '0');
+
+                    setCustomReminderDate(`${year}-${month}-${day}`);
+                    setCustomReminderTime(`${hour}:${minute}`);
                 } catch(e) {/* ignore invalid date */}
             } else {
                 setReminderType(String(todo.reminder_offset || '0'));

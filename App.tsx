@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -2190,22 +2191,39 @@ const App: React.FC = () => {
 
         setUserBackgrounds(backgrounds);
 
-        if (savedActiveBgId) {
-            const bgToActivate = backgrounds.find(bg => bg.id === savedActiveBgId);
-            if(bgToActivate) setActiveBackground(bgToActivate);
-        }
     } catch (error) {
         console.error("Error loading backgrounds from Supabase:", error);
     } finally {
         setBackgroundsAreLoading(false);
     }
-  }, [user, savedActiveBgId]);
+  }, [user]);
 
   useEffect(() => {
     if (user && isOnline) {
       loadBackgroundsFromSupabase();
     }
   }, [user, isOnline, loadBackgroundsFromSupabase]);
+  
+  // New robust effect to set active background
+  useEffect(() => {
+    // Wait until we have the saved ID and the list of backgrounds
+    if (userBackgrounds.length > 0) {
+        if(savedActiveBgId) {
+            const bgToActivate = userBackgrounds.find(bg => bg.id === savedActiveBgId);
+            if (bgToActivate) {
+                setActiveBackground(bgToActivate);
+            } else {
+                // The saved ID might be for a deleted background, so reset.
+                setActiveBackground(null);
+                set('settings', { key: 'activeBackgroundId', value: null });
+            }
+        } else {
+             // If there's no saved ID, ensure it's set to default.
+            setActiveBackground(null);
+        }
+    }
+  }, [savedActiveBgId, userBackgrounds]);
+
 
   const handleAddBackground = async (file: File) => {
     if (!user) return;
@@ -2309,8 +2327,11 @@ const App: React.FC = () => {
   // Active Background Persistence
   useEffect(() => {
     if (user && dataLoaded) {
-        if(activeBackground) set('settings', { key: 'activeBackgroundId', value: activeBackground.id });
-        else set('settings', { key: 'activeBackgroundId', value: null });
+        if(activeBackground) {
+            set('settings', { key: 'activeBackgroundId', value: activeBackground.id });
+        } else {
+            set('settings', { key: 'activeBackgroundId', value: null });
+        }
     }
   }, [activeBackground, user, dataLoaded]);
 
