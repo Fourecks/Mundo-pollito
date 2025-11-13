@@ -1130,6 +1130,7 @@ const App: React.FC = () => {
   const isMobile = useMediaQuery('(max-width: 767px)');
   
   const settingsSaveTimeout = useRef<number | null>(null);
+  const isInitialMount = useRef(true);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -2207,18 +2208,13 @@ const App: React.FC = () => {
   // New robust effect to set active background
   useEffect(() => {
     // Wait until we have the saved ID and the list of backgrounds
-    if (userBackgrounds.length > 0) {
-        if(savedActiveBgId) {
-            const bgToActivate = userBackgrounds.find(bg => bg.id === savedActiveBgId);
-            if (bgToActivate) {
-                setActiveBackground(bgToActivate);
-            } else {
-                // The saved ID might be for a deleted background, so reset.
-                setActiveBackground(null);
-                set('settings', { key: 'activeBackgroundId', value: null });
-            }
+    if (savedActiveBgId && userBackgrounds.length > 0) {
+        const bgToActivate = userBackgrounds.find(bg => bg.id === savedActiveBgId);
+        if (bgToActivate) {
+            setActiveBackground(bgToActivate);
         } else {
-             // If there's no saved ID, ensure it's set to default.
+            // The saved ID might be for a deleted background, so reset.
+            set('settings', { key: 'activeBackgroundId', value: null });
             setActiveBackground(null);
         }
     }
@@ -2326,12 +2322,12 @@ const App: React.FC = () => {
   
   // Active Background Persistence
   useEffect(() => {
+    if (isInitialMount.current) {
+        isInitialMount.current = false;
+        return;
+    }
     if (user && dataLoaded) {
-        if(activeBackground) {
-            set('settings', { key: 'activeBackgroundId', value: activeBackground.id });
-        } else {
-            set('settings', { key: 'activeBackgroundId', value: null });
-        }
+        set('settings', { key: 'activeBackgroundId', value: activeBackground ? activeBackground.id : null });
     }
   }, [activeBackground, user, dataLoaded]);
 
