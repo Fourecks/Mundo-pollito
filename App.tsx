@@ -1164,16 +1164,19 @@ const App: React.FC = () => {
   const [activeTrack, setActiveTrack] = useState<Playlist | null>(null);
   const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
 
-  // Google Drive State
+  // Google Drive State (For Gallery only)
   const [gapiReady, setGapiReady] = useState(false);
   const [gisReady, setGisReady] = useState(false);
   const [gdriveToken, setGdriveToken] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
-  const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
   const [galleryIsLoading, setGalleryIsLoading] = useState(false);
-  const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   const tokenClientRef = useRef<any>(null);
+  
+  // Supabase Backgrounds State
+  const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
+  const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
+
 
   // OneSignal Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -1932,7 +1935,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // This effect runs when the component unmounts or when the dependencies change.
     // The cleanup function from the *previous* render is called, which has the old URLs.
-    const urlsToClean = [...galleryImages.map(i => i.url), ...userBackgrounds.map(b => b.url)];
+    const urlsToClean = [...galleryImages.map(i => i.url)];
     return () => {
         urlsToClean.forEach(url => {
             if (url.startsWith('blob:')) {
@@ -1940,7 +1943,7 @@ const App: React.FC = () => {
             }
         });
     };
-  }, [galleryImages, userBackgrounds]);
+  }, [galleryImages]);
 
   // --- Google Drive Integration ---
   const userRef = useRef(user);
@@ -2052,26 +2055,25 @@ const App: React.FC = () => {
     } catch (error) { console.error("Error finding/creating app folder:", error); return null; }
   }, []);
   
-  const loadFilesFromDrive = useCallback(async (folderName: 'gallery' | 'backgrounds') => {
+  const loadGalleryFromDrive = useCallback(async () => {
       if (!gdriveToken) return;
-      if (folderName === 'gallery') setGalleryIsLoading(true);
-      else setBackgroundsAreLoading(true);
+      setGalleryIsLoading(true);
 
       try {
           const parentFolderId = await findOrCreateAppFolder();
           if (!parentFolderId) throw new Error("Could not access app folder.");
           
           let subFolderId: string | null = null;
-          const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`, fields: 'files(id)' });
+          const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='gallery' and trashed=false`, fields: 'files(id)' });
           if(folderResponse.result.files && folderResponse.result.files.length > 0) {
               subFolderId = folderResponse.result.files[0].id!;
           } else {
-              const subFolderMeta = { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
+              const subFolderMeta = { name: 'gallery', mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
               const createSubResponse = await window.gapi.client.drive.files.create({ resource: subFolderMeta, fields: 'id' });
               subFolderId = createSubResponse.result.id!;
           }
 
-          if(!subFolderId) throw new Error(`Could not access ${folderName} folder.`);
+          if(!subFolderId) throw new Error(`Could not access gallery folder.`);
           
           const filesResponse = await window.gapi.client.drive.files.list({ q: `'${subFolderId}' in parents and trashed=false`, fields: 'files(id, name, appProperties)' });
           const files = filesResponse.result.files || [];
@@ -2099,49 +2101,30 @@ const App: React.FC = () => {
           });
         
           const processedFiles = (await Promise.all(fileDataPromises)).filter(Boolean);
+          const images: GalleryImage[] = processedFiles.map(file => ({ id: file!.id!, url: file!.url }));
+          setGalleryImages(images);
 
-          if(folderName === 'gallery') {
-              const images: GalleryImage[] = processedFiles.map(file => ({ id: file!.id!, url: file!.url }));
-              setGalleryImages(images);
-          } else {
-              const backgrounds: Background[] = processedFiles.map(file => ({
-                  id: file!.id!,
-                  name: file!.name!,
-                  url: file!.url,
-                  type: file!.name!.toLowerCase().endsWith('.mp4') ? 'video' : 'image',
-                  isFavorite: file!.appProperties?.isFavorite === 'true'
-              }));
-              setUserBackgrounds(backgrounds);
-              
-              if(savedActiveBgId) {
-                const bgToActivate = backgrounds.find(bg => bg.id === savedActiveBgId);
-                if(bgToActivate) setActiveBackground(bgToActivate);
-              }
-          }
-
-      } catch (error) { console.error(`Error loading ${folderName}:`, error); }
+      } catch (error) { console.error(`Error loading gallery:`, error); }
       finally {
-          if (folderName === 'gallery') setGalleryIsLoading(false);
-          else setBackgroundsAreLoading(false);
+          setGalleryIsLoading(false);
       }
-  }, [gdriveToken, findOrCreateAppFolder, savedActiveBgId, getUserKey]);
+  }, [gdriveToken, findOrCreateAppFolder, getUserKey]);
   
   useEffect(() => {
       if (gdriveToken && isOnline) {
-          loadFilesFromDrive('gallery');
-          loadFilesFromDrive('backgrounds');
+          loadGalleryFromDrive();
       }
-  }, [gdriveToken, loadFilesFromDrive, isOnline]);
+  }, [gdriveToken, loadGalleryFromDrive, isOnline]);
   
-  const uploadFileToDrive = useCallback(async (file: File, folderName: 'gallery' | 'backgrounds'): Promise<any> => {
+  const uploadGalleryImageToDrive = useCallback(async (file: File): Promise<any> => {
       const parentFolderId = await findOrCreateAppFolder();
       if (!parentFolderId) throw new Error("No parent folder");
       
       let subFolderId: string | null = null;
-      const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`, fields: 'files(id)' });
+      const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='gallery' and trashed=false`, fields: 'files(id)' });
       subFolderId = folderResponse.result.files?.[0]?.id || null;
       if (!subFolderId) {
-          const subFolderMeta = { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
+          const subFolderMeta = { name: 'gallery', mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
           const createSubResponse = await window.gapi.client.drive.files.create({ resource: subFolderMeta, fields: 'id' });
           subFolderId = createSubResponse.result.id!;
       }
@@ -2162,43 +2145,151 @@ const App: React.FC = () => {
   const handleAddGalleryImages = async (files: File[]) => {
       setGalleryIsLoading(true);
       try {
-          const uploadPromises = files.map(file => uploadFileToDrive(file, 'gallery'));
+          const uploadPromises = files.map(file => uploadGalleryImageToDrive(file));
           await Promise.all(uploadPromises);
-          await loadFilesFromDrive('gallery');
+          await loadGalleryFromDrive();
       } catch (error) { console.error("Error uploading images:", error); }
       finally { setGalleryIsLoading(false); }
   };
-  const handleDeleteFile = async (id: string, folderName: 'gallery' | 'backgrounds') => {
+  const handleDeleteGalleryImage = async (id: string) => {
       try {
           await window.gapi.client.drive.files.delete({ fileId: id });
-          if(folderName === 'gallery') {
-            setGalleryImages(i => i.filter(img => img.id !== id));
-          } else {
-              setUserBackgrounds(bgs => bgs.filter(bg => bg.id !== id));
-              if(activeBackground?.id === id) setActiveBackground(null);
-          }
-      } catch (error) { console.error(`Error deleting ${folderName} item:`, error); }
+          setGalleryImages(i => i.filter(img => img.id !== id));
+      } catch (error) { console.error(`Error deleting gallery item:`, error); }
   };
   
+  // --- Supabase Backgrounds Logic ---
+  const loadBackgroundsFromSupabase = useCallback(async () => {
+    if (!user) return;
+    setBackgroundsAreLoading(true);
+    try {
+        const { data: backgroundMeta, error } = await supabase
+            .from('user_backgrounds')
+            .select('*')
+            .eq('user_id', user.id);
+        if (error) throw error;
+        
+        const backgrounds: Background[] = backgroundMeta.map(meta => {
+            const { data: { publicUrl } } = supabase.storage.from('backgrounds').getPublicUrl(meta.path);
+            return { ...meta, url: publicUrl };
+        });
+
+        setUserBackgrounds(backgrounds);
+
+        if (savedActiveBgId) {
+            const bgToActivate = backgrounds.find(bg => bg.id === savedActiveBgId);
+            if(bgToActivate) setActiveBackground(bgToActivate);
+        }
+    } catch (error) {
+        console.error("Error loading backgrounds from Supabase:", error);
+    } finally {
+        setBackgroundsAreLoading(false);
+    }
+  }, [user, savedActiveBgId]);
+
+  useEffect(() => {
+    if (user && isOnline) {
+      loadBackgroundsFromSupabase();
+    }
+  }, [user, isOnline, loadBackgroundsFromSupabase]);
+
   const handleAddBackground = async (file: File) => {
-      setBackgroundsAreLoading(true);
-      try {
-          await uploadFileToDrive(file, 'backgrounds');
-          await loadFilesFromDrive('backgrounds');
-      } catch (error) { console.error("Error uploading background:", error); }
-      finally { setBackgroundsAreLoading(false); }
+    if (!user) return;
+    if (userBackgrounds.length >= 10) {
+      alert("Has alcanzado el límite de 10 fondos. Por favor, elimina uno para subir otro nuevo.");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) { // 15MB limit
+      alert(`El archivo "${file.name}" es demasiado grande. El límite es 15MB.`);
+      return;
+    }
+
+    setBackgroundsAreLoading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('backgrounds')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data, error: insertError } = await supabase
+        .from('user_backgrounds')
+        .insert({
+          user_id: user.id,
+          name: file.name,
+          path: filePath,
+          type: file.type.startsWith('video') ? 'video' : 'image',
+          is_favorite: false,
+        }).select().single();
+      
+      if (insertError) {
+        // Cleanup storage if db insert fails
+        await supabase.storage.from('backgrounds').remove([filePath]);
+        throw insertError;
+      }
+
+      // Optimistically update UI
+      const { data: { publicUrl } } = supabase.storage.from('backgrounds').getPublicUrl(data.path);
+      const newBackground = { ...data, url: publicUrl, is_favorite: data.is_favorite };
+      setUserBackgrounds(prev => [...prev, newBackground]);
+
+    } catch (error) {
+      console.error("Error uploading background:", error);
+      alert("Error al subir el fondo. Inténtalo de nuevo.");
+    } finally {
+      setBackgroundsAreLoading(false);
+    }
   };
+  
+  const handleDeleteBackground = async (id: string) => {
+    const bgToDelete = userBackgrounds.find(bg => bg.id === id);
+    if (!bgToDelete) return;
+
+    setBackgroundsAreLoading(true);
+    try {
+        const { error: storageError } = await supabase.storage.from('backgrounds').remove([bgToDelete.path]);
+        if (storageError) throw storageError;
+
+        const { error: dbError } = await supabase.from('user_backgrounds').delete().eq('id', id);
+        if (dbError) throw dbError;
+        
+        setUserBackgrounds(bgs => bgs.filter(bg => bg.id !== id));
+        if (activeBackground?.id === id) setActiveBackground(null);
+
+    } catch (error) {
+        console.error("Error deleting background:", error);
+        alert("Error al eliminar el fondo.");
+    } finally {
+      setBackgroundsAreLoading(false);
+    }
+  };
+  
   const handleToggleFavoriteBackground = async (id: string) => {
     const bg = userBackgrounds.find(b => b.id === id);
     if (!bg) return;
-    const isFavorite = !bg.isFavorite;
+    const newIsFavorite = !bg.is_favorite;
+
     try {
-        await window.gapi.client.drive.files.update({
-            fileId: id,
-            appProperties: { isFavorite: String(isFavorite) },
-        });
-        setUserBackgrounds(bgs => bgs.map(b => b.id === id ? { ...b, isFavorite } : b));
-    } catch (error) { console.error("Error favoriting background:", error); }
+      setUserBackgrounds(bgs => bgs.map(b => b.id === id ? { ...b, is_favorite: newIsFavorite } : b));
+      
+      const { error } = await supabase
+        .from('user_backgrounds')
+        .update({ is_favorite: newIsFavorite })
+        .eq('id', id);
+
+      if (error) {
+        setUserBackgrounds(bgs => bgs.map(b => b.id === id ? { ...b, is_favorite: !newIsFavorite } : b));
+        throw error;
+      }
+
+    } catch (error) {
+      console.error("Error favoriting background:", error);
+      alert("No se pudo actualizar el favorito.");
+    }
   };
   
   // Active Background Persistence
@@ -2316,8 +2407,8 @@ const App: React.FC = () => {
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,
     setActiveTrack, setActiveSpotifyTrack,
     gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
-    handleAddGalleryImages, handleDeleteGalleryImage: (id) => handleDeleteFile(id, 'gallery'),
-    handleAddBackground, handleDeleteBackground: (id) => handleDeleteFile(id, 'backgrounds'),
+    handleAddGalleryImages, handleDeleteGalleryImage,
+    handleAddBackground, handleDeleteBackground,
     handleToggleFavoriteBackground, gapiReady,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
   };
