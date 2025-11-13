@@ -46,6 +46,7 @@ import MobilePomodoroPanel from './components/MobilePomodoroPanel';
 import ConfirmationModalWithOptions from './components/ConfirmationModalWithOptions';
 import ConfirmationModal from './components/ConfirmationModal';
 import QuickCaptureSetupModal from './components/QuickCaptureSetupModal';
+import MotivationalToast from './components/MotivationalToast';
 
 // --- Google Drive Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -1146,6 +1147,7 @@ const App: React.FC = () => {
   const [deleteOptions, setDeleteOptions] = useState<{ isOpen: boolean; todo: Todo | null; }>({ isOpen: false, todo: null });
   const [updateOptions, setUpdateOptions] = useState<{ isOpen: boolean; original: Todo | null; updated: Todo | null; }>({ isOpen: false, original: null, updated: null });
   const [isClearPastConfirmOpen, setIsClearPastConfirmOpen] = useState(false);
+  const [quickCaptureMessage, setQuickCaptureMessage] = useState<string | null>(null);
 
 
   const [activeBackground, setActiveBackground] = useState<Background | null>(null);
@@ -1599,9 +1601,19 @@ const App: React.FC = () => {
     const handleUrlTask = async () => {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
         const urlParams = new URLSearchParams(window.location.search);
-        const taskText = urlParams.get('addTask');
+        const taskText = urlParams.get('task');
+        
+        // Prevent duplicate task creation on app reload
+        const requestKey = urlParams.toString();
+        if (sessionStorage.getItem(requestKey)) {
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+            return;
+        }
 
         if (taskText && user && isStandalone) {
+            sessionStorage.setItem(requestKey, 'true'); // Mark as processed
+            
             const decodedText = decodeURIComponent(taskText.replace(/\+/g, ' '));
             
             const dateKey = formatDateKey(new Date());
@@ -1620,6 +1632,7 @@ const App: React.FC = () => {
             setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
             await syncableCreate('todos', newTodo);
             
+            setQuickCaptureMessage('¡Tarea capturada con éxito!');
             setSelectedDate(new Date());
 
             const newUrl = window.location.pathname;
@@ -2423,6 +2436,7 @@ const App: React.FC = () => {
         onInstall={handleInstallPwa} 
         onDismiss={handleDismissPwaBanner} 
       />
+      <MotivationalToast message={quickCaptureMessage} onClear={() => setQuickCaptureMessage(null)} />
       <ConfirmationModalWithOptions
         isOpen={deleteOptions.isOpen}
         onClose={() => setDeleteOptions({ isOpen: false, todo: null })}

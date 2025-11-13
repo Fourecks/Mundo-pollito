@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import CloseIcon from './icons/CloseIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
@@ -9,9 +10,7 @@ interface QuickCaptureSetupModalProps {
 }
 
 const QuickCaptureSetupModal: React.FC<QuickCaptureSetupModalProps> = ({ isOpen, onClose, userId }) => {
-    // FIX: The URL now points directly to the Supabase function endpoint.
-    const baseUrl = "https://pbtdzkpympdfemnejpwj.supabase.co/functions/v1/quick-add-task";
-    const shortcutUrl = `${baseUrl}?uid=${userId}&task=`;
+    const shortcutUrl = `${window.location.origin}/?task=`;
     const [copySuccess, setCopySuccess] = useState(false);
 
     const copyToClipboard = () => {
@@ -40,8 +39,8 @@ const QuickCaptureSetupModal: React.FC<QuickCaptureSetupModalProps> = ({ isOpen,
                         <p>Sigue estos pasos para crear un Atajo en tu iPhone y añadir tareas desde la pantalla de bloqueo:</p>
                         
                         <div className="space-y-2">
-                            <h4 className="font-bold text-primary-dark dark:text-primary">Paso 1: Copia tu URL Pollito</h4>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Esta URL es única para ti. ¡No la compartas!</p>
+                            <h4 className="font-bold text-primary-dark dark:text-primary">Paso 1: Copia la URL de la App</h4>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Esta URL base se usará en tu atajo.</p>
                             <div className="relative">
                                 <input
                                     type="text"
@@ -63,11 +62,10 @@ const QuickCaptureSetupModal: React.FC<QuickCaptureSetupModalProps> = ({ isOpen,
                              <ol className="list-decimal list-inside space-y-2 text-xs bg-white/60 dark:bg-gray-700/60 p-3 rounded-lg">
                                 <li>Abre la app <strong>Atajos</strong> y toca el botón <strong>"+"</strong>.</li>
                                 <li><strong>Acción 1:</strong> Busca y añade <strong>"Solicitar entrada"</strong>. En "Pregunta", escribe: <i>¿Qué tarea quieres añadir?</i></li>
-                                <li><strong>Acción 2:</strong> Busca y añade <strong>"Texto"</strong>.</li>
-                                <li>En el campo de texto, <strong>pega tu URL Pollito</strong>.</li>
+                                <li><strong>Acción 2:</strong> Busca y añade <strong>"URL"</strong>.</li>
+                                <li>En el campo de la URL, <strong>pega la URL de la app que copiaste</strong>.</li>
                                 <li><strong>MUY IMPORTANTE:</strong> Justo después de la URL, <strong>toca la variable azul "Entrada proporcionada"</strong> que aparece sobre el teclado.</li>
-                                <li><strong>Acción 3:</strong> Busca y añade <strong>"URL-codificar"</strong>. Asegúrate de que codifique la variable "Texto".</li>
-                                <li><strong>Acción 4:</strong> Busca y añade <strong>"Abrir URL"</strong>. Esta debe abrir la variable "URL-codificada".</li>
+                                <li><strong>Acción 3:</strong> Busca y añade <strong>"Abrir URL"</strong>.</li>
                                 <li>¡Listo! Nombra tu atajo (ej. "Añadir Tarea") y añádelo a tu pantalla de inicio o de bloqueo como un widget.</li>
                              </ol>
                         </div>
