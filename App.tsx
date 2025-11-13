@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -2170,7 +2171,7 @@ const App: React.FC = () => {
         if (error) throw error;
         
         const backgrounds: Background[] = backgroundMeta.map(meta => {
-            const { data: { publicUrl } } = supabase.storage.from('backgrounds').getPublicUrl(meta.path);
+            const { data: { publicUrl } } = supabase.storage.from('fondos').getPublicUrl(meta.path);
             return { ...meta, url: publicUrl };
         });
 
@@ -2211,7 +2212,7 @@ const App: React.FC = () => {
       const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('backgrounds')
+        .from('fondos')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
@@ -2228,12 +2229,12 @@ const App: React.FC = () => {
       
       if (insertError) {
         // Cleanup storage if db insert fails
-        await supabase.storage.from('backgrounds').remove([filePath]);
+        await supabase.storage.from('fondos').remove([filePath]);
         throw insertError;
       }
 
       // Optimistically update UI
-      const { data: { publicUrl } } = supabase.storage.from('backgrounds').getPublicUrl(data.path);
+      const { data: { publicUrl } } = supabase.storage.from('fondos').getPublicUrl(data.path);
       const newBackground = { ...data, url: publicUrl, is_favorite: data.is_favorite };
       setUserBackgrounds(prev => [...prev, newBackground]);
 
@@ -2251,7 +2252,7 @@ const App: React.FC = () => {
 
     setBackgroundsAreLoading(true);
     try {
-        const { error: storageError } = await supabase.storage.from('backgrounds').remove([bgToDelete.path]);
+        const { error: storageError } = await supabase.storage.from('fondos').remove([bgToDelete.path]);
         if (storageError) throw storageError;
 
         const { error: dbError } = await supabase.from('user_backgrounds').delete().eq('id', id);
