@@ -160,7 +160,8 @@ const queueMutation = async (op: Omit<SyncOperation, 'id'>) => {
 /**
  * Creates a record with an "online-first" strategy.
  * 1. Tries to insert the record directly into Supabase.
- * 2. If successful, it adds the server-confirmed record to the local IndexedDB.
+ * 2. If successful, it performs an atomic transaction to replace the temporary local record
+ *    with the server-confirmed record in IndexedDB.
  * 3. If it fails (e.g., offline), it falls back to adding the temporary record
  *    locally and queuing the 'CREATE' operation for a later sync.
  * @param tableName - The name of the Supabase/IndexedDB table.
@@ -227,41 +228,34 @@ export const syncableCreate = async (tableName: string, payload: any): Promise<a
  * @returns The updated record (either from Supabase or the optimistic local one).
  */
 export const syncableUpdate = async (tableName: string, payload: any): Promise<any> => {
-    await set(tableName, payload); // Optimistic local update for immediate UI feedback.
-
     // This robustness check handles the edge case where an item created offline is
     // updated before it has a chance to sync. Instead of making a failing network
     // request, we simply queue the update, which will be processed correctly
     // after the initial creation is synced.
     if (typeof payload.id === 'number' && payload.id < 0) {
         await queueMutation({ type: 'UPDATE', tableName, payload });
+        await set(tableName, payload); // Still need to update the local version
         return payload;
     }
+
+    // For online updates, do the optimistic update *after* the check above.
+    await set(tableName, payload); 
 
     if (navigator.onLine) {
         try {
             const { id, ...updateData } = payload;
             
-            // Remove client-side only or relational fields before sending to Supabase.
             const relationalFields = ['subtasks', 'notes'];
-            relationalFields.forEach(field => {
-                if (updateData.hasOwnProperty(field)) {
-                    delete updateData[field];
-                }
-            });
-            // These fields are managed by the database and should not be part of an update payload.
+            relationalFields.forEach(field => delete updateData[field]);
             delete updateData.created_at;
             delete updateData.user_id;
             
             let selectClause = '*';
-            if (tableName === 'todos') {
-                selectClause = '*, subtasks(*)';
-            }
+            if (tableName === 'todos') selectClause = '*, subtasks(*)';
 
             const { data: updatedRecord, error } = await supabase.from(tableName).update(updateData).eq('id', id).select(selectClause).single();
             if (error) throw error;
 
-            // Ensure local DB has the confirmed server state.
             await set(tableName, updatedRecord);
             return updatedRecord;
         } catch (error) {
@@ -281,15 +275,16 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
  * @param key - The 'id' of the record to delete.
  */
 export const syncableDelete = async (tableName: string, key: number | string): Promise<void> => {
-    await remove(tableName, key); // Optimistic local delete
-
     // This robustness check handles deleting an item that was created offline before
     // it could be synced. We just queue the delete operation, and the sync processor
-    // will handle it correctly (often by simply discarding both the create and delete ops).
+    // will handle it correctly.
     if (typeof key === 'number' && key < 0) {
         await queueMutation({ type: 'DELETE', tableName, key });
+        await remove(tableName, key); // Still perform the optimistic local delete
         return;
     }
+
+    await remove(tableName, key); // Optimistic local delete for online items
 
     if (navigator.onLine) {
         try {
@@ -316,8 +311,12 @@ export const syncableDeleteMultiple = async (tableName: string, keys: (number | 
 
     if (navigator.onLine) {
         try {
-            const { error } = await supabase.from(tableName).delete().in('id', keys);
-            if (error) throw error;
+            // Filter out any temporary negative IDs before sending to server
+            const serverKeys = keys.filter(k => typeof k !== 'number' || k >= 0);
+            if (serverKeys.length > 0) {
+                const { error } = await supabase.from(tableName).delete().in('id', serverKeys);
+                if (error) throw error;
+            }
         } catch (error) {
             console.error(`Online DELETE_MULTIPLE failed for ${tableName}, queueing for later.`, error);
             await queueMutation({ type: 'DELETE_MULTIPLE', tableName, keys });
@@ -364,6 +363,8 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
     const errors: any[] = [];
     const tempIdMap = new Map<number, number>();
 
+    // This loop is now resilient. If one operation fails, it will be logged
+    // and skipped, but the loop will continue with the next operation.
     for (const op of operations) {
         try {
             switch (op.type) {
@@ -402,7 +403,7 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                         if (tempIdMap.has(recordId)) {
                             recordId = tempIdMap.get(recordId);
                         } else {
-                            console.warn(`Could not find server ID for temp ID ${recordId}. This may happen if a record is updated before its create operation is synced. The update will be attempted with the temp ID.`);
+                           console.warn(`Could not find server ID for temp ID ${recordId}. This update may fail if the create operation hasn't synced yet.`);
                         }
                     }
 
@@ -423,7 +424,7 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                     let key = op.key!;
                     if (typeof key === 'number' && key < 0 && tempIdMap.has(key)) {
                         // This item was created and deleted offline before a sync. No need to delete from server.
-                    } else {
+                    } else if (typeof key !== 'number' || key >= 0) {
                         const { error } = await supabase.from(op.tableName).delete().eq('id', key);
                         if (error) throw error;
                     }
@@ -431,7 +432,6 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                 }
                  case 'DELETE_MULTIPLE': {
                     const keys = op.keys!;
-                    // Filter out temporary IDs that were created and deleted offline.
                     const serverKeys = keys.filter(key => typeof key !== 'number' || key >= 0);
                     if (serverKeys.length > 0) {
                         const { error } = await supabase.from(op.tableName).delete().in('id', serverKeys);
@@ -445,16 +445,18 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                     break;
                 }
             }
+            // If the operation was successful, remove it from the queue.
             await remove('sync_queue', op.id!);
+
         } catch (error) {
-            console.error('Sync operation failed:', op, error);
+            console.error('Sync operation failed, but continuing with the next one:', op, error);
             errors.push({ op, error });
-            isSyncing = false;
-            return { success: false, errors };
+            // Don't re-throw or return; just continue to the next operation.
         }
     }
     
-    console.log("Sync process finished successfully.");
+    console.log("Sync process finished.");
     isSyncing = false;
-    return { success: true, errors: [] };
+    // The process is considered successful overall if it completed, but we report any individual errors.
+    return { success: errors.length === 0, errors };
 };
