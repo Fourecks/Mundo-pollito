@@ -11,6 +11,7 @@ import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import TrashIcon from './icons/TrashIcon';
 import PlusIcon from './icons/PlusIcon';
+import FolderIcon from './icons/FolderIcon';
 import ConfirmationModal from './ConfirmationModal';
 
 interface TodoListModuleProps {
@@ -50,7 +51,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     } = props;
 
     const [viewMode, setViewMode] = useState<'date' | 'project'>('date');
-    const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
     const [sortBy, setSortBy] = useState<'default' | 'priority' | 'dueDate'>('default');
     const [hideCompleted, setHideCompleted] = useState(false);
     const [calendarVisible, setCalendarVisible] = useState(false);
@@ -60,11 +60,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     
     const containerRef = useRef<HTMLDivElement>(null);
-
-    const handleViewModeChange = (mode: 'date' | 'project') => {
-        setViewMode(mode);
-        setSelectedProjectId(null); // Reset project selection when switching views
-    };
 
     const handlePrevDay = () => {
       const newDate = new Date(selectedDate);
@@ -164,6 +159,37 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         month: 'long',
     }).format(selectedDate).replace(/^\w/, c => c.toUpperCase());
     
+    const todosByProject = useMemo(() => {
+        if (viewMode !== 'project') return new Map<string, { project: Project | { name: string, id: number }; tasks: Todo[] }>();
+
+        // FIX: Explicitly type `flatTodos` as `Todo[]` to resolve type inference issues.
+        // The type of `todo` in the following `forEach` was being inferred as `unknown`.
+        const flatTodos: Todo[] = Object.values(allTodos).flat();
+        const grouped = new Map<string, { project: Project | { name: string, id: number }; tasks: Todo[] }>();
+
+        projects.forEach(p => {
+            grouped.set(`project-${p.id}`, { project: p, tasks: [] });
+        });
+        grouped.set('unassigned', { project: { name: 'Tareas sin proyecto', id: 0 }, tasks: [] });
+
+        flatTodos.forEach(todo => {
+            if (todo.project_id && grouped.has(`project-${todo.project_id}`)) {
+                grouped.get(`project-${todo.project_id}`)!.tasks.push(todo);
+            } else {
+                grouped.get('unassigned')!.tasks.push(todo);
+            }
+        });
+        
+        // Filter out empty projects unless it's the unassigned group
+        for (const [key, value] of grouped.entries()) {
+            if (key !== 'unassigned' && value.tasks.length === 0) {
+                grouped.delete(key);
+            }
+        }
+
+        return grouped;
+    }, [allTodos, projects, viewMode]);
+
     const renderDateView = () => (
         <>
             <div className={`flex-shrink-0 ${isMobile ? 'sticky top-0 bg-secondary-lighter/80 dark:bg-gray-800/80 backdrop-blur-md z-20 border-b border-secondary-light/50 dark:border-gray-700/50' : ''}`}>
@@ -294,95 +320,58 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         </>
     );
     
-    const renderProjectList = () => {
-        // FIX: Replaced .flat() with a more compatible array flattening method to fix TypeScript type inference.
-        const flatTodos: Todo[] = [].concat(...Object.values(allTodos));
-        
-        return (
-            <div className="p-3 flex-grow min-h-0 space-y-4 overflow-y-auto custom-scrollbar">
-                {projects.map(project => {
-                    const projectTasks = flatTodos.filter(t => t.project_id === project.id);
-                    const completed = projectTasks.filter(t => t.completed).length;
-                    const total = projectTasks.length;
+    const renderProjectView = () => (
+        <div className="p-3 flex-grow min-h-0 space-y-4 overflow-y-auto custom-scrollbar">
+            {Array.from(todosByProject.entries()).map(([key, { project, tasks }]) => {
+                if (tasks.length === 0 && key !== 'unassigned') return null;
 
-                    return (
-                        <div key={project.id} className="bg-white/50 dark:bg-gray-800/50 p-3 rounded-xl shadow-sm transition-all hover:shadow-md hover:scale-[1.02]">
-                            <button onClick={() => setSelectedProjectId(project.id)} className="w-full text-left">
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="font-bold text-primary-dark dark:text-primary">{project.name}</h3>
-                                    <ChevronRightIcon className="h-5 w-5 text-gray-400" />
-                                </div>
-                                {total > 0 && <ProgressBar completed={completed} total={total} />}
-                                {total === 0 && <p className="text-xs text-gray-500">Sin tareas.</p>}
-                            </button>
+                const completed = tasks.filter(t => t.completed).length;
+                const total = tasks.length;
+                
+                const sortedTasks = [...tasks].sort((a,b) => {
+                    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                    return (a.due_date || '9999').localeCompare(b.due_date || '9999');
+                });
+
+                return (
+                    <div key={key} className="bg-white/50 dark:bg-gray-800/50 p-3 rounded-xl shadow-sm">
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="font-bold text-primary-dark dark:text-primary">{project.name}</h3>
+                             {project.id !== 0 && (
+                                <button
+                                    onClick={() => setProjectToDelete(project as Project)}
+                                    className="p-1.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-full hover:bg-red-100/50 dark:hover:bg-red-900/30 transition-colors"
+                                    title="Eliminar proyecto"
+                                >
+                                    <TrashIcon className="h-4 w-4" />
+                                </button>
+                            )}
                         </div>
-                    );
-                })}
-                 <div className="p-3 bg-white/50 dark:bg-gray-800/50 rounded-xl">
-                     <h3 className="font-bold text-primary-dark dark:text-primary mb-2">Nuevo Proyecto</h3>
-                    <form onSubmit={handleAddNewProject} className="flex gap-2">
-                        <input 
-                            type="text" 
-                            value={newProjectName} 
-                            onChange={e => setNewProjectName(e.target.value)} 
-                            placeholder="Nombre del proyecto..."
-                            className="flex-grow bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                        />
-                        <button type="submit" className="bg-primary text-white p-2 rounded-lg shadow-md hover:bg-primary-dark shrink-0"><PlusIcon /></button>
-                    </form>
-                </div>
-            </div>
-        );
-    };
-
-    const renderSingleProjectView = () => {
-        const project = projects.find(p => p.id === selectedProjectId);
-        if (!project) return null;
-
-        // FIX: Replaced .flat() with a more compatible array flattening method to fix TypeScript type inference.
-        const flatTodos: Todo[] = [].concat(...Object.values(allTodos));
-        const projectTasks = flatTodos.filter(t => t.project_id === selectedProjectId);
-        const completed = projectTasks.filter(t => t.completed).length;
-        const total = projectTasks.length;
-
-        const sortedTasks = [...projectTasks].sort((a,b) => {
-            if (a.completed !== b.completed) return a.completed ? 1 : -1;
-            return (a.due_date || '9999').localeCompare(b.due_date || '9999');
-        });
-
-        return (
-            <div className="flex flex-col h-full animate-fade-in">
-                <header className="p-3 flex items-center justify-between gap-2 flex-shrink-0 border-b border-secondary-light/30 dark:border-gray-700/50">
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setSelectedProjectId(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
-                            <ChevronLeftIcon />
-                        </button>
-                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary truncate">{project.name}</h3>
+                        {total > 0 && <ProgressBar completed={completed} total={total} />}
+                        <div className="space-y-2 mt-2">
+                           {sortedTasks.map(todo => (
+                                <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} />
+                           ))}
+                        </div>
+                        {tasks.length === 0 && key === 'unassigned' && <p className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">Todas las tareas están en un proyecto. ¡Bien hecho!</p>}
                     </div>
-                    <button
-                        onClick={() => setProjectToDelete(project as Project)}
-                        className="p-1.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-full hover:bg-red-100/50 dark:hover:bg-red-900/30 transition-colors"
-                        title="Eliminar proyecto"
-                    >
-                        <TrashIcon className="h-4 w-4" />
-                    </button>
-                </header>
-                <div className="p-3">
-                    <ProgressBar completed={completed} total={total} />
-                </div>
-                <div className="space-y-2 p-3 flex-grow overflow-y-auto custom-scrollbar">
-                   {sortedTasks.map(todo => (
-                        <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} />
-                   ))}
-                   {total === 0 && <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">Este proyecto no tiene tareas.</p>}
-                </div>
+                );
+            })}
+             <div className="p-3 bg-white/50 dark:bg-gray-800/50 rounded-xl">
+                 <h3 className="font-bold text-primary-dark dark:text-primary mb-2">Nuevo Proyecto</h3>
+                <form onSubmit={handleAddNewProject} className="flex gap-2">
+                    <input 
+                        type="text" 
+                        value={newProjectName} 
+                        onChange={e => setNewProjectName(e.target.value)} 
+                        placeholder="Nombre del proyecto..."
+                        className="flex-grow bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    />
+                    <button type="submit" className="bg-primary text-white p-2 rounded-lg shadow-md hover:bg-primary-dark shrink-0"><PlusIcon /></button>
+                </form>
             </div>
-        );
-    };
-
-    const renderProjectView = () => {
-        return selectedProjectId === null ? renderProjectList() : renderSingleProjectView();
-    };
+        </div>
+    );
 
     return (
         <div ref={containerRef} className="w-full bg-transparent flex flex-col md:flex-row h-full">
@@ -409,8 +398,8 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                 </div>
 
                 <div className="p-2 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center gap-2">
-                    <button onClick={() => handleViewModeChange('date')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-lg transition-colors ${viewMode === 'date' ? 'bg-white/80 dark:bg-gray-700/80 text-primary-dark dark:text-primary shadow' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}>Tareas</button>
-                    <button onClick={() => handleViewModeChange('project')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-lg transition-colors ${viewMode === 'project' ? 'bg-white/80 dark:bg-gray-700/80 text-primary-dark dark:text-primary shadow' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}>Proyectos</button>
+                    <button onClick={() => setViewMode('date')} className={`flex-1 text-center font-semibold py-2 rounded-lg transition-colors ${viewMode === 'date' ? 'bg-white/80 dark:bg-gray-700/80 text-primary-dark dark:text-primary shadow' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}>Por Fecha</button>
+                    <button onClick={() => setViewMode('project')} className={`flex-1 text-center font-semibold py-2 rounded-lg transition-colors ${viewMode === 'project' ? 'bg-white/80 dark:bg-gray-700/80 text-primary-dark dark:text-primary shadow' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}>Por Proyecto</button>
                 </div>
                 
                 {viewMode === 'date' ? renderDateView() : renderProjectView()}
@@ -438,12 +427,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                 isOpen={!!projectToDelete}
                 onClose={() => setProjectToDelete(null)}
                 onConfirm={() => {
-                    if (projectToDelete) {
-                        if (projectToDelete.id === selectedProjectId) {
-                            setSelectedProjectId(null);
-                        }
-                        onDeleteProject(projectToDelete.id);
-                    }
+                    if (projectToDelete) onDeleteProject(projectToDelete.id);
                     setProjectToDelete(null);
                 }}
                 title="Eliminar Proyecto"
