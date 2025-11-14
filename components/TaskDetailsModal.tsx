@@ -76,7 +76,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const [completed, setCompleted] = useState(false);
 
     // Main date
-    const [isDateless, setIsDateless] = useState(false);
     const [due_date, setDueDate] = useState('');
     const [project_id, setProjectId] = useState<number | null | undefined>(undefined);
 
@@ -110,8 +109,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             setPriority(todo.priority || 'medium');
             setSubtasks(todo.subtasks || []);
             setCompleted(todo.completed || false);
-            
-            setIsDateless(!todo.due_date);
             setDueDate(todo.due_date || '');
             setProjectId(todo.project_id);
 
@@ -184,7 +181,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const handleSave = async () => {
         if (!todo) return;
 
-        if (hasReminder && !isDateless && 'Notification' in window && Notification.permission !== 'granted') {
+        if (hasReminder && 'Notification' in window && Notification.permission !== 'granted') {
              alert("Para recibir recordatorios, activa las notificaciones usando el ícono de la campana en la pantalla principal.");
         }
 
@@ -196,7 +193,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         updatedTodoPayload.subtasks = subtasks;
         updatedTodoPayload.project_id = project_id;
 
-        updatedTodoPayload.due_date = isDateless ? undefined : (due_date || undefined);
+        updatedTodoPayload.due_date = due_date || undefined;
         updatedTodoPayload.end_date = hasEndDate ? (end_date || undefined) : undefined;
         updatedTodoPayload.start_time = hasTime ? (start_time || undefined) : undefined;
         updatedTodoPayload.end_time = hasTime ? (end_time || undefined) : undefined;
@@ -263,7 +260,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     };
     
     const reminderSummary = useMemo(() => {
-        if (!hasReminder || isDateless) return 'Nunca';
+        if (!hasReminder) return 'Nunca';
 
         if (reminderType === 'custom') {
             if (customReminderTime) {
@@ -286,76 +283,37 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             case '1440': return '1 día antes';
             default: return 'Nunca';
         }
-    }, [hasReminder, isDateless, reminderType, customReminderDate, customReminderTime]);
+    }, [hasReminder, reminderType, customReminderDate, customReminderTime]);
 
     const recurrenceSummary = useMemo(() => {
-        if (!hasRecurrence || isDateless) return 'Nunca';
+        if (!hasRecurrence) return 'Nunca';
         switch(recurrence.frequency) {
             case 'daily': return 'Diariamente';
             case 'weekly': return 'Semanalmente';
             case 'custom': return 'Personalizado';
             default: return 'Nunca';
         }
-    }, [hasRecurrence, isDateless, recurrence.frequency]);
+    }, [hasRecurrence, recurrence.frequency]);
 
     if (!isOpen || !todo) return null;
 
     const renderMainSettings = () => (
         <>
+            {/* Date Section */}
             <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-400"/>
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Tarea sin fecha</span>
+                    <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><CalendarIcon className="h-4 w-4" /> Fecha</label>
+                    <div className="flex items-center gap-1">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rango</span>
+                        <Switch checked={hasEndDate} onChange={setHasEndDate} />
                     </div>
-                    <Switch checked={isDateless} onChange={(checked) => {
-                        setIsDateless(checked);
-                        if (checked) {
-                            setHasTime(false);
-                            setHasEndDate(false);
-                            setHasReminder(false);
-                            setHasRecurrence(false);
-                        }
-                    }} />
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                    <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
+                    {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
+                    {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>}
                 </div>
             </div>
-
-            {!isDateless && (
-                <div className="space-y-3 animate-pop-in">
-                    {/* Date Section */}
-                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
-                        <div className="flex items-center justify-between">
-                            <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><CalendarIcon className="h-4 w-4" /> Fecha</label>
-                            <div className="flex items-center gap-1">
-                                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rango</span>
-                                <Switch checked={hasEndDate} onChange={setHasEndDate} />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                            <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
-                            {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
-                            {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>}
-                        </div>
-                    </div>
-                    
-                    <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                                <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
-                                <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                            </div>
-                                <div>
-                                <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
-                                <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                            </div>
-                            </div>
-                    </SettingRow>
-
-                    <NavSettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" value={reminderSummary} onClick={() => setActiveSubView('reminder')} />
-
-                    <NavSettingRow icon={<RefreshIcon className="h-4 w-4"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
-                </div>
-            )}
             
              <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -384,7 +342,25 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 </div>
             </div>
 
+            {/* Conditional Settings */}
+            <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                        <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
+                        <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
+                    </div>
+                        <div>
+                        <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
+                        <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
+                    </div>
+                    </div>
+            </SettingRow>
+
+            <NavSettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" value={reminderSummary} onClick={() => setActiveSubView('reminder')} />
+            
             <SettingRow icon={<NotesIcon />} label="Añadir notas" enabled={hasNotes} onToggle={handleToggleNotes}><div/></SettingRow>
+
+            <NavSettingRow icon={<RefreshIcon className="h-4 w-4"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
             
             <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Estado</span>

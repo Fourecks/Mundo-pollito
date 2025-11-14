@@ -107,20 +107,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         }
     }, [isNarrow, isCalendarPanelVisible]);
 
-    const todosForDateView = useMemo(() => {
-        const dateKey = formatDateKey(selectedDate);
-        const todayKey = formatDateKey(new Date());
-
-        const tasksForDate = allTodos[dateKey] || [];
-        
-        if (dateKey === todayKey) {
-            const undatedTasks = allTodos['undated'] || [];
-            return [...tasksForDate, ...undatedTasks];
-        }
-
-        return tasksForDate;
-    }, [allTodos, selectedDate]);
-
+    const todosForDateView = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
     const completedCount = todosForDateView.filter(t => t.completed).length;
     const totalCount = todosForDateView.length;
     
@@ -308,6 +295,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     );
     
     const renderProjectList = () => {
+        // FIX: Replaced .flat() with a more compatible array flattening method to fix TypeScript type inference.
         const flatTodos: Todo[] = [].concat(...Object.values(allTodos));
         
         return (
@@ -351,6 +339,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         const project = projects.find(p => p.id === selectedProjectId);
         if (!project) return null;
 
+        // FIX: Replaced .flat() with a more compatible array flattening method to fix TypeScript type inference.
         const flatTodos: Todo[] = [].concat(...Object.values(allTodos));
         const projectTasks = flatTodos.filter(t => t.project_id === selectedProjectId);
         const completed = projectTasks.filter(t => t.completed).length;

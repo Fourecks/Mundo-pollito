@@ -1412,7 +1412,7 @@ const App: React.FC = () => {
 
     const todosByDate: { [key: string]: Todo[] } = {};
     cachedTodos.forEach(todo => {
-        const dateKey = todo.due_date ? todo.due_date : 'undated';
+        const dateKey = todo.due_date ? todo.due_date : formatDateKey(new Date(todo.created_at!));
         if (!todosByDate[dateKey]) todosByDate[dateKey] = [];
         todosByDate[dateKey].push(todo);
     });
@@ -1477,7 +1477,7 @@ const App: React.FC = () => {
         
         const networkTodosByDate: { [key: string]: Todo[] } = {};
         recentTodosData.forEach(todo => {
-            const dateKey = todo.due_date ? todo.due_date : 'undated';
+            const dateKey = todo.due_date ? todo.due_date : formatDateKey(new Date(todo.created_at));
             if (!networkTodosByDate[dateKey]) networkTodosByDate[dateKey] = [];
             networkTodosByDate[dateKey].push(todo);
         });
@@ -1704,7 +1704,7 @@ const App: React.FC = () => {
       }
 
       // Add the updated task to the correct date key
-      const newDateKey = todoToUpdate.due_date || 'undated';
+      const newDateKey = todoToUpdate.due_date || formatDateKey(new Date(todoToUpdate.created_at!));
       if (!newAllTodos[newDateKey]) {
           newAllTodos[newDateKey] = [];
       }
