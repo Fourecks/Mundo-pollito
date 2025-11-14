@@ -1063,7 +1063,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             
             {isAiBrowserOpen && (
                 <div className="fixed inset-0 bg-secondary-lighter/90 dark:bg-gray-900 z-[100] animate-deploy">
-                    {/* FIX: Correctly pass `setBrowserSession` prop instead of undefined `setSession`. */}
                     <Browser session={browserSession} setSession={setBrowserSession} onClose={() => setIsAiBrowserOpen(false)} currentUser={currentUser} />
                 </div>
             )}
@@ -1851,7 +1850,7 @@ const App: React.FC = () => {
   };
   
   const handleClearPastTodos = async () => {
-    const todayKey = formatDateKey(selectedDate);
+    const todayKey = formatDateKey(new Date());
     const idsToDelete: number[] = [];
     
     const newAllTodos = { ...allTodos };
@@ -1865,9 +1864,8 @@ const App: React.FC = () => {
     
     if (idsToDelete.length > 0) {
         setAllTodos(newAllTodos);
-        for (const id of idsToDelete) {
-            syncableDelete('todos', id);
-        }
+        const deletePromises = idsToDelete.map(id => syncableDelete('todos', id));
+        await Promise.all(deletePromises);
     }
     setIsClearPastConfirmOpen(false);
   };
