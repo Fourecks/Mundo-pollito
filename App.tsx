@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -215,7 +215,6 @@ interface AppComponentProps {
   // Shared Data
   allTodos: { [key: string]: Todo[] };
   folders: Folder[];
-  projects: Project[];
   galleryImages: GalleryImage[];
   userBackgrounds: Background[];
   playlists: Playlist[];
@@ -243,9 +242,6 @@ interface AppComponentProps {
   handleAddNote: (folderId: number) => Promise<Note | null>;
   handleUpdateNote: (note: Note) => Promise<void>;
   handleDeleteNote: (noteId: number, folderId: number) => Promise<void>;
-  handleAddProject: (name: string) => Promise<void>;
-  handleUpdateProject: (project: Project) => Promise<void>;
-  handleDeleteProject: (projectId: number) => Promise<void>;
   handleAddPlaylist: (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   handleUpdatePlaylist: (playlist: Playlist) => Promise<void>;
   handleDeletePlaylist: (playlistId: number) => Promise<void>;
@@ -282,12 +278,11 @@ interface AppComponentProps {
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
     isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
-    allTodos, folders, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
-    handleAddProject, handleUpdateProject, handleDeleteProject,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
@@ -584,7 +579,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           {openWindows.includes('todo') && (
             <ModalWindow isOpen={true} onClose={() => toggleWindow('todo')} title="Lista de Tareas" isDraggable isResizable zIndex={focusedWindow === 'todo' ? 50 : 40} onFocus={() => bringToFront('todo')} className="w-full max-w-3xl h-[80vh]" windowState={windowStates.todo} onStateChange={s => setWindowStates(ws => ({...ws, todo: s}))}>
               <TodoListModule 
-                allTodos={allTodos}
+                todos={todayTodos} 
                 addTodo={handleAddTodo} 
                 toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
                 toggleSubtask={handleToggleSubtask}
@@ -596,10 +591,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 datesWithTasks={datesWithTasks} 
                 datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
                 onClearPastTodos={onClearPastTodos}
-                projects={projects}
-                onAddProject={handleAddProject}
-                onUpdateProject={handleUpdateProject}
-                onDeleteProject={handleDeleteProject}
               />
             </ModalWindow>
           )}
@@ -637,7 +628,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       
       <div className={`transition-opacity duration-500 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <CompletionModal isOpen={showCompletionModal} onClose={() => setShowCompletionModal(false)} quote={completionQuote}/>
-        <TaskDetailsModal isOpen={!!taskToEdit} onClose={() => setTaskToEdit(null)} onSave={handleUpdateTodo} todo={taskToEdit} projects={projects} />
+        <TaskDetailsModal isOpen={!!taskToEdit} onClose={() => setTaskToEdit(null)} onSave={handleUpdateTodo} todo={taskToEdit} />
         {activeTrack && <FloatingPlayer track={activeTrack} queue={activeTrack.queue} onSelectTrack={handleSelectTrack} onClose={() => setActiveTrack(null)} />}
         {activeSpotifyTrack && <SpotifyFloatingPlayer track={activeSpotifyTrack} onClose={() => setActiveSpotifyTrack(null)} />}
       </div>
@@ -655,12 +646,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
       isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
-      allTodos, folders, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+      allTodos, folders, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
       activeTrack, activeSpotifyTrack,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
-      handleAddProject, handleUpdateProject, handleDeleteProject,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
@@ -853,7 +843,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     <div className="flex flex-col h-full">
                         <TodoListModule 
                             isMobile={true} 
-                            allTodos={allTodos} 
+                            todos={todayTodos} 
                             addTodo={handleAddTodo} 
                             toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
                             toggleSubtask={handleToggleSubtask}
@@ -865,10 +855,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             datesWithTasks={datesWithTasks} 
                             datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
                             onClearPastTodos={onClearPastTodos}
-                            projects={projects}
-                            onAddProject={handleAddProject}
-                            onUpdateProject={handleUpdateProject}
-                            onDeleteProject={handleDeleteProject}
                         />
                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
@@ -1073,7 +1059,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 onSave={handleUpdateTodo}
                 onDelete={handleDeleteTodo} 
                 todo={taskToEdit} 
-                projects={projects}
             />
             
             {isAiBrowserOpen && (
@@ -1153,7 +1138,6 @@ const App: React.FC = () => {
   // Data state
   const [allTodos, setAllTodos] = useState<{ [key: string]: Todo[] }>({});
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
@@ -1365,7 +1349,7 @@ const App: React.FC = () => {
         if(!session) { // If logged out
             setDataLoaded(false);
             // Reset all state
-            setAllTodos({}); setFolders([]); setProjects([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
+            setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
             setGalleryImages([]); setUserBackgrounds([]);
             setActiveBackground(null); setSavedActiveBgId(null);
             setGdriveToken(null);
@@ -1400,10 +1384,9 @@ const App: React.FC = () => {
     if (!user) return;
     
     // Load from cache first for instant UI
-    const [cachedTodos, cachedFolders, cachedProjects, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedSettings] = await Promise.all([
+    const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedSettings] = await Promise.all([
         getAll<Todo>('todos'),
         getAll<Folder>('folders'),
-        getAll<Project>('projects'),
         getAll<Note>('notes'),
         getAll<Playlist>('playlists'),
         getAll<QuickNote>('quick_notes'),
@@ -1418,7 +1401,6 @@ const App: React.FC = () => {
     });
     setAllTodos(todosByDate);
     setFolders(cachedFolders);
-    setProjects(cachedProjects);
     setNotes(cachedNotes);
     setPlaylists(cachedPlaylists);
     setQuickNotes(cachedQuickNotes);
@@ -1437,7 +1419,6 @@ const App: React.FC = () => {
       const [
         { data: todosData },
         { data: foldersData },
-        { data: projectsData },
         { data: notesData },
         { data: playlistsData },
         { data: quickNotesData },
@@ -1445,7 +1426,6 @@ const App: React.FC = () => {
       ] = await Promise.all([
         supabase.from('todos').select('*, subtasks(*)').order('created_at'),
         supabase.from('folders').select('*').order('created_at'),
-        supabase.from('projects').select('*').order('created_at'),
         supabase.from('notes').select('*').order('created_at'),
         supabase.from('playlists').select('*').order('created_at'),
         supabase.from('quick_notes').select('*').order('created_at'),
@@ -1485,7 +1465,6 @@ const App: React.FC = () => {
         await clearAndPutAll('todos', recentTodosData);
       }
       if(foldersData) { setFolders(foldersData); await clearAndPutAll('folders', foldersData); }
-      if(projectsData) { setProjects(projectsData); await clearAndPutAll('projects', projectsData); }
       if(notesData) { setNotes(notesData); await clearAndPutAll('notes', notesData); }
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
@@ -1978,42 +1957,6 @@ const App: React.FC = () => {
   const handleDeleteNote = async (noteId: number, folderId: number) => {
     setNotes(n => n.filter(item => item.id !== noteId));
     await syncableDelete('notes', noteId);
-  };
-  
-  const handleAddProject = useCallback(async (name: string) => {
-    if (!user || !name.trim()) return;
-    const tempId = -Date.now();
-    const newProject: Project = { id: tempId, name: name.trim(), user_id: user.id, created_at: new Date().toISOString() };
-    
-    setProjects(p => [...p, newProject].sort((a,b) => a.name.localeCompare(b.name)));
-    
-    const savedProject = await syncableCreate('projects', newProject) as Project;
-    
-    if (savedProject.id !== tempId) {
-        setProjects(p => p.map(proj => proj.id === tempId ? savedProject : proj).sort((a,b) => a.name.localeCompare(b.name)));
-    }
-  }, [user]);
-
-  const handleUpdateProject = async (project: Project) => {
-      setProjects(p => p.map(item => item.id === project.id ? project : item).sort((a,b) => a.name.localeCompare(b.name)));
-      const savedProject = await syncableUpdate('projects', project);
-      setProjects(p => p.map(item => item.id === project.id ? savedProject : item).sort((a,b) => a.name.localeCompare(b.name)));
-  };
-
-  const handleDeleteProject = async (projectId: number) => {
-      setProjects(p => p.filter(item => item.id !== projectId));
-      // Nullify project_id on associated todos
-      const newAllTodos = { ...allTodos };
-      Object.keys(newAllTodos).forEach(dateKey => {
-        newAllTodos[dateKey] = newAllTodos[dateKey].map(todo => {
-            if (todo.project_id === projectId) {
-                return { ...todo, project_id: null };
-            }
-            return todo;
-        });
-      });
-      setAllTodos(newAllTodos);
-      await syncableDelete('projects', projectId);
   };
   
   const handleAddPlaylist = useCallback(async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
@@ -2545,12 +2488,11 @@ const App: React.FC = () => {
   
   const appProps: AppComponentProps = {
     isOnline, isSyncing, currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
-    allTodos, folders: foldersWithNotes, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos, folders: foldersWithNotes, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos: () => setIsClearPastConfirmOpen(true),
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
-    handleAddProject, handleUpdateProject, handleDeleteProject,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,
