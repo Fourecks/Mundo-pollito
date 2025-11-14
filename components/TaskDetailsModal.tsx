@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ReactNode, useMemo } from 'react';
-import { Todo, Subtask, Priority, RecurrenceRule } from '../types';
+import { Todo, Subtask, Priority, RecurrenceRule, Project } from '../types';
 import CloseIcon from './icons/CloseIcon';
 import PlusIcon from './icons/PlusIcon';
 import TrashIcon from './icons/TrashIcon';
@@ -11,12 +11,14 @@ import RefreshIcon from './icons/RefreshIcon';
 import NotesIcon from './icons/NotesIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
+import FolderIcon from './icons/FolderIcon';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (todo: Todo) => void;
   todo: Todo | null;
+  projects: Project[];
 }
 
 const priorityMap: { [key in Priority]: { base: string; text: string; label: string } } = {
@@ -66,7 +68,7 @@ const NavSettingRow: React.FC<{ icon: ReactNode; label: string; value: string; o
 );
 
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, onSave, todo }) => {
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, onSave, todo, projects }) => {
     const [text, setText] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -74,7 +76,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const [completed, setCompleted] = useState(false);
 
     // Main date
+    const [isDateless, setIsDateless] = useState(false);
     const [due_date, setDueDate] = useState('');
+    const [project_id, setProjectId] = useState<number | null | undefined>(undefined);
 
     // Toggles
     const [hasTime, setHasTime] = useState(false);
@@ -106,7 +110,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             setPriority(todo.priority || 'medium');
             setSubtasks(todo.subtasks || []);
             setCompleted(todo.completed || false);
+            
+            setIsDateless(!todo.due_date);
             setDueDate(todo.due_date || '');
+            setProjectId(todo.project_id);
 
             // Set toggles based on existing data
             setHasTime(!!todo.start_time);
@@ -177,7 +184,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const handleSave = async () => {
         if (!todo) return;
 
-        if (hasReminder && 'Notification' in window && Notification.permission !== 'granted') {
+        if (hasReminder && !isDateless && 'Notification' in window && Notification.permission !== 'granted') {
              alert("Para recibir recordatorios, activa las notificaciones usando el ícono de la campana en la pantalla principal.");
         }
 
@@ -187,12 +194,13 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         updatedTodoPayload.completed = completed;
         updatedTodoPayload.priority = priority;
         updatedTodoPayload.subtasks = subtasks;
+        updatedTodoPayload.project_id = project_id;
 
-        updatedTodoPayload.due_date = due_date || null;
-        updatedTodoPayload.end_date = hasEndDate ? (end_date || null) : null;
-        updatedTodoPayload.start_time = hasTime ? (start_time || null) : null;
-        updatedTodoPayload.end_time = hasTime ? (end_time || null) : null;
-        updatedTodoPayload.notes = hasNotes ? notes : null;
+        updatedTodoPayload.due_date = isDateless ? undefined : (due_date || undefined);
+        updatedTodoPayload.end_date = hasEndDate ? (end_date || undefined) : undefined;
+        updatedTodoPayload.start_time = hasTime ? (start_time || undefined) : undefined;
+        updatedTodoPayload.end_time = hasTime ? (end_time || undefined) : undefined;
+        updatedTodoPayload.notes = hasNotes ? notes : undefined;
 
         const currentRecurrence = { ...recurrence };
         if (hasRecurrence && !currentRecurrence.id) {
@@ -211,21 +219,21 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                     const localReminderDate = new Date(year, month - 1, day, hour, minute);
                     
                     updatedTodoPayload.reminder_at = localReminderDate.toISOString();
-                    updatedTodoPayload.reminder_offset = null;
+                    updatedTodoPayload.reminder_offset = undefined;
                 } else {
-                    updatedTodoPayload.reminder_at = null;
-                    updatedTodoPayload.reminder_offset = null;
+                    updatedTodoPayload.reminder_at = undefined;
+                    updatedTodoPayload.reminder_offset = undefined;
                 }
             } else if (reminderType !== 'custom') {
                 updatedTodoPayload.reminder_offset = Number(reminderType) as Todo['reminder_offset'];
-                updatedTodoPayload.reminder_at = null;
+                updatedTodoPayload.reminder_at = undefined;
             } else {
-                updatedTodoPayload.reminder_offset = null;
-                updatedTodoPayload.reminder_at = null;
+                updatedTodoPayload.reminder_offset = undefined;
+                updatedTodoPayload.reminder_at = undefined;
             }
         } else {
-            updatedTodoPayload.reminder_offset = null;
-            updatedTodoPayload.reminder_at = null;
+            updatedTodoPayload.reminder_offset = undefined;
+            updatedTodoPayload.reminder_at = undefined;
         }
 
         if (todo.reminder_at !== updatedTodoPayload.reminder_at || todo.reminder_offset !== updatedTodoPayload.reminder_offset) {
@@ -255,7 +263,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     };
     
     const reminderSummary = useMemo(() => {
-        if (!hasReminder) return 'Nunca';
+        if (!hasReminder || isDateless) return 'Nunca';
 
         if (reminderType === 'custom') {
             if (customReminderTime) {
@@ -278,36 +286,92 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             case '1440': return '1 día antes';
             default: return 'Nunca';
         }
-    }, [hasReminder, reminderType, customReminderDate, customReminderTime]);
+    }, [hasReminder, isDateless, reminderType, customReminderDate, customReminderTime]);
 
     const recurrenceSummary = useMemo(() => {
-        if (!hasRecurrence) return 'Nunca';
+        if (!hasRecurrence || isDateless) return 'Nunca';
         switch(recurrence.frequency) {
             case 'daily': return 'Diariamente';
             case 'weekly': return 'Semanalmente';
             case 'custom': return 'Personalizado';
             default: return 'Nunca';
         }
-    }, [hasRecurrence, recurrence.frequency]);
+    }, [hasRecurrence, isDateless, recurrence.frequency]);
 
     if (!isOpen || !todo) return null;
 
     const renderMainSettings = () => (
         <>
-            {/* Date Section */}
             <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
                 <div className="flex items-center justify-between">
-                    <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><CalendarIcon className="h-4 w-4" /> Fecha</label>
-                    <div className="flex items-center gap-1">
-                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rango</span>
-                        <Switch checked={hasEndDate} onChange={setHasEndDate} />
+                    <div className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-400"/>
+                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Tarea sin fecha</span>
                     </div>
+                    <Switch checked={isDateless} onChange={(checked) => {
+                        setIsDateless(checked);
+                        if (checked) {
+                            setHasTime(false);
+                            setHasEndDate(false);
+                            setHasReminder(false);
+                            setHasRecurrence(false);
+                        }
+                    }} />
                 </div>
-                <div className="flex items-center gap-2 mt-2">
-                    <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
-                    {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
-                    {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>}
+            </div>
+
+            {!isDateless && (
+                <div className="space-y-3 animate-pop-in">
+                    {/* Date Section */}
+                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                            <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><CalendarIcon className="h-4 w-4" /> Fecha</label>
+                            <div className="flex items-center gap-1">
+                                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rango</span>
+                                <Switch checked={hasEndDate} onChange={setHasEndDate} />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                            <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
+                            {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
+                            {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>}
+                        </div>
+                    </div>
+                    
+                    <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
+                                <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
+                            </div>
+                                <div>
+                                <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
+                                <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
+                            </div>
+                            </div>
+                    </SettingRow>
+
+                    <NavSettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" value={reminderSummary} onClick={() => setActiveSubView('reminder')} />
+
+                    <NavSettingRow icon={<RefreshIcon className="h-4 w-4"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
                 </div>
+            )}
+            
+             <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                    <FolderIcon />
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Proyecto</span>
+                </div>
+                <select
+                    value={project_id || ''}
+                    onChange={e => setProjectId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full bg-white/80 dark:bg-gray-600/80 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm appearance-none"
+                >
+                    <option value="">Sin Proyecto</option>
+                    {projects.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                </select>
             </div>
             
             {/* Priority */}
@@ -320,25 +384,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 </div>
             </div>
 
-            {/* Conditional Settings */}
-            <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                        <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
-                        <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                    </div>
-                        <div>
-                        <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
-                        <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                    </div>
-                    </div>
-            </SettingRow>
-
-            <NavSettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" value={reminderSummary} onClick={() => setActiveSubView('reminder')} />
-            
             <SettingRow icon={<NotesIcon />} label="Añadir notas" enabled={hasNotes} onToggle={handleToggleNotes}><div/></SettingRow>
-
-            <NavSettingRow icon={<RefreshIcon className="h-4 w-4"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
             
             <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Estado</span>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Todo, Priority } from '../types';
+import { Todo, Priority, Project } from '../types';
 import ProgressBar from './ProgressBar';
 import TodoInput from './TodoInput';
 import TodoItem from './TodoItem';
@@ -10,9 +10,11 @@ import CalendarIcon from './icons/CalendarIcon';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import TrashIcon from './icons/TrashIcon';
+import PlusIcon from './icons/PlusIcon';
+import ConfirmationModal from './ConfirmationModal';
 
 interface TodoListModuleProps {
-    todos: Todo[];
+    allTodos: { [key: string]: Todo[] };
     addTodo: (text: string) => void;
     toggleTodo: (id: number) => void;
     toggleSubtask: (taskId: number, subtaskId: number) => void;
@@ -25,31 +27,44 @@ interface TodoListModuleProps {
     datesWithAllTasksCompleted: Set<string>;
     isMobile?: boolean;
     onClearPastTodos: () => void;
+    projects: Project[];
+    onAddProject: (name: string) => Promise<void>;
+    onUpdateProject: (project: Project) => Promise<void>;
+    onDeleteProject: (projectId: number) => Promise<void>;
 }
+
+const formatDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const priorityOrder: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
 
-const TodoListModule: React.FC<TodoListModuleProps> = ({
-    todos,
-    addTodo,
-    toggleTodo,
-    toggleSubtask,
-    deleteTodo,
-    updateTodo,
-    onEditTodo,
-    selectedDate,
-    setSelectedDate,
-    datesWithTasks,
-    datesWithAllTasksCompleted,
-    isMobile = false,
-    onClearPastTodos,
-}) => {
+const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
+    const {
+        allTodos, addTodo, toggleTodo, toggleSubtask, deleteTodo, updateTodo, onEditTodo,
+        selectedDate, setSelectedDate, datesWithTasks, datesWithAllTasksCompleted,
+        isMobile = false, onClearPastTodos, projects, onAddProject, onUpdateProject, onDeleteProject
+    } = props;
+
+    const [viewMode, setViewMode] = useState<'date' | 'project'>('date');
+    const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
     const [sortBy, setSortBy] = useState<'default' | 'priority' | 'dueDate'>('default');
     const [hideCompleted, setHideCompleted] = useState(false);
     const [calendarVisible, setCalendarVisible] = useState(false);
     const [isCalendarPanelVisible, setIsCalendarPanelVisible] = useState(true);
     const [isNarrow, setIsNarrow] = useState(false);
+    const [newProjectName, setNewProjectName] = useState('');
+    const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+    
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const handleViewModeChange = (mode: 'date' | 'project') => {
+        setViewMode(mode);
+        setSelectedProjectId(null); // Reset project selection when switching views
+    };
 
     const handlePrevDay = () => {
       const newDate = new Date(selectedDate);
@@ -62,6 +77,14 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
         newDate.setDate(newDate.getDate() + 1);
         setSelectedDate(newDate);
     };
+    
+    const handleAddNewProject = (e: React.FormEvent) => {
+        e.preventDefault();
+        if(newProjectName.trim()) {
+            onAddProject(newProjectName.trim());
+            setNewProjectName('');
+        }
+    }
 
     useEffect(() => {
         const observer = new ResizeObserver(entries => {
@@ -84,8 +107,22 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
         }
     }, [isNarrow, isCalendarPanelVisible]);
 
-    const completedCount = todos.filter(t => t.completed).length;
-    const totalCount = todos.length;
+    const todosForDateView = useMemo(() => {
+        const dateKey = formatDateKey(selectedDate);
+        const todayKey = formatDateKey(new Date());
+
+        const tasksForDate = allTodos[dateKey] || [];
+        
+        if (dateKey === todayKey) {
+            const undatedTasks = allTodos['undated'] || [];
+            return [...tasksForDate, ...undatedTasks];
+        }
+
+        return tasksForDate;
+    }, [allTodos, selectedDate]);
+
+    const completedCount = todosForDateView.filter(t => t.completed).length;
+    const totalCount = todosForDateView.length;
     
     const toggleSort = () => {
         setSortBy(prev => {
@@ -103,8 +140,8 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
         }
     };
 
-    const sortedTodos = useMemo(() => {
-        const initialList = hideCompleted ? todos.filter(t => !t.completed) : todos;
+    const sortedTodosForDateView = useMemo(() => {
+        const initialList = hideCompleted ? todosForDateView.filter(t => !t.completed) : todosForDateView;
         const todosCopy = [...initialList];
 
         if (sortBy === 'priority') {
@@ -132,18 +169,237 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
             });
         }
         return todosCopy;
-    }, [todos, sortBy, hideCompleted]);
+    }, [todosForDateView, sortBy, hideCompleted]);
 
     const formattedDate = new Intl.DateTimeFormat('es-ES', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
     }).format(selectedDate).replace(/^\w/, c => c.toUpperCase());
+    
+    const renderDateView = () => (
+        <>
+            <div className={`flex-shrink-0 ${isMobile ? 'sticky top-0 bg-secondary-lighter/80 dark:bg-gray-800/80 backdrop-blur-md z-20 border-b border-secondary-light/50 dark:border-gray-700/50' : ''}`}>
+                <div className="p-3 md:p-4">
+                     {isMobile ? (
+                        <div className="flex justify-between items-center">
+                            <button onClick={handlePrevDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día anterior">
+                                <ChevronLeftIcon />
+                            </button>
+                            <button onClick={() => setCalendarVisible(true)} className="px-3 py-1.5 rounded-full hover:bg-white/70 dark:hover:bg-gray-700/70 transition-colors">
+                                <h2 className="text-lg font-bold text-primary-dark dark:text-primary text-center">
+                                    {formattedDate}
+                                </h2>
+                            </button>
+                            <button onClick={handleNextDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día siguiente">
+                                <ChevronRightIcon />
+                            </button>
+                        </div>
+                    ) : (
+                         <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-1 sm:gap-2">
+                                <button
+                                    onClick={() => setIsCalendarPanelVisible(!isCalendarPanelVisible)}
+                                    className="hidden md:flex p-2 items-center justify-center rounded-full hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-primary-dark transition-colors"
+                                    aria-label={isCalendarPanelVisible ? 'Ocultar calendario' : 'Mostrar calendario'}
+                                >
+                                    <ChevronLeftIcon className={`h-5 w-5 transition-transform duration-300 ${!isCalendarPanelVisible ? 'rotate-180' : ''}`}/>
+                                </button>
+                                
+                                <div className="flex items-center">
+                                    <button onClick={handlePrevDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día anterior">
+                                        <ChevronLeftIcon />
+                                    </button>
+                                    <h2 className="text-lg sm:text-xl font-bold text-primary-dark dark:text-primary text-center w-40 sm:w-auto flex-shrink-0">
+                                        {formattedDate}
+                                    </h2>
+                                    <button onClick={handleNextDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día siguiente">
+                                        <ChevronRightIcon />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <button
+                                onClick={() => setCalendarVisible(true)}
+                                className="md:hidden flex items-center gap-2 bg-white/70 dark:bg-gray-700/70 backdrop-blur-sm p-2 rounded-full shadow-sm text-primary dark:text-primary-dark hover:bg-primary-light/50 dark:hover:bg-primary/20 transition-colors"
+                                aria-label="Abrir calendario"
+                            >
+                                <CalendarIcon />
+                            </button>
+                        </div>
+                    )}
+
+
+                    <p className="text-gray-500 dark:text-gray-300 text-sm mt-1 text-center md:text-left">
+                        {totalCount > 0 ? `${completedCount} de ${totalCount} tareas completadas.` : '¡Añade una tarea para empezar!'}
+                    </p>
+                    <ProgressBar completed={completedCount} total={totalCount} />
+                     <div className="flex flex-wrap justify-between items-center mt-4 mb-2 gap-3">
+                        <label htmlFor="hide-completed-toggle" className="flex items-center cursor-pointer select-none">
+                            <div className="relative">
+                                <input 
+                                    type="checkbox" 
+                                    id="hide-completed-toggle" 
+                                    className="sr-only" 
+                                    checked={hideCompleted} 
+                                    onChange={() => setHideCompleted(!hideCompleted)} 
+                                />
+                                <div className={`block w-10 h-6 rounded-full transition-colors ${hideCompleted ? 'bg-primary-light' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${hideCompleted ? 'translate-x-full' : ''}`}></div>
+                            </div>
+                            <div className="ml-2 text-sm font-semibold text-gray-500 dark:text-gray-300">
+                                Ocultar completadas
+                            </div>
+                        </label>
+
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            <button
+                                onClick={onClearPastTodos}
+                                className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-red-100/50 dark:hover:bg-red-900/30"
+                                title="Limpiar tareas anteriores al día actual"
+                            >
+                                <TrashIcon className="h-4 w-4" />
+                                <span className="hidden sm:inline">Limpiar</span>
+                            </button>
+                            <button 
+                                onClick={toggleSort}
+                                className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-primary-light/30 dark:hover:bg-primary/10"
+                                aria-label="Cambiar orden de tareas"
+                            >
+                                <SortIcon />
+                                <span className="hidden sm:inline">{getSortButtonText()}</span>
+                                <span className="sm:hidden">{sortBy === 'default' ? 'Original' : sortBy === 'priority' ? 'Prioridad' : 'Fecha'}</span>
+                            </button>
+                        </div>
+                    </div>
+                     {!isMobile && <TodoInput onAddTodo={addTodo} />}
+                </div>
+            </div>
+          
+            <div className="space-y-3 overflow-y-auto custom-scrollbar p-3 flex-grow min-h-0">
+                {sortedTodosForDateView.length > 0 ? (
+                sortedTodosForDateView.map(todo => (
+                    <TodoItem
+                    key={todo.id}
+                    todo={todo}
+                    onToggle={toggleTodo}
+                    onToggleSubtask={toggleSubtask}
+                    onDelete={deleteTodo}
+                    onUpdate={updateTodo}
+                    onEdit={onEditTodo}
+                    />
+                ))
+                ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-300 py-10">
+                    <p className="font-medium">
+                        {totalCount > 0 && hideCompleted
+                            ? '¡Todas las tareas completadas!'
+                            : '¡No hay tareas para este día!'}
+                    </p>
+                    <p className="text-sm">
+                        {totalCount > 0 && hideCompleted
+                            ? 'Desactiva "Ocultar completadas" para verlas.'
+                            : '¡Añade una para empezar a organizarte!'}
+                    </p>
+                </div>
+                )}
+            </div>
+        </>
+    );
+    
+    const renderProjectList = () => {
+        const flatTodos: Todo[] = [].concat(...Object.values(allTodos));
+        
+        return (
+            <div className="p-3 flex-grow min-h-0 space-y-4 overflow-y-auto custom-scrollbar">
+                {projects.map(project => {
+                    const projectTasks = flatTodos.filter(t => t.project_id === project.id);
+                    const completed = projectTasks.filter(t => t.completed).length;
+                    const total = projectTasks.length;
+
+                    return (
+                        <div key={project.id} className="bg-white/50 dark:bg-gray-800/50 p-3 rounded-xl shadow-sm transition-all hover:shadow-md hover:scale-[1.02]">
+                            <button onClick={() => setSelectedProjectId(project.id)} className="w-full text-left">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h3 className="font-bold text-primary-dark dark:text-primary">{project.name}</h3>
+                                    <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+                                </div>
+                                {total > 0 && <ProgressBar completed={completed} total={total} />}
+                                {total === 0 && <p className="text-xs text-gray-500">Sin tareas.</p>}
+                            </button>
+                        </div>
+                    );
+                })}
+                 <div className="p-3 bg-white/50 dark:bg-gray-800/50 rounded-xl">
+                     <h3 className="font-bold text-primary-dark dark:text-primary mb-2">Nuevo Proyecto</h3>
+                    <form onSubmit={handleAddNewProject} className="flex gap-2">
+                        <input 
+                            type="text" 
+                            value={newProjectName} 
+                            onChange={e => setNewProjectName(e.target.value)} 
+                            placeholder="Nombre del proyecto..."
+                            className="flex-grow bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                        />
+                        <button type="submit" className="bg-primary text-white p-2 rounded-lg shadow-md hover:bg-primary-dark shrink-0"><PlusIcon /></button>
+                    </form>
+                </div>
+            </div>
+        );
+    };
+
+    const renderSingleProjectView = () => {
+        const project = projects.find(p => p.id === selectedProjectId);
+        if (!project) return null;
+
+        const flatTodos: Todo[] = [].concat(...Object.values(allTodos));
+        const projectTasks = flatTodos.filter(t => t.project_id === selectedProjectId);
+        const completed = projectTasks.filter(t => t.completed).length;
+        const total = projectTasks.length;
+
+        const sortedTasks = [...projectTasks].sort((a,b) => {
+            if (a.completed !== b.completed) return a.completed ? 1 : -1;
+            return (a.due_date || '9999').localeCompare(b.due_date || '9999');
+        });
+
+        return (
+            <div className="flex flex-col h-full animate-fade-in">
+                <header className="p-3 flex items-center justify-between gap-2 flex-shrink-0 border-b border-secondary-light/30 dark:border-gray-700/50">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setSelectedProjectId(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+                            <ChevronLeftIcon />
+                        </button>
+                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary truncate">{project.name}</h3>
+                    </div>
+                    <button
+                        onClick={() => setProjectToDelete(project as Project)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-full hover:bg-red-100/50 dark:hover:bg-red-900/30 transition-colors"
+                        title="Eliminar proyecto"
+                    >
+                        <TrashIcon className="h-4 w-4" />
+                    </button>
+                </header>
+                <div className="p-3">
+                    <ProgressBar completed={completed} total={total} />
+                </div>
+                <div className="space-y-2 p-3 flex-grow overflow-y-auto custom-scrollbar">
+                   {sortedTasks.map(todo => (
+                        <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} />
+                   ))}
+                   {total === 0 && <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">Este proyecto no tiene tareas.</p>}
+                </div>
+            </div>
+        );
+    };
+
+    const renderProjectView = () => {
+        return selectedProjectId === null ? renderProjectList() : renderSingleProjectView();
+    };
 
     return (
         <div ref={containerRef} className="w-full bg-transparent flex flex-col md:flex-row h-full">
-            <div className={`
-                    hidden md:flex flex-col flex-shrink-0 border-r border-secondary-light/30 dark:border-gray-700
+             {viewMode === 'date' && !isMobile && (
+                <div className={`
+                    flex flex-col flex-shrink-0 border-r border-secondary-light/30 dark:border-gray-700
                     transition-all duration-300 ease-in-out
                     ${isCalendarPanelVisible ? 'w-full md:w-[260px] p-2' : 'w-0 md:w-0 p-0 overflow-hidden'}
                 `}>
@@ -154,6 +410,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                         datesWithAllTasksCompleted={datesWithAllTasksCompleted}
                     />
                 </div>
+             )}
             <div className="flex-grow relative flex flex-col overflow-hidden">
                 <div className="absolute -top-10 -left-10 opacity-10 dark:opacity-20 transform rotate-12 -z-10">
                     <ChickenIcon className="w-40 h-40 text-secondary"/>
@@ -162,131 +419,12 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                     <ChickenIcon className="w-48 h-48 text-primary"/>
                 </div>
 
-                <div className={`flex-shrink-0 ${isMobile ? 'sticky top-0 bg-secondary-lighter/80 dark:bg-gray-800/80 backdrop-blur-md z-20 border-b border-secondary-light/50 dark:border-gray-700/50' : ''}`}>
-                    <div className="p-3 md:p-4">
-                         {isMobile ? (
-                            <div className="flex justify-between items-center">
-                                <button onClick={handlePrevDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día anterior">
-                                    <ChevronLeftIcon />
-                                </button>
-                                <button onClick={() => setCalendarVisible(true)} className="px-3 py-1.5 rounded-full hover:bg-white/70 dark:hover:bg-gray-700/70 transition-colors">
-                                    <h2 className="text-lg font-bold text-primary-dark dark:text-primary text-center">
-                                        {formattedDate}
-                                    </h2>
-                                </button>
-                                <button onClick={handleNextDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día siguiente">
-                                    <ChevronRightIcon />
-                                </button>
-                            </div>
-                        ) : (
-                             <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                    <button
-                                        onClick={() => setIsCalendarPanelVisible(!isCalendarPanelVisible)}
-                                        className="hidden md:flex p-2 items-center justify-center rounded-full hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-primary-dark transition-colors"
-                                        aria-label={isCalendarPanelVisible ? 'Ocultar calendario' : 'Mostrar calendario'}
-                                    >
-                                        <ChevronLeftIcon className={`h-5 w-5 transition-transform duration-300 ${!isCalendarPanelVisible ? 'rotate-180' : ''}`}/>
-                                    </button>
-                                    
-                                    <div className="flex items-center">
-                                        <button onClick={handlePrevDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día anterior">
-                                            <ChevronLeftIcon />
-                                        </button>
-                                        <h2 className="text-lg sm:text-xl font-bold text-primary-dark dark:text-primary text-center w-40 sm:w-auto flex-shrink-0">
-                                            {formattedDate}
-                                        </h2>
-                                        <button onClick={handleNextDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día siguiente">
-                                            <ChevronRightIcon />
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <button
-                                    onClick={() => setCalendarVisible(true)}
-                                    className="md:hidden flex items-center gap-2 bg-white/70 dark:bg-gray-700/70 backdrop-blur-sm p-2 rounded-full shadow-sm text-primary dark:text-primary-dark hover:bg-primary-light/50 dark:hover:bg-primary/20 transition-colors"
-                                    aria-label="Abrir calendario"
-                                >
-                                    <CalendarIcon />
-                                </button>
-                            </div>
-                        )}
-
-
-                        <p className="text-gray-500 dark:text-gray-300 text-sm mt-1 text-center md:text-left">
-                            {totalCount > 0 ? `${completedCount} de ${totalCount} tareas completadas.` : '¡Añade una tarea para empezar!'}
-                        </p>
-                        <ProgressBar completed={completedCount} total={totalCount} />
-                         <div className="flex flex-wrap justify-between items-center mt-4 mb-2 gap-3">
-                            <label htmlFor="hide-completed-toggle" className="flex items-center cursor-pointer select-none">
-                                <div className="relative">
-                                    <input 
-                                        type="checkbox" 
-                                        id="hide-completed-toggle" 
-                                        className="sr-only" 
-                                        checked={hideCompleted} 
-                                        onChange={() => setHideCompleted(!hideCompleted)} 
-                                    />
-                                    <div className={`block w-10 h-6 rounded-full transition-colors ${hideCompleted ? 'bg-primary-light' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
-                                    <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${hideCompleted ? 'translate-x-full' : ''}`}></div>
-                                </div>
-                                <div className="ml-2 text-sm font-semibold text-gray-500 dark:text-gray-300">
-                                    Ocultar completadas
-                                </div>
-                            </label>
-
-                            <div className="flex items-center gap-2 sm:gap-4">
-                                <button
-                                    onClick={onClearPastTodos}
-                                    className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-red-100/50 dark:hover:bg-red-900/30"
-                                    title="Limpiar tareas anteriores al día actual"
-                                >
-                                    <TrashIcon className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Limpiar</span>
-                                </button>
-                                <button 
-                                    onClick={toggleSort}
-                                    className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-primary-light/30 dark:hover:bg-primary/10"
-                                    aria-label="Cambiar orden de tareas"
-                                >
-                                    <SortIcon />
-                                    <span className="hidden sm:inline">{getSortButtonText()}</span>
-                                    <span className="sm:hidden">{sortBy === 'default' ? 'Original' : sortBy === 'priority' ? 'Prioridad' : 'Fecha'}</span>
-                                </button>
-                            </div>
-                        </div>
-                         {!isMobile && <TodoInput onAddTodo={addTodo} />}
-                    </div>
+                <div className="p-2 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center gap-2">
+                    <button onClick={() => handleViewModeChange('date')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-lg transition-colors ${viewMode === 'date' ? 'bg-white/80 dark:bg-gray-700/80 text-primary-dark dark:text-primary shadow' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}>Tareas</button>
+                    <button onClick={() => handleViewModeChange('project')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-lg transition-colors ${viewMode === 'project' ? 'bg-white/80 dark:bg-gray-700/80 text-primary-dark dark:text-primary shadow' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}>Proyectos</button>
                 </div>
-              
-                <div className="space-y-3 overflow-y-auto custom-scrollbar p-3 flex-grow min-h-0">
-                    {sortedTodos.length > 0 ? (
-                    sortedTodos.map(todo => (
-                        <TodoItem
-                        key={todo.id}
-                        todo={todo}
-                        onToggle={toggleTodo}
-                        onToggleSubtask={toggleSubtask}
-                        onDelete={deleteTodo}
-                        onUpdate={updateTodo}
-                        onEdit={onEditTodo}
-                        />
-                    ))
-                    ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-300 py-10">
-                        <p className="font-medium">
-                            {totalCount > 0 && hideCompleted
-                                ? '¡Todas las tareas completadas!'
-                                : '¡No hay tareas para este día!'}
-                        </p>
-                        <p className="text-sm">
-                            {totalCount > 0 && hideCompleted
-                                ? 'Desactiva "Ocultar completadas" para verlas.'
-                                : '¡Añade una para empezar a organizarte!'}
-                        </p>
-                    </div>
-                    )}
-                </div>
+                
+                {viewMode === 'date' ? renderDateView() : renderProjectView()}
 
                 {calendarVisible && (
                     <div
@@ -307,6 +445,22 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                     </div>
                 )}
             </div>
+            <ConfirmationModal 
+                isOpen={!!projectToDelete}
+                onClose={() => setProjectToDelete(null)}
+                onConfirm={() => {
+                    if (projectToDelete) {
+                        if (projectToDelete.id === selectedProjectId) {
+                            setSelectedProjectId(null);
+                        }
+                        onDeleteProject(projectToDelete.id);
+                    }
+                    setProjectToDelete(null);
+                }}
+                title="Eliminar Proyecto"
+                message={`¿Seguro que quieres eliminar "${projectToDelete?.name}"? Las tareas asociadas no se borrarán, pero quedarán sin proyecto.`}
+                confirmText="Sí, eliminar"
+            />
         </div>
     );
 };

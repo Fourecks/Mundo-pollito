@@ -1,6 +1,5 @@
 
 
-
 import React, { useState } from 'react';
 import { Todo, Priority, Subtask } from '../types';
 import SubtaskIcon from './icons/SubtaskIcon';
@@ -126,9 +125,13 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
         
         {/* Right side controls */}
         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-            {todo.due_date && (
+            {todo.due_date ? (
                 <span className="text-xs font-medium text-primary-dark dark:text-primary bg-primary-light/50 dark:bg-primary/20 px-2 py-0.5 rounded-full whitespace-nowrap hidden sm:inline">
                     {formatDueDate(todo)}
+                </span>
+            ) : (
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-200/50 dark:bg-gray-700/50 px-2 py-0.5 rounded-full whitespace-nowrap hidden sm:inline">
+                    Sin Fecha
                 </span>
             )}
             {hasSubtasks && <SubtaskIcon className="text-gray-400 dark:text-gray-500 h-5 w-5" />}
