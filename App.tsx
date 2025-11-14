@@ -18,7 +18,7 @@ import FloatingPlayer from './components/FloatingPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
-import { initDB, getAll, clearAndPutAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue } from './db';
+import { initDB, getAll, clearAndPutAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue, syncableDeleteMultiple } from './db';
 import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
 import Browser from './components/Browser';
@@ -1591,15 +1591,20 @@ const App: React.FC = () => {
     const tempId = -Date.now();
     const newTodo: Todo = { id: tempId, text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id, created_at: new Date().toISOString(), subtasks: [] };
     
+    // Optimistic UI update
     setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
     
+    // Sync
     const savedTodo = await syncableCreate('todos', newTodo) as Todo;
 
+    // Replace temporary item with server-confirmed item
     if (savedTodo.id !== tempId) {
         setAllTodos(current => {
             const dateTodos = current[dateKey] || [];
-            const newDateTodos = dateTodos.map(t => t.id === tempId ? savedTodo : t);
-            return { ...current, [dateKey]: newDateTodos };
+            return {
+                ...current,
+                [dateKey]: dateTodos.map(t => t.id === tempId ? savedTodo : t)
+            };
         });
     }
   }, [user, selectedDate]);
@@ -1702,8 +1707,12 @@ const App: React.FC = () => {
     if (recurrenceChanged) {
         setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
     } else {
+        // Optimistic update
         setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
-        await syncableUpdate('todos', updatedTodo);
+        // Sync and get server-confirmed data
+        const savedTodo = await syncableUpdate('todos', updatedTodo);
+        // Ensure local state matches server state
+        setAllTodos(current => getUpdatedTodosState(current, savedTodo));
     }
   };
   
@@ -1874,7 +1883,8 @@ const App: React.FC = () => {
     const newAllTodos = { ...allTodos };
 
     for (const dateKey in newAllTodos) {
-        const date = new Date(dateKey + 'T00:00:00Z'); // Treat dateKey as UTC to avoid timezone shifts
+        // Use a UTC-based date to avoid timezone shifts from the date string.
+        const date = new Date(dateKey + 'T00:00:00Z');
         if (date < today) {
             newAllTodos[dateKey].forEach(todo => idsToDelete.push(todo.id));
             delete newAllTodos[dateKey];
@@ -1883,8 +1893,7 @@ const App: React.FC = () => {
     
     if (idsToDelete.length > 0) {
         setAllTodos(newAllTodos);
-        const deletePromises = idsToDelete.map(id => syncableDelete('todos', id));
-        await Promise.all(deletePromises);
+        await syncableDeleteMultiple('todos', idsToDelete);
     }
     setIsClearPastConfirmOpen(false);
   };
@@ -1910,8 +1919,11 @@ const App: React.FC = () => {
       if(!folderToUpdate) return;
       const updatedFolder = { ...folderToUpdate, name };
       setFolders(f => f.map(folder => folder.id === folderId ? updatedFolder : folder));
-      await syncableUpdate('folders', updatedFolder);
+      
+      const savedFolder = await syncableUpdate('folders', updatedFolder);
+      setFolders(f => f.map(folder => folder.id === folderId ? savedFolder : folder));
   };
+
   const handleDeleteFolder = async (folderId: number) => {
       setFolders(f => f.filter(folder => folder.id !== folderId));
       await syncableDelete('folders', folderId);
@@ -1937,7 +1949,9 @@ const App: React.FC = () => {
   const handleUpdateNote = async (note: Note) => {
     const updatedNote = { ...note, updated_at: new Date().toISOString() };
     setNotes(n => n.map(item => item.id === note.id ? updatedNote : item));
-    await syncableUpdate('notes', updatedNote);
+
+    const savedNote = await syncableUpdate('notes', updatedNote);
+    setNotes(n => n.map(item => item.id === note.id ? savedNote : item));
   };
 
   const handleDeleteNote = async (noteId: number, folderId: number) => {
@@ -1961,7 +1975,8 @@ const App: React.FC = () => {
 
   const handleUpdatePlaylist = async (playlist: Playlist) => {
       setPlaylists(p => p.map(item => item.id === playlist.id ? playlist : item));
-      await syncableUpdate('playlists', playlist);
+      const savedPlaylist = await syncableUpdate('playlists', playlist);
+      setPlaylists(p => p.map(item => item.id === playlist.id ? savedPlaylist : item));
   };
   const handleDeletePlaylist = async (playlistId: number) => {
       setPlaylists(p => p.filter(item => item.id !== playlistId));
