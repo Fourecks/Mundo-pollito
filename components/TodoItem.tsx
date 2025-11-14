@@ -1,5 +1,6 @@
 
 
+
 import React, { useState } from 'react';
 import { Todo, Priority, Subtask } from '../types';
 import SubtaskIcon from './icons/SubtaskIcon';
@@ -43,23 +44,31 @@ const formatDueDate = (todo: Todo): string => {
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowKey = formatDateKey(tomorrowDate);
 
+    const formatDate = (dateStr: string) => {
+        if (dateStr === todayKey) return 'Hoy';
+        if (dateStr === tomorrowKey) return 'Mañana';
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    };
+
+    const startDateString = formatDate(todo.due_date);
+
+    // If there's an end date, format a range
+    if (todo.end_date && todo.end_date > todo.due_date) {
+        const endDateString = formatDate(todo.end_date);
+        return `${startDateString} - ${endDateString}`;
+    }
+    
+    // If it's a single day task, format with time if available
     let timeString = '';
     if (todo.start_time && todo.end_time) {
         timeString = `${formatTime(todo.start_time)} - ${formatTime(todo.end_time)}`;
     } else if (todo.start_time) {
         timeString = formatTime(todo.start_time);
     }
-    
-    let dateString;
-    if (todo.due_date === todayKey) dateString = `Hoy`;
-    else if (todo.due_date === tomorrowKey) dateString = `Mañana`;
-    else {
-        const [year, month, day] = todo.due_date.split('-').map(Number);
-        const date = new Date(Date.UTC(year, month - 1, day));
-        dateString = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-    }
 
-    return `${dateString}${timeString ? `, ${timeString}` : ''}`;
+    return `${startDateString}${timeString ? `, ${timeString}` : ''}`;
 };
 
 
@@ -98,7 +107,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
 
         {/* Task Text & Subtask Toggle */}
         <div className="flex-grow flex items-center gap-2 ml-4 min-w-0">
-            {todo.start_time && (
+            {todo.start_time && !todo.end_date && (
                 <span className={`sm:hidden text-xs font-semibold text-primary-dark dark:text-primary flex-shrink-0 ${todo.completed ? 'opacity-70' : ''}`}>
                     {formatTime(todo.start_time)}
                 </span>
