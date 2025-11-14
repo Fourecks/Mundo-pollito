@@ -1592,7 +1592,16 @@ const App: React.FC = () => {
     const newTodo: Todo = { id: tempId, text, completed: false, priority: 'medium', due_date: dateKey, user_id: user.id, created_at: new Date().toISOString(), subtasks: [] };
     
     setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
-    await syncableCreate('todos', newTodo);
+    
+    const savedTodo = await syncableCreate('todos', newTodo) as Todo;
+
+    if (savedTodo.id !== tempId) {
+        setAllTodos(current => {
+            const dateTodos = current[dateKey] || [];
+            const newDateTodos = dateTodos.map(t => t.id === tempId ? savedTodo : t);
+            return { ...current, [dateKey]: newDateTodos };
+        });
+    }
   }, [user, selectedDate]);
   
   // --- Quick Capture from URL (PWA only) ---
@@ -1631,7 +1640,15 @@ const App: React.FC = () => {
             };
 
             setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
-            await syncableCreate('todos', newTodo);
+            const savedTodo = await syncableCreate('todos', newTodo) as Todo;
+
+            if (savedTodo.id !== tempId) {
+                setAllTodos(current => {
+                    const dateTodos = current[dateKey] || [];
+                    const newDateTodos = dateTodos.map(t => t.id === tempId ? savedTodo : t);
+                    return { ...current, [dateKey]: newDateTodos };
+                });
+            }
             
             setQuickCaptureMessage('¡Tarea capturada con éxito!');
             setSelectedDate(new Date());
@@ -1850,13 +1867,15 @@ const App: React.FC = () => {
   };
   
   const handleClearPastTodos = async () => {
-    const todayKey = formatDateKey(new Date());
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Consider start of today
     const idsToDelete: number[] = [];
     
     const newAllTodos = { ...allTodos };
 
     for (const dateKey in newAllTodos) {
-        if (dateKey < todayKey) {
+        const date = new Date(dateKey + 'T00:00:00Z'); // Treat dateKey as UTC to avoid timezone shifts
+        if (date < today) {
             newAllTodos[dateKey].forEach(todo => idsToDelete.push(todo.id));
             delete newAllTodos[dateKey];
         }
@@ -1871,14 +1890,21 @@ const App: React.FC = () => {
   };
 
 
-  const handleAddFolder = async (name: string): Promise<Folder | null> => {
+  const handleAddFolder = useCallback(async (name: string): Promise<Folder | null> => {
       if (!user) return null;
       const tempId = -Date.now();
       const newFolder: Folder = { id: tempId, name, user_id: user.id, created_at: new Date().toISOString(), notes: [] };
+      
       setFolders(f => [...f, newFolder]);
-      await syncableCreate('folders', newFolder);
-      return newFolder;
-  };
+      
+      const savedFolder = await syncableCreate('folders', newFolder) as Folder;
+      
+      if (savedFolder.id !== tempId) {
+          setFolders(f => f.map(folder => folder.id === tempId ? savedFolder : folder));
+      }
+      return savedFolder;
+  }, [user]);
+
   const handleUpdateFolder = async (folderId: number, name: string) => {
       const folderToUpdate = folders.find(f => f.id === folderId);
       if(!folderToUpdate) return;
@@ -1891,15 +1917,22 @@ const App: React.FC = () => {
       await syncableDelete('folders', folderId);
   };
   
-  const handleAddNote = async (folderId: number): Promise<Note | null> => {
+  const handleAddNote = useCallback(async (folderId: number): Promise<Note | null> => {
     if (!user) return null;
     const tempId = -Date.now();
     const now = new Date().toISOString();
     const newNote: Note = { id: tempId, folder_id: folderId, user_id: user.id, title: 'Nueva Nota', content: '', created_at: now, updated_at: now };
+    
     setNotes(n => [...n, newNote]);
-    await syncableCreate('notes', newNote);
-    return newNote;
-  };
+    
+    const savedNote = await syncableCreate('notes', newNote) as Note;
+
+    if (savedNote.id !== tempId) {
+        setNotes(n => n.map(item => item.id === tempId ? savedNote : item));
+    }
+    return savedNote;
+  }, [user]);
+
 
   const handleUpdateNote = async (note: Note) => {
     const updatedNote = { ...note, updated_at: new Date().toISOString() };
@@ -1912,13 +1945,20 @@ const App: React.FC = () => {
     await syncableDelete('notes', noteId);
   };
   
-  const handleAddPlaylist = async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
+  const handleAddPlaylist = useCallback(async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
     if (!user) return;
     const tempId = -Date.now();
     const newPlaylist = { ...playlistData, id: tempId, user_id: user.id, created_at: new Date().toISOString() };
+    
     setPlaylists(p => [...p, newPlaylist]);
-    await syncableCreate('playlists', newPlaylist);
-  };
+    
+    const savedPlaylist = await syncableCreate('playlists', newPlaylist) as Playlist;
+    
+    if (savedPlaylist.id !== tempId) {
+        setPlaylists(p => p.map(item => item.id === tempId ? savedPlaylist : item));
+    }
+  }, [user]);
+
   const handleUpdatePlaylist = async (playlist: Playlist) => {
       setPlaylists(p => p.map(item => item.id === playlist.id ? playlist : item));
       await syncableUpdate('playlists', playlist);
@@ -1928,13 +1968,20 @@ const App: React.FC = () => {
       await syncableDelete('playlists', playlistId);
   };
   
-  const handleAddQuickNote = async (text: string) => {
+  const handleAddQuickNote = useCallback(async (text: string) => {
       if(!user) return;
       const tempId = -Date.now();
       const newNote: QuickNote = { id: tempId, text, user_id: user.id, created_at: new Date().toISOString() };
+      
       setQuickNotes(qn => [...qn, newNote]);
-      await syncableCreate('quick_notes', newNote);
-  };
+
+      const savedNote = await syncableCreate('quick_notes', newNote) as QuickNote;
+
+      if (savedNote.id !== tempId) {
+          setQuickNotes(qn => qn.map(note => note.id === tempId ? savedNote : note));
+      }
+  }, [user]);
+
   const handleDeleteQuickNote = async (id: number) => {
       setQuickNotes(qn => qn.filter(note => note.id !== id));
       await syncableDelete('quick_notes', id);
@@ -2501,7 +2548,7 @@ const App: React.FC = () => {
         onClose={() => setIsClearPastConfirmOpen(false)}
         onConfirm={handleClearPastTodos}
         title="Limpiar Tareas Pasadas"
-        message={`¿Seguro que quieres eliminar todas las tareas anteriores al ${selectedDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}? Esta acción es permanente.`}
+        message={`¿Seguro que quieres eliminar todas las tareas anteriores al ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}? Esta acción es permanente.`}
         confirmText="Sí, limpiar"
         cancelText="Cancelar"
       />

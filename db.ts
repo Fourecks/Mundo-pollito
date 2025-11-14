@@ -2,7 +2,7 @@
 // Robust IndexedDB wrapper with offline sync queue functionality.
 
 import { supabase } from './supabaseClient';
-import { Todo } from './types';
+import { Folder, Note, Playlist, QuickNote, Todo } from './types';
 
 let db: IDBDatabase;
 const DB_NAME_PREFIX = 'PollitoProductivoDB';
@@ -139,21 +139,110 @@ const queueMutation = async (op: Omit<SyncOperation, 'id'>) => {
     await add('sync_queue', op);
 };
 
-export const syncableCreate = async (tableName: string, payload: any) => {
-    await add(tableName, payload);
-    await queueMutation({ type: 'CREATE', tableName, payload });
+export const syncableCreate = async (tableName: string, payload: any): Promise<any> => {
+    if (navigator.onLine) {
+        try {
+            const { id: tempId, ...insertData } = payload;
+
+            const relationalFields = ['subtasks', 'notes'];
+            relationalFields.forEach(field => {
+                if (insertData.hasOwnProperty(field)) {
+                    delete insertData[field];
+                }
+            });
+
+            let selectClause = '*';
+            if (tableName === 'todos') {
+                selectClause = '*, subtasks(*)';
+            }
+
+            const { data: newRecord, error } = await supabase.from(tableName).insert(insertData).select(selectClause).single();
+            if (error) throw error;
+            
+            await add(tableName, newRecord); 
+            return newRecord;
+        } catch (error) {
+            console.error(`Online CREATE failed for ${tableName}, falling back to offline mode.`, error);
+            await add(tableName, payload);
+            await queueMutation({ type: 'CREATE', tableName, payload });
+            return payload;
+        }
+    } 
+    else {
+        await add(tableName, payload);
+        await queueMutation({ type: 'CREATE', tableName, payload });
+        return payload;
+    }
 };
-export const syncableUpdate = async (tableName: string, payload: any) => {
-    await set(tableName, payload);
-    await queueMutation({ type: 'UPDATE', tableName, payload });
+
+export const syncableUpdate = async (tableName: string, payload: any): Promise<any> => {
+    await set(tableName, payload); // Optimistic update
+
+    if (navigator.onLine) {
+        try {
+            const { id, ...updateData } = payload;
+            
+            const relationalFields = ['subtasks', 'notes'];
+            relationalFields.forEach(field => {
+                if (updateData.hasOwnProperty(field)) {
+                    delete updateData[field];
+                }
+            });
+
+            delete updateData.created_at;
+            delete updateData.user_id;
+            
+            let selectClause = '*';
+            if (tableName === 'todos') {
+                selectClause = '*, subtasks(*)';
+            }
+
+            const { data: updatedRecord, error } = await supabase.from(tableName).update(updateData).eq('id', id).select(selectClause).single();
+            if (error) throw error;
+
+            await set(tableName, updatedRecord);
+            return updatedRecord;
+        } catch (error) {
+            console.error(`Online UPDATE failed for ${tableName}, queueing for later.`, error);
+            await queueMutation({ type: 'UPDATE', tableName, payload });
+            return payload;
+        }
+    } else {
+        await queueMutation({ type: 'UPDATE', tableName, payload });
+        return payload;
+    }
 };
-export const syncableDelete = async (tableName: string, key: number | string) => {
-    await remove(tableName, key);
-    await queueMutation({ type: 'DELETE', tableName, key });
+
+export const syncableDelete = async (tableName: string, key: number | string): Promise<void> => {
+    await remove(tableName, key); // Optimistic delete
+
+    if (navigator.onLine) {
+        try {
+            const { error } = await supabase.from(tableName).delete().eq('id', key);
+            if (error) throw error;
+        } catch (error) {
+            console.error(`Online DELETE failed for ${tableName}, queueing for later.`, error);
+            await queueMutation({ type: 'DELETE', tableName, key });
+        }
+    } else {
+        await queueMutation({ type: 'DELETE', tableName, key });
+    }
 };
-export const syncableDeleteAll = async (tableName: string, userId: string) => {
-    await clearStore(tableName);
-    await queueMutation({ type: 'DELETE_ALL', tableName, userId });
+
+export const syncableDeleteAll = async (tableName: string, userId: string): Promise<void> => {
+    await clearStore(tableName); // Optimistic clear
+
+    if (navigator.onLine) {
+        try {
+            const { error } = await supabase.from(tableName).delete().eq('user_id', userId);
+            if (error) throw error;
+        } catch (error) {
+            console.error(`Online DELETE_ALL failed for ${tableName}, queueing for later.`, error);
+            await queueMutation({ type: 'DELETE_ALL', tableName, userId });
+        }
+    } else {
+        await queueMutation({ type: 'DELETE_ALL', tableName, userId });
+    }
 };
 
 let isSyncing = false;
@@ -179,9 +268,6 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                     const tempId = op.payload.id;
                     const { id, ...insertData } = op.payload;
 
-                    // FIX: Clean the payload before sending to Supabase.
-                    // The frontend state might have relational fields (like 'subtasks' or 'notes')
-                    // that don't exist as columns in the database table. Supabase insert will fail if they are present.
                     const relationalFields = ['subtasks', 'notes'];
                     relationalFields.forEach(field => {
                         if (insertData.hasOwnProperty(field)) {
