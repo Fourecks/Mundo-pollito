@@ -191,9 +191,18 @@ export const syncableCreate = async (tableName: string, payload: any): Promise<a
             const { data: newRecord, error } = await supabase.from(tableName).insert(insertData).select(selectClause).single();
             if (error) throw error;
             
-            // Replace the temporary local record with the permanent one from the server.
-            await remove(tableName, tempId);
-            await add(tableName, newRecord); 
+            // ATOMIC UPDATE: Replace the temporary local record with the permanent one from the server
+            // within a single transaction to ensure data integrity.
+            await new Promise<void>((resolve, reject) => {
+                if (!db) return reject("DB not initialized for atomic create operation.");
+                const tx = db.transaction(tableName, 'readwrite');
+                const store = tx.objectStore(tableName);
+                store.delete(tempId);
+                store.put(newRecord);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+            
             return newRecord;
         } catch (error) {
             console.error(`Online CREATE failed for ${tableName}, falling back to offline mode.`, error);
@@ -219,6 +228,15 @@ export const syncableCreate = async (tableName: string, payload: any): Promise<a
  */
 export const syncableUpdate = async (tableName: string, payload: any): Promise<any> => {
     await set(tableName, payload); // Optimistic local update for immediate UI feedback.
+
+    // This robustness check handles the edge case where an item created offline is
+    // updated before it has a chance to sync. Instead of making a failing network
+    // request, we simply queue the update, which will be processed correctly
+    // after the initial creation is synced.
+    if (typeof payload.id === 'number' && payload.id < 0) {
+        await queueMutation({ type: 'UPDATE', tableName, payload });
+        return payload;
+    }
 
     if (navigator.onLine) {
         try {
@@ -264,6 +282,14 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
  */
 export const syncableDelete = async (tableName: string, key: number | string): Promise<void> => {
     await remove(tableName, key); // Optimistic local delete
+
+    // This robustness check handles deleting an item that was created offline before
+    // it could be synced. We just queue the delete operation, and the sync processor
+    // will handle it correctly (often by simply discarding both the create and delete ops).
+    if (typeof key === 'number' && key < 0) {
+        await queueMutation({ type: 'DELETE', tableName, key });
+        return;
+    }
 
     if (navigator.onLine) {
         try {
