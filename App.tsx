@@ -229,7 +229,7 @@ interface AppComponentProps {
   activeTrack: Playlist | null;
   activeSpotifyTrack: Playlist | null;
   // Handlers
-  handleAddTodo: (text: string, projectId?: number | null) => Promise<void>;
+  handleAddTodo: (text: string, options?: { projectId?: number | null; isUndated?: boolean }) => Promise<void>;
   handleUpdateTodo: (updatedTodo: Todo) => Promise<void>;
   handleToggleTodo: (id: number, onAllCompleted: (quote: string) => void) => Promise<void>;
   handleToggleSubtask: (taskId: number, subtaskId: number, onAllCompleted: (quote: string) => void) => Promise<void>;
@@ -680,6 +680,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     const [isQuickCaptureSetupOpen, setIsQuickCaptureSetupOpen] = useState(false);
     const [isDailyDoseSettingsOpen, setIsDailyDoseSettingsOpen] = useState(false);
+    const [viewingProjectId, setViewingProjectId] = useState<number | null>(null);
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
     const ambientAudioRef = useRef<HTMLAudioElement>(null);
@@ -868,6 +869,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onUpdateProject={handleUpdateProject}
                             onDeleteProject={handleDeleteProject}
                             onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
+                            onViewProjectChange={setViewingProjectId}
                         />
                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
@@ -1056,7 +1058,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 isOpen={isAddTaskModalOpen}
                 onClose={() => setIsAddTaskModalOpen(false)}
                 onAddTask={(text) => {
-                    handleAddTodo(text);
+                    const options = viewingProjectId
+                      ? { projectId: viewingProjectId, isUndated: true }
+                      : undefined;
+                    handleAddTodo(text, options);
                     setIsAddTaskModalOpen(false);
                 }}
             />
@@ -1622,24 +1627,33 @@ const App: React.FC = () => {
   };
   
   // --- Data Handlers (Now with Offline Support) ---
-  const handleAddTodo = useCallback(async (text: string, projectId?: number | null) => {
+  const handleAddTodo = useCallback(async (text: string, options?: { projectId?: number | null; isUndated?: boolean }) => {
     if (!user) return;
-    const dateKey = formatDateKey(selectedDate);
+
+    const projectId = options?.projectId || null;
+    const isUndated = options?.isUndated || false;
+
+    const dateKey = isUndated ? 'undated' : formatDateKey(selectedDate);
+    const dueDate = isUndated ? null : formatDateKey(selectedDate);
+
     const tempId = -Date.now();
     const newTodo: Todo = { 
         id: tempId, 
         text, 
         completed: false, 
         priority: 'medium', 
-        due_date: dateKey, 
+        due_date: dueDate, 
         user_id: user.id, 
         created_at: new Date().toISOString(), 
         subtasks: [],
-        project_id: projectId || null,
+        project_id: projectId,
     };
     
     // Optimistic UI update
-    setAllTodos(current => ({ ...current, [dateKey]: [...(current[dateKey] || []), newTodo] }));
+    setAllTodos(current => {
+        const newDateTodos = [...(current[dateKey] || []), newTodo];
+        return { ...current, [dateKey]: newDateTodos };
+    });
     
     // Sync
     const savedTodo = await syncableCreate('todos', newTodo) as Todo;
@@ -2074,7 +2088,7 @@ const App: React.FC = () => {
             }
             return true;
         });
-        if (newAllTodos[dateKey].length === 0) {
+        if (newAllTodos[dateKey].length === 0 && dateKey !== 'undated') {
             delete newAllTodos[dateKey];
         }
     });

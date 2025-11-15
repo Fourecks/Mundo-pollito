@@ -19,7 +19,7 @@ import ConfirmationModalWithOptions from './ConfirmationModalWithOptions';
 
 interface TodoListModuleProps {
     allTodos: { [key: string]: Todo[] };
-    addTodo: (text: string, projectId?: number | null) => Promise<void>;
+    addTodo: (text: string, options?: { projectId?: number | null; isUndated?: boolean }) => Promise<void>;
     toggleTodo: (id: number) => void;
     toggleSubtask: (taskId: number, subtaskId: number) => void;
     deleteTodo: (id: number) => void;
@@ -36,6 +36,7 @@ interface TodoListModuleProps {
     onUpdateProject: (projectId: number, name: string, emoji: string | null) => Promise<void>;
     onDeleteProject: (projectId: number) => Promise<void>;
     onDeleteProjectAndTasks: (projectId: number) => Promise<void>;
+    onViewProjectChange?: (projectId: number | null) => void;
 }
 
 const formatDateKey = (date: Date): string => {
@@ -66,6 +67,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     onUpdateProject,
     onDeleteProject,
     onDeleteProjectAndTasks,
+    onViewProjectChange,
 }) => {
     // Common State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -194,12 +196,11 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
             return (
                 <div className="flex flex-col h-full animate-fade-in">
                     <header className="flex-shrink-0 p-3 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center gap-2">
-                        <button onClick={() => setViewingProject(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
+                        <button onClick={() => { setViewingProject(null); onViewProjectChange?.(null); }} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
                         <h2 className="text-xl font-bold text-primary-dark dark:text-primary truncate">{viewingProject.emoji} {viewingProject.name}</h2>
                     </header>
                     <div className="p-4 flex-shrink-0">
                         <ProgressBar completed={completedTasks} total={projectTasks.length} />
-                        <TodoInput onAddTodo={(text) => addTodo(text, viewingProject.id)} />
                     </div>
                     <div className="flex-grow overflow-y-auto custom-scrollbar p-4 pt-0 space-y-3">
                         {projectTasks.length > 0 ? (
@@ -247,7 +248,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                                             </div>
                                         )}
                                     </div>
-                                    <button onClick={() => !editingProject && setViewingProject(project)} className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
+                                    <button onClick={() => { if (!editingProject) { setViewingProject(project); onViewProjectChange?.(project.id); } }} className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
                                         {editingProject?.id === project.id ? (
                                             <input
                                                 type="text"
@@ -338,7 +339,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                                     <p className="text-gray-500 dark:text-gray-300 text-sm mt-1 text-center md:text-left">{todosForSelectedDate.length > 0 ? `${completedCount} de ${todosForSelectedDate.length} tareas completadas.` : '¡Añade una tarea para empezar!'}</p>
                                     <ProgressBar completed={completedCount} total={todosForSelectedDate.length} />
                                     <div className="flex flex-wrap justify-between items-center mt-4 mb-2 gap-3"><label htmlFor="hide-completed-toggle" className="flex items-center cursor-pointer select-none"><div className="relative"><input type="checkbox" id="hide-completed-toggle" className="sr-only" checked={hideCompleted} onChange={() => setHideCompleted(!hideCompleted)} /><div className={`block w-10 h-6 rounded-full transition-colors ${hideCompleted ? 'bg-primary-light' : 'bg-gray-200 dark:bg-gray-600'}`}></div><div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${hideCompleted ? 'translate-x-full' : ''}`}></div></div><div className="ml-2 text-sm font-semibold text-gray-500 dark:text-gray-300">Ocultar completadas</div></label><div className="flex items-center gap-2 sm:gap-4"><button onClick={onClearPastTodos} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-red-100/50 dark:hover:bg-red-900/30" title="Limpiar tareas anteriores al día actual"><TrashIcon className="h-4 w-4" /><span className="hidden sm:inline">Limpiar</span></button><button onClick={toggleSort} className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-primary-light/30 dark:hover:bg-primary/10" aria-label="Cambiar orden de tareas"><SortIcon /><span className="hidden sm:inline">{getSortButtonText()}</span><span className="sm:hidden">{sortBy === 'default' ? 'Original' : sortBy === 'priority' ? 'Prioridad' : 'Fecha'}</span></button></div></div>
-                                    {!isMobile && <TodoInput onAddTodo={(text) => addTodo(text, null)} />}
+                                    {!isMobile && <TodoInput onAddTodo={(text) => addTodo(text)} />}
                                 </div>
                             </div>
                             <div className="space-y-3 overflow-y-auto custom-scrollbar p-3 flex-grow min-h-0">
