@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ReactNode, useMemo } from 'react';
-import { Todo, Subtask, Priority, RecurrenceRule } from '../types';
+import { Todo, Subtask, Priority, RecurrenceRule, Project } from '../types';
 import CloseIcon from './icons/CloseIcon';
 import PlusIcon from './icons/PlusIcon';
 import TrashIcon from './icons/TrashIcon';
@@ -11,12 +11,14 @@ import RefreshIcon from './icons/RefreshIcon';
 import NotesIcon from './icons/NotesIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
+import BriefcaseIcon from './icons/BriefcaseIcon';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (todo: Todo) => void;
   todo: Todo | null;
+  projects: Project[];
 }
 
 const priorityMap: { [key in Priority]: { base: string; text: string; label: string } } = {
@@ -66,12 +68,13 @@ const NavSettingRow: React.FC<{ icon: ReactNode; label: string; value: string; o
 );
 
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, onSave, todo }) => {
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, onSave, todo, projects }) => {
     const [text, setText] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
     const [newSubtaskText, setNewSubtaskText] = useState('');
     const [completed, setCompleted] = useState(false);
+    const [projectId, setProjectId] = useState<number | null>(null);
 
     // Main date
     const [due_date, setDueDate] = useState('');
@@ -107,6 +110,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             setSubtasks(todo.subtasks || []);
             setCompleted(todo.completed || false);
             setDueDate(todo.due_date || '');
+            setProjectId(todo.project_id || null);
 
             // Set toggles based on existing data
             setHasTime(!!todo.start_time);
@@ -187,12 +191,13 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         updatedTodoPayload.completed = completed;
         updatedTodoPayload.priority = priority;
         updatedTodoPayload.subtasks = subtasks;
+        updatedTodoPayload.project_id = projectId;
 
-        updatedTodoPayload.due_date = due_date || null;
-        updatedTodoPayload.end_date = hasEndDate ? (end_date || null) : null;
-        updatedTodoPayload.start_time = hasTime ? (start_time || null) : null;
-        updatedTodoPayload.end_time = hasTime ? (end_time || null) : null;
-        updatedTodoPayload.notes = hasNotes ? notes : null;
+        updatedTodoPayload.due_date = due_date || undefined;
+        updatedTodoPayload.end_date = hasEndDate ? (end_date || undefined) : undefined;
+        updatedTodoPayload.start_time = hasTime ? (start_time || undefined) : undefined;
+        updatedTodoPayload.end_time = hasTime ? (end_time || undefined) : undefined;
+        updatedTodoPayload.notes = hasNotes ? notes : undefined;
 
         const currentRecurrence = { ...recurrence };
         if (hasRecurrence && !currentRecurrence.id) {
@@ -211,21 +216,21 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                     const localReminderDate = new Date(year, month - 1, day, hour, minute);
                     
                     updatedTodoPayload.reminder_at = localReminderDate.toISOString();
-                    updatedTodoPayload.reminder_offset = null;
+                    updatedTodoPayload.reminder_offset = undefined;
                 } else {
-                    updatedTodoPayload.reminder_at = null;
-                    updatedTodoPayload.reminder_offset = null;
+                    updatedTodoPayload.reminder_at = undefined;
+                    updatedTodoPayload.reminder_offset = undefined;
                 }
             } else if (reminderType !== 'custom') {
                 updatedTodoPayload.reminder_offset = Number(reminderType) as Todo['reminder_offset'];
-                updatedTodoPayload.reminder_at = null;
+                updatedTodoPayload.reminder_at = undefined;
             } else {
-                updatedTodoPayload.reminder_offset = null;
-                updatedTodoPayload.reminder_at = null;
+                updatedTodoPayload.reminder_offset = undefined;
+                updatedTodoPayload.reminder_at = undefined;
             }
         } else {
-            updatedTodoPayload.reminder_offset = null;
-            updatedTodoPayload.reminder_at = null;
+            updatedTodoPayload.reminder_offset = undefined;
+            updatedTodoPayload.reminder_at = undefined;
         }
 
         if (todo.reminder_at !== updatedTodoPayload.reminder_at || todo.reminder_offset !== updatedTodoPayload.reminder_offset) {
@@ -308,6 +313,17 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                     {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
                     {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>}
                 </div>
+            </div>
+
+             {/* Project */}
+            <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2"><BriefcaseIcon className="h-4 w-4 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Proyecto</span></div>
+                    <select value={projectId === null ? '' : projectId} onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)} className="w-full bg-white/80 dark:bg-gray-600/80 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm appearance-none">
+                        <option value="">Sin proyecto</option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
             </div>
             
             {/* Priority */}

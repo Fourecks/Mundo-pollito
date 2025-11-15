@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, ReactNode, useMemo } from 'react';
-import { Todo, Subtask, Priority, RecurrenceRule } from '../types';
+import { Todo, Subtask, Priority, RecurrenceRule, Project } from '../types';
 import TrashIcon from './icons/TrashIcon';
 import PlusIcon from './icons/PlusIcon';
 import CalendarIcon from './icons/CalendarIcon';
@@ -12,6 +12,7 @@ import ConfirmationModal from './ConfirmationModal';
 import NotesIcon from './icons/NotesIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
+import BriefcaseIcon from './icons/BriefcaseIcon';
 
 interface MobileTaskEditorProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface MobileTaskEditorProps {
   onSave: (todo: Todo) => void;
   onDelete: (id: number) => void;
   todo: Todo | null;
+  projects: Project[];
 }
 
 const priorityMap: { [key in Priority]: { base: string; text: string; label: string } } = {
@@ -68,13 +70,14 @@ const NavSettingRow: React.FC<{ icon: ReactNode; label: string; value: string; o
 );
 
 
-const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, onSave, onDelete, todo }) => {
+const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, onSave, onDelete, todo, projects }) => {
     const [text, setText] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
     const [newSubtaskText, setNewSubtaskText] = useState('');
     const [completed, setCompleted] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [projectId, setProjectId] = useState<number | null>(null);
 
     const [due_date, setDueDate] = useState('');
 
@@ -105,6 +108,7 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             setSubtasks(todo.subtasks || []);
             setCompleted(todo.completed || false);
             setDueDate(todo.due_date || '');
+            setProjectId(todo.project_id || null);
 
             setHasTime(!!todo.start_time);
             setHasEndDate(!!todo.end_date);
@@ -187,12 +191,13 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
         updatedTodoPayload.completed = completed;
         updatedTodoPayload.priority = priority;
         updatedTodoPayload.subtasks = subtasks;
+        updatedTodoPayload.project_id = projectId;
 
-        updatedTodoPayload.due_date = due_date || null;
-        updatedTodoPayload.end_date = hasEndDate ? (end_date || null) : null;
-        updatedTodoPayload.start_time = hasTime ? (start_time || null) : null;
-        updatedTodoPayload.end_time = hasTime ? (end_time || null) : null;
-        updatedTodoPayload.notes = hasNotes ? notes : null;
+        updatedTodoPayload.due_date = due_date || undefined;
+        updatedTodoPayload.end_date = hasEndDate ? (end_date || undefined) : undefined;
+        updatedTodoPayload.start_time = hasTime ? (start_time || undefined) : undefined;
+        updatedTodoPayload.end_time = hasTime ? (end_time || undefined) : undefined;
+        updatedTodoPayload.notes = hasNotes ? notes : undefined;
         updatedTodoPayload.recurrence = hasRecurrence ? recurrence : { frequency: 'none' };
         
         let reminderChanged = false;
@@ -206,21 +211,21 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                     const localReminderDate = new Date(year, month - 1, day, hour, minute);
                     
                     updatedTodoPayload.reminder_at = localReminderDate.toISOString();
-                    updatedTodoPayload.reminder_offset = null;
+                    updatedTodoPayload.reminder_offset = undefined;
                 } else {
-                    updatedTodoPayload.reminder_at = null;
-                    updatedTodoPayload.reminder_offset = null;
+                    updatedTodoPayload.reminder_at = undefined;
+                    updatedTodoPayload.reminder_offset = undefined;
                 }
             } else if (reminderType !== 'custom') {
                 updatedTodoPayload.reminder_offset = Number(reminderType) as Todo['reminder_offset'];
-                updatedTodoPayload.reminder_at = null;
+                updatedTodoPayload.reminder_at = undefined;
             } else {
-                updatedTodoPayload.reminder_offset = null;
-                updatedTodoPayload.reminder_at = null;
+                updatedTodoPayload.reminder_offset = undefined;
+                updatedTodoPayload.reminder_at = undefined;
             }
         } else {
-            updatedTodoPayload.reminder_offset = null;
-            updatedTodoPayload.reminder_at = null;
+            updatedTodoPayload.reminder_offset = undefined;
+            updatedTodoPayload.reminder_at = undefined;
         }
 
         if (todo.reminder_at !== updatedTodoPayload.reminder_at || todo.reminder_offset !== updatedTodoPayload.reminder_offset) {
@@ -333,6 +338,20 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                     )}
                 </div>
             </div>
+
+            <div className="p-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                    <BriefcaseIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/>
+                    <label htmlFor="project-select" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Proyecto</label>
+                </div>
+                <select id="project-select" value={projectId === null ? '' : projectId} onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)} className="bg-transparent text-gray-700 dark:text-gray-200 text-sm text-right focus:outline-none max-w-[50%]">
+                    <option value="">Sin proyecto</option>
+                    {projects.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                </select>
+            </div>
+
 
             <div className="p-3 flex flex-col gap-2 border-b border-black/5 dark:border-white/10">
                     <div className="flex items-center gap-3"><FlagIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prioridad</span></div>

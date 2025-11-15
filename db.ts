@@ -7,7 +7,7 @@ import { Folder, Note, Playlist, QuickNote, Todo } from './types';
 let db: IDBDatabase;
 const DB_NAME_PREFIX = 'PollitoProductivoDB';
 const DB_VERSION = 2; // Incremented version for new schema
-const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue'];
+const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'projects'];
 
 // --- Types for Sync Queue ---
 interface SyncOperation {
@@ -177,7 +177,7 @@ export const syncableCreate = async (tableName: string, payload: any): Promise<a
         try {
             const { id: tempId, ...insertData } = payload;
 
-            const relationalFields = ['subtasks', 'notes'];
+            const relationalFields = ['subtasks', 'notes', 'todos'];
             relationalFields.forEach(field => {
                 if (insertData.hasOwnProperty(field)) {
                     delete insertData[field];
@@ -245,7 +245,7 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
         try {
             const { id, ...updateData } = payload;
             
-            const relationalFields = ['subtasks', 'notes'];
+            const relationalFields = ['subtasks', 'notes', 'todos'];
             relationalFields.forEach(field => delete updateData[field]);
             delete updateData.created_at;
             delete updateData.user_id;
@@ -372,7 +372,7 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                     const tempId = op.payload.id;
                     const { id, ...insertData } = op.payload;
 
-                    const relationalFields = ['subtasks', 'notes'];
+                    const relationalFields = ['subtasks', 'notes', 'todos'];
                     relationalFields.forEach(field => {
                         if (insertData.hasOwnProperty(field)) {
                             delete insertData[field];
@@ -409,7 +409,7 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
 
                     const { id, ...updateData } = payload;
                     
-                    const relationalFields = ['subtasks', 'notes'];
+                    const relationalFields = ['subtasks', 'notes', 'todos'];
                     relationalFields.forEach(field => delete updateData[field]);
 
                     delete updateData.created_at;
