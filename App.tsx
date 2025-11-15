@@ -334,7 +334,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   useEffect(() => { localStorage.setItem(getUserKey('openWindows'), JSON.stringify(openWindows)); }, [openWindows, getUserKey]);
 
   const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
-  const ambientAudioRef = useRef<HTMLAudioElement>(null);
   
   const handleShowCompletionModal = (quote: string) => {
     setCompletionQuote(quote);
@@ -432,26 +431,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         document.title = originalTitle;
     };
   }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
-
-  // Ambient Sound Effect
-  useEffect(() => {
-    const audio = ambientAudioRef.current;
-    if (!audio) return;
-    const soundMap: Record<AmbientSoundType, string | null> = {
-      'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
-    };
-    const newSrc = soundMap[ambientSound.type];
-    if (newSrc) {
-      if (audio.src !== newSrc) audio.src = newSrc;
-      audio.loop = true;
-      audio.volume = ambientSound.volume;
-      audio.play().catch(e => console.error("Audio play failed:", e));
-    } else {
-      audio.pause();
-      audio.src = '';
-    }
-    audio.volume = ambientSound.volume;
-  }, [ambientSound]);
 
   // --- Windowing and Misc Handlers ---
   const toggleWindow = (windowType: WindowType) => {
@@ -682,7 +661,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       </div>
 
       <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
-      <audio ref={ambientAudioRef} />
     </div>
   );
 };
@@ -721,7 +699,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [viewingProjectId, setViewingProjectId] = useState<number | null>(null);
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
-    const ambientAudioRef = useRef<HTMLAudioElement>(null);
 
     const handleShowCompletionModal = (quote: string) => {
         setCompletionQuote(quote);
@@ -823,27 +800,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         };
     }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
 
-
-    // Ambient Sound Effect
-    useEffect(() => {
-        const audio = ambientAudioRef.current;
-        if (!audio) return;
-        const soundMap: Record<AmbientSoundType, string | null> = {
-          'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
-        };
-        const newSrc = soundMap[ambientSound.type];
-        if (newSrc) {
-          if (audio.src !== newSrc) audio.src = newSrc;
-          audio.loop = true;
-          audio.volume = ambientSound.volume;
-          audio.play().catch(e => console.error("Audio play failed:", e));
-        } else {
-          audio.pause();
-          audio.src = '';
-        }
-        audio.volume = ambientSound.volume;
-    }, [ambientSound]);
-    
     const handleSelectTrack = (track: Playlist, queue: Playlist[]) => {
       if(track.platform === 'youtube') { setActiveTrack({ ...track, queue }); if(activeSpotifyTrack) setActiveSpotifyTrack(null); }
       else { setActiveSpotifyTrack({ ...track, queue }); if(activeTrack) setActiveTrack(null); }
@@ -1107,7 +1063,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             />
 
             <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
-            <audio ref={ambientAudioRef} />
         </div>
     );
 };
@@ -1166,6 +1121,8 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   
+  const ambientAudioRef = useRef<HTMLAudioElement>(null);
+
   // --- ALL SHARED STATE MOVED HERE ---
   // Data state
   const [allTodos, setAllTodos] = useState<{ [key: string]: Todo[] }>({});
@@ -2550,7 +2507,32 @@ const App: React.FC = () => {
   
   const handleAmbientSoundChange = (value: { type: AmbientSoundType; volume: number; }) => {
     setUiSettings(prev => prev ? { ...prev, ambientSound: value } : null);
-  }
+
+    const audio = ambientAudioRef.current;
+    if (!audio) return;
+
+    const soundMap: Record<AmbientSoundType, string | null> = {
+      'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
+    };
+    const newSrc = soundMap[value.type];
+
+    if (newSrc) {
+      if (!audio.src.endsWith(newSrc)) {
+        audio.src = newSrc;
+        audio.loop = true;
+      }
+      audio.volume = value.volume;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error("Audio playback failed:", error);
+        });
+      }
+    } else {
+      audio.pause();
+      audio.src = '';
+    }
+  };
 
   // --- OneSignal / Notifications ---
   useEffect(() => {
@@ -2740,6 +2722,7 @@ const App: React.FC = () => {
         confirmText="Sí, limpiar"
         cancelText="Cancelar"
       />
+      <audio ref={ambientAudioRef} />
     </>
   );
 };
