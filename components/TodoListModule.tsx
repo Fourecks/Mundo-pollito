@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Todo, Priority, Project } from '../types';
+import { Todo, Priority, Project, GoogleCalendarEvent } from '../types';
 import ProgressBar from './ProgressBar';
 import TodoInput from './TodoInput';
 import TodoItem from './TodoItem';
@@ -37,6 +37,7 @@ interface TodoListModuleProps {
     onDeleteProject: (projectId: number) => Promise<void>;
     onDeleteProjectAndTasks: (projectId: number) => Promise<void>;
     onViewProjectChange?: (projectId: number | null) => void;
+    calendarEvents: GoogleCalendarEvent[];
 }
 
 const formatDateKey = (date: Date): string => {
@@ -48,27 +49,13 @@ const formatDateKey = (date: Date): string => {
 
 const priorityOrder: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
 
-const TodoListModule: React.FC<TodoListModuleProps> = ({
-    allTodos,
-    addTodo,
-    toggleTodo,
-    toggleSubtask,
-    deleteTodo,
-    updateTodo,
-    onEditTodo,
-    selectedDate,
-    setSelectedDate,
-    datesWithTasks,
-    datesWithAllTasksCompleted,
-    isMobile = false,
-    onClearPastTodos,
-    projects,
-    onAddProject,
-    onUpdateProject,
-    onDeleteProject,
-    onDeleteProjectAndTasks,
-    onViewProjectChange,
-}) => {
+const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
+    const {
+        allTodos, addTodo, toggleTodo, toggleSubtask, deleteTodo, updateTodo, onEditTodo,
+        selectedDate, setSelectedDate, datesWithTasks, datesWithAllTasksCompleted,
+        isMobile = false, onClearPastTodos, projects, onAddProject, onUpdateProject,
+        onDeleteProject, onDeleteProjectAndTasks, onViewProjectChange, calendarEvents
+    } = props;
     // Common State
     const containerRef = useRef<HTMLDivElement>(null);
     const [activeTab, setActiveTab] = useState<'tasks' | 'projects'>('tasks');
@@ -324,7 +311,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                 {activeTab === 'tasks' && (
                      <div className="flex flex-col md:flex-row h-full">
                         <div className={`hidden md:flex flex-col flex-shrink-0 border-r border-secondary-light/30 dark:border-gray-700 transition-all duration-300 ease-in-out ${isCalendarPanelVisible ? 'w-full md:w-[260px] p-2' : 'w-0 p-0 overflow-hidden'}`}>
-                            <Calendar selectedDate={selectedDate} setDate={setSelectedDate} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} />
+                            <Calendar selectedDate={selectedDate} setDate={setSelectedDate} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} calendarEvents={calendarEvents} />
                         </div>
                         <div className="flex-grow relative flex flex-col overflow-hidden">
                             <div className="absolute -top-10 -left-10 opacity-10 dark:opacity-20 transform rotate-12 -z-10"><ChickenIcon className="w-40 h-40 text-secondary"/></div>
@@ -345,7 +332,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                             <div className="space-y-3 overflow-y-auto custom-scrollbar p-3 flex-grow min-h-0">
                                 {sortedTodos.length > 0 ? sortedTodos.map(todo => <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo}/>) : (<div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-300 py-10"><p className="font-medium">{todosForSelectedDate.length > 0 && hideCompleted ? '¡Todas las tareas completadas!' : '¡No hay tareas para este día!'}</p><p className="text-sm">{todosForSelectedDate.length > 0 && hideCompleted ? 'Desactiva "Ocultar completadas" para verlas.' : '¡Añade una para empezar a organizarte!'}</p></div>)}
                             </div>
-                            {calendarVisible && (<div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCalendarVisible(false)}><div className="bg-secondary-lighter dark:bg-gray-800 rounded-2xl shadow-xl p-4 w-full max-w-xs animate-pop-in" onClick={e => e.stopPropagation()}><Calendar selectedDate={selectedDate} setDate={(date) => { setSelectedDate(date); setCalendarVisible(false); }} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted}/></div></div>)}
+                            {calendarVisible && (<div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCalendarVisible(false)}><div className="bg-secondary-lighter dark:bg-gray-800 rounded-2xl shadow-xl p-4 w-full max-w-xs animate-pop-in" onClick={e => e.stopPropagation()}><Calendar selectedDate={selectedDate} setDate={(date) => { setSelectedDate(date); setCalendarVisible(false); }} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} calendarEvents={calendarEvents}/></div></div>)}
                         </div>
                     </div>
                 )}

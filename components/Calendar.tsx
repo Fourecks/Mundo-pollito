@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
+import { GoogleCalendarEvent } from '../types';
 
 interface CalendarProps {
   selectedDate: Date;
   setDate: (date: Date) => void;
   datesWithTasks: Set<string>;
   datesWithAllTasksCompleted: Set<string>;
+  calendarEvents: GoogleCalendarEvent[];
 }
 
 // Helper to format date as YYYY-MM-DD key
@@ -17,13 +19,22 @@ const formatDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-const Calendar: React.FC<CalendarProps> = ({ selectedDate, setDate, datesWithTasks, datesWithAllTasksCompleted }) => {
+const Calendar: React.FC<CalendarProps> = ({ selectedDate, setDate, datesWithTasks, datesWithAllTasksCompleted, calendarEvents }) => {
   // Set the view date to the month of the selected date whenever it changes
   const [viewDate, setViewDate] = useState(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
 
   useEffect(() => {
     setViewDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
   }, [selectedDate]);
+
+  const datesWithGCalEvents = useMemo(() => {
+      const dates = new Set<string>();
+      calendarEvents.forEach(event => {
+          const dateStr = event.start.dateTime ? event.start.dateTime.split('T')[0] : event.start.date;
+          if (dateStr) dates.add(dateStr);
+      });
+      return dates;
+  }, [calendarEvents]);
 
 
   const handlePrevMonth = () => {
@@ -55,6 +66,7 @@ const Calendar: React.FC<CalendarProps> = ({ selectedDate, setDate, datesWithTas
       const isSelected = formatDateKey(selectedDate) === currentDateKey;
       const hasTasks = datesWithTasks.has(currentDateKey);
       const hasAllTasksCompleted = datesWithAllTasksCompleted.has(currentDateKey);
+      const hasGCalEvent = datesWithGCalEvents.has(currentDateKey);
 
 
       const dayClasses = [
@@ -73,12 +85,11 @@ const Calendar: React.FC<CalendarProps> = ({ selectedDate, setDate, datesWithTas
       days.push(
         <div key={day} className={dayClasses.join(' ')} onClick={() => setDate(currentDate)}>
           {day}
-          {!isSelected && hasAllTasksCompleted && (
-              <div className="absolute bottom-1 w-1 h-1 bg-secondary rounded-full"></div>
-          )}
-          {!isSelected && !hasAllTasksCompleted && hasTasks && (
-            <div className="absolute bottom-1 w-1 h-1 bg-primary rounded-full"></div>
-          )}
+          <div className="absolute bottom-1 flex items-center justify-center gap-0.5 w-full">
+            {!isSelected && hasGCalEvent && <div className="w-1 h-1 bg-blue-400 rounded-full"></div>}
+            {!isSelected && hasAllTasksCompleted && <div className="w-1 h-1 bg-secondary rounded-full"></div>}
+            {!isSelected && !hasAllTasksCompleted && hasTasks && <div className="w-1 h-1 bg-primary rounded-full"></div>}
+          </div>
         </div>
       );
     }

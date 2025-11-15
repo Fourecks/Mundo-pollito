@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Todo, Subtask, QuickNote } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Todo, Subtask, QuickNote, GoogleCalendarEvent } from '../types';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import ClockIcon from './icons/ClockIcon';
 import PlusIcon from './icons/PlusIcon';
 import XIcon from './icons/XIcon';
+import CalendarIcon from './icons/CalendarIcon';
 
 const formatTime = (timeStr: string) => {
     if (!timeStr) return '';
@@ -96,24 +97,72 @@ const AgendaItem: React.FC<AgendaItemProps> = ({ task, onToggleTask, onToggleSub
   );
 };
 
-const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'onToggleTask' | 'onToggleSubtask'>> = ({ tasks, onToggleTask, onToggleSubtask }) => (
-  <>
-    {tasks.length > 0 ? (
-      tasks.map(task => (
-        <AgendaItem
-          key={task.id}
-          task={task}
-          onToggleTask={onToggleTask}
-          onToggleSubtask={onToggleSubtask}
-        />
-      ))
-    ) : (
-      <div className="text-center text-gray-500 dark:text-gray-400 text-xs py-4 px-2">
-        <p>No tienes tareas para hoy.</p>
-      </div>
-    )}
-  </>
-);
+const CalendarEventItem: React.FC<{ event: GoogleCalendarEvent }> = ({ event }) => {
+    const formatEventTime = (start: { dateTime?: string; date?: string }, end: { dateTime?: string; date?: string }) => {
+        if (start.dateTime && end.dateTime) {
+            const startTime = new Date(start.dateTime).toLocaleTimeString('es-ES', { hour: 'numeric', minute: '2-digit' });
+            const endTime = new Date(end.dateTime).toLocaleTimeString('es-ES', { hour: 'numeric', minute: '2-digit' });
+            return `${startTime} - ${endTime}`;
+        }
+        return 'Todo el día';
+    };
+
+    return (
+        <a href={event.htmlLink} target="_blank" rel="noopener noreferrer" className="bg-blue-100/60 dark:bg-blue-900/40 p-2 rounded-lg text-sm transition-all duration-200 flex items-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/60">
+            <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-400 rounded-md">
+                <CalendarIcon className="h-3 w-3 text-white" />
+            </div>
+            <div className="flex-grow min-w-0">
+                <p className="font-semibold text-xs text-blue-600 dark:text-blue-300">
+                    {formatEventTime(event.start, event.end)}
+                </p>
+                <p className="truncate text-gray-700 dark:text-gray-200 mt-0.5 font-semibold">
+                    {event.summary}
+                </p>
+            </div>
+        </a>
+    );
+};
+
+const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'calendarEvents' | 'onToggleTask' | 'onToggleSubtask'>> = ({ tasks, calendarEvents, onToggleTask, onToggleSubtask }) => {
+    
+    const agendaItems = useMemo(() => {
+        const taskItems = tasks.map(t => ({ ...t, itemType: 'task' as const, sortKey: t.start_time || '23:59:59' }));
+
+        const todayKey = new Date().toISOString().split('T')[0];
+        const eventItems = calendarEvents
+            .filter(e => {
+                const eventDate = e.start.dateTime ? e.start.dateTime.split('T')[0] : e.start.date;
+                return eventDate === todayKey;
+            })
+            .map(e => ({ ...e, itemType: 'event' as const, sortKey: e.start.dateTime ? e.start.dateTime.split('T')[1] : '00:00:00' }));
+        
+        return [...taskItems, ...eventItems].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    }, [tasks, calendarEvents]);
+
+    return (
+      <>
+        {agendaItems.length > 0 ? (
+          agendaItems.map(item =>
+            item.itemType === 'task' ? (
+              <AgendaItem
+                key={`task-${item.id}`}
+                task={item}
+                onToggleTask={onToggleTask}
+                onToggleSubtask={onToggleSubtask}
+              />
+            ) : (
+              <CalendarEventItem key={`event-${item.id}`} event={item} />
+            )
+          )
+        ) : (
+          <div className="text-center text-gray-500 dark:text-gray-400 text-xs py-4 px-2">
+            <p>No tienes nada para hoy.</p>
+          </div>
+        )}
+      </>
+    );
+};
 
 const NotesView: React.FC<Pick<TodaysAgendaProps, 'quickNotes' | 'onAddQuickNote' | 'onDeleteQuickNote' | 'onClearAllQuickNotes'>> = ({ quickNotes, onAddQuickNote, onDeleteQuickNote, onClearAllQuickNotes }) => {
     const [newNoteText, setNewNoteText] = useState('');
@@ -176,6 +225,7 @@ const NotesView: React.FC<Pick<TodaysAgendaProps, 'quickNotes' | 'onAddQuickNote
 
 interface TodaysAgendaProps {
   tasks: Todo[];
+  calendarEvents: GoogleCalendarEvent[];
   onToggleTask: (taskId: number) => void;
   onToggleSubtask: (taskId: number, subtaskId: number) => void;
   quickNotes: QuickNote[];
@@ -184,15 +234,17 @@ interface TodaysAgendaProps {
   onClearAllQuickNotes: () => void;
 }
 
-const TodaysAgenda: React.FC<TodaysAgendaProps> = ({ 
-    tasks, 
-    onToggleTask, 
-    onToggleSubtask,
-    quickNotes,
-    onAddQuickNote,
-    onDeleteQuickNote,
-    onClearAllQuickNotes
-}) => {
+const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
+    const { 
+        tasks, 
+        calendarEvents,
+        onToggleTask, 
+        onToggleSubtask,
+        quickNotes,
+        onAddQuickNote,
+        onDeleteQuickNote,
+        onClearAllQuickNotes
+    } = props;
     const [activeView, setActiveView] = useState<'agenda' | 'notes'>('agenda');
     
     return (
@@ -213,7 +265,7 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = ({
             </div>
             <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
                  {activeView === 'agenda' ? (
-                    <AgendaView tasks={tasks} onToggleTask={onToggleTask} onToggleSubtask={onToggleSubtask} />
+                    <AgendaView tasks={tasks} calendarEvents={calendarEvents} onToggleTask={onToggleTask} onToggleSubtask={onToggleSubtask} />
                  ) : (
                     <NotesView 
                         quickNotes={quickNotes} 

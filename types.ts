@@ -43,6 +43,7 @@ export interface Todo {
   reminder_at?: string; // ISO string for a specific reminder time, e.g., "2024-10-27T09:00:00"
   notification_sent?: boolean;
   project_id?: number | null;
+  gcal_event_id?: string | null;
 }
 
 export interface Project {
@@ -152,6 +153,34 @@ export interface EncouragementNote {
   id: string;
   text: string;
 }
+
+// --- Google Calendar Types ---
+export interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  start: {
+    dateTime?: string; // ISO String for timed events
+    date?: string;     // YYYY-MM-DD for all-day events
+  };
+  end: {
+    dateTime?: string;
+    date?: string;
+  };
+  htmlLink: string;
+}
+
+export interface GoogleCalendar {
+  id: string;
+  summary: string;
+  primary?: boolean;
+}
+
+export interface GCalSettings {
+  enabled: boolean;
+  calendarId: string;
+}
+// --- End Google Calendar Types ---
 
 // Centralized YouTube IFrame API type definitions.
 declare global {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -47,9 +47,9 @@ import ConfirmationModal from './components/ConfirmationModal';
 import QuickCaptureSetupModal from './components/QuickCaptureSetupModal';
 import MotivationalToast from './components/MotivationalToast';
 
-// --- Google Drive Configuration ---
+// --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar';
 const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 
 // --- OneSignal Configuration ---
@@ -261,8 +261,8 @@ interface AppComponentProps {
   onSetDailyEncouragement: (localHour: number | null) => void;
   setActiveTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
   setActiveSpotifyTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
-  // Google Drive Props
-  gdriveToken: string | null;
+  // Google API Props
+  googleApiToken: string | null;
   galleryIsLoading: boolean;
   backgroundsAreLoading: boolean;
   handleAuthClick: () => void;
@@ -272,6 +272,11 @@ interface AppComponentProps {
   handleDeleteBackground: (id: string) => Promise<void>;
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
   gapiReady: boolean;
+  // Google Calendar Props
+  gcalSettings: GCalSettings;
+  onGCalSettingsChange: (settings: GCalSettings) => void;
+  userCalendars: GoogleCalendar[];
+  calendarEvents: GoogleCalendarEvent[];
   // Notifications
   isSubscribed: boolean;
   isPermissionBlocked: boolean;
@@ -291,8 +296,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
     setActiveTrack, setActiveSpotifyTrack,
-    gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
+    googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+    gcalSettings, onGCalSettingsChange, userCalendars, calendarEvents,
     isSubscribed, isPermissionBlocked, handleNotificationAction
   } = props;
   
@@ -539,7 +545,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       <CustomizationPanel
         isOpen={isCustomizationPanelOpen}
         onClose={() => setIsCustomizationPanelOpen(false)}
-        isSignedIn={!!gdriveToken}
+        isSignedIn={!!googleApiToken}
         onAuthClick={handleAuthClick}
         isGapiReady={props.gapiReady}
         colors={themeColors}
@@ -558,6 +564,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setAmbientSound={setAmbientSound}
         dailyEncouragementHour={dailyEncouragementLocalHour}
         onSetDailyEncouragement={onSetDailyEncouragement}
+        gcalSettings={gcalSettings}
+        onGCalSettingsChange={onGCalSettingsChange}
+        userCalendars={userCalendars}
       />
       
       <div className={`fixed top-4 left-4 z-30 w-64 space-y-4 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block`}>
@@ -565,6 +574,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           <BibleVerse />
           <TodaysAgenda 
             tasks={todayAgendaTasks} 
+            calendarEvents={calendarEvents}
             onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} 
             onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
             quickNotes={quickNotes}
@@ -599,6 +609,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 onUpdateProject={handleUpdateProject}
                 onDeleteProject={handleDeleteProject}
                 onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
+                calendarEvents={calendarEvents}
               />
             </ModalWindow>
           )}
@@ -609,7 +620,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
           {openWindows.includes('gallery') && (
               <ModalWindow isOpen onClose={() => toggleWindow('gallery')} title="Galería de Recuerdos" isDraggable isResizable zIndex={focusedWindow === 'gallery' ? 50 : 40} onFocus={() => bringToFront('gallery')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.gallery} onStateChange={s => setWindowStates(ws => ({...ws, gallery: s}))}>
-                  <ImageGallery images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!gdriveToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
+                  <ImageGallery images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
               </ModalWindow>
           )}
           {openWindows.includes('pomodoro') && (
@@ -664,8 +675,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
       setActiveTrack, setActiveSpotifyTrack,
-      gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
+      googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+      gcalSettings, onGCalSettingsChange, userCalendars, calendarEvents,
       isSubscribed, isPermissionBlocked, handleNotificationAction
     } = props;
 
@@ -843,7 +855,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 onSwitchMode={handleSwitchMode}
                                 onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
                              />
-                            <TodaysAgenda tasks={todayAgendaTasks} onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} quickNotes={quickNotes} onAddQuickNote={handleAddQuickNote} onDeleteQuickNote={handleDeleteQuickNote} onClearAllQuickNotes={handleClearAllQuickNotes} />
+                            <TodaysAgenda tasks={todayAgendaTasks} calendarEvents={calendarEvents} onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} quickNotes={quickNotes} onAddQuickNote={handleAddQuickNote} onDeleteQuickNote={handleDeleteQuickNote} onClearAllQuickNotes={handleClearAllQuickNotes} />
                         </div>
                     </>
                 );
@@ -870,6 +882,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onDeleteProject={handleDeleteProject}
                             onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
                             onViewProjectChange={setViewingProjectId}
+                            calendarEvents={calendarEvents}
                         />
                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
@@ -885,7 +898,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'gallery':
                 return (
                     <div className="flex flex-col h-full pt-8">
-                        <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!gdriveToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
+                        <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
                     </div>
                 );
             case 'games':
@@ -906,7 +919,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left">
                                   <div>
                                     <h3 className="font-bold text-primary-dark dark:text-primary">Personalización</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Colores, fondos, sonidos y efectos.</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Colores, fondos, sonidos y más.</p>
                                   </div>
                                   <ChevronRightIcon />
                                 </button>
@@ -1036,7 +1049,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               isOpen={isCustomizationPanelOpen}
               onClose={() => setIsCustomizationPanelOpen(false)}
               isMobile={true}
-              isSignedIn={!!gdriveToken}
+              isSignedIn={!!googleApiToken}
               onAuthClick={handleAuthClick}
               isGapiReady={props.gapiReady}
               colors={themeColors}
@@ -1053,6 +1066,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={setParticleType}
               ambientSound={ambientSound}
               setAmbientSound={setAmbientSound}
+              gcalSettings={gcalSettings}
+              onGCalSettingsChange={onGCalSettingsChange}
+              userCalendars={userCalendars}
             />
             <AddTaskModal
                 isOpen={isAddTaskModalOpen}
@@ -1188,14 +1204,18 @@ const App: React.FC = () => {
   const [activeTrack, setActiveTrack] = useState<Playlist | null>(null);
   const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
 
-  // Google Drive State (For Gallery only)
+  // Google API State
   const [gapiReady, setGapiReady] = useState(false);
   const [gisReady, setGisReady] = useState(false);
-  const [gdriveToken, setGdriveToken] = useState<string | null>(null);
+  const [googleApiToken, setGoogleApiToken] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [galleryIsLoading, setGalleryIsLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   const tokenClientRef = useRef<any>(null);
+  // Google Calendar State
+  const [gcalSettings, setGcalSettings] = useState<GCalSettings>({ enabled: false, calendarId: 'primary' });
+  const [userCalendars, setUserCalendars] = useState<GoogleCalendar[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
   
   // Supabase Backgrounds State
   const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
@@ -1373,7 +1393,7 @@ const App: React.FC = () => {
             setProjects([]);
             setGalleryImages([]); setUserBackgrounds([]);
             setActiveBackground(null); setSavedActiveBgId(null);
-            setGdriveToken(null);
+            setGoogleApiToken(null);
         }
     });
 
@@ -1381,15 +1401,15 @@ const App: React.FC = () => {
   }, []);
   
   const handleLogout = useCallback(async () => {
-    // Google Drive logout
-    if (gdriveToken && window.google?.accounts?.oauth2) {
-      window.google.accounts.oauth2.revoke(gdriveToken, () => {
-        console.log('Google Drive token revoked.');
+    // Google API logout
+    if (googleApiToken && window.google?.accounts?.oauth2) {
+      window.google.accounts.oauth2.revoke(googleApiToken, () => {
+        console.log('Google API token revoked.');
       });
     }
-    setGdriveToken(null);
+    setGoogleApiToken(null);
     if (user) {
-      localStorage.removeItem(getUserKey('gdrive_token'));
+      localStorage.removeItem(getUserKey('google_api_token'));
     }
     // Also clear the token from the gapi client instance.
     if (window.gapi && window.gapi.client) {
@@ -1399,7 +1419,7 @@ const App: React.FC = () => {
     // Supabase logout
     const { error } = await supabase.auth.signOut();
     if (error) console.error('Error logging out:', error.message);
-  }, [gdriveToken, user, getUserKey]);
+  }, [googleApiToken, user, getUserKey]);
   
   const loadData = useCallback(async (networkMode: 'fetch' | 'cache-only' = 'fetch') => {
     if (!user) return;
@@ -1462,7 +1482,7 @@ const App: React.FC = () => {
         supabase.from('playlists').select('*').order('created_at'),
         supabase.from('quick_notes').select('*').order('created_at'),
         supabase.from('projects').select('*').order('name'),
-        supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings').eq('id', user.id).single(),
+        supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings, gcal_settings').eq('id', user.id).single(),
       ]);
       
       if (todosData) {
@@ -1516,6 +1536,9 @@ const App: React.FC = () => {
         if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
             const savedSettings = profileData.pomodoro_settings as Partial<typeof pomodoroState>;
             setPomodoroState(s => ({ ...s, durations: savedSettings.durations || s.durations, timeLeft: (savedSettings.durations || s.durations)[s.mode], isActive: false, endTime: null }));
+        }
+        if(profileData.gcal_settings) {
+            setGcalSettings(profileData.gcal_settings as GCalSettings);
         }
       }
       setIsSyncing(false);
@@ -2164,7 +2187,7 @@ const App: React.FC = () => {
     };
   }, [galleryImages]);
 
-  // --- Google Drive Integration ---
+  // --- Google API Integration ---
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
   
@@ -2172,7 +2195,10 @@ const App: React.FC = () => {
     const initializeGoogleClients = () => {
         window.gapi.load('client', async () => {
             await window.gapi.client.init({
-                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+                discoveryDocs: [
+                    'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
+                    'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
+                ],
             });
             console.log("GAPI client initialized.");
             setGapiReady(true);
@@ -2184,26 +2210,26 @@ const App: React.FC = () => {
             callback: (tokenResponse: any) => {
                 const currentUser = userRef.current;
                 if (tokenResponse.error) {
-                    console.error("Google Drive auth error. Resetting auth state.", tokenResponse);
-                    setGdriveToken(null);
+                    console.error("Google API auth error. Resetting auth state.", tokenResponse);
+                    setGoogleApiToken(null);
                     if (currentUser) {
-                        localStorage.removeItem(getUserKey('gdrive_token'));
+                        localStorage.removeItem(getUserKey('google_api_token'));
                     }
                     return;
                 }
                 
                 if (tokenResponse && tokenResponse.access_token && tokenResponse.expires_in && currentUser) {
-                    console.log("Google Drive token received successfully.");
+                    console.log("Google API token received successfully.");
                     const expiryTime = Date.now() + (tokenResponse.expires_in * 1000);
-                    localStorage.setItem(getUserKey('gdrive_token'), JSON.stringify({ token: tokenResponse.access_token, expiry: expiryTime }));
+                    localStorage.setItem(getUserKey('google_api_token'), JSON.stringify({ token: tokenResponse.access_token, expiry: expiryTime }));
                     
                     window.gapi.client.setToken({ access_token: tokenResponse.access_token });
-                    setGdriveToken(tokenResponse.access_token);
+                    setGoogleApiToken(tokenResponse.access_token);
                 } else {
-                    console.warn("Google Drive auth response was invalid. Resetting auth state.", tokenResponse);
-                    setGdriveToken(null);
+                    console.warn("Google API auth response was invalid. Resetting auth state.", tokenResponse);
+                    setGoogleApiToken(null);
                     if (currentUser) {
-                        localStorage.removeItem(getUserKey('gdrive_token'));
+                        localStorage.removeItem(getUserKey('google_api_token'));
                     }
                 }
             },
@@ -2226,21 +2252,21 @@ const App: React.FC = () => {
   useEffect(() => {
     // On app load, check for a stored, unexpired token to avoid re-authentication.
     if (user && gapiReady) {
-        const storedTokenData = localStorage.getItem(getUserKey('gdrive_token'));
+        const storedTokenData = localStorage.getItem(getUserKey('google_api_token'));
         if (storedTokenData) {
             try {
                 const { token, expiry } = JSON.parse(storedTokenData);
                 // Use token if it's not expiring in the next 5 minutes
                 if (token && expiry && expiry > Date.now() + (5 * 60 * 1000)) {
-                    console.log("Re-using stored Google Drive token.");
+                    console.log("Re-using stored Google API token.");
                     window.gapi.client.setToken({ access_token: token });
-                    setGdriveToken(token);
+                    setGoogleApiToken(token);
                 } else {
-                    console.log("Stored Google Drive token expired or is missing.");
-                    localStorage.removeItem(getUserKey('gdrive_token'));
+                    console.log("Stored Google API token expired or is missing.");
+                    localStorage.removeItem(getUserKey('google_api_token'));
                 }
             } catch (e) {
-                localStorage.removeItem(getUserKey('gdrive_token'));
+                localStorage.removeItem(getUserKey('google_api_token'));
             }
         }
     }
@@ -2248,7 +2274,7 @@ const App: React.FC = () => {
 
   const handleAuthClick = () => {
     if (tokenClientRef.current) {
-      console.log("Requesting user consent for Google Drive.");
+      console.log("Requesting user consent for Google APIs.");
       tokenClientRef.current.requestAccessToken({});
     } else {
       console.error("Google token client not ready.");
@@ -2275,7 +2301,7 @@ const App: React.FC = () => {
   }, []);
   
   const loadGalleryFromDrive = useCallback(async () => {
-      if (!gdriveToken) return;
+      if (!googleApiToken) return;
       setGalleryIsLoading(true);
 
       try {
@@ -2300,13 +2326,13 @@ const App: React.FC = () => {
           const fileDataPromises = files.map(async (file) => {
             try {
                 const mediaResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
-                    headers: { 'Authorization': `Bearer ${gdriveToken}` }
+                    headers: { 'Authorization': `Bearer ${googleApiToken}` }
                 });
                 if (!mediaResponse.ok) {
                     if (mediaResponse.status === 401 || mediaResponse.status === 403) {
-                       console.error('GDrive token expired during fetch. Resetting auth.');
-                       setGdriveToken(null);
-                       localStorage.removeItem(getUserKey('gdrive_token'));
+                       console.error('Google API token expired during fetch. Resetting auth.');
+                       setGoogleApiToken(null);
+                       localStorage.removeItem(getUserKey('google_api_token'));
                     }
                     throw new Error(`Failed to fetch file media for ${file.id}, status: ${mediaResponse.status}`);
                 }
@@ -2327,13 +2353,13 @@ const App: React.FC = () => {
       finally {
           setGalleryIsLoading(false);
       }
-  }, [gdriveToken, findOrCreateAppFolder, getUserKey]);
+  }, [googleApiToken, findOrCreateAppFolder, getUserKey]);
   
   useEffect(() => {
-      if (gdriveToken && isOnline) {
+      if (googleApiToken && isOnline) {
           loadGalleryFromDrive();
       }
-  }, [gdriveToken, loadGalleryFromDrive, isOnline]);
+  }, [googleApiToken, loadGalleryFromDrive, isOnline]);
   
   const uploadGalleryImageToDrive = useCallback(async (file: File): Promise<any> => {
       const parentFolderId = await findOrCreateAppFolder();
@@ -2355,11 +2381,11 @@ const App: React.FC = () => {
 
       const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${gdriveToken}` },
+          headers: { 'Authorization': `Bearer ${googleApiToken}` },
           body: form,
       });
       return response.json();
-  }, [gdriveToken, findOrCreateAppFolder]);
+  }, [googleApiToken, findOrCreateAppFolder]);
 
   const handleAddGalleryImages = async (files: File[]) => {
       setGalleryIsLoading(true);
@@ -2641,11 +2667,12 @@ const App: React.FC = () => {
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,
     setActiveTrack, setActiveSpotifyTrack,
-    gdriveToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
+    googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage,
     handleAddBackground, handleDeleteBackground,
     handleToggleFavoriteBackground, gapiReady,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
+    gcalSettings, onGCalSettingsChange: () => {}, userCalendars, calendarEvents
   };
 
   return (
