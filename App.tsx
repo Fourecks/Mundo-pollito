@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -246,6 +247,7 @@ interface AppComponentProps {
   handleAddProject: (name: string) => Promise<Project | null>;
   handleUpdateProject: (projectId: number, name: string) => Promise<void>;
   handleDeleteProject: (projectId: number) => Promise<void>;
+  handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
   handleAddPlaylist: (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   handleUpdatePlaylist: (playlist: Playlist) => Promise<void>;
   handleDeletePlaylist: (playlistId: number) => Promise<void>;
@@ -287,7 +289,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
-    handleAddProject, handleUpdateProject, handleDeleteProject,
+    handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
@@ -599,6 +601,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 onAddProject={handleAddProject}
                 onUpdateProject={handleUpdateProject}
                 onDeleteProject={handleDeleteProject}
+                onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
               />
             </ModalWindow>
           )}
@@ -659,7 +662,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       activeTrack, activeSpotifyTrack,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
-      handleAddProject, handleUpdateProject, handleDeleteProject,
+      handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
@@ -867,6 +870,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onAddProject={handleAddProject}
                             onUpdateProject={handleUpdateProject}
                             onDeleteProject={handleDeleteProject}
+                            onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
                         />
                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
@@ -2033,6 +2037,32 @@ const App: React.FC = () => {
       }
       await syncableDelete('projects', projectId);
   };
+  
+  const handleDeleteProjectAndTasks = async (projectId: number) => {
+    const tasksToDeleteIds: number[] = [];
+    const newAllTodos = { ...allTodos };
+    
+    Object.keys(newAllTodos).forEach(dateKey => {
+        newAllTodos[dateKey] = newAllTodos[dateKey].filter(todo => {
+            if (todo.project_id === projectId) {
+                tasksToDeleteIds.push(todo.id);
+                return false;
+            }
+            return true;
+        });
+        if (newAllTodos[dateKey].length === 0) {
+            delete newAllTodos[dateKey];
+        }
+    });
+
+    setAllTodos(newAllTodos);
+    setProjects(p => p.filter(project => project.id !== projectId));
+
+    if (tasksToDeleteIds.length > 0) {
+        await syncableDeleteMultiple('todos', tasksToDeleteIds);
+    }
+    await syncableDelete('projects', projectId);
+  };
 
   const handleAddPlaylist = useCallback(async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
     if (!user) return;
@@ -2568,7 +2598,7 @@ const App: React.FC = () => {
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos: () => setIsClearPastConfirmOpen(true),
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
-    handleAddProject, handleUpdateProject, handleDeleteProject,
+    handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,

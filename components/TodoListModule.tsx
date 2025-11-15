@@ -15,6 +15,7 @@ import PlusIcon from './icons/PlusIcon';
 import DotsVerticalIcon from './icons/DotsVerticalIcon';
 import ConfirmationModal from './ConfirmationModal';
 import ChevronDownIcon from './icons/ChevronDownIcon';
+import ConfirmationModalWithOptions from './ConfirmationModalWithOptions';
 
 interface TodoListModuleProps {
     allTodos: { [key: string]: Todo[] };
@@ -34,6 +35,7 @@ interface TodoListModuleProps {
     onAddProject: (name: string) => Promise<Project | null>;
     onUpdateProject: (projectId: number, name: string) => Promise<void>;
     onDeleteProject: (projectId: number) => Promise<void>;
+    onDeleteProjectAndTasks: (projectId: number) => Promise<void>;
 }
 
 const formatDateKey = (date: Date): string => {
@@ -63,6 +65,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     onAddProject,
     onUpdateProject,
     onDeleteProject,
+    onDeleteProjectAndTasks,
 }) => {
     // Common State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -131,12 +134,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
             setIsAddingProject(false);
         }
     };
-    const confirmDeleteProject = async () => {
-        if(projectToDelete) {
-            await onDeleteProject(projectToDelete.id);
-            setProjectToDelete(null);
-        }
-    }
     
     const handleSaveProjectName = () => {
         if (editingProject && editingProject.name.trim()) {
@@ -321,7 +318,30 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                 )}
             </div>
             
-            <ConfirmationModal isOpen={!!projectToDelete} onClose={() => setProjectToDelete(null)} onConfirm={confirmDeleteProject} title="Eliminar Proyecto" message={`¿Seguro que quieres eliminar "${projectToDelete?.name}"? Las tareas asociadas no se borrarán.`} />
+            <ConfirmationModalWithOptions
+                isOpen={!!projectToDelete}
+                onClose={() => setProjectToDelete(null)}
+                title={`Eliminar "${projectToDelete?.name}"`}
+                message="¿Qué quieres hacer con las tareas de este proyecto?"
+                options={[
+                    {
+                        label: 'Eliminar solo el proyecto',
+                        onClick: () => {
+                            if (projectToDelete) onDeleteProject(projectToDelete.id);
+                            setProjectToDelete(null);
+                        },
+                        style: 'default',
+                    },
+                    {
+                        label: 'Eliminar proyecto Y TAREAS',
+                        onClick: () => {
+                            if (projectToDelete) onDeleteProjectAndTasks(projectToDelete.id);
+                            setProjectToDelete(null);
+                        },
+                        style: 'danger',
+                    }
+                ]}
+            />
         </div>
     );
 };
