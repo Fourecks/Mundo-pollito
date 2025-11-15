@@ -27,6 +27,13 @@ const priorityMap: { [key in Priority]: { base: string; text: string; label: str
     high: { base: 'bg-red-500', text: 'text-white', label: 'Alta' },
 };
 
+const formatDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const Switch: React.FC<{ checked: boolean; onChange: (checked: boolean) => void; }> = ({ checked, onChange }) => (
     <div className="relative" onClick={() => onChange(!checked)}>
         <input type="checkbox" className="sr-only" checked={checked} readOnly />
@@ -77,7 +84,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     const [projectId, setProjectId] = useState<number | null>(null);
 
     // Main date
-    const [due_date, setDueDate] = useState('');
+    const [isUndated, setIsUndated] = useState(false);
+    const [due_date, setDueDate] = useState<string | null>('');
 
     // Toggles
     const [hasTime, setHasTime] = useState(false);
@@ -109,8 +117,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             setPriority(todo.priority || 'medium');
             setSubtasks(todo.subtasks || []);
             setCompleted(todo.completed || false);
-            setDueDate(todo.due_date || '');
+            setDueDate(todo.due_date || null);
             setProjectId(todo.project_id || null);
+            setIsUndated(!todo.due_date);
 
             // Set toggles based on existing data
             setHasTime(!!todo.start_time);
@@ -148,6 +157,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         }
         setActiveSubView('main');
     }, [todo]);
+
+    const handleToggleUndated = (enabled: boolean) => {
+        setIsUndated(enabled);
+        if (enabled) {
+            setDueDate(null);
+            setHasEndDate(false);
+        } else {
+            setDueDate(todo?.due_date || formatDateKey(new Date()));
+        }
+    };
     
     const handleToggleTime = (enabled: boolean) => {
         setHasTime(enabled);
@@ -193,21 +212,21 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         updatedTodoPayload.subtasks = subtasks;
         updatedTodoPayload.project_id = projectId;
 
-        updatedTodoPayload.due_date = due_date || undefined;
-        updatedTodoPayload.end_date = hasEndDate ? (end_date || undefined) : undefined;
-        updatedTodoPayload.start_time = hasTime ? (start_time || undefined) : undefined;
-        updatedTodoPayload.end_time = hasTime ? (end_time || undefined) : undefined;
+        updatedTodoPayload.due_date = due_date;
+        updatedTodoPayload.end_date = hasEndDate && !isUndated ? (end_date || undefined) : undefined;
+        updatedTodoPayload.start_time = hasTime && !isUndated ? (start_time || undefined) : undefined;
+        updatedTodoPayload.end_time = hasTime && !isUndated ? (end_time || undefined) : undefined;
         updatedTodoPayload.notes = hasNotes ? notes : undefined;
 
         const currentRecurrence = { ...recurrence };
         if (hasRecurrence && !currentRecurrence.id) {
             currentRecurrence.id = crypto.randomUUID();
         }
-        updatedTodoPayload.recurrence = hasRecurrence ? currentRecurrence : { frequency: 'none' };
+        updatedTodoPayload.recurrence = hasRecurrence && !isUndated ? currentRecurrence : { frequency: 'none' };
         
         let reminderChanged = false;
 
-        if (hasReminder) {
+        if (hasReminder && !isUndated) {
             if (reminderType === 'custom' && customReminderTime) {
                 const reminderDateStr = customReminderDate || due_date; // Fallback to task's due_date
                 if (reminderDateStr) {
@@ -260,7 +279,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     };
     
     const reminderSummary = useMemo(() => {
-        if (!hasReminder) return 'Nunca';
+        if (!hasReminder || isUndated) return 'Nunca';
 
         if (reminderType === 'custom') {
             if (customReminderTime) {
@@ -283,17 +302,17 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             case '1440': return '1 día antes';
             default: return 'Nunca';
         }
-    }, [hasReminder, reminderType, customReminderDate, customReminderTime]);
+    }, [hasReminder, reminderType, customReminderDate, customReminderTime, isUndated]);
 
     const recurrenceSummary = useMemo(() => {
-        if (!hasRecurrence) return 'Nunca';
+        if (!hasRecurrence || isUndated) return 'Nunca';
         switch(recurrence.frequency) {
             case 'daily': return 'Diariamente';
             case 'weekly': return 'Semanalmente';
             case 'custom': return 'Personalizado';
             default: return 'Nunca';
         }
-    }, [hasRecurrence, recurrence.frequency]);
+    }, [hasRecurrence, recurrence.frequency, isUndated]);
 
     if (!isOpen || !todo) return null;
 
@@ -303,15 +322,23 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
                 <div className="flex items-center justify-between">
                     <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><CalendarIcon className="h-4 w-4" /> Fecha</label>
-                    <div className="flex items-center gap-1">
-                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rango</span>
-                        <Switch checked={hasEndDate} onChange={setHasEndDate} />
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Sin fecha</span>
+                        <Switch checked={isUndated} onChange={handleToggleUndated} />
                     </div>
                 </div>
-                <div className="flex items-center gap-2 mt-2">
-                    <input type="date" id="due-date" value={due_date} onChange={e => setDueDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>
-                    {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
-                    {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm"/>}
+                <div className={`mt-2 transition-opacity duration-300 ${isUndated ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="flex items-center justify-end">
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rango</span>
+                            <Switch checked={hasEndDate} onChange={setHasEndDate} />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                        <input type="date" id="due-date" value={due_date || ''} onChange={e => setDueDate(e.target.value)} disabled={isUndated} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm disabled:bg-gray-100 dark:disabled:bg-gray-600"/>
+                        {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
+                        {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} disabled={isUndated} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm disabled:bg-gray-100 dark:disabled:bg-gray-600"/>}
+                    </div>
                 </div>
             </div>
 
@@ -337,24 +364,25 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Conditional Settings */}
-            <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                        <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
-                        <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                    </div>
+            <div className={`${isUndated ? 'opacity-50 pointer-events-none' : ''}`}>
+                <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
-                        <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
-                        <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                    </div>
-                    </div>
-            </SettingRow>
+                            <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
+                            <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
+                        </div>
+                            <div>
+                            <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
+                            <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
+                        </div>
+                        </div>
+                </SettingRow>
 
-            <NavSettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" value={reminderSummary} onClick={() => setActiveSubView('reminder')} />
+                <NavSettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" value={reminderSummary} onClick={() => setActiveSubView('reminder')} />
+                <NavSettingRow icon={<RefreshIcon className="h-4 w-4"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
+            </div>
             
             <SettingRow icon={<NotesIcon />} label="Añadir notas" enabled={hasNotes} onToggle={handleToggleNotes}><div/></SettingRow>
-
-            <NavSettingRow icon={<RefreshIcon className="h-4 w-4"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
             
             <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Estado</span>

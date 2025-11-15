@@ -32,7 +32,7 @@ export interface Todo {
   text: string;
   completed: boolean;
   priority: Priority;
-  due_date?: string; // Represents the start date of the task
+  due_date?: string | null; // Represents the start date of the task
   end_date?: string; // Represents the end date for a multi-day task
   start_time?: string; // e.g., "14:00"
   end_time?: string;   // e.g., "15:30"

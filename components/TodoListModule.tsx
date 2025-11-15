@@ -88,7 +88,16 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     const menuRef = useRef<HTMLDivElement>(null);
     
     // Memoized calculations
-    const todosForSelectedDate = useMemo(() => (allTodos && allTodos[formatDateKey(selectedDate)]) || [], [allTodos, selectedDate]);
+    const todosForSelectedDate = useMemo(() => {
+        const dateKey = formatDateKey(selectedDate);
+        const todayKey = formatDateKey(new Date());
+        
+        const dailyTodos = (allTodos && allTodos[dateKey]) || [];
+        // Only include undated tasks if we are looking at today's date
+        const undatedTodos = (allTodos && dateKey === todayKey && allTodos['undated']) ? allTodos['undated'] : [];
+        
+        return [...dailyTodos, ...undatedTodos];
+    }, [allTodos, selectedDate]);
     const allTasksFlat = useMemo(() => Object.values(allTodos || {}).flat(), [allTodos]);
 
     const projectsWithProgress = useMemo(() => {

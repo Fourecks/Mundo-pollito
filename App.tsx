@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1414,11 +1415,19 @@ const App: React.FC = () => {
     ]);
 
     const todosByDate: { [key: string]: Todo[] } = {};
+    const undatedTodos: Todo[] = [];
     cachedTodos.forEach(todo => {
-        const dateKey = todo.due_date ? todo.due_date : formatDateKey(new Date(todo.created_at!));
-        if (!todosByDate[dateKey]) todosByDate[dateKey] = [];
-        todosByDate[dateKey].push(todo);
+        if (todo.due_date) {
+            const dateKey = todo.due_date;
+            if (!todosByDate[dateKey]) todosByDate[dateKey] = [];
+            todosByDate[dateKey].push(todo);
+        } else {
+            undatedTodos.push(todo);
+        }
     });
+    if (undatedTodos.length > 0) {
+        todosByDate['undated'] = undatedTodos;
+    }
     setAllTodos(todosByDate);
     setFolders(cachedFolders);
     setNotes(cachedNotes);
@@ -1479,11 +1488,19 @@ const App: React.FC = () => {
         }
         
         const networkTodosByDate: { [key: string]: Todo[] } = {};
+        const networkUndatedTodos: Todo[] = [];
         recentTodosData.forEach(todo => {
-            const dateKey = todo.due_date ? todo.due_date : formatDateKey(new Date(todo.created_at));
-            if (!networkTodosByDate[dateKey]) networkTodosByDate[dateKey] = [];
-            networkTodosByDate[dateKey].push(todo);
+            if (todo.due_date) {
+                const dateKey = todo.due_date;
+                if (!networkTodosByDate[dateKey]) networkTodosByDate[dateKey] = [];
+                networkTodosByDate[dateKey].push(todo);
+            } else {
+                networkUndatedTodos.push(todo);
+            }
         });
+        if (networkUndatedTodos.length > 0) {
+            networkTodosByDate['undated'] = networkUndatedTodos;
+        }
         setAllTodos(networkTodosByDate);
         await clearAndPutAll('todos', recentTodosData);
       }
@@ -1702,29 +1719,39 @@ const App: React.FC = () => {
   }, [user, dataLoaded]);
 
   const getUpdatedTodosState = (current: { [key: string]: Todo[] }, todoToUpdate: Todo): { [key: string]: Todo[] } => {
-      const newAllTodos = JSON.parse(JSON.stringify(current));
-      
-      // Find and remove the original task
-      for (const key in newAllTodos) {
-          const index = newAllTodos[key].findIndex(t => t.id === todoToUpdate.id);
-          if (index !== -1) {
-              newAllTodos[key].splice(index, 1);
-              if (newAllTodos[key].length === 0) {
-                  delete newAllTodos[key];
-              }
-              break;
-          }
-      }
+    const newAllTodos = JSON.parse(JSON.stringify(current));
+    
+    // Find and remove the original task
+    let foundAndRemoved = false;
+    for (const key in newAllTodos) {
+        const index = newAllTodos[key].findIndex(t => t.id === todoToUpdate.id);
+        if (index !== -1) {
+            newAllTodos[key].splice(index, 1);
+            // Don't delete the key if it's 'undated', even if it becomes empty
+            if (newAllTodos[key].length === 0 && key !== 'undated') {
+                delete newAllTodos[key];
+            }
+            foundAndRemoved = true;
+            break;
+        }
+    }
 
-      // Add the updated task to the correct date key
-      const newDateKey = todoToUpdate.due_date || formatDateKey(new Date(todoToUpdate.created_at!));
-      if (!newAllTodos[newDateKey]) {
-          newAllTodos[newDateKey] = [];
-      }
-      newAllTodos[newDateKey].push(todoToUpdate);
-      
-      return newAllTodos;
-  }
+    // Add the updated task to the correct new location
+    if (todoToUpdate.due_date) {
+        const newDateKey = todoToUpdate.due_date;
+        if (!newAllTodos[newDateKey]) {
+            newAllTodos[newDateKey] = [];
+        }
+        newAllTodos[newDateKey].push(todoToUpdate);
+    } else {
+        if (!newAllTodos.undated) {
+            newAllTodos.undated = [];
+        }
+        newAllTodos.undated.push(todoToUpdate);
+    }
+    
+    return newAllTodos;
+}
 
   const findTodoById = (id: number): Todo | null => {
     for (const key in allTodos) {
@@ -1815,7 +1842,7 @@ const App: React.FC = () => {
     await syncableUpdate('todos', updatedTodo);
     
     const dateKeyForCompletionCheck = updatedTodo.due_date || originalDateKey;
-    if (newCompletedState && nextState[dateKeyForCompletionCheck]?.every(t => t.completed)) {
+    if (newCompletedState && dateKeyForCompletionCheck !== 'undated' && nextState[dateKeyForCompletionCheck]?.every(t => t.completed)) {
         triggerConfetti();
         onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
     }
@@ -1837,7 +1864,7 @@ const App: React.FC = () => {
       await syncableUpdate('todos', updatedTodo);
 
       const dateKeyForCompletionCheck = updatedTodo.due_date || originalDateKey;
-      if (parentCompleted && nextState[dateKeyForCompletionCheck]?.every(t => t.completed)) {
+      if (parentCompleted && dateKeyForCompletionCheck !== 'undated' && nextState[dateKeyForCompletionCheck]?.every(t => t.completed)) {
           triggerConfetti();
           onAllCompleted(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
       }
@@ -1860,16 +1887,16 @@ const App: React.FC = () => {
   };
 
   const handleDeleteThisOccurrence = async (id: number) => {
-    let dateKeyToDeleteFrom: string | null = null;
-    for(const key in allTodos) { if(allTodos[key].some(t => t.id === id)) { dateKeyToDeleteFrom = key; break; } }
+    let keyToDeleteFrom: string | null = null;
+    for(const key in allTodos) { if(allTodos[key].some(t => t.id === id)) { keyToDeleteFrom = key; break; } }
     
-    if (dateKeyToDeleteFrom) {
+    if (keyToDeleteFrom) {
         setAllTodos(current => {
-            const newDateTodos = current[dateKeyToDeleteFrom!].filter(t => t.id !== id);
-            if(newDateTodos.length > 0) {
-                return { ...current, [dateKeyToDeleteFrom!]: newDateTodos };
+            const newKeyTodos = current[keyToDeleteFrom!].filter(t => t.id !== id);
+            if(newKeyTodos.length > 0 || keyToDeleteFrom === 'undated') {
+                return { ...current, [keyToDeleteFrom!]: newKeyTodos };
             } else {
-                const { [dateKeyToDeleteFrom!]: _, ...rest } = current;
+                const { [keyToDeleteFrom!]: _, ...rest } = current;
                 return rest;
             }
         });
@@ -1917,6 +1944,7 @@ const App: React.FC = () => {
     const newAllTodos = { ...allTodos };
 
     for (const dateKey in newAllTodos) {
+        if (dateKey === 'undated') continue;
         // Use a UTC-based date to avoid timezone shifts from the date string.
         const date = new Date(dateKey + 'T00:00:00Z');
         if (date < today) {
