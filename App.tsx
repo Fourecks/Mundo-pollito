@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -19,7 +16,6 @@ import FloatingPlayer from './components/FloatingPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
-// FIX: Import 'clearAndPutAll' function to resolve multiple 'Cannot find name' errors when syncing data.
 import { initDB, getAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue, syncableDeleteMultiple, clearAndPutAll } from './db';
 import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
@@ -261,9 +257,9 @@ interface AppComponentProps {
   setBrowserSession: React.Dispatch<React.SetStateAction<BrowserSession>>;
   setSelectedDate: React.Dispatch<React.SetStateAction<Date>>;
   setPomodoroState: React.Dispatch<React.SetStateAction<any>>;
-  setActiveBackground: React.Dispatch<React.SetStateAction<Background | null>>;
-  setParticleType: React.Dispatch<React.SetStateAction<ParticleType>>;
-  setAmbientSound: React.Dispatch<React.SetStateAction<{ type: AmbientSoundType; volume: number }>>;
+  setActiveBackground: (background: Background | null) => void;
+  setParticleType: (type: ParticleType) => void;
+  setAmbientSound: (sound: { type: AmbientSoundType; volume: number }) => void;
   onSetDailyEncouragement: (localHour: number | null) => void;
   setActiveTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
   setActiveSpotifyTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
@@ -1166,7 +1162,6 @@ const App: React.FC = () => {
   const [isClearPastConfirmOpen, setIsClearPastConfirmOpen] = useState(false);
   const [quickCaptureMessage, setQuickCaptureMessage] = useState<string | null>(null);
 
-  const [activeBackground, setActiveBackground] = useState<Background | null>(null);
   const [dailyEncouragementLocalHour, setDailyEncouragementLocalHour] = useState<number | null>(null);
   const [pomodoroState, setPomodoroState] = useState({
       timeLeft: 25 * 60,
@@ -1345,7 +1340,6 @@ const App: React.FC = () => {
             setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
             setProjects([]);
             setGalleryImages([]); setUserBackgrounds([]);
-            setActiveBackground(null);
             setGoogleApiToken(null);
         }
     });
@@ -1487,7 +1481,14 @@ const App: React.FC = () => {
             setGcalSettings(profileData.gcal_settings as GCalSettings);
         }
         if(profileData.ui_settings) {
-            setUiSettings(profileData.ui_settings as any);
+            const settings = profileData.ui_settings as any;
+            // Ensure settings object has all required keys to prevent crashes
+            setUiSettings({
+                themeColors: settings.themeColors || DEFAULT_COLORS,
+                activeBackgroundId: settings.activeBackgroundId || null,
+                particleType: settings.particleType || 'none',
+                ambientSound: settings.ambientSound || { type: 'none', volume: 0.5 },
+            });
         } else {
              setUiSettings({
                 themeColors: DEFAULT_COLORS,
@@ -2392,15 +2393,11 @@ const App: React.FC = () => {
     }
   }, [user, isOnline, loadBackgroundsFromSupabase]);
   
-  // New robust effect to set active background
-  useEffect(() => {
-    // Wait until we have the saved ID and the list of backgrounds
-    if (uiSettings?.activeBackgroundId && userBackgrounds.length > 0) {
-        const bgToActivate = userBackgrounds.find(bg => bg.id === uiSettings.activeBackgroundId);
-        setActiveBackground(bgToActivate || null);
-    } else {
-        setActiveBackground(null);
+  const activeBackground = useMemo(() => {
+    if (!uiSettings?.activeBackgroundId || userBackgrounds.length === 0) {
+        return null;
     }
+    return userBackgrounds.find(bg => bg.id === uiSettings.activeBackgroundId) || null;
   }, [uiSettings?.activeBackgroundId, userBackgrounds]);
 
 
