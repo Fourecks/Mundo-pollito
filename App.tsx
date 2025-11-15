@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -17,7 +19,8 @@ import FloatingPlayer from './components/FloatingPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
-import { initDB, getAll, clearAndPutAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue, syncableDeleteMultiple } from './db';
+// FIX: Import 'clearAndPutAll' function to resolve multiple 'Cannot find name' errors when syncing data.
+import { initDB, getAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue, syncableDeleteMultiple, clearAndPutAll } from './db';
 import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
 import Browser from './components/Browser';
@@ -570,8 +573,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setParticleType={setParticleType}
         ambientSound={ambientSound}
         setAmbientSound={setAmbientSound}
-        dailyEncouragementHour={dailyEncouragementLocalHour}
-        onSetDailyEncouragement={onSetDailyEncouragement}
       />
       
       <IntegrationsPanel
@@ -708,7 +709,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isIntegrationsPanelOpen, setIsIntegrationsPanelOpen] = useState(false);
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     const [isQuickCaptureSetupOpen, setIsQuickCaptureSetupOpen] = useState(false);
-    const [isDailyDoseSettingsOpen, setIsDailyDoseSettingsOpen] = useState(false);
     const [viewingProjectId, setViewingProjectId] = useState<number | null>(null);
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
@@ -944,31 +944,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                         <ChevronRightIcon />
                                     </button>
                                     
-                                    <div className="p-4">
-                                        <button onClick={() => setIsDailyDoseSettingsOpen(s => !s)} className="w-full flex justify-between items-center text-left">
-                                            <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Dosis de Ánimo</h3>
-                                            <ChevronRightIcon className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isDailyDoseSettingsOpen ? 'rotate-90' : ''}`} />
-                                        </button>
-                                        {isDailyDoseSettingsOpen && (
-                                            <div className="mt-3 animate-pop-in">
-                                                <select 
-                                                    value={dailyEncouragementLocalHour === null ? 'none' : dailyEncouragementLocalHour} 
-                                                    onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
-                                                    className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
-                                                >
-                                                    <option value="none">Desactivado</option>
-                                                    {Array.from({length: 24}, (_, i) => i).map(hour => {
-                                                        const displayDate = new Date();
-                                                        displayDate.setHours(hour, 0, 0);
-                                                        return <option key={hour} value={hour}>
-                                                            {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
-                                                        </option>
-                                                    })}
-                                                </select>
-                                            </div>
-                                        )}
-                                    </div>
-                                    
                                     <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5" disabled={isPermissionBlocked}>
                                         <h3 className={`font-bold text-lg transition-colors ${ isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary' }`}>
                                             Notificaciones
@@ -1057,6 +1032,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={setParticleType}
               ambientSound={ambientSound}
               setAmbientSound={setAmbientSound}
+              dailyEncouragementHour={dailyEncouragementLocalHour}
+              onSetDailyEncouragement={onSetDailyEncouragement}
             />
             <IntegrationsPanel
                 isOpen={isIntegrationsPanelOpen}
@@ -1157,9 +1134,14 @@ const adjustBrightness = (hex: string, percent: number) => {
 const App: React.FC = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [uiSettings, setUiSettings] = useState<{
+      themeColors: ThemeColors;
+      activeBackgroundId: string | null;
+      particleType: ParticleType;
+      ambientSound: { type: AmbientSoundType; volume: number };
+  } | null>(null);
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [themeColors, setThemeColors] = useState<ThemeColors>(DEFAULT_COLORS);
   const isMobile = useMediaQuery('(max-width: 767px)');
   
   const settingsSaveTimeout = useRef<number | null>(null);
@@ -1184,11 +1166,7 @@ const App: React.FC = () => {
   const [isClearPastConfirmOpen, setIsClearPastConfirmOpen] = useState(false);
   const [quickCaptureMessage, setQuickCaptureMessage] = useState<string | null>(null);
 
-
   const [activeBackground, setActiveBackground] = useState<Background | null>(null);
-  const [savedActiveBgId, setSavedActiveBgId] = useState<string | null>(null);
-  const [particleType, setParticleType] = useState<ParticleType>('none');
-  const [ambientSound, setAmbientSound] = useState<{ type: AmbientSoundType; volume: number }>({ type: 'none', volume: 0.5 });
   const [dailyEncouragementLocalHour, setDailyEncouragementLocalHour] = useState<number | null>(null);
   const [pomodoroState, setPomodoroState] = useState({
       timeLeft: 25 * 60,
@@ -1329,26 +1307,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleThemeColorChange = useCallback((colorName: keyof ThemeColors, value: string) => {
-    setThemeColors(prev => {
-        const newColors = { ...prev, [colorName]: value };
-        applyThemeColors(newColors);
-        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-        settingsSaveTimeout.current = window.setTimeout(() => {
-          if (user && dataLoaded) {
-              set('settings', { key: 'themeColors', value: newColors });
-          }
-        }, 500);
-        return newColors;
-    });
-  }, [applyThemeColors, user, dataLoaded]);
-
-  const handleResetThemeColors = useCallback(() => {
-    setThemeColors(DEFAULT_COLORS);
-    applyThemeColors(DEFAULT_COLORS);
-    if(user && dataLoaded) set('settings', { key: 'themeColors', value: DEFAULT_COLORS });
-  }, [applyThemeColors, user, dataLoaded]);
-  
   // Initialize theme on load
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -1361,17 +1319,13 @@ const App: React.FC = () => {
     } else {
         document.documentElement.classList.remove('dark');
     }
-
-    if (user) {
-        get<{key: string, value: ThemeColors}>('settings', 'themeColors').then(savedColors => {
-            const initialColors = savedColors ? savedColors.value : DEFAULT_COLORS;
-            setThemeColors(initialColors);
-            applyThemeColors(initialColors);
-        });
+    
+    if (uiSettings) {
+        applyThemeColors(uiSettings.themeColors);
     } else {
         applyThemeColors(DEFAULT_COLORS);
     }
-}, [user, applyThemeColors]);
+  }, [uiSettings, applyThemeColors]);
 
   // --- Auth & Data Loading ---
   useEffect(() => {
@@ -1386,11 +1340,12 @@ const App: React.FC = () => {
         setUser(session?.user ?? null);
         if(!session) { // If logged out
             setDataLoaded(false);
+            setUiSettings(null);
             // Reset all state
             setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
             setProjects([]);
             setGalleryImages([]); setUserBackgrounds([]);
-            setActiveBackground(null); setSavedActiveBgId(null);
+            setActiveBackground(null);
             setGoogleApiToken(null);
         }
     });
@@ -1423,13 +1378,12 @@ const App: React.FC = () => {
     if (!user) return;
     
     // Load from cache first for instant UI
-    const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedSettings, cachedProjects] = await Promise.all([
+    const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedProjects] = await Promise.all([
         getAll<Todo>('todos'),
         getAll<Folder>('folders'),
         getAll<Note>('notes'),
         getAll<Playlist>('playlists'),
         getAll<QuickNote>('quick_notes'),
-        getAll<{key: string, value: any}>('settings'),
         getAll<Project>('projects'),
     ]);
 
@@ -1453,12 +1407,6 @@ const App: React.FC = () => {
     setPlaylists(cachedPlaylists);
     setQuickNotes(cachedQuickNotes);
     setProjects(cachedProjects);
-
-    cachedSettings.forEach(s => {
-        if (s.key === 'pomodoroState') setPomodoroState(p => ({...p, ...s.value, isActive: false, endTime: null}));
-        if (s.key === 'particleType') setParticleType(s.value);
-        if (s.key === 'ambientSound') setAmbientSound(s.value);
-    });
     
     setDataLoaded(true);
 
@@ -1480,7 +1428,7 @@ const App: React.FC = () => {
         supabase.from('playlists').select('*').order('created_at'),
         supabase.from('quick_notes').select('*').order('created_at'),
         supabase.from('projects').select('*').order('name'),
-        supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings, gcal_settings').eq('id', user.id).single(),
+        supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings, gcal_settings, ui_settings').eq('id', user.id).single(),
       ]);
       
       if (todosData) {
@@ -1538,22 +1486,26 @@ const App: React.FC = () => {
         if(profileData.gcal_settings) {
             setGcalSettings(profileData.gcal_settings as GCalSettings);
         }
+        if(profileData.ui_settings) {
+            setUiSettings(profileData.ui_settings as any);
+        } else {
+             setUiSettings({
+                themeColors: DEFAULT_COLORS,
+                activeBackgroundId: null,
+                particleType: 'none',
+                ambientSound: { type: 'none', volume: 0.5 }
+             });
+        }
       }
       setIsSyncing(false);
     }
     
     try {
-        const [ storedActiveBgId, storedParticles, storedAmbience, storedBrowser, storedActiveTrack, storedSpotifyTrack] = await Promise.all([
-            get<{key: string, value: string}>('settings', 'activeBackgroundId'),
-            get<{key: string, value: ParticleType}>('settings', 'particleType'),
-            get<{key: string, value: any}>('settings', 'ambientSound'),
+        const [storedBrowser, storedActiveTrack, storedSpotifyTrack] = await Promise.all([
             get<{key: string, value: BrowserSession}>('settings', getUserKey('browserSession')),
             get<{key: string, value: Playlist}>('settings', getUserKey('activeTrack')),
             get<{key: string, value: Playlist}>('settings', getUserKey('activeSpotifyTrack')),
         ]);
-        if (storedActiveBgId) setSavedActiveBgId(storedActiveBgId.value);
-        if (storedParticles) setParticleType(storedParticles.value);
-        if (storedAmbience) setAmbientSound(storedAmbience.value);
         if (storedBrowser) setBrowserSession(storedBrowser.value);
         if(storedActiveTrack) setActiveTrack(storedActiveTrack.value);
         if(storedSpotifyTrack) setActiveSpotifyTrack(storedSpotifyTrack.value);
@@ -1585,7 +1537,7 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.removeEventListener('offline', handleOffline);
 
     const startup = async () => {
       await initDB(user.email!);
@@ -1616,8 +1568,8 @@ const App: React.FC = () => {
     }
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
     };
   }, [user, dataLoaded, loadData]);
 
@@ -1628,15 +1580,23 @@ const App: React.FC = () => {
       settingsSaveTimeout.current = window.setTimeout(async () => {
         const { durations, showBackgroundTimer, backgroundTimerOpacity } = pomodoroState;
         const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity };
-        await set('settings', { key: 'pomodoroState', value: settingsToSave });
         if(isOnline) await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
       }, 1500);
     }
     return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
   }, [pomodoroState, user, dataLoaded, isOnline]);
+  
+  useEffect(() => {
+    if (user && dataLoaded && uiSettings) {
+      if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+      settingsSaveTimeout.current = window.setTimeout(async () => {
+        if(isOnline) await supabase.from('profiles').update({ ui_settings: uiSettings }).eq('id', user.id);
+      }, 1000);
+    }
+    return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
+  }, [uiSettings, user, dataLoaded, isOnline]);
 
-  useEffect(() => { if (user && dataLoaded) set('settings', { key: 'particleType', value: particleType }); }, [particleType, user, dataLoaded]);
-  useEffect(() => { if (user && dataLoaded) set('settings', { key: 'ambientSound', value: ambientSound }); }, [ambientSound, user, dataLoaded]);
+
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('browserSession'), value: browserSession }); }, [browserSession, getUserKey, user, dataLoaded]);
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeTrack'), value: activeTrack }); }, [activeTrack, getUserKey, user, dataLoaded]);
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeSpotifyTrack'), value: activeSpotifyTrack }); }, [activeSpotifyTrack, getUserKey, user, dataLoaded]);
@@ -2435,17 +2395,13 @@ const App: React.FC = () => {
   // New robust effect to set active background
   useEffect(() => {
     // Wait until we have the saved ID and the list of backgrounds
-    if (savedActiveBgId && userBackgrounds.length > 0) {
-        const bgToActivate = userBackgrounds.find(bg => bg.id === savedActiveBgId);
-        if (bgToActivate) {
-            setActiveBackground(bgToActivate);
-        } else {
-            // The saved ID might be for a deleted background, so reset.
-            set('settings', { key: 'activeBackgroundId', value: null });
-            setActiveBackground(null);
-        }
+    if (uiSettings?.activeBackgroundId && userBackgrounds.length > 0) {
+        const bgToActivate = userBackgrounds.find(bg => bg.id === uiSettings.activeBackgroundId);
+        setActiveBackground(bgToActivate || null);
+    } else {
+        setActiveBackground(null);
     }
-  }, [savedActiveBgId, userBackgrounds]);
+  }, [uiSettings?.activeBackgroundId, userBackgrounds]);
 
 
   const handleAddBackground = async (file: File) => {
@@ -2513,7 +2469,9 @@ const App: React.FC = () => {
         if (dbError) throw dbError;
         
         setUserBackgrounds(bgs => bgs.filter(bg => bg.id !== id));
-        if (activeBackground?.id === id) setActiveBackground(null);
+        if (activeBackground?.id === id) {
+             setUiSettings(s => s ? { ...s, activeBackgroundId: null } : null);
+        }
 
     } catch (error) {
         console.error("Error deleting background:", error);
@@ -2547,12 +2505,26 @@ const App: React.FC = () => {
     }
   };
   
-  // Active Background Persistence
-  useEffect(() => {
-    if (user && dataLoaded) {
-        set('settings', { key: 'activeBackgroundId', value: activeBackground ? activeBackground.id : null });
-    }
-  }, [activeBackground, user, dataLoaded]);
+  // --- UI Settings Handlers ---
+  const handleThemeColorChange = useCallback((colorName: keyof ThemeColors, value: string) => {
+    setUiSettings(prev => prev ? { ...prev, themeColors: { ...prev.themeColors, [colorName]: value } } : null);
+  }, []);
+
+  const handleResetThemeColors = useCallback(() => {
+    setUiSettings(prev => prev ? { ...prev, themeColors: DEFAULT_COLORS } : null);
+  }, []);
+  
+  const handleSelectBackground = (background: Background | null) => {
+    setUiSettings(prev => prev ? { ...prev, activeBackgroundId: background ? background.id : null } : null);
+  };
+  
+  const handleParticleChange = (type: ParticleType) => {
+    setUiSettings(prev => prev ? { ...prev, particleType: type } : null);
+  };
+  
+  const handleAmbientSoundChange = (value: { type: AmbientSoundType; volume: number; }) => {
+    setUiSettings(prev => prev ? { ...prev, ambientSound: value } : null);
+  }
 
   // --- OneSignal / Notifications ---
   useEffect(() => {
@@ -2634,7 +2606,7 @@ const App: React.FC = () => {
     await syncableUpdate('profiles', { id: user.id, gcal_settings: settings });
   };
   
-  if (authLoading || (user && !dataLoaded)) {
+  if (authLoading || (user && !dataLoaded) || (user && !uiSettings)) {
     return (
         <div className="min-h-screen bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 flex flex-col items-center justify-center text-center">
             <div className="relative w-40 h-32">
@@ -2657,16 +2629,17 @@ const App: React.FC = () => {
   }
   
   const appProps: AppComponentProps = {
-    isOnline, isSyncing, currentUser: user, onLogout: handleLogout, theme, toggleTheme, themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
+    isOnline, isSyncing, currentUser: user, onLogout: handleLogout, 
+    theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders: foldersWithNotes, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
+    pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, dailyEncouragementLocalHour,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos: () => setIsClearPastConfirmOpen(true),
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement: handleSetDailyEncouragement,
+    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground: handleSelectBackground, setParticleType: handleParticleChange, setAmbientSound: handleAmbientSoundChange, onSetDailyEncouragement: handleSetDailyEncouragement,
     setActiveTrack, setActiveSpotifyTrack,
     googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage,
