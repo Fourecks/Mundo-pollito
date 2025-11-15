@@ -319,6 +319,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [isIntegrationsPanelOpen, setIsIntegrationsPanelOpen] = useState(false);
   const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
   const pomodoroStartedRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (videoElement && activeBackground?.type === 'video') {
+        videoElement.play().catch(error => {
+            console.warn("Video autoplay prevented on desktop:", error);
+        });
+    }
+  }, [activeBackground]);
 
   const getUserKey = useCallback((key: string) => `${currentUser.email}_${key}`, [currentUser]);
   
@@ -459,7 +469,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     <div className="h-screen w-screen text-gray-800 dark:text-gray-100 font-sans overflow-hidden">
         {activeBackground ? (
             activeBackground.type === 'video' ? (
-                <video key={activeBackground.id} src={activeBackground.url} autoPlay loop muted playsInline className="absolute top-0 left-0 w-full h-full object-cover -z-30"/>
+                <video ref={videoRef} key={activeBackground.id} src={activeBackground.url} autoPlay loop muted playsInline className="absolute top-0 left-0 w-full h-full object-cover -z-30"/>
             ) : (
                 <div key={activeBackground.id} className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-30" style={{ backgroundImage: `url(${activeBackground.url})` }}/>
             )
@@ -699,6 +709,16 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [viewingProjectId, setViewingProjectId] = useState<number | null>(null);
     
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        const videoElement = videoRef.current;
+        if (videoElement && activeBackground?.type === 'video') {
+            videoElement.play().catch(error => {
+                console.warn("Video autoplay prevented on mobile:", error);
+            });
+        }
+    }, [activeBackground]);
 
     const handleShowCompletionModal = (quote: string) => {
         setCompletionQuote(quote);
@@ -933,7 +953,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         <div className="h-[100dvh] w-screen text-gray-800 dark:text-gray-100 font-sans flex flex-col">
             {activeBackground ? (
                 activeBackground.type === 'video' ? (
-                    <video key={activeBackground.id} src={activeBackground.url} autoPlay loop muted playsInline className="absolute top-0 left-0 w-full h-full object-cover -z-30"/>
+                    <video ref={videoRef} key={activeBackground.id} src={activeBackground.url} autoPlay loop muted playsInline className="absolute top-0 left-0 w-full h-full object-cover -z-30"/>
                 ) : (
                     <div key={activeBackground.id} className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-30" style={{ backgroundImage: `url(${activeBackground.url})` }}/>
                 )
@@ -2385,6 +2405,17 @@ const App: React.FC = () => {
     }
     return userBackgrounds.find(bg => bg.id === uiSettings.activeBackgroundId) || null;
   }, [uiSettings?.activeBackgroundId, userBackgrounds]);
+
+  useEffect(() => {
+    if (activeBackground) {
+        document.body.classList.add('has-custom-background');
+    } else {
+        document.body.classList.remove('has-custom-background');
+    }
+    return () => { // Cleanup on unmount
+        document.body.classList.remove('has-custom-background');
+    };
+  }, [activeBackground]);
 
 
   const handleAddBackground = async (file: File) => {
