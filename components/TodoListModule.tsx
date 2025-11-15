@@ -80,13 +80,16 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     const [isAddingProject, setIsAddingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+    const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
+    const [editingProject, setEditingProject] = useState<{ id: number; name: string } | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
     
     // Memoized calculations
-    const todosForSelectedDate = useMemo(() => allTodos[formatDateKey(selectedDate)] || [], [allTodos, selectedDate]);
-    const allTasksFlat = useMemo(() => Object.values(allTodos).flat(), [allTodos]);
+    const todosForSelectedDate = useMemo(() => (allTodos && allTodos[formatDateKey(selectedDate)]) || [], [allTodos, selectedDate]);
+    const allTasksFlat = useMemo(() => Object.values(allTodos || {}).flat(), [allTodos]);
 
     const projectsWithProgress = useMemo(() => {
-        return projects.map(project => {
+        return (projects || []).map(project => {
             const projectTasks = allTasksFlat.filter(t => t.project_id === project.id);
             const completedTasks = projectTasks.filter(t => t.completed).length;
             return { ...project, total: projectTasks.length, completed: completedTasks };
@@ -134,6 +137,24 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
             setProjectToDelete(null);
         }
     }
+    
+    const handleSaveProjectName = () => {
+        if (editingProject && editingProject.name.trim()) {
+            onUpdateProject(editingProject.id, editingProject.name.trim());
+        }
+        setEditingProject(null);
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setMenuOpenFor(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
 
     const CircularProgressWithChicken = ({ percentage }: { percentage: number }) => {
         const radius = 45;
@@ -191,13 +212,50 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                         {projectsWithProgress.map(project => {
                             const percentage = project.total > 0 ? (project.completed / project.total) * 100 : 0;
                             return (
-                                <button key={project.id} onClick={() => setViewingProject(project)} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-4 text-center shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between gap-2">
-                                    <CircularProgressWithChicken percentage={percentage} />
-                                    <div className="w-full">
-                                        <h3 className="font-bold text-base text-gray-800 dark:text-gray-200 truncate">{project.name}</h3>
-                                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{project.completed} / {project.total} completadas</p>
+                                <div key={project.id} className="relative group bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between gap-2">
+                                    <div className="absolute top-2 right-2 z-10">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setMenuOpenFor(project.id);
+                                            }}
+                                            className="p-1.5 rounded-full text-gray-500 hover:bg-black/10 dark:hover:bg-white/10 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                                            aria-label={`Opciones para ${project.name}`}
+                                        >
+                                            <DotsVerticalIcon />
+                                        </button>
+                                        {menuOpenFor === project.id && (
+                                            <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl z-20 animate-pop-in origin-top-right p-1">
+                                                <button onClick={() => { setEditingProject({ id: project.id, name: project.name }); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
+                                                    Renombrar
+                                                </button>
+                                                <button onClick={() => { setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">
+                                                    Eliminar
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-                                </button>
+                                    <button onClick={() => !editingProject && setViewingProject(project)} className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
+                                        <CircularProgressWithChicken percentage={percentage} />
+                                        <div className="w-full">
+                                            {editingProject?.id === project.id ? (
+                                                <input
+                                                    type="text"
+                                                    value={editingProject.name}
+                                                    onChange={(e) => setEditingProject(p => p ? { ...p, name: e.target.value } : null)}
+                                                    onBlur={handleSaveProjectName}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveProjectName(); }}
+                                                    className="w-full bg-white dark:bg-gray-700 text-base p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-center font-bold"
+                                                    autoFocus
+                                                    onClick={e => e.stopPropagation()}
+                                                />
+                                            ) : (
+                                                <h3 className="font-bold text-base text-gray-800 dark:text-gray-200 truncate">{project.name}</h3>
+                                            )}
+                                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{project.completed} / {project.total} completadas</p>
+                                        </div>
+                                    </button>
+                                </div>
                             );
                         })}
                         <div className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-secondary-light dark:border-gray-600 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 aspect-square">
