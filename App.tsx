@@ -48,6 +48,7 @@ import QuickCaptureSetupModal from './components/QuickCaptureSetupModal';
 import MotivationalToast from './components/MotivationalToast';
 import IntegrationsPanel from './components/IntegrationsPanel';
 import LinkIcon from './components/icons/LinkIcon';
+import NotificationsPanel from './components/NotificationsPanel';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -228,6 +229,7 @@ interface AppComponentProps {
   particleType: ParticleType;
   ambientSound: { type: AmbientSoundType; volume: number };
   dailyEncouragementLocalHour: number | null;
+  dailySummaryHour: number | null;
   activeTrack: Playlist | null;
   activeSpotifyTrack: Playlist | null;
   // Handlers
@@ -261,6 +263,7 @@ interface AppComponentProps {
   setParticleType: (type: ParticleType) => void;
   setAmbientSound: (sound: { type: AmbientSoundType; volume: number }) => void;
   onSetDailyEncouragement: (localHour: number | null) => void;
+  onSetDailySummary: (localHour: number | null) => void;
   setActiveTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
   setActiveSpotifyTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
   // Google API Props
@@ -289,14 +292,14 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
     isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
     allTodos, folders, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
+    pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour, dailySummaryHour,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
+    setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement, onSetDailySummary,
     setActiveTrack, setActiveSpotifyTrack,
     googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
@@ -314,6 +317,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
   const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
   const [isIntegrationsPanelOpen, setIsIntegrationsPanelOpen] = useState(false);
+  const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
   const pomodoroStartedRef = useRef(false);
 
   const getUserKey = useCallback((key: string) => `${currentUser.email}_${key}`, [currentUser]);
@@ -522,7 +526,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 <LinkIcon />
               </button>
             <button
-                onClick={handleNotificationAction}
+                onClick={() => setIsNotificationsPanelOpen(true)}
                 className={`relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
                     isPermissionBlocked
                     ? 'text-red-400 cursor-not-allowed'
@@ -530,13 +534,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                     ? 'text-primary'
                     : 'text-gray-700 dark:text-gray-300 hover:text-primary'
                 }`}
-                aria-label={isSubscribed ? 'Enviar notificación de prueba' : 'Activar notificaciones'}
+                aria-label={isSubscribed ? 'Gestionar notificaciones' : 'Activar notificaciones'}
                 title={
                     isPermissionBlocked
                     ? 'Notificaciones bloqueadas por el navegador'
-                    : isSubscribed
-                    ? 'Enviar una notificación de prueba'
-                    : 'Activar notificaciones para recordatorios'
+                    : 'Gestionar notificaciones'
                 }
                 disabled={isPermissionBlocked}
             >
@@ -580,6 +582,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         gcalSettings={gcalSettings}
         onGCalSettingsChange={onGCalSettingsChange}
         userCalendars={userCalendars}
+      />
+
+      <NotificationsPanel
+        isOpen={isNotificationsPanelOpen}
+        onClose={() => setIsNotificationsPanelOpen(false)}
+        dailyEncouragementHour={props.dailyEncouragementLocalHour}
+        onSetDailyEncouragement={props.onSetDailyEncouragement}
+        dailySummaryHour={props.dailySummaryHour}
+        onSetDailySummary={props.onSetDailySummary}
+        onSendTestNotification={handleNotificationAction}
       />
       
       <div className={`fixed top-4 left-4 z-30 w-64 space-y-4 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block`}>
@@ -679,14 +691,14 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
       isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
       allTodos, folders, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-      pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour,
+      pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour, dailySummaryHour,
       activeTrack, activeSpotifyTrack,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-      setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement,
+      setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground, setParticleType, setAmbientSound, onSetDailyEncouragement, onSetDailySummary,
       setActiveTrack, setActiveSpotifyTrack,
       googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
       handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
@@ -703,6 +715,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
     const [isIntegrationsPanelOpen, setIsIntegrationsPanelOpen] = useState(false);
+    const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     const [isQuickCaptureSetupOpen, setIsQuickCaptureSetupOpen] = useState(false);
     const [viewingProjectId, setViewingProjectId] = useState<number | null>(null);
@@ -940,7 +953,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                         <ChevronRightIcon />
                                     </button>
                                     
-                                    <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5" disabled={isPermissionBlocked}>
+                                    <button onClick={() => setIsNotificationsPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5" disabled={isPermissionBlocked}>
                                         <h3 className={`font-bold text-lg transition-colors ${ isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary' }`}>
                                             Notificaciones
                                         </h3>
@@ -1028,8 +1041,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={setParticleType}
               ambientSound={ambientSound}
               setAmbientSound={setAmbientSound}
-              dailyEncouragementHour={dailyEncouragementLocalHour}
-              onSetDailyEncouragement={onSetDailyEncouragement}
             />
             <IntegrationsPanel
                 isOpen={isIntegrationsPanelOpen}
@@ -1041,6 +1052,16 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 gcalSettings={gcalSettings}
                 onGCalSettingsChange={onGCalSettingsChange}
                 userCalendars={userCalendars}
+            />
+            <NotificationsPanel
+                isOpen={isNotificationsPanelOpen}
+                onClose={() => setIsNotificationsPanelOpen(false)}
+                isMobile={true}
+                dailyEncouragementHour={dailyEncouragementLocalHour}
+                onSetDailyEncouragement={onSetDailyEncouragement}
+                dailySummaryHour={dailySummaryHour}
+                onSetDailySummary={onSetDailySummary}
+                onSendTestNotification={handleNotificationAction}
             />
             <AddTaskModal
                 isOpen={isAddTaskModalOpen}
@@ -1163,6 +1184,7 @@ const App: React.FC = () => {
   const [quickCaptureMessage, setQuickCaptureMessage] = useState<string | null>(null);
 
   const [dailyEncouragementLocalHour, setDailyEncouragementLocalHour] = useState<number | null>(null);
+  const [dailySummaryHour, setDailySummaryHour] = useState<number | null>(null);
   const [pomodoroState, setPomodoroState] = useState({
       timeLeft: 25 * 60,
       isActive: false,
@@ -1422,7 +1444,7 @@ const App: React.FC = () => {
         supabase.from('playlists').select('*').order('created_at'),
         supabase.from('quick_notes').select('*').order('created_at'),
         supabase.from('projects').select('*').order('name'),
-        supabase.from('profiles').select('daily_encouragement_hour_local, pomodoro_settings, gcal_settings, ui_settings').eq('id', user.id).single(),
+        supabase.from('profiles').select('daily_encouragement_hour_local, daily_summary_hour_local, pomodoro_settings, gcal_settings, ui_settings').eq('id', user.id).single(),
       ]);
       
       if (todosData) {
@@ -1473,6 +1495,7 @@ const App: React.FC = () => {
 
       if(profileData) {
         setDailyEncouragementLocalHour(profileData.daily_encouragement_hour_local);
+        setDailySummaryHour(profileData.daily_summary_hour_local);
         if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
             const savedSettings = profileData.pomodoro_settings as Partial<typeof pomodoroState>;
             setPomodoroState(s => ({ ...s, durations: savedSettings.durations || s.durations, timeLeft: (savedSettings.durations || s.durations)[s.mode], isActive: false, endTime: null }));
@@ -1608,6 +1631,12 @@ const App: React.FC = () => {
     await syncableUpdate('profiles', { id: user.id, daily_encouragement_hour_local: localHour });
   };
   
+  const handleSetDailySummary = async (localHour: number | null) => {
+    if (!user) return;
+    setDailySummaryHour(localHour);
+    await syncableUpdate('profiles', { id: user.id, daily_summary_hour_local: localHour });
+  };
+
   // --- Data Handlers (Now with Offline Support) ---
   const handleAddTodo = useCallback(async (text: string, options?: { projectId?: number | null; isUndated?: boolean }) => {
     if (!user) return;
@@ -2630,6 +2659,7 @@ const App: React.FC = () => {
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders: foldersWithNotes, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, dailyEncouragementLocalHour,
+    dailySummaryHour,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos: () => setIsClearPastConfirmOpen(true),
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
@@ -2637,6 +2667,7 @@ const App: React.FC = () => {
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground: handleSelectBackground, setParticleType: handleParticleChange, setAmbientSound: handleAmbientSoundChange, onSetDailyEncouragement: handleSetDailyEncouragement,
+    onSetDailySummary: handleSetDailySummary,
     setActiveTrack, setActiveSpotifyTrack,
     googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
     handleAddGalleryImages, handleDeleteGalleryImage,

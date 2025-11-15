@@ -49,8 +49,6 @@ interface CustomizationPanelProps {
   setParticleType: (type: ParticleType) => void;
   ambientSound: { type: AmbientSoundType; volume: number };
   setAmbientSound: (sound: { type: AmbientSoundType; volume: number }) => void;
-  dailyEncouragementHour?: number | null;
-  onSetDailyEncouragement?: (localHour: number | null) => void;
 }
 
 const particleOptions: { type: ParticleType; icon: React.FC; label: string }[] = [

@@ -20,40 +20,41 @@ serve(async (req) => {
   try {
     const nowUTC = new Date();
 
-    // 1. Obtener todos los perfiles con una zona horaria configurada.
+    // 1. Obtener todos los perfiles con una zona horaria configurada y resumen diario activado.
     const { data: profiles, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, timezone_offset')
-      .not('timezone_offset', 'is', null);
+      .select('id, timezone_offset, daily_summary_hour_local')
+      .not('timezone_offset', 'is', null)
+      .not('daily_summary_hour_local', 'is', null);
 
     if (profileError) {
-      console.error("Error al obtener perfiles por zona horaria. ¿Existe la columna 'timezone_offset' en la tabla 'profiles'?", profileError);
+      console.error("Error al obtener perfiles. ¿Existe la columna 'daily_summary_hour_local' en 'profiles'?", profileError);
       throw profileError;
     }
 
     if (!profiles || profiles.length === 0) {
-      return new Response(JSON.stringify({ message: `No se encontraron perfiles con zona horaria configurada.` }), {
+      return new Response(JSON.stringify({ message: `No se encontraron perfiles con resumen diario activado.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
     
     const usersToNotify: string[] = [];
 
-    // 2. Iterar sobre cada perfil para verificar si son las 5 AM en su hora local.
+    // 2. Iterar sobre cada perfil para verificar si es la hora preferida del usuario.
     for (const profile of profiles) {
-      // El offset de getTimezoneOffset() es opuesto al estándar (ej. UTC-5 es +300). El nuestro está bien.
       const userOffsetMinutes = profile.timezone_offset;
+      const preferredLocalHour = profile.daily_summary_hour_local;
       const userLocalTime = new Date(nowUTC.getTime() - userOffsetMinutes * 60 * 1000);
       
       // La función cron se ejecuta a HH:30 UTC. Usamos getUTCHours() en la hora local calculada
       // para evitar problemas con el horario de verano del servidor.
-      if (userLocalTime.getUTCHours() === 5) {
+      if (userLocalTime.getUTCHours() === preferredLocalHour) {
         usersToNotify.push(profile.id);
       }
     }
 
     if (usersToNotify.length === 0) {
-        return new Response(JSON.stringify({ message: "No hay usuarios en la zona horaria de las 5 AM en este momento." }), {
+        return new Response(JSON.stringify({ message: "No hay usuarios para notificar en esta hora." }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
@@ -73,9 +74,20 @@ serve(async (req) => {
 
     if (todayTodosError) throw todayTodosError;
     if (!todos || todos.length === 0) {
-        return new Response(JSON.stringify({ message: "No se encontraron tareas para hoy para los usuarios seleccionados." }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        // Aún así notificar a los usuarios que no tienen tareas.
+        const usersWithNoTasks = usersToNotify.filter(uid => !todos.some(t => t.user_id === uid));
+        const noTaskPromises = usersWithNoTasks.map(userId => {
+             const title = "Tu resumen de hoy ☀️";
+             const message = "¡Pío, pío! No tienes tareas para hoy. ¡Aprovecha para descansar o planificar algo nuevo!";
+             return sendOneSignalNotification(userId, title, message);
         });
+        await Promise.all(noTaskPromises);
+
+        if (todos.length === 0) {
+             return new Response(JSON.stringify({ message: "Se notificó a los usuarios que no tienen tareas para hoy." }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
     }
 
     // 5. Agrupar tareas por usuario y contarlas.
