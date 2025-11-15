@@ -2281,12 +2281,79 @@ const App: React.FC = () => {
           setGalleryIsLoading(false);
       }
   }, [googleApiToken, findOrCreateAppFolder, getUserKey]);
-  
+
+  // --- Google Calendar Sync ---
+  const handleGCalSettingsChange = useCallback(async (settings: GCalSettings) => {
+    if (!user) return;
+    setGcalSettings(settings);
+    await syncableUpdate('profiles', { id: user.id, gcal_settings: settings });
+  }, [user]);
+
+  const loadAndValidateCalendarData = useCallback(async () => {
+      if (!googleApiToken || !gapiReady || !isOnline) {
+          setUserCalendars([]);
+          setCalendarEvents([]);
+          return;
+      }
+
+      try {
+          // 1. Fetch Calendar List
+          const calListResponse = await window.gapi.client.calendar.calendarList.list();
+          const calendars = calListResponse.result.items || [];
+          setUserCalendars(calendars);
+          
+          if (!gcalSettings.enabled || calendars.length === 0) {
+              setCalendarEvents([]);
+              return;
+          }
+
+          // 2. Validate selected calendar ID
+          let calendarIdToUse = gcalSettings.calendarId;
+          const selectedCalendarExists = calendars.some(c => c.id === calendarIdToUse);
+
+          if (!selectedCalendarExists) {
+              const primary = calendars.find(c => c.primary);
+              calendarIdToUse = primary ? primary.id : calendars[0].id;
+              // Update settings, which will trigger a re-run of this effect
+              handleGCalSettingsChange({ ...gcalSettings, calendarId: calendarIdToUse });
+              return; // Exit to avoid fetching with old ID, re-run will handle it
+          }
+
+          // 3. Fetch events for the valid calendar
+          const today = new Date();
+          const timeMin = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString();
+          const timeMax = new Date(today.getFullYear(), today.getMonth() + 2, 0).toISOString();
+          
+          const eventsResponse = await window.gapi.client.calendar.events.list({
+              calendarId: calendarIdToUse,
+              timeMin,
+              timeMax,
+              showDeleted: false,
+              singleEvents: true,
+              orderBy: 'startTime',
+          });
+          setCalendarEvents(eventsResponse.result.items || []);
+
+      } catch (error) {
+          console.error("Error with Google Calendar sync:", error);
+          const gapiError = error as any;
+          if (gapiError?.result?.error?.code === 401) {
+              setGoogleApiToken(null);
+              if (user) localStorage.removeItem(getUserKey('google_api_token'));
+          }
+      }
+  }, [googleApiToken, gapiReady, isOnline, gcalSettings, handleGCalSettingsChange, user, getUserKey]);
+
   useEffect(() => {
       if (googleApiToken && isOnline) {
           loadGalleryFromDrive();
       }
-  }, [googleApiToken, loadGalleryFromDrive, isOnline]);
+  }, [googleApiToken, isOnline, loadGalleryFromDrive]);
+
+  // This new effect handles all calendar logic
+  useEffect(() => {
+      loadAndValidateCalendarData();
+  }, [loadAndValidateCalendarData]);
   
   const uploadGalleryImageToDrive = useCallback(async (file: File): Promise<any> => {
       const parentFolderId = await findOrCreateAppFolder();
@@ -2379,29 +2446,6 @@ const App: React.FC = () => {
     };
   }, [activeBackground]);
   
-  // --- Media Playback Logic ---
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
-
-    if (activeBackground && activeBackground.type === 'video') {
-        if (videoElement.src !== activeBackground.url) {
-            videoElement.src = activeBackground.url;
-            videoElement.load();
-        }
-        const playPromise = videoElement.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                console.warn("Video autoplay prevented:", error);
-            });
-        }
-    } else {
-        if (!videoElement.paused) {
-            videoElement.pause();
-        }
-    }
-  }, [activeBackground]);
-
 
   const handleAddBackground = async (file: File) => {
     if (!user) return;
@@ -2523,33 +2567,73 @@ const App: React.FC = () => {
   
   const handleAmbientSoundChange = (value: { type: AmbientSoundType; volume: number; }) => {
     setUiSettings(prev => prev ? { ...prev, ambientSound: value } : null);
-
-    const audio = ambientAudioRef.current;
-    if (!audio) return;
-
-    const soundMap: Record<AmbientSoundType, string | null> = {
-      'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
-    };
-    const newSrc = soundMap[value.type];
-
-    if (newSrc) {
-      if (audio.src !== newSrc) {
-        audio.src = newSrc;
-        audio.load();
-      }
-      audio.volume = value.volume;
-      audio.loop = true;
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.error("Audio playback failed:", error);
-        });
-      }
-    } else {
-      audio.pause();
-      audio.src = '';
-    }
   };
+
+  // --- Media Playback Effect ---
+  useEffect(() => {
+    // Video handling
+    const videoEl = videoRef.current;
+    if (videoEl) {
+        if (activeBackground && activeBackground.type === 'video') {
+            if (videoEl.src !== activeBackground.url) {
+                videoEl.src = activeBackground.url;
+            }
+            const playPromise = videoEl.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    if (error.name !== 'AbortError') {
+                        console.error("Video play failed:", error);
+                    }
+                });
+            }
+        } else {
+            if (!videoEl.paused) {
+                videoEl.pause();
+            }
+            if (videoEl.src) {
+                videoEl.src = '';
+                videoEl.removeAttribute('src'); // Force unload
+            }
+        }
+    }
+
+    // Audio handling
+    const audioEl = ambientAudioRef.current;
+    if(audioEl) {
+        const soundMap: Record<AmbientSoundType, string | null> = {
+            'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
+        };
+        const newSound = uiSettings?.ambientSound;
+        const newSrc = newSound ? soundMap[newSound.type] : null;
+
+        audioEl.loop = true;
+        if (newSound) {
+            audioEl.volume = newSound.volume;
+        }
+
+        if (newSrc) {
+            if (audioEl.src !== newSrc) {
+                audioEl.src = newSrc;
+            }
+            const playPromise = audioEl.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    if (error.name !== 'AbortError') {
+                        console.error("Audio playback failed:", error);
+                    }
+                });
+            }
+        } else {
+            if (!audioEl.paused) {
+                audioEl.pause();
+            }
+            if (audioEl.src) {
+                audioEl.src = '';
+                audioEl.removeAttribute('src'); // Force unload
+            }
+        }
+    }
+  }, [activeBackground, uiSettings?.ambientSound]);
 
   // --- OneSignal / Notifications ---
   useEffect(() => {
@@ -2624,13 +2708,6 @@ const App: React.FC = () => {
       }
   };
   
-  const handleGCalSettingsChange = async (settings: GCalSettings) => {
-    if (!user) return;
-    setGcalSettings(settings);
-    // Persist to Supabase
-    await syncableUpdate('profiles', { id: user.id, gcal_settings: settings });
-  };
-  
   if (authLoading || (user && !dataLoaded) || (user && !uiSettings)) {
     return (
         <div className="min-h-screen bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 flex flex-col items-center justify-center text-center">
@@ -2678,15 +2755,30 @@ const App: React.FC = () => {
 
   return (
     <>
-      {activeBackground ? (
-          activeBackground.type === 'video' ? (
-              <video ref={videoRef} key={activeBackground.id} autoPlay loop muted playsInline className="absolute top-0 left-0 w-full h-full object-cover -z-30"/>
-          ) : (
-              <div key={activeBackground.id} className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-30" style={{ backgroundImage: `url(${activeBackground.url})` }}/>
-          )
-      ) : (
-          <div className="absolute top-0 left-0 w-full h-full bg-gray-50 dark:bg-gray-950 -z-30"/>
-      )}
+      {/* Default background (underneath everything) */}
+      <div className="absolute top-0 left-0 w-full h-full bg-gray-50 dark:bg-gray-950 -z-30"/>
+      
+      {/* Image background (overlays default) */}
+      <div 
+          className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-20 transition-opacity duration-500"
+          style={{ 
+              backgroundImage: `url(${activeBackground?.type === 'image' ? activeBackground.url : ''})`,
+              opacity: activeBackground?.type === 'image' ? 1 : 0
+          }}
+      />
+
+      {/* Video background (persistent in DOM, overlays default) */}
+      <video 
+          ref={videoRef} 
+          loop 
+          muted 
+          playsInline 
+          className="absolute top-0 left-0 w-full h-full object-cover -z-20 transition-opacity duration-500"
+          style={{ 
+              opacity: activeBackground?.type === 'video' ? 1 : 0,
+              pointerEvents: activeBackground?.type === 'video' ? 'auto' : 'none'
+          }}
+      />
       
       {isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />}
 
