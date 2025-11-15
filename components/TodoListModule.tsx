@@ -180,16 +180,36 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         if (viewingProject) {
             const projectTasks = allTasksFlat.filter(t => t.project_id === viewingProject.id);
             const completedTasks = projectTasks.filter(t => t.completed).length;
-
+            const percentage = projectTasks.length > 0 ? (completedTasks / projectTasks.length) * 100 : 0;
+            
+            const radius = 60;
+            const circumference = 2 * Math.PI * radius;
+            const offset = circumference - (percentage / 100) * circumference;
+        
             return (
                 <div className="flex flex-col h-full animate-fade-in">
                     <header className="flex-shrink-0 p-3 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center gap-2">
                         <button onClick={() => { setViewingProject(null); onViewProjectChange?.(null); }} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                        <h2 className="text-xl font-bold text-primary-dark dark:text-primary truncate">{viewingProject.emoji} {viewingProject.name}</h2>
                     </header>
-                    <div className="p-4 flex-shrink-0">
-                        <ProgressBar completed={completedTasks} total={projectTasks.length} />
+                    
+                    <div className="flex flex-col items-center justify-center p-6 flex-shrink-0">
+                        <div className="relative w-36 h-36">
+                            <svg className="w-full h-full" viewBox="0 0 140 140">
+                                <circle cx="70" cy="70" r={radius} stroke="currentColor" strokeWidth="10" fill="transparent" className="text-secondary-light/50 dark:text-gray-700" />
+                                <circle cx="70" cy="70" r={radius} stroke="currentColor" strokeWidth="10" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} className="text-primary transform -rotate-90 origin-center transition-all duration-700 ease-out" />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                {viewingProject.emoji ? (
+                                    <span className="text-5xl drop-shadow-sm">{viewingProject.emoji}</span>
+                                ) : (
+                                    <ChickenIcon className="w-16 h-16 text-secondary-dark drop-shadow-sm" />
+                                )}
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-primary-dark dark:text-primary mt-4">{viewingProject.name}</h2>
+                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">{completedTasks} de {projectTasks.length} completadas</p>
                     </div>
+
                     <div className="flex-grow overflow-y-auto custom-scrollbar p-4 pt-0 space-y-3">
                         {projectTasks.length > 0 ? (
                             [...projectTasks]
