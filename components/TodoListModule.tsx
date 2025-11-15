@@ -32,8 +32,8 @@ interface TodoListModuleProps {
     isMobile?: boolean;
     onClearPastTodos: () => void;
     projects: Project[];
-    onAddProject: (name: string) => Promise<Project | null>;
-    onUpdateProject: (projectId: number, name: string) => Promise<void>;
+    onAddProject: (name: string, emoji: string | null) => Promise<Project | null>;
+    onUpdateProject: (projectId: number, name: string, emoji: string | null) => Promise<void>;
     onDeleteProject: (projectId: number) => Promise<void>;
     onDeleteProjectAndTasks: (projectId: number) => Promise<void>;
 }
@@ -82,9 +82,10 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     const [viewingProject, setViewingProject] = useState<Project | null>(null);
     const [isAddingProject, setIsAddingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
+    const [newProjectEmoji, setNewProjectEmoji] = useState<string | null>(null);
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
-    const [editingProject, setEditingProject] = useState<{ id: number; name: string } | null>(null);
+    const [editingProject, setEditingProject] = useState<{ id: number; name: string; emoji: string | null; } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     
     // Memoized calculations
@@ -138,15 +139,16 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     // Handlers for 'Projects' tab
     const handleAddProject = async () => {
         if (newProjectName.trim()) {
-            await onAddProject(newProjectName.trim());
+            await onAddProject(newProjectName.trim(), newProjectEmoji);
             setNewProjectName('');
+            setNewProjectEmoji(null);
             setIsAddingProject(false);
         }
     };
     
     const handleSaveProjectName = () => {
         if (editingProject && editingProject.name.trim()) {
-            onUpdateProject(editingProject.id, editingProject.name.trim());
+            onUpdateProject(editingProject.id, editingProject.name.trim(), editingProject.emoji);
         }
         setEditingProject(null);
     };
@@ -162,7 +164,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
     }, []);
 
 
-    const CircularProgressWithChicken = ({ percentage }: { percentage: number }) => {
+    const CircularProgressWithChicken = ({ percentage, emoji }: { percentage: number, emoji?: string | null }) => {
         const radius = 45;
         const circumference = 2 * Math.PI * radius;
         const offset = circumference - (percentage / 100) * circumference;
@@ -174,7 +176,11 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                     <circle cx="50" cy="50" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} className="text-primary transform -rotate-90 origin-center transition-all duration-700 ease-out" />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <ChickenIcon className="w-10 h-10 sm:w-12 sm:h-12 text-secondary-dark drop-shadow-sm" />
+                    {emoji ? (
+                        <span className="text-3xl sm:text-4xl drop-shadow-sm">{emoji}</span>
+                    ) : (
+                        <ChickenIcon className="w-10 h-10 sm:w-12 sm:h-12 text-secondary-dark drop-shadow-sm" />
+                    )}
                 </div>
             </div>
         );
@@ -189,7 +195,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                 <div className="flex flex-col h-full animate-fade-in">
                     <header className="flex-shrink-0 p-3 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center gap-2">
                         <button onClick={() => setViewingProject(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                        <h2 className="text-xl font-bold text-primary-dark dark:text-primary truncate">{viewingProject.name}</h2>
+                        <h2 className="text-xl font-bold text-primary-dark dark:text-primary truncate">{viewingProject.emoji} {viewingProject.name}</h2>
                     </header>
                     <div className="p-4 flex-shrink-0">
                         <ProgressBar completed={completedTasks} total={projectTasks.length} />
@@ -232,7 +238,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                                         </button>
                                         {menuOpenFor === project.id && (
                                             <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl z-20 animate-pop-in origin-top-right p-1">
-                                                <button onClick={() => { setEditingProject({ id: project.id, name: project.name }); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
+                                                <button onClick={() => { setEditingProject({ id: project.id, name: project.name, emoji: project.emoji || null }); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
                                                     Renombrar
                                                 </button>
                                                 <button onClick={() => { setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">
@@ -242,7 +248,19 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                                         )}
                                     </div>
                                     <button onClick={() => !editingProject && setViewingProject(project)} className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
-                                        <CircularProgressWithChicken percentage={percentage} />
+                                        {editingProject?.id === project.id ? (
+                                            <input
+                                                type="text"
+                                                value={editingProject.emoji || ''}
+                                                onChange={(e) => setEditingProject(p => p ? { ...p, emoji: e.target.value } : null)}
+                                                placeholder="✨"
+                                                className="w-12 h-12 text-2xl text-center rounded-full bg-white dark:bg-gray-700 border-2 border-secondary-light dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary"
+                                                maxLength={4}
+                                                onClick={e => e.stopPropagation()}
+                                            />
+                                        ) : (
+                                            <CircularProgressWithChicken percentage={percentage} emoji={project.emoji} />
+                                        )}
                                         <div className="w-full">
                                             {editingProject?.id === project.id ? (
                                                 <input
@@ -267,8 +285,19 @@ const TodoListModule: React.FC<TodoListModuleProps> = ({
                         <div className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-secondary-light dark:border-gray-600 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 aspect-square">
                             {isAddingProject ? (
                                 <>
-                                    <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} onKeyDown={e => {if (e.key === 'Enter') handleAddProject()}} placeholder="Nombre" className="w-full bg-white dark:bg-gray-700 text-sm p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-center" autoFocus onBlur={() => setIsAddingProject(false)}/>
-                                    <button onClick={handleAddProject} className="mt-2 text-xs font-semibold text-primary px-3 py-1 bg-primary-light/50 rounded-full">Guardar</button>
+                                    <input
+                                        type="text"
+                                        value={newProjectEmoji || ''}
+                                        onChange={(e) => setNewProjectEmoji(e.target.value)}
+                                        placeholder="✨"
+                                        className="w-12 h-12 text-2xl text-center rounded-full bg-white dark:bg-gray-700 border-2 border-secondary-light dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary"
+                                        maxLength={4}
+                                    />
+                                    <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} onKeyDown={e => {if (e.key === 'Enter') handleAddProject()}} placeholder="Nombre del proyecto" className="w-full bg-white dark:bg-gray-700 text-sm p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-center" autoFocus />
+                                    <div className="flex gap-2">
+                                        <button onClick={() => { setIsAddingProject(false); setNewProjectName(''); setNewProjectEmoji(null); }} className="mt-2 text-xs font-semibold text-gray-500 px-3 py-1 bg-gray-200/50 rounded-full">Cancelar</button>
+                                        <button onClick={handleAddProject} className="mt-2 text-xs font-semibold text-primary px-3 py-1 bg-primary-light/50 rounded-full">Guardar</button>
+                                    </div>
                                 </>
                             ) : (
                                 <button onClick={() => setIsAddingProject(true)} className="text-center text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary transition-colors">

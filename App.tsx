@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -245,8 +241,8 @@ interface AppComponentProps {
   handleAddNote: (folderId: number) => Promise<Note | null>;
   handleUpdateNote: (note: Note) => Promise<void>;
   handleDeleteNote: (noteId: number, folderId: number) => Promise<void>;
-  handleAddProject: (name: string) => Promise<Project | null>;
-  handleUpdateProject: (projectId: number, name: string) => Promise<void>;
+  handleAddProject: (name: string, emoji: string | null) => Promise<Project | null>;
+  handleUpdateProject: (projectId: number, name: string, emoji: string | null) => Promise<void>;
   handleDeleteProject: (projectId: number) => Promise<void>;
   handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
   handleAddPlaylist: (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
@@ -2021,10 +2017,10 @@ const App: React.FC = () => {
     await syncableDelete('notes', noteId);
   };
   
-  const handleAddProject = useCallback(async (name: string): Promise<Project | null> => {
+  const handleAddProject = useCallback(async (name: string, emoji: string | null): Promise<Project | null> => {
       if (!user) return null;
       const tempId = -Date.now();
-      const newProject: Project = { id: tempId, name, user_id: user.id, created_at: new Date().toISOString() };
+      const newProject: Project = { id: tempId, name, user_id: user.id, created_at: new Date().toISOString(), emoji };
       
       setProjects(p => [...p, newProject]);
       
@@ -2036,10 +2032,10 @@ const App: React.FC = () => {
       return savedProject;
   }, [user]);
 
-  const handleUpdateProject = async (projectId: number, name: string) => {
+  const handleUpdateProject = async (projectId: number, name: string, emoji: string | null) => {
       const projectToUpdate = projects.find(p => p.id === projectId);
       if(!projectToUpdate) return;
-      const updatedProject = { ...projectToUpdate, name };
+      const updatedProject = { ...projectToUpdate, name, emoji };
       setProjects(p => p.map(project => project.id === projectId ? updatedProject : project));
       
       const savedProject = await syncableUpdate('projects', updatedProject);

@@ -51,6 +51,7 @@ export interface Project {
   name: string;
   created_at: string;
   todos?: Todo[]; // Populated on the client
+  emoji?: string | null;
 }
 
 export interface Note {
