@@ -68,7 +68,7 @@ const NavSettingRow: React.FC<{ icon: ReactNode; label: string; value: string; o
 );
 
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, onSave, todo, projects }) => {
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, onSave, todo, projects = [] }) => {
     const [text, setText] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);

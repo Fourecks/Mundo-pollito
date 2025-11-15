@@ -70,7 +70,7 @@ const NavSettingRow: React.FC<{ icon: ReactNode; label: string; value: string; o
 );
 
 
-const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, onSave, onDelete, todo, projects }) => {
+const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, onSave, onDelete, todo, projects = [] }) => {
     const [text, setText] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
