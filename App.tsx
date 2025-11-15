@@ -1163,7 +1163,6 @@ const App: React.FC = () => {
   const isMobile = useMediaQuery('(max-width: 767px)');
   
   const settingsSaveTimeout = useRef<number | null>(null);
-  const isInitialMount = useRef(true);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -2550,10 +2549,6 @@ const App: React.FC = () => {
   
   // Active Background Persistence
   useEffect(() => {
-    if (isInitialMount.current) {
-        isInitialMount.current = false;
-        return;
-    }
     if (user && dataLoaded) {
         set('settings', { key: 'activeBackgroundId', value: activeBackground ? activeBackground.id : null });
     }
