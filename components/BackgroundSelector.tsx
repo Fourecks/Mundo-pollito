@@ -49,7 +49,8 @@ const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
         }
     };
     
-    const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.isFavorite) : userBackgrounds;
+    // FIX: Corrected property access from isFavorite to is_favorite to match the type definition.
+    const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.is_favorite) : userBackgrounds;
 
     return (
         <>
@@ -125,9 +126,11 @@ const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
                                             <button
                                                 onClick={() => onToggleFavorite(bg.id)}
                                                 className="p-1.5 rounded-full bg-black/30 text-white hover:bg-yellow-500 backdrop-blur-sm"
-                                                title={bg.isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                                                // FIX: Corrected property access from isFavorite to is_favorite to match the type definition.
+                                                title={bg.is_favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                                             >
-                                                <StarIcon filled={!!bg.isFavorite} className="h-4 w-4" />
+                                                {/* FIX: Corrected property access from isFavorite to is_favorite to match the type definition. */}
+                                                <StarIcon filled={!!bg.is_favorite} className="h-4 w-4" />
                                             </button>
                                             <button
                                                 onClick={() => setBgToDelete(bg)}

@@ -110,8 +110,9 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     useEffect(() => { if (isNarrow && isCalendarPanelVisible) setIsCalendarPanelVisible(false); }, [isNarrow, isCalendarPanelVisible]);
 
     // Handlers for 'Tasks' tab
-    const handlePrevDay = () => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n; });
-    const handleNextDay = () => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n; });
+    // FIX: Changed to non-functional update to match prop type (date: Date) => void.
+    const handlePrevDay = () => { const newDate = new Date(selectedDate); newDate.setDate(newDate.getDate() - 1); setSelectedDate(newDate); };
+    const handleNextDay = () => { const newDate = new Date(selectedDate); newDate.setDate(newDate.getDate() + 1); setSelectedDate(newDate); };
     const toggleSort = () => setSortBy(p => p === 'default' ? 'priority' : p === 'priority' ? 'dueDate' : 'default');
     const getSortButtonText = () => sortBy === 'priority' ? 'Prioridad' : sortBy === 'dueDate' ? 'Fecha' : 'Original';
     

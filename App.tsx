@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -46,6 +47,8 @@ import ConfirmationModalWithOptions from './components/ConfirmationModalWithOpti
 import ConfirmationModal from './components/ConfirmationModal';
 import QuickCaptureSetupModal from './components/QuickCaptureSetupModal';
 import MotivationalToast from './components/MotivationalToast';
+import IntegrationsPanel from './components/IntegrationsPanel';
+import LinkIcon from './components/icons/LinkIcon';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -311,6 +314,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [focusedWindow, setFocusedWindow] = useState<WindowType | null>(null);
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
   const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
+  const [isIntegrationsPanelOpen, setIsIntegrationsPanelOpen] = useState(false);
   const pomodoroStartedRef = useRef(false);
 
   const getUserKey = useCallback((key: string) => `${currentUser.email}_${key}`, [currentUser]);
@@ -512,6 +516,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               <PaletteIcon />
             </button>
             <button
+                onClick={() => setIsIntegrationsPanelOpen(true)}
+                className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-300 hover:text-primary p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+                aria-label="Integraciones"
+              >
+                <LinkIcon />
+              </button>
+            <button
                 onClick={handleNotificationAction}
                 className={`relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
                     isPermissionBlocked
@@ -545,9 +556,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       <CustomizationPanel
         isOpen={isCustomizationPanelOpen}
         onClose={() => setIsCustomizationPanelOpen(false)}
-        isSignedIn={!!googleApiToken}
-        onAuthClick={handleAuthClick}
-        isGapiReady={props.gapiReady}
         colors={themeColors}
         onThemeColorChange={onThemeColorChange}
         onReset={onResetThemeColors}
@@ -564,6 +572,14 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setAmbientSound={setAmbientSound}
         dailyEncouragementHour={dailyEncouragementLocalHour}
         onSetDailyEncouragement={onSetDailyEncouragement}
+      />
+      
+      <IntegrationsPanel
+        isOpen={isIntegrationsPanelOpen}
+        onClose={() => setIsIntegrationsPanelOpen(false)}
+        isSignedIn={!!googleApiToken}
+        onAuthClick={handleAuthClick}
+        isGapiReady={props.gapiReady}
         gcalSettings={gcalSettings}
         onGCalSettingsChange={onGCalSettingsChange}
         userCalendars={userCalendars}
@@ -595,7 +611,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 allTodos={allTodos} 
                 addTodo={handleAddTodo} 
                 toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
-                toggleSubtask={handleToggleSubtask}
+                toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
                 deleteTodo={handleDeleteTodo} 
                 updateTodo={handleUpdateTodo} 
                 onEditTodo={setTaskToEdit} 
@@ -689,6 +705,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isPomodoroModalOpen, setIsPomodoroModalOpen] = useState(false);
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
+    const [isIntegrationsPanelOpen, setIsIntegrationsPanelOpen] = useState(false);
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     const [isQuickCaptureSetupOpen, setIsQuickCaptureSetupOpen] = useState(false);
     const [isDailyDoseSettingsOpen, setIsDailyDoseSettingsOpen] = useState(false);
@@ -706,13 +723,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
     const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
     
-    const doseSummary = useMemo(() => {
-        if (dailyEncouragementLocalHour === null) return 'Desactivado';
-        const d = new Date();
-        d.setHours(dailyEncouragementLocalHour, 0, 0);
-        return d.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true });
-    }, [dailyEncouragementLocalHour]);
-
     // Pomodoro Timer Logic
     const handleTimerCompletion = useCallback(() => {
         pomodoroAudioRef.current?.play();
@@ -867,7 +877,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             allTodos={allTodos} 
                             addTodo={handleAddTodo} 
                             toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
-                            toggleSubtask={handleToggleSubtask}
+                            toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
                             deleteTodo={handleDeleteTodo} 
                             updateTodo={handleUpdateTodo} 
                             onEditTodo={setTaskToEdit} 
@@ -884,7 +894,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onViewProjectChange={setViewingProjectId}
                             calendarEvents={calendarEvents}
                         />
-                        <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
+                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
                         </button>
                     </div>
@@ -910,81 +920,65 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'more':
                 return (
                      <>
-                        <div className="p-4 pt-8 space-y-4">
-                            <div className="p-4 flex justify-between items-center border-b border-black/5 dark:border-white/10">
-                                <h3 className="font-bold text-primary-dark dark:text-primary">Tema</h3>
-                                <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
-                            </div>
-                             <div className="p-4 border-b border-black/5 dark:border-white/10">
-                                <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left">
-                                  <div>
-                                    <h3 className="font-bold text-primary-dark dark:text-primary">Personalización</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Colores, fondos, sonidos y más.</p>
-                                  </div>
-                                  <ChevronRightIcon />
-                                </button>
-                            </div>
-                            <div className="p-4 border-b border-black/5 dark:border-white/10">
-                                <button onClick={() => setIsQuickCaptureSetupOpen(true)} className="w-full flex justify-between items-center text-left">
-                                  <div>
-                                    <h3 className="font-bold text-primary-dark dark:text-primary">Captura Rápida</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Configura un Atajo de iPhone para añadir tareas.</p>
-                                  </div>
-                                  <ChevronRightIcon />
-                                </button>
-                            </div>
-                            <div className="p-4 border-b border-black/5 dark:border-white/10">
-                                <button onClick={() => setIsDailyDoseSettingsOpen(s => !s)} className="w-full text-left">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <h3 className="font-bold text-primary-dark dark:text-primary">Dosis de Ánimo Diario</h3>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recibe un versículo cada día a la hora que elijas.</p>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">{doseSummary}</span>
+                        <div className="p-4 pt-8">
+                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden">
+                                <div className="divide-y divide-black/5 dark:divide-white/10">
+
+                                    <div className="p-4 flex justify-between items-center">
+                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Tema</h3>
+                                        <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+                                    </div>
+
+                                    <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Personalización</h3>
+                                        <ChevronRightIcon />
+                                    </button>
+
+                                    <button onClick={() => setIsIntegrationsPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Integraciones</h3>
+                                        <ChevronRightIcon />
+                                    </button>
+
+                                    <button onClick={() => setIsQuickCaptureSetupOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Captura Rápida</h3>
+                                        <ChevronRightIcon />
+                                    </button>
+                                    
+                                    <div className="p-4">
+                                        <button onClick={() => setIsDailyDoseSettingsOpen(s => !s)} className="w-full flex justify-between items-center text-left">
+                                            <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Dosis de Ánimo</h3>
                                             <ChevronRightIcon className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isDailyDoseSettingsOpen ? 'rotate-90' : ''}`} />
-                                        </div>
+                                        </button>
+                                        {isDailyDoseSettingsOpen && (
+                                            <div className="mt-3 animate-pop-in">
+                                                <select 
+                                                    value={dailyEncouragementLocalHour === null ? 'none' : dailyEncouragementLocalHour} 
+                                                    onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
+                                                    className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
+                                                >
+                                                    <option value="none">Desactivado</option>
+                                                    {Array.from({length: 24}, (_, i) => i).map(hour => {
+                                                        const displayDate = new Date();
+                                                        displayDate.setHours(hour, 0, 0);
+                                                        return <option key={hour} value={hour}>
+                                                            {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
+                                                        </option>
+                                                    })}
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
-                                </button>
-                                {isDailyDoseSettingsOpen && (
-                                    <div className="mt-3 animate-pop-in">
-                                        <select 
-                                            value={dailyEncouragementLocalHour === null ? 'none' : dailyEncouragementLocalHour} 
-                                            onChange={e => onSetDailyEncouragement(e.target.value === 'none' ? null : parseInt(e.target.value, 10))}
-                                            className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm appearance-none text-center"
-                                        >
-                                            <option value="none">Desactivado</option>
-                                            {Array.from({length: 24}, (_, i) => i).map(hour => {
-                                                const displayDate = new Date();
-                                                displayDate.setHours(hour, 0, 0);
-                                                return <option key={hour} value={hour}>
-                                                    {displayDate.toLocaleTimeString(navigator.language, { hour: 'numeric', hour12: true })}
-                                                </option>
-                                            })}
-                                        </select>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="p-4 border-b border-black/5 dark:border-white/10">
-                                <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left" disabled={isPermissionBlocked}>
-                                    <div>
-                                        <h3 className={`font-bold transition-colors ${
-                                            isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary'
-                                        }`}>
-                                            {isSubscribed ? 'Probar Notificaciones' : 'Activar Notificaciones'}
+                                    
+                                    <button onClick={handleNotificationAction} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5" disabled={isPermissionBlocked}>
+                                        <h3 className={`font-bold text-lg transition-colors ${ isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary' }`}>
+                                            Notificaciones
                                         </h3>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            {isPermissionBlocked
-                                                ? 'Permisos bloqueados en el navegador.'
-                                                : isSubscribed
-                                                ? 'Recibe una notificación de prueba ahora.'
-                                                : 'Permite recibir recordatorios de tareas.'}
-                                        </p>
-                                    </div>
-                                    {!isPermissionBlocked && <ChevronRightIcon />}
-                                </button>
+                                        {!isPermissionBlocked && <ChevronRightIcon />}
+                                    </button>
+
+                                </div>
                             </div>
-                             <button onClick={onLogout} className="w-full mt-4 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
+                             <button onClick={onLogout} className="w-full mt-6 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
                                 <LogoutIcon />
                                 Cerrar Sesión
                             </button>
@@ -1049,9 +1043,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               isOpen={isCustomizationPanelOpen}
               onClose={() => setIsCustomizationPanelOpen(false)}
               isMobile={true}
-              isSignedIn={!!googleApiToken}
-              onAuthClick={handleAuthClick}
-              isGapiReady={props.gapiReady}
               colors={themeColors}
               onThemeColorChange={onThemeColorChange}
               onReset={onResetThemeColors}
@@ -1066,9 +1057,17 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={setParticleType}
               ambientSound={ambientSound}
               setAmbientSound={setAmbientSound}
-              gcalSettings={gcalSettings}
-              onGCalSettingsChange={onGCalSettingsChange}
-              userCalendars={userCalendars}
+            />
+            <IntegrationsPanel
+                isOpen={isIntegrationsPanelOpen}
+                onClose={() => setIsIntegrationsPanelOpen(false)}
+                isMobile={true}
+                isSignedIn={!!googleApiToken}
+                onAuthClick={handleAuthClick}
+                isGapiReady={props.gapiReady}
+                gcalSettings={gcalSettings}
+                onGCalSettingsChange={onGCalSettingsChange}
+                userCalendars={userCalendars}
             />
             <AddTaskModal
                 isOpen={isAddTaskModalOpen}
@@ -2633,6 +2632,13 @@ const App: React.FC = () => {
       }
   };
   
+  const handleGCalSettingsChange = async (settings: GCalSettings) => {
+    if (!user) return;
+    setGcalSettings(settings);
+    // Persist to Supabase
+    await syncableUpdate('profiles', { id: user.id, gcal_settings: settings });
+  };
+  
   if (authLoading || (user && !dataLoaded)) {
     return (
         <div className="min-h-screen bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 flex flex-col items-center justify-center text-center">
@@ -2672,7 +2678,7 @@ const App: React.FC = () => {
     handleAddBackground, handleDeleteBackground,
     handleToggleFavoriteBackground, gapiReady,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
-    gcalSettings, onGCalSettingsChange: () => {}, userCalendars, calendarEvents
+    gcalSettings, onGCalSettingsChange: handleGCalSettingsChange, userCalendars, calendarEvents
   };
 
   return (

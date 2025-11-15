@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Background, ParticleType, AmbientSoundType, ThemeColors, GCalSettings, GoogleCalendar } from '../types';
+import React, { useState, useRef, useMemo } from 'react';
+import { Background, ParticleType, AmbientSoundType, ThemeColors } from '../types';
 import CloseIcon from './icons/CloseIcon';
 import ThemeCustomizer from './ThemeCustomizer';
 
@@ -31,11 +31,6 @@ interface CustomizationPanelProps {
   onClose: () => void;
   isMobile?: boolean;
   
-  // Auth Props (for Google APIs)
-  isSignedIn: boolean;
-  onAuthClick: () => void;
-  isGapiReady: boolean;
-
   // Color Props
   colors: ThemeColors;
   onThemeColorChange: (colorName: keyof ThemeColors, value: string) => void;
@@ -57,11 +52,6 @@ interface CustomizationPanelProps {
   setAmbientSound: React.Dispatch<React.SetStateAction<{ type: AmbientSoundType; volume: number }>>;
   dailyEncouragementHour?: number | null;
   onSetDailyEncouragement?: (localHour: number | null) => void;
-
-  // Google Calendar Props
-  gcalSettings: GCalSettings;
-  onGCalSettingsChange: (settings: GCalSettings) => void;
-  userCalendars: GoogleCalendar[];
 }
 
 const particleOptions: { type: ParticleType; icon: React.FC; label: string }[] = [
@@ -254,61 +244,11 @@ const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setP
     );
 };
 
-const SyncTab: React.FC<Pick<CustomizationPanelProps, 'isSignedIn' | 'onAuthClick' | 'isGapiReady' | 'gcalSettings' | 'onGCalSettingsChange' | 'userCalendars'>> = (props) => {
-    const { isSignedIn, onAuthClick, isGapiReady, gcalSettings, onGCalSettingsChange, userCalendars } = props;
-
-    if (!isSignedIn) {
-        return (
-            <div className="p-4 text-center">
-                 <ChickenIcon className="w-16 h-16 text-primary mb-4 mx-auto" />
-                <h3 className="font-bold text-lg text-gray-700 dark:text-gray-300">Conecta tu cuenta de Google</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                   Para sincronizar con Google Calendar y guardar tus recuerdos en Google Drive, conecta tu cuenta.
-                </p>
-                <button
-                    onClick={onAuthClick}
-                    disabled={!isGapiReady}
-                    className="mt-6 bg-primary text-white font-bold rounded-full px-6 py-3 shadow-md hover:bg-primary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 disabled:bg-primary-light disabled:cursor-wait"
-                >
-                    {isGapiReady ? 'Conectar con Google' : 'Cargando...'}
-                </button>
-            </div>
-        );
-    }
-    
-    return (
-        <div className="p-3 space-y-3">
-             <div className="flex items-center justify-between p-2">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Sincronizar con Google Calendar</span>
-                <div className="relative" onClick={() => onGCalSettingsChange({ ...gcalSettings, enabled: !gcalSettings.enabled })}>
-                    <input type="checkbox" className="sr-only" checked={gcalSettings.enabled} readOnly />
-                    <div className={`block w-10 h-6 rounded-full transition-colors ${gcalSettings.enabled ? 'bg-primary-light' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
-                    <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${gcalSettings.enabled ? 'translate-x-full' : ''}`}></div>
-                </div>
-            </div>
-            <div className={`transition-opacity duration-300 ${!gcalSettings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                <label className="text-xs font-semibold text-gray-600 dark:text-gray-300 px-2">Elegir calendario</label>
-                <select
-                    value={gcalSettings.calendarId}
-                    onChange={(e) => onGCalSettingsChange({ ...gcalSettings, calendarId: e.target.value })}
-                    className="w-full mt-1 bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                >
-                    {userCalendars.map(cal => (
-                        <option key={cal.id} value={cal.id}>{cal.summary}</option>
-                    ))}
-                </select>
-            </div>
-        </div>
-    );
-};
-
-
 const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
     const { isOpen, onClose, isMobile } = props;
-    const [activeTab, setActiveTab] = useState<'sinc' | 'colores' | 'fondos' | 'ambiente'>('sinc');
+    const [activeTab, setActiveTab] = useState<'colores' | 'fondos' | 'ambiente'>('colores');
 
     const tabs = [
-        { id: 'sinc', label: 'Sincronización' },
         { id: 'colores', label: 'Colores' },
         { id: 'fondos', label: 'Fondos' },
         { id: 'ambiente', label: 'Ambiente' },
@@ -334,7 +274,6 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
             </div>
 
             <div className="flex-grow overflow-y-auto custom-scrollbar">
-                {activeTab === 'sinc' && <SyncTab {...props} />}
                 {activeTab === 'colores' && <ThemeCustomizer colors={props.colors} onThemeColorChange={props.onThemeColorChange} onReset={props.onReset} />}
                 {activeTab === 'fondos' && <BackgroundsTab {...props} />}
                 {activeTab === 'ambiente' && <AmbienceTab {...props} />}
