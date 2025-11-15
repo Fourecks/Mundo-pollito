@@ -188,11 +188,11 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         
             return (
                 <div className="flex flex-col h-full animate-fade-in">
-                    <header className="flex-shrink-0 p-3 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center gap-2">
-                        <button onClick={() => { setViewingProject(null); onViewProjectChange?.(null); }} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                    </header>
                     
-                    <div className="flex flex-col items-center justify-center p-6 flex-shrink-0">
+                    <div className="relative flex flex-col items-center justify-center p-6 flex-shrink-0">
+                        <button onClick={() => { setViewingProject(null); onViewProjectChange?.(null); }} className="absolute top-3 left-3 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 z-10">
+                            <ChevronLeftIcon />
+                        </button>
                         <div className="relative w-36 h-36">
                             <svg className="w-full h-full" viewBox="0 0 140 140">
                                 <circle cx="70" cy="70" r={radius} stroke="currentColor" strokeWidth="10" fill="transparent" className="text-secondary-light/50 dark:text-gray-700" />
