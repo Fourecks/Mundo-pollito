@@ -154,6 +154,14 @@
         animation: deploy-from-bottom 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
       }
 
+      @keyframes slide-in-from-bottom {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+      }
+      .animate-slide-up {
+        animation: slide-in-from-bottom 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+      }
+
       @keyframes walk-cycle {
         0% { transform: translateX(-50px) scaleX(1); }
         49% { transform: translateX(50px) scaleX(1); }

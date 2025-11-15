@@ -383,7 +383,6 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             <div className="p-3 flex flex-col gap-2 border-b border-black/5 dark:border-white/10">
                     <div className="flex items-center gap-3"><FlagIcon className="h-5 w-5 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prioridad</span></div>
                     <div className="flex items-center gap-2 bg-black/5 dark:bg-black/20 p-1 rounded-full">
-                    {/* FIX: Completed the truncated line */}
                     {(['low', 'medium', 'high'] as Priority[]).map(p => (<button key={p} onClick={() => setPriority(p)} className={`w-full text-xs py-1.5 rounded-full transition-all ${priority === p ? `${priorityMap[p].base} ${priorityMap[p].text} font-semibold shadow` : 'text-gray-700 dark:text-gray-300 hover:bg-white/50'}`}>{priorityMap[p].label}</button>))}
                     </div>
             </div>
@@ -489,17 +488,23 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
     );
 
     return (
-        <div className={`fixed inset-0 bg-secondary-lighter dark:bg-gray-800 z-[60000] flex flex-col transition-transform duration-300 ${isOpen ? 'translate-y-0' : 'translate-y-full'}`} onClick={e => e.stopPropagation()}>
-            <header className="flex-shrink-0 p-2 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
-                <button onClick={() => setIsDeleting(true)} className="p-2 rounded-full text-gray-500 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
-                <button onClick={handleSave} className="bg-primary text-white font-bold rounded-full px-5 py-2 text-sm shadow-md hover:bg-primary-dark transition-all">Guardar</button>
-            </header>
-            <main className="flex-grow p-4 space-y-4 overflow-y-auto custom-scrollbar">
-                {activeSubView === 'main' && renderMainView()}
-                {activeSubView === 'reminder' && renderReminderSettings()}
-                {activeSubView === 'recurrence' && renderRecurrenceSettings()}
-            </main>
-            <ConfirmationModal isOpen={isDeleting} onClose={() => setIsDeleting(false)} onConfirm={confirmDelete} title="Eliminar Tarea" message="¿Seguro que quieres eliminar esta tarea?"/>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60000] flex items-end animate-fade-in" onClick={onClose}>
+            <div
+                className="w-full max-h-[90vh] bg-secondary-lighter dark:bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col animate-slide-up"
+                onClick={e => e.stopPropagation()}
+            >
+                <header className="flex-shrink-0 p-2 border-b border-black/5 dark:border-white/5 flex items-center justify-between relative">
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                    <button onClick={() => setIsDeleting(true)} className="p-2 rounded-full text-gray-500 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
+                    <button onClick={handleSave} className="bg-primary text-white font-bold rounded-full px-5 py-2 text-sm shadow-md hover:bg-primary-dark transition-all">Guardar</button>
+                </header>
+                <main className="flex-grow p-4 space-y-4 overflow-y-auto custom-scrollbar">
+                    {activeSubView === 'main' && renderMainView()}
+                    {activeSubView === 'reminder' && renderReminderSettings()}
+                    {activeSubView === 'recurrence' && renderRecurrenceSettings()}
+                </main>
+                <ConfirmationModal isOpen={isDeleting} onClose={() => setIsDeleting(false)} onConfirm={confirmDelete} title="Eliminar Tarea" message="¿Seguro que quieres eliminar esta tarea?"/>
+            </div>
         </div>
     );
 };
