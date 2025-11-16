@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -52,6 +53,7 @@ import LinkIcon from './components/icons/LinkIcon';
 import NotificationsPanel from './components/NotificationsPanel';
 import ProjectEditorPanel from './components/ProjectEditorPanel';
 import HabitTracker from './components/HabitTracker';
+import HabitEditorPanel from './components/HabitEditorPanel';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -254,9 +256,12 @@ interface AppComponentProps {
   handleDeleteProject: (projectId: number) => Promise<void>;
   handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
   handleArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
-  handleAddHabit: (name: string, emoji: string, frequency: 'daily' | 'weekly') => Promise<void>;
+  handleAddHabit: (name: string, emoji: string, frequency: HabitFrequency) => Promise<void>;
+  handleUpdateHabit: (habitId: number, name: string, emoji: string | null, frequency: HabitFrequency) => Promise<void>;
   handleDeleteHabit: (habitId: number) => Promise<void>;
   handleToggleHabitRecord: (habitId: number, date: string) => Promise<void>;
+  onOpenHabitCreator: () => void;
+  onOpenHabitEditor: (habit: Habit) => void;
   handleAddPlaylist: (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   handleUpdatePlaylist: (playlist: Playlist) => Promise<void>;
   handleDeletePlaylist: (playlistId: number) => Promise<void>;
@@ -301,7 +306,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
-    handleAddHabit, handleDeleteHabit, handleToggleHabitRecord,
+    handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator, onOpenHabitEditor,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
@@ -615,7 +620,14 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
            {openWindows.includes('habits') && (
             <ModalWindow isOpen={true} onClose={() => toggleWindow('habits')} title="Seguimiento de Hábitos" isDraggable isResizable zIndex={focusedWindow === 'habits' ? 50 : 40} onFocus={() => bringToFront('habits')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.habits} onStateChange={s => setWindowStates(ws => ({...ws, habits: s}))}>
-              <HabitTracker habits={habits} records={habitRecords} onAddHabit={handleAddHabit} onDeleteHabit={handleDeleteHabit} onToggleRecord={handleToggleHabitRecord} />
+              <HabitTracker 
+                habits={habits} 
+                records={habitRecords} 
+                onOpenHabitCreator={onOpenHabitCreator}
+                onOpenHabitEditor={onOpenHabitEditor}
+                onDeleteHabit={handleDeleteHabit} 
+                onToggleRecord={handleToggleHabitRecord}
+              />
             </ModalWindow>
           )}
           {openWindows.includes('notes') && (
@@ -670,7 +682,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
-      handleAddHabit, handleDeleteHabit, handleToggleHabitRecord,
+      handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator, onOpenHabitEditor,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
@@ -889,7 +901,14 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'habits':
                 return (
                      <div className="h-full pt-8">
-                        <HabitTracker habits={habits} records={habitRecords} onAddHabit={handleAddHabit} onDeleteHabit={handleDeleteHabit} onToggleRecord={handleToggleHabitRecord} />
+                        <HabitTracker 
+                            habits={habits} 
+                            records={habitRecords} 
+                            onOpenHabitCreator={onOpenHabitCreator}
+                            onOpenHabitEditor={onOpenHabitEditor}
+                            onDeleteHabit={handleDeleteHabit} 
+                            onToggleRecord={handleToggleHabitRecord}
+                        />
                     </div>
                 );
             case 'notes':
@@ -1148,6 +1167,8 @@ const App: React.FC = () => {
   const [habitRecords, setHabitRecords] = useState<HabitRecord[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
+  const [isHabitEditorOpen, setIsHabitEditorOpen] = useState(false);
+  const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
   
   // UI state
   const [browserSession, setBrowserSession] = useState<BrowserSession>({});
@@ -1397,8 +1418,29 @@ const App: React.FC = () => {
     setPlaylists(cachedPlaylists);
     setQuickNotes(cachedQuickNotes);
     setProjects(cachedProjects);
-    setHabits(cachedHabits);
     setHabitRecords(cachedHabitRecords);
+
+    // Parse habits from cache
+    const parsedCachedHabits: Habit[] = (cachedHabits as any[]).map((h: any) => {
+        let parsedFrequency: HabitFrequency;
+        if (typeof h.frequency === 'string') {
+            try {
+                parsedFrequency = JSON.parse(h.frequency);
+            } catch (e) {
+                if (h.frequency === 'daily' || h.frequency === 'weekly') {
+                    parsedFrequency = { type: 'daily' };
+                } else {
+                    parsedFrequency = { type: 'daily' };
+                }
+            }
+        } else if (typeof h.frequency === 'object' && h.frequency !== null) {
+            parsedFrequency = h.frequency;
+        } else {
+            parsedFrequency = { type: 'daily' };
+        }
+        return { ...h, frequency: parsedFrequency };
+    });
+    setHabits(parsedCachedHabits);
     
     setDataLoaded(true);
 
@@ -1472,7 +1514,31 @@ const App: React.FC = () => {
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
       if(projectsData) { setProjects(projectsData); await clearAndPutAll('projects', projectsData); }
-      if(habitsData) { setHabits(habitsData); await clearAndPutAll('habits', habitsData); }
+      if(habitsData) { 
+            const parsedHabits: Habit[] = (habitsData as any[]).map((h: any) => {
+                let parsedFrequency: HabitFrequency;
+                if (typeof h.frequency === 'string') {
+                    try {
+                        parsedFrequency = JSON.parse(h.frequency);
+                    } catch (e) {
+                        // Handle old string values
+                        if (h.frequency === 'daily' || h.frequency === 'weekly') {
+                            parsedFrequency = { type: 'daily' };
+                        } else {
+                            parsedFrequency = { type: 'daily' }; // Default fallback
+                        }
+                    }
+                } else if (typeof h.frequency === 'object' && h.frequency !== null) {
+                    parsedFrequency = h.frequency; // It might already be an object
+                }
+                else {
+                    parsedFrequency = { type: 'daily' }; // Fallback for null/undefined
+                }
+                return { ...h, frequency: parsedFrequency };
+            });
+            setHabits(parsedHabits);
+            await clearAndPutAll('habits', habitsData);
+      }
       if(habitRecordsData) { setHabitRecords(habitRecordsData); await clearAndPutAll('habit_records', habitRecordsData); }
 
       if (profileData) {
@@ -2144,7 +2210,7 @@ const App: React.FC = () => {
   };
   
   // --- Habit Handlers ---
-  const handleAddHabit = useCallback(async (name: string, emoji: string, frequency: 'daily' | 'weekly') => {
+  const handleAddHabit = useCallback(async (name: string, emoji: string, frequency: HabitFrequency) => {
     if (!user) return;
     const tempId = -Date.now();
     const newHabit: Habit = { 
@@ -2156,14 +2222,29 @@ const App: React.FC = () => {
         created_at: new Date().toISOString()
     };
     setHabits(h => [...h, newHabit]);
-    const savedHabit = await syncableCreate('habits', newHabit) as Habit;
+    const payloadForDb = { ...newHabit, frequency: JSON.stringify(frequency) };
+    const savedHabit = await syncableCreate('habits', payloadForDb) as any;
     if (savedHabit.id !== tempId) {
-        setHabits(h => h.map(item => item.id === tempId ? savedHabit : item));
+        const parsedSavedHabit: Habit = { ...savedHabit, frequency: JSON.parse(savedHabit.frequency) };
+        setHabits(h => h.map(item => item.id === tempId ? parsedSavedHabit : item));
     }
   }, [user]);
 
+  const handleUpdateHabit = async (habitId: number, name: string, emoji: string | null, frequency: HabitFrequency) => {
+      const habitToUpdate = habits.find(h => h.id === habitId);
+      if(!habitToUpdate) return;
+      const updatedHabit: Habit = { ...habitToUpdate, name, emoji, frequency };
+
+      setHabits(h => h.map(habit => habit.id === habitId ? updatedHabit : habit));
+      const payloadForDb = { ...updatedHabit, frequency: JSON.stringify(frequency) };
+      const savedHabit = await syncableUpdate('habits', payloadForDb) as any;
+      const parsedSavedHabit: Habit = { ...savedHabit, frequency: JSON.parse(savedHabit.frequency) };
+      setHabits(h => h.map(habit => habit.id === habitId ? parsedSavedHabit : habit));
+  };
+
   const handleDeleteHabit = async (habitId: number) => {
     setHabits(h => h.filter(item => item.id !== habitId));
+    setHabitRecords(hr => hr.filter(r => r.habit_id !== habitId));
     await syncableDelete('habits', habitId);
   };
 
@@ -2191,6 +2272,25 @@ const App: React.FC = () => {
     }
   };
 
+  const handleOpenHabitCreator = () => {
+    setHabitToEdit(null);
+    setIsHabitEditorOpen(true);
+  };
+
+  const handleOpenHabitEditor = (habit: Habit) => {
+    setHabitToEdit(habit);
+    setIsHabitEditorOpen(true);
+  };
+  
+  const handleSaveHabit = (name: string, emoji: string, frequency: HabitFrequency) => {
+      if (habitToEdit) {
+          handleUpdateHabit(habitToEdit.id, name, emoji, frequency);
+      } else {
+          handleAddHabit(name, emoji, frequency);
+      }
+      setIsHabitEditorOpen(false);
+      setHabitToEdit(null);
+  };
 
   // --- Blob URL Cleanup ---
   useEffect(() => {
@@ -2813,7 +2913,7 @@ const App: React.FC = () => {
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
     handleArchiveProject,
-    handleAddHabit, handleDeleteHabit, handleToggleHabitRecord,
+    handleAddHabit, handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator: handleOpenHabitCreator, onOpenHabitEditor: handleOpenHabitEditor,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
@@ -2914,6 +3014,12 @@ const App: React.FC = () => {
         message={`¿Seguro que quieres eliminar todas las tareas anteriores al ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}? Esta acción es permanente.`}
         confirmText="Sí, limpiar"
         cancelText="Cancelar"
+      />
+      <HabitEditorPanel 
+        isOpen={isHabitEditorOpen}
+        onClose={() => { setIsHabitEditorOpen(false); setHabitToEdit(null); }}
+        onSave={handleSaveHabit}
+        habitToEdit={habitToEdit}
       />
       <audio ref={ambientAudioRef} />
     </>

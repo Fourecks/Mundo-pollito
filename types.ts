@@ -157,12 +157,20 @@ export interface EncouragementNote {
 }
 
 // --- Habit Tracker Types ---
+export type FrequencyType = 'daily' | 'specific_days' | 'times_per_week' | 'interval';
+
+export type HabitFrequency =
+    | { type: 'daily' }
+    | { type: 'specific_days'; days: number[] } // 0=Sun, 1=Mon...
+    | { type: 'times_per_week'; count: number }
+    | { type: 'interval'; days: number; startDate: string };
+
 export interface Habit {
   id: number;
   user_id: string;
   name: string;
   emoji: string | null;
-  frequency: 'daily' | 'weekly';
+  frequency: HabitFrequency;
   created_at: string;
 }
 
