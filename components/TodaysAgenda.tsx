@@ -55,7 +55,7 @@ const AgendaItem: React.FC<AgendaItemProps> = ({ task, onToggleTask, onToggleSub
           ) : (
             <span className="text-xs text-gray-400 dark:text-gray-500 italic">Sin hora</span>
           )}
-          <p className={`truncate text-gray-700 dark:text-gray-200 mt-0.5 ${task.completed ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
+          <p className={`truncate text-gray-700 dark:text-gray-200 mt-0.5 ${task.completed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-on-transparent'}`}>
             {task.text}
           </p>
         </div>
@@ -116,7 +116,7 @@ const CalendarEventItem: React.FC<{ event: GoogleCalendarEvent }> = ({ event }) 
                 <p className="font-semibold text-xs text-blue-600 dark:text-blue-300">
                     {formatEventTime(event.start, event.end)}
                 </p>
-                <p className="truncate text-gray-700 dark:text-gray-200 mt-0.5 font-semibold">
+                <p className="truncate text-gray-700 dark:text-gray-200 mt-0.5 font-semibold text-on-transparent">
                     {event.summary}
                 </p>
             </div>
@@ -198,7 +198,7 @@ const NotesView: React.FC<Pick<TodaysAgendaProps, 'quickNotes' | 'onAddQuickNote
             <div className="space-y-1.5">
                 {quickNotes.map(note => (
                     <div key={note.id} className="flex items-center justify-between bg-white/60 dark:bg-gray-700/50 p-2 rounded-lg group text-sm">
-                        <p className="text-gray-700 dark:text-gray-200 break-words flex-grow">{note.text}</p>
+                        <p className="text-gray-700 dark:text-gray-200 break-words flex-grow text-on-transparent">{note.text}</p>
                         <button 
                             onClick={() => onDeleteQuickNote(note.id)} 
                             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 p-1 rounded-full transition-opacity flex-shrink-0 ml-2"
@@ -252,13 +252,13 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
              <div className="flex border-b border-yellow-200/50 dark:border-gray-700/50 mb-2">
                 <button 
                     onClick={() => setActiveView('agenda')} 
-                    className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'agenda' ? 'text-gray-800 dark:text-gray-100 bg-white/80 dark:bg-gray-600/80' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'agenda' ? 'text-gray-800 dark:text-gray-100 bg-white/80 dark:bg-gray-600/80 text-on-transparent' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >
                     Agenda
                 </button>
                 <button 
                     onClick={() => setActiveView('notes')} 
-                    className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'notes' ? 'text-gray-800 dark:text-gray-100 bg-white/80 dark:bg-gray-600/80' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'notes' ? 'text-gray-800 dark:text-gray-100 bg-white/80 dark:bg-gray-600/80 text-on-transparent' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >
                     Notas Rápidas
                 </button>

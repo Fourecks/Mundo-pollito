@@ -187,9 +187,9 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
             const offset = circumference - (percentage / 100) * circumference;
         
             return (
-                <div className="flex flex-col h-full animate-fade-in">
+                <div className="flex flex-col h-full animate-fade-in p-4 space-y-4">
                     
-                    <div className="relative flex flex-col items-center justify-center p-6 flex-shrink-0">
+                    <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg relative flex flex-col items-center justify-center p-4 flex-shrink-0">
                         <button onClick={() => { setViewingProject(null); onViewProjectChange?.(null); }} className="absolute top-3 left-3 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 z-10">
                             <ChevronLeftIcon />
                         </button>
@@ -210,7 +210,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                         <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">{completedTasks} de {projectTasks.length} completadas</p>
                     </div>
 
-                    <div className="flex-grow overflow-y-auto custom-scrollbar p-4 pt-0 space-y-3">
+                    <div className="flex-grow overflow-y-auto custom-scrollbar space-y-3">
                         {projectTasks.length > 0 ? (
                             [...projectTasks]
                                 .sort((a,b) => (a.completed ? 1 : -1) - (b.completed ? 1 : -1) || (new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()))
@@ -324,8 +324,8 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     return (
         <div ref={containerRef} className="w-full bg-transparent flex flex-col h-full">
             <div className="flex-shrink-0 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center p-1 bg-black/5 dark:bg-black/20">
-                <button onClick={() => setActiveTab('tasks')} className={`w-1/2 py-1 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'tasks' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Tareas</button>
-                <button onClick={() => setActiveTab('projects')} className={`w-1/2 py-1 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'projects' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Proyectos</button>
+                <button onClick={() => setActiveTab('tasks')} className={`w-1/2 py-1 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'tasks' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Tareas</button>
+                <button onClick={() => setActiveTab('projects')} className={`w-1/2 py-1 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'projects' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Proyectos</button>
             </div>
 
             <div className="flex-grow overflow-hidden">

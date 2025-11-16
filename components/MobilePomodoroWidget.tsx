@@ -28,13 +28,13 @@ const MobilePomodoroWidget: React.FC<MobilePomodoroWidgetProps> = ({ timeLeft, i
             <div className="flex items-center gap-2 mb-1">
                 <button 
                     onClick={(e) => { e.stopPropagation(); onSwitchMode('work'); }} 
-                    className={`px-3 py-0.5 rounded-full text-xs font-semibold transition-colors ${mode === 'work' ? 'bg-primary text-white' : 'bg-white/50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-200'}`}
+                    className={`px-3 py-0.5 rounded-full text-xs font-semibold transition-colors ${mode === 'work' ? 'bg-primary text-white' : 'bg-white/50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-200 text-on-transparent'}`}
                 >
                     Pomodoro
                 </button>
                 <button 
                     onClick={(e) => { e.stopPropagation(); onSwitchMode('break'); }} 
-                    className={`px-3 py-0.5 rounded-full text-xs font-semibold transition-colors ${mode === 'break' ? 'bg-primary text-white' : 'bg-white/50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-200'}`}
+                    className={`px-3 py-0.5 rounded-full text-xs font-semibold transition-colors ${mode === 'break' ? 'bg-primary text-white' : 'bg-white/50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-200 text-on-transparent'}`}
                 >
                     Descanso
                 </button>
