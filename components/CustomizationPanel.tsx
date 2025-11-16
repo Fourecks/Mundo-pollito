@@ -99,8 +99,8 @@ const BackgroundsTab: React.FC<BackgroundsTabProps> = (props) => {
         <>
             <div className="p-2 border-b border-secondary-light/50 dark:border-gray-700/50 flex-shrink-0">
                 <div className="bg-black/5 dark:bg-black/20 rounded-full p-1 flex items-center gap-1">
-                    <button onClick={() => setView('all')} className={`w-full py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-colors ${view === 'all' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Todos</button>
-                    <button onClick={() => setView('favorites')} className={`w-full py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-colors ${view === 'favorites' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Favoritos</button>
+                    <button onClick={() => setView('all')} className={`w-full py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-colors ${view === 'all' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Todos</button>
+                    <button onClick={() => setView('favorites')} className={`w-full py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-colors ${view === 'favorites' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Favoritos</button>
                 </div>
             </div>
 
@@ -225,7 +225,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
             <div className="border-b border-secondary-light/50 dark:border-gray-700/50 flex-shrink-0">
                 <div className="flex items-center gap-1 p-2">
                     {tabs.map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`w-full py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === tab.id ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`w-full py-2 text-sm font-semibold rounded-lg transition-colors ${activeTab === tab.id ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>
                             {tab.label}
                         </button>
                     ))}
