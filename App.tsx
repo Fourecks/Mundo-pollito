@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -51,6 +51,7 @@ import IntegrationsPanel from './components/IntegrationsPanel';
 import LinkIcon from './components/icons/LinkIcon';
 import NotificationsPanel from './components/NotificationsPanel';
 import ProjectEditorPanel from './components/ProjectEditorPanel';
+import HabitTracker from './components/HabitTracker';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -219,6 +220,8 @@ interface AppComponentProps {
   allTodos: { [key: string]: Todo[] };
   folders: Folder[];
   projects: Project[];
+  habits: Habit[];
+  habitRecords: HabitRecord[];
   galleryImages: GalleryImage[];
   userBackgrounds: Background[];
   playlists: Playlist[];
@@ -251,6 +254,9 @@ interface AppComponentProps {
   handleDeleteProject: (projectId: number) => Promise<void>;
   handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
   handleArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
+  handleAddHabit: (name: string, emoji: string, frequency: 'daily' | 'weekly') => Promise<void>;
+  handleDeleteHabit: (habitId: number) => Promise<void>;
+  handleToggleHabitRecord: (habitId: number, date: string) => Promise<void>;
   handleAddPlaylist: (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   handleUpdatePlaylist: (playlist: Playlist) => Promise<void>;
   handleDeletePlaylist: (playlistId: number) => Promise<void>;
@@ -289,12 +295,13 @@ interface AppComponentProps {
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
     isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
-    allTodos, folders, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos, folders, projects, habits, habitRecords, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, uiSettings,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
+    handleAddHabit, handleDeleteHabit, handleToggleHabitRecord,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
@@ -606,14 +613,19 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               />
             </ModalWindow>
           )}
+           {openWindows.includes('habits') && (
+            <ModalWindow isOpen={true} onClose={() => toggleWindow('habits')} title="Seguimiento de Hábitos" isDraggable isResizable zIndex={focusedWindow === 'habits' ? 50 : 40} onFocus={() => bringToFront('habits')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.habits} onStateChange={s => setWindowStates(ws => ({...ws, habits: s}))}>
+              <HabitTracker habits={habits} records={habitRecords} onAddHabit={handleAddHabit} onDeleteHabit={handleDeleteHabit} onToggleRecord={handleToggleHabitRecord} />
+            </ModalWindow>
+          )}
           {openWindows.includes('notes') && (
               <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas del Pollito" isDraggable isResizable zIndex={focusedWindow === 'notes' ? 50 : 40} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStates.notes} onStateChange={s => setWindowStates(ws => ({...ws, notes: s}))}>
                   <NotesSection folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
               </ModalWindow>
           )}
           {openWindows.includes('gallery') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('gallery')} title="Galería de Recuerdos" isDraggable isResizable zIndex={focusedWindow === 'gallery' ? 50 : 40} onFocus={() => bringToFront('gallery')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.gallery} onStateChange={s => setWindowStates(ws => ({...ws, gallery: s}))}>
-                  <ImageGallery images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
+              <ModalWindow isOpen onClose={() => toggleWindow('gallery')} title="Recuerdos y Juegos" isDraggable isResizable zIndex={focusedWindow === 'gallery' ? 50 : 40} onFocus={() => bringToFront('gallery')} className="w-full max-w-4xl h-[85vh]" windowState={windowStates.gallery} onStateChange={s => setWindowStates(ws => ({...ws, gallery: s}))} noHeader>
+                  <ImageGallery images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} currentUser={capitalizedUserName} />
               </ModalWindow>
           )}
           {openWindows.includes('pomodoro') && (
@@ -630,11 +642,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               <ModalWindow isOpen onClose={() => toggleWindow('browser')} title="IA Pollito" isDraggable isResizable zIndex={focusedWindow === 'browser' ? 50 : 40} onFocus={() => bringToFront('browser')} className="w-full max-w-xl h-[85vh]" windowState={windowStates.browser} onStateChange={s => setWindowStates(ws => ({...ws, browser: s}))}>
                   <Browser session={browserSession} setSession={setBrowserSession} currentUser={currentUser} />
               </ModalWindow>
-          )}
-          {openWindows.includes('games') && (
-            <ModalWindow isOpen={true} onClose={() => toggleWindow('games')} title="Centro de Juegos" isDraggable isResizable zIndex={focusedWindow === 'games' ? 50 : 40} onFocus={() => bringToFront('games')} className="w-full max-w-4xl h-[85vh]" windowState={windowStates.games} onStateChange={s => setWindowStates(ws => ({...ws, games: s}))}>
-              <GamesHub galleryImages={galleryImages} currentUser={capitalizedUserName} />
-            </ModalWindow>
           )}
         </main>
       
@@ -657,12 +664,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
       isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
-      allTodos, folders, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+      allTodos, folders, projects, habits, habitRecords, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, uiSettings,
       activeTrack, activeSpotifyTrack,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
+      handleAddHabit, handleDeleteHabit, handleToggleHabitRecord,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
@@ -878,6 +886,12 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                         </button>
                     </div>
                 );
+            case 'habits':
+                return (
+                     <div className="h-full pt-8">
+                        <HabitTracker habits={habits} records={habitRecords} onAddHabit={handleAddHabit} onDeleteHabit={handleDeleteHabit} onToggleRecord={handleToggleHabitRecord} />
+                    </div>
+                );
             case 'notes':
                 return (
                     <div className="h-full pt-8">
@@ -887,13 +901,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'gallery':
                 return (
                     <div className="flex flex-col h-full pt-8">
-                        <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} />
-                    </div>
-                );
-            case 'games':
-                return (
-                    <div className="h-full pt-8">
-                        <GamesHub galleryImages={galleryImages} isMobile={true} currentUser={capitalizedUserName} />
+                        <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} currentUser={capitalizedUserName} />
                     </div>
                 );
             case 'more':
@@ -1136,6 +1144,8 @@ const App: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitRecords, setHabitRecords] = useState<HabitRecord[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
   
@@ -1322,7 +1332,7 @@ const App: React.FC = () => {
             setUiSettings(null);
             // Reset all state
             setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
-            setProjects([]);
+            setProjects([]); setHabits([]); setHabitRecords([]);
             setGalleryImages([]); setUserBackgrounds([]);
             setGoogleApiToken(null);
         }
@@ -1356,13 +1366,15 @@ const App: React.FC = () => {
     if (!user) return;
     
     // Load from cache first for instant UI
-    const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedProjects] = await Promise.all([
+    const [cachedTodos, cachedFolders, cachedNotes, cachedPlaylists, cachedQuickNotes, cachedProjects, cachedHabits, cachedHabitRecords] = await Promise.all([
         getAll<Todo>('todos'),
         getAll<Folder>('folders'),
         getAll<Note>('notes'),
         getAll<Playlist>('playlists'),
         getAll<QuickNote>('quick_notes'),
         getAll<Project>('projects'),
+        getAll<Habit>('habits'),
+        getAll<HabitRecord>('habit_records'),
     ]);
 
     const todosByDate: { [key: string]: Todo[] } = {};
@@ -1385,6 +1397,8 @@ const App: React.FC = () => {
     setPlaylists(cachedPlaylists);
     setQuickNotes(cachedQuickNotes);
     setProjects(cachedProjects);
+    setHabits(cachedHabits);
+    setHabitRecords(cachedHabitRecords);
     
     setDataLoaded(true);
 
@@ -1398,6 +1412,8 @@ const App: React.FC = () => {
         { data: playlistsData },
         { data: quickNotesData },
         { data: projectsData },
+        { data: habitsData },
+        { data: habitRecordsData },
         { data: profileData }
       ] = await Promise.all([
         supabase.from('todos').select('*, subtasks(*)').order('created_at'),
@@ -1406,6 +1422,8 @@ const App: React.FC = () => {
         supabase.from('playlists').select('*').order('created_at'),
         supabase.from('quick_notes').select('*').order('created_at'),
         supabase.from('projects').select('*').order('name'),
+        supabase.from('habits').select('*').order('created_at'),
+        supabase.from('habit_records').select('*').order('created_at'),
         supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings').eq('id', user.id).single(),
       ]);
       
@@ -1454,6 +1472,8 @@ const App: React.FC = () => {
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
       if(projectsData) { setProjects(projectsData); await clearAndPutAll('projects', projectsData); }
+      if(habitsData) { setHabits(habitsData); await clearAndPutAll('habits', habitsData); }
+      if(habitRecordsData) { setHabitRecords(habitRecordsData); await clearAndPutAll('habit_records', habitRecordsData); }
 
       if (profileData) {
           if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
@@ -2122,6 +2142,55 @@ const App: React.FC = () => {
     setQuickNotes([]);
     await syncableDeleteAll('quick_notes', user.id);
   };
+  
+  // --- Habit Handlers ---
+  const handleAddHabit = useCallback(async (name: string, emoji: string, frequency: 'daily' | 'weekly') => {
+    if (!user) return;
+    const tempId = -Date.now();
+    const newHabit: Habit = { 
+        id: tempId, 
+        name, 
+        emoji, 
+        frequency,
+        user_id: user.id, 
+        created_at: new Date().toISOString()
+    };
+    setHabits(h => [...h, newHabit]);
+    const savedHabit = await syncableCreate('habits', newHabit) as Habit;
+    if (savedHabit.id !== tempId) {
+        setHabits(h => h.map(item => item.id === tempId ? savedHabit : item));
+    }
+  }, [user]);
+
+  const handleDeleteHabit = async (habitId: number) => {
+    setHabits(h => h.filter(item => item.id !== habitId));
+    await syncableDelete('habits', habitId);
+  };
+
+  const handleToggleHabitRecord = async (habitId: number, date: string) => {
+    if(!user) return;
+    const existingRecord = habitRecords.find(r => r.habit_id === habitId && r.completed_at === date);
+    if(existingRecord) {
+        // Delete it
+        setHabitRecords(r => r.filter(item => item.id !== existingRecord.id));
+        await syncableDelete('habit_records', existingRecord.id);
+    } else {
+        // Create it
+        const tempId = -Date.now();
+        const newRecord: HabitRecord = {
+            id: tempId,
+            habit_id: habitId,
+            completed_at: date,
+            user_id: user.id
+        };
+        setHabitRecords(r => [...r, newRecord]);
+        const savedRecord = await syncableCreate('habit_records', newRecord) as HabitRecord;
+        if (savedRecord.id !== tempId) {
+            setHabitRecords(r => r.map(item => item.id === tempId ? savedRecord : item));
+        }
+    }
+  };
+
 
   // --- Blob URL Cleanup ---
   useEffect(() => {
@@ -2736,7 +2805,7 @@ const App: React.FC = () => {
   const appProps: AppComponentProps = {
     isOnline, isSyncing, currentUser: user, onLogout: handleLogout, 
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
-    allTodos, folders: foldersWithNotes, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos, folders: foldersWithNotes, projects, habits, habitRecords, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, 
     uiSettings,
     activeTrack, activeSpotifyTrack, 
@@ -2744,6 +2813,7 @@ const App: React.FC = () => {
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
     handleArchiveProject,
+    handleAddHabit, handleDeleteHabit, handleToggleHabitRecord,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,

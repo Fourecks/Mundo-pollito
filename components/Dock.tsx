@@ -6,8 +6,7 @@ import MusicIcon from './icons/MusicIcon';
 import ClockIcon from './icons/ClockIcon';
 import ChickenIcon from './ChickenIcon';
 import { WindowType } from '../types';
-import GameIcon from './icons/GameIcon';
-import StickyNoteIcon from './icons/StickyNoteIcon';
+import CheckBadgeIcon from './icons/CheckBadgeIcon';
 
 interface DockProps {
   onButtonClick: (window: WindowType) => void;
@@ -16,10 +15,10 @@ interface DockProps {
 
 const dockItems: { id: WindowType; label: string; icon: React.FC }[] = [
   { id: 'todo', label: 'Tareas', icon: ListIcon },
+  { id: 'habits', label: 'Hábitos', icon: CheckBadgeIcon },
   { id: 'pomodoro', label: 'Pomodoro', icon: ClockIcon },
   { id: 'notes', label: 'Notas', icon: NotesIcon },
   { id: 'gallery', label: 'Galería', icon: GalleryIcon },
-  { id: 'games', label: 'Juegos', icon: GameIcon },
   { id: 'music', label: 'Música', icon: MusicIcon },
   { id: 'browser', label: 'IA Pollito', icon: ChickenIcon },
 ];

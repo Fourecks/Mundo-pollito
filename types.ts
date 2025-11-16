@@ -7,7 +7,7 @@ export interface WindowState {
 
 export type Priority = 'low' | 'medium' | 'high';
 
-export type WindowType = 'todo' | 'notes' | 'gallery' | 'music' | 'pomodoro' | 'browser' | 'games';
+export type WindowType = 'todo' | 'notes' | 'gallery' | 'music' | 'pomodoro' | 'browser' | 'habits';
 
 export interface Subtask {
   id: number;
@@ -155,6 +155,24 @@ export interface EncouragementNote {
   id: string;
   text: string;
 }
+
+// --- Habit Tracker Types ---
+export interface Habit {
+  id: number;
+  user_id: string;
+  name: string;
+  emoji: string | null;
+  frequency: 'daily' | 'weekly';
+  created_at: string;
+}
+
+export interface HabitRecord {
+  id: number;
+  user_id: string;
+  habit_id: number;
+  completed_at: string; // YYYY-MM-DD
+}
+// --- End Habit Tracker Types ---
 
 // --- Google Calendar Types ---
 export interface GoogleCalendarEvent {

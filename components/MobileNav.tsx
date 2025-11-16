@@ -4,21 +4,21 @@ import ListIcon from './icons/ListIcon';
 import NotesIcon from './icons/NotesIcon';
 import GalleryIcon from './icons/GalleryIcon';
 import MoreIcon from './icons/MoreIcon';
-import GameIcon from './icons/GameIcon';
+import CheckBadgeIcon from './icons/CheckBadgeIcon';
 
 interface MobileNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
-type TabName = 'home' | 'tasks' | 'notes' | 'gallery' | 'games' | 'more';
+type TabName = 'home' | 'tasks' | 'habits' | 'notes' | 'gallery' | 'more';
 
 const navItems: { id: TabName; label: string; icon: React.FC }[] = [
   { id: 'home', label: 'Hoy', icon: HomeIcon },
   { id: 'tasks', label: 'Tareas', icon: ListIcon },
+  { id: 'habits', label: 'Hábitos', icon: CheckBadgeIcon },
   { id: 'notes', label: 'Notas', icon: NotesIcon },
   { id: 'gallery', label: 'Galería', icon: GalleryIcon },
-  { id: 'games', label: 'Juegos', icon: GameIcon },
   { id: 'more', label: 'Más', icon: MoreIcon },
 ];
 
