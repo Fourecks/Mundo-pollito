@@ -40,7 +40,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   
   // Effect to create and destroy the YouTube background player for the header
   useEffect(() => {
-    const videoId = 'uAUJxhHHjoE';
+    const videoId = '5qap5aO4i9A'; // Changed from a livestream to a loopable video.
     
     const createPlayer = () => {
       // Ensure the target element exists before creating the player

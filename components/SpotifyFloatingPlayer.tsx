@@ -9,6 +9,8 @@ interface SpotifyFloatingPlayerProps {
 
 const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, onClose }) => {
     const embedUrl = `https://open.spotify.com/embed/${track.type}/${track.id}?utm_source=generator`;
+    const isTrack = track.type === 'track';
+    const playerHeight = isTrack ? 80 : 352; // Standard height for playlists/albums is 352px
 
     return (
         // The `group` class enables the hover effect on the child button
@@ -17,7 +19,7 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
                 title="Spotify Player"
                 src={embedUrl}
                 width="100%"
-                height="80"
+                height={playerHeight}
                 frameBorder="0"
                 allowFullScreen
                 allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
