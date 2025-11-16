@@ -7,6 +7,7 @@ import ClockIcon from './icons/ClockIcon';
 import ChickenIcon from './ChickenIcon';
 import { WindowType } from '../types';
 import CheckBadgeIcon from './icons/CheckBadgeIcon';
+import ChartBarIcon from './icons/ChartBarIcon';
 
 interface DockProps {
   onButtonClick: (window: WindowType) => void;

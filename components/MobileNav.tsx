@@ -2,9 +2,9 @@ import React from 'react';
 import HomeIcon from './icons/HomeIcon';
 import ListIcon from './icons/ListIcon';
 import NotesIcon from './icons/NotesIcon';
-import GalleryIcon from './icons/GalleryIcon';
 import MoreIcon from './icons/MoreIcon';
 import CheckBadgeIcon from './icons/CheckBadgeIcon';
+import GalleryIcon from './icons/GalleryIcon';
 
 interface MobileNavProps {
   activeTab: string;

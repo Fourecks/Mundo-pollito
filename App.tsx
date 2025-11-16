@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -54,6 +56,9 @@ import NotificationsPanel from './components/NotificationsPanel';
 import ProjectEditorPanel from './components/ProjectEditorPanel';
 import HabitTracker from './components/HabitTracker';
 import HabitEditorPanel from './components/HabitEditorPanel';
+import ProgressView from './components/ProgressView';
+import GalleryIcon from './components/icons/GalleryIcon';
+import ChevronLeftIcon from './components/icons/ChevronLeftIcon';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -573,8 +578,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         onSendTestNotification={handleNotificationAction}
       />
       
-      <div className={`fixed top-4 left-4 z-30 w-64 space-y-4 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block`}>
-          <Greeting name={capitalizedUserName} />
+      <div className={`fixed top-4 left-4 z-30 space-y-4 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block`}>
+          <div className="flex items-center gap-2">
+            <Greeting name={capitalizedUserName} />
+            <button onClick={() => toggleWindow('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800">
+                Progreso
+            </button>
+          </div>
           <BibleVerse />
           <TodaysAgenda 
             tasks={todayAgendaTasks} 
@@ -629,6 +639,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 onToggleRecord={handleToggleHabitRecord}
               />
             </ModalWindow>
+          )}
+          {openWindows.includes('progreso') && (
+              <ModalWindow isOpen onClose={() => toggleWindow('progreso')} title="Informe de Crecimiento" isDraggable isResizable zIndex={focusedWindow === 'progreso' ? 50 : 40} onFocus={() => bringToFront('progreso')} className="w-full max-w-4xl h-[85vh]" windowState={windowStates.progreso} onStateChange={s => setWindowStates(ws => ({...ws, progreso: s}))}>
+                  <ProgressView 
+                      allTodos={allTodos} 
+                      projects={projects} 
+                      habits={habits} 
+                      habitRecords={habitRecords} 
+                  />
+              </ModalWindow>
           )}
           {openWindows.includes('notes') && (
               <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas del Pollito" isDraggable isResizable zIndex={focusedWindow === 'notes' ? 50 : 40} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStates.notes} onStateChange={s => setWindowStates(ws => ({...ws, notes: s}))}>
@@ -847,8 +867,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'home':
                 return (
                     <>
-                        <header className="sticky top-0 p-4 z-30">
+                        <header className="sticky top-0 p-4 z-30 flex items-center justify-between">
                             <Greeting name={capitalizedUserName} />
+                            <button onClick={() => setActiveTab('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800">
+                                Progreso
+                            </button>
                         </header>
                         <div className="p-4 space-y-4">
                              <BibleVerse />
@@ -917,9 +940,21 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                       <NotesSection isMobile={true} folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
                     </div>
                 );
-            case 'gallery':
+             case 'progreso':
                 return (
-                    <div className="flex flex-col h-full pt-8">
+                    <div className="flex flex-col h-full">
+                        <ProgressView 
+                            allTodos={allTodos} 
+                            projects={projects} 
+                            habits={habits} 
+                            habitRecords={habitRecords}
+                            onBack={() => setActiveTab('home')}
+                        />
+                    </div>
+                );
+            case 'gallery':
+                 return (
+                    <div className="flex flex-col h-full animate-fade-in">
                         <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} currentUser={capitalizedUserName} />
                     </div>
                 );
@@ -992,7 +1027,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 {renderContent()}
             </main>
             
-            {activeTab !== 'tasks' && activeTab !== 'notes' && (
+            {activeTab !== 'tasks' && activeTab !== 'notes' && activeTab !== 'gallery' && (
               <button onClick={() => setIsAiBrowserOpen(true)} className="mobile-ai-button fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40">
                   <ChickenIcon className="w-6 h-6" />
               </button>
@@ -1165,6 +1200,7 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitRecords, setHabitRecords] = useState<HabitRecord[]>([]);
+  const [processingHabitRecord, setProcessingHabitRecord] = useState<string | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [quickNotes, setQuickNotes] = useState<QuickNote[]>([]);
   const [isHabitEditorOpen, setIsHabitEditorOpen] = useState(false);
@@ -1680,6 +1716,80 @@ const App: React.FC = () => {
     }
     return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
   }, [uiSettings, user, dataLoaded, isOnline]);
+
+  // --- Robust Pomodoro State Persistence ---
+  const pomodoroInitialized = useRef(false);
+
+  useEffect(() => {
+    // This effect loads the pomodoro state from localStorage ONCE when the app is ready.
+    if (user && dataLoaded && !pomodoroInitialized.current) {
+        pomodoroInitialized.current = true;
+        const savedStateJSON = localStorage.getItem(getUserKey('pomodoroState'));
+        if (savedStateJSON) {
+            try {
+                const savedState = JSON.parse(savedStateJSON);
+                
+                if (savedState.isActive && savedState.endTime) {
+                    const remainingMs = savedState.endTime - Date.now();
+                    if (remainingMs > 0) {
+                        // Timer was active and is still running. Resume it.
+                        setPomodoroState(s => ({
+                            ...s,
+                            ...savedState,
+                            isActive: true,
+                            timeLeft: Math.ceil(remainingMs / 1000),
+                        }));
+                    } else {
+                        // Timer finished while the app was closed.
+                        const timeElapsed = Math.abs(remainingMs);
+                        let newMode = savedState.mode;
+                        let newTimeLeft = 0;
+                        let timeAfterFinishing = timeElapsed;
+
+                        // Cycle through phases that would have passed
+                        while (timeAfterFinishing > 0) {
+                            const durationOfFinishedPhase = savedState.durations[newMode];
+                            if (timeAfterFinishing < durationOfFinishedPhase * 1000) {
+                                newTimeLeft = (durationOfFinishedPhase * 1000) - timeAfterFinishing;
+                                break;
+                            }
+                            timeAfterFinishing -= durationOfFinishedPhase * 1000;
+                            newMode = newMode === 'work' ? 'break' : 'work';
+                        }
+                        
+                        setPomodoroState(s => ({
+                            ...s,
+                            ...savedState,
+                            isActive: false, // Don't auto-start the next phase
+                            endTime: null,
+                            mode: newMode,
+                            timeLeft: Math.ceil(newTimeLeft / 1000),
+                        }));
+                    }
+                } else if (savedState.timeLeft) {
+                    // Timer was paused. Restore its state.
+                    setPomodoroState(s => ({
+                        ...s,
+                        ...savedState,
+                        isActive: false,
+                        endTime: null,
+                    }));
+                }
+            } catch (e) {
+                console.error("Failed to parse saved pomodoro state, clearing it.", e);
+                localStorage.removeItem(getUserKey('pomodoroState'));
+            }
+        }
+    }
+  }, [user, dataLoaded, getUserKey]);
+
+  useEffect(() => {
+      // This effect saves the pomodoro state to localStorage on every change.
+      if (user && dataLoaded) {
+          const { ...stateToSave } = pomodoroState;
+          localStorage.setItem(getUserKey('pomodoroState'), JSON.stringify(stateToSave));
+      }
+  }, [pomodoroState, user, dataLoaded, getUserKey]);
 
 
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('browserSession'), value: browserSession }); }, [browserSession, getUserKey, user, dataLoaded]);
@@ -2263,25 +2373,35 @@ const App: React.FC = () => {
 
   const handleToggleHabitRecord = async (habitId: number, date: string) => {
     if(!user) return;
-    const existingRecord = habitRecords.find(r => r.habit_id === habitId && r.completed_at === date);
-    if(existingRecord) {
-        // Delete it
-        setHabitRecords(r => r.filter(item => item.id !== existingRecord.id));
-        await syncableDelete('habit_records', existingRecord.id);
-    } else {
-        // Create it
-        const tempId = -Date.now();
-        const newRecord: HabitRecord = {
-            id: tempId,
-            habit_id: habitId,
-            completed_at: date,
-            user_id: user.id
-        };
-        setHabitRecords(r => [...r, newRecord]);
-        const savedRecord = await syncableCreate('habit_records', newRecord) as HabitRecord;
-        if (savedRecord.id !== tempId) {
-            setHabitRecords(r => r.map(item => item.id === tempId ? savedRecord : item));
+    const recordKey = `${habitId}-${date}`;
+    if (processingHabitRecord === recordKey) {
+        return; // Prevent rapid-fire clicks
+    }
+    setProcessingHabitRecord(recordKey);
+
+    try {
+        const existingRecord = habitRecords.find(r => r.habit_id === habitId && r.completed_at === date);
+        if(existingRecord) {
+            // Delete it
+            setHabitRecords(r => r.filter(item => item.id !== existingRecord.id));
+            await syncableDelete('habit_records', existingRecord.id);
+        } else {
+            // Create it
+            const tempId = -Date.now();
+            const newRecord: HabitRecord = {
+                id: tempId,
+                habit_id: habitId,
+                completed_at: date,
+                user_id: user.id
+            };
+            setHabitRecords(r => [...r, newRecord]);
+            const savedRecord = await syncableCreate('habit_records', newRecord) as HabitRecord;
+            if (savedRecord.id !== tempId) {
+                setHabitRecords(r => r.map(item => item.id === tempId ? savedRecord : item));
+            }
         }
+    } finally {
+        setProcessingHabitRecord(null);
     }
   };
 

@@ -7,7 +7,7 @@ export interface WindowState {
 
 export type Priority = 'low' | 'medium' | 'high';
 
-export type WindowType = 'todo' | 'notes' | 'gallery' | 'music' | 'pomodoro' | 'browser' | 'habits';
+export type WindowType = 'todo' | 'notes' | 'gallery' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso';
 
 export interface Subtask {
   id: number;
