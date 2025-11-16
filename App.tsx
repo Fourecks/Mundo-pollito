@@ -827,7 +827,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'home':
                 return (
                     <>
-                        <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-4 z-30 border-b border-gray-200/50 dark:border-gray-700/50">
+                        <header className="sticky top-0 p-4 z-30">
                             <Greeting name={capitalizedUserName} />
                         </header>
                         <div className="p-4 space-y-4">
