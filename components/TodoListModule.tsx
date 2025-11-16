@@ -32,10 +32,11 @@ interface TodoListModuleProps {
     isMobile?: boolean;
     onClearPastTodos: () => void;
     projects: Project[];
-    onAddProject: (name: string, emoji: string | null) => Promise<Project | null>;
-    onUpdateProject: (projectId: number, name: string, emoji: string | null) => Promise<void>;
+    onAddProject: (name: string, emoji: string | null, color: string | null) => Promise<Project | null>;
+    onUpdateProject: (projectId: number, name: string, emoji: string | null, color: string | null) => Promise<void>;
     onDeleteProject: (projectId: number) => Promise<void>;
     onDeleteProjectAndTasks: (projectId: number) => Promise<void>;
+    handleArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
     onViewProjectChange?: (projectId: number | null) => void;
     calendarEvents: GoogleCalendarEvent[];
 }
@@ -49,11 +50,13 @@ const formatDateKey = (date: Date): string => {
 
 const priorityOrder: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
 
+const projectColors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899'];
+
 const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const {
         allTodos, addTodo, toggleTodo, toggleSubtask, deleteTodo, updateTodo, onEditTodo,
         selectedDate, setSelectedDate, datesWithTasks, datesWithAllTasksCompleted,
-        isMobile = false, onClearPastTodos, projects, onAddProject, onUpdateProject,
+        isMobile = false, onClearPastTodos, projects, onAddProject, onUpdateProject, handleArchiveProject,
         onDeleteProject, onDeleteProjectAndTasks, onViewProjectChange, calendarEvents
     } = props;
     // Common State
@@ -72,9 +75,11 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const [isAddingProject, setIsAddingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [newProjectEmoji, setNewProjectEmoji] = useState<string | null>(null);
+    const [newProjectColor, setNewProjectColor] = useState<string | null>(projectColors[0]);
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
-    const [editingProject, setEditingProject] = useState<{ id: number; name: string; emoji: string | null; } | null>(null);
+    const [editingProject, setEditingProject] = useState<{ id: number; name: string; emoji: string | null; color: string | null; } | null>(null);
+    const [showArchived, setShowArchived] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     
     // Memoized calculations
@@ -129,16 +134,17 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     // Handlers for 'Projects' tab
     const handleAddProject = async () => {
         if (newProjectName.trim()) {
-            await onAddProject(newProjectName.trim(), newProjectEmoji);
+            await onAddProject(newProjectName.trim(), newProjectEmoji, newProjectColor);
             setNewProjectName('');
             setNewProjectEmoji(null);
+            setNewProjectColor(projectColors[0]);
             setIsAddingProject(false);
         }
     };
     
     const handleSaveProjectName = () => {
         if (editingProject && editingProject.name.trim()) {
-            onUpdateProject(editingProject.id, editingProject.name.trim(), editingProject.emoji);
+            onUpdateProject(editingProject.id, editingProject.name.trim(), editingProject.emoji, editingProject.color);
         }
         setEditingProject(null);
     };
@@ -154,7 +160,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     }, []);
 
 
-    const CircularProgressWithChicken = ({ percentage, emoji }: { percentage: number, emoji?: string | null }) => {
+    const CircularProgressWithChicken = ({ percentage, emoji, color }: { percentage: number, emoji?: string | null, color?: string | null }) => {
         const radius = 45;
         const circumference = 2 * Math.PI * radius;
         const offset = circumference - (percentage / 100) * circumference;
@@ -163,7 +169,18 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
             <div className="relative w-24 h-24 sm:w-28 sm:h-28">
                 <svg className="w-full h-full" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" className="text-secondary-light/50 dark:text-gray-700" />
-                    <circle cx="50" cy="50" r={radius} stroke="currentColor" strokeWidth="8" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} className="text-primary transform -rotate-90 origin-center transition-all duration-700 ease-out" />
+                    <circle
+                        cx="50"
+                        cy="50"
+                        r={radius}
+                        strokeWidth="8"
+                        fill="transparent"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        className="transform -rotate-90 origin-center transition-all duration-700 ease-out"
+                        style={{ stroke: color || 'var(--color-primary)' }}
+                    />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                     {emoji ? (
@@ -196,7 +213,18 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                         <div className="relative w-36 h-36">
                             <svg className="w-full h-full" viewBox="0 0 140 140">
                                 <circle cx="70" cy="70" r={radius} stroke="currentColor" strokeWidth="10" fill="transparent" className="text-secondary-light/50 dark:text-gray-700" />
-                                <circle cx="70" cy="70" r={radius} stroke="currentColor" strokeWidth="10" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} className="text-primary transform -rotate-90 origin-center transition-all duration-700 ease-out" />
+                                <circle
+                                    cx="70"
+                                    cy="70"
+                                    r={radius}
+                                    strokeWidth="10"
+                                    fill="transparent"
+                                    strokeLinecap="round"
+                                    strokeDasharray={circumference}
+                                    strokeDashoffset={offset}
+                                    className="transform -rotate-90 origin-center transition-all duration-700 ease-out"
+                                    style={{ stroke: viewingProject.color || 'var(--color-primary)' }}
+                                />
                             </svg>
                             <div className="absolute inset-0 flex items-center justify-center">
                                 {viewingProject.emoji ? (
@@ -214,7 +242,10 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                         {projectTasks.length > 0 ? (
                             [...projectTasks]
                                 .sort((a,b) => (a.completed ? 1 : -1) - (b.completed ? 1 : -1) || (new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()))
-                                .map(todo => <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} />)
+                                .map(todo => {
+                                    const projectForTodo = todo.project_id ? projects.find(p => p.id === todo.project_id) : null;
+                                    return <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} color={projectForTodo?.color} />
+                                })
                         ) : (
                             <p className="text-center text-gray-500 dark:text-gray-400 py-10">Este proyecto no tiene tareas. ¡Añade una!</p>
                         )}
@@ -223,17 +254,24 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
             );
         }
 
+        const projectsToDisplay = showArchived 
+            ? projectsWithProgress.filter(p => p.is_archived) 
+            : projectsWithProgress.filter(p => !p.is_archived);
+
         return (
             <div className="flex flex-col h-full">
-                <header className="flex-shrink-0 p-4 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center justify-between">
+                <header className="flex-shrink-0 p-4 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center justify-between gap-2">
                      <h2 className="text-xl font-bold text-primary-dark dark:text-primary">Mis Proyectos</h2>
+                     <button onClick={() => setShowArchived(!showArchived)} className="text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors px-3 py-1 rounded-full bg-black/5 dark:bg-black/20">
+                        {showArchived ? 'Ver Activos' : 'Ver Archivados'}
+                     </button>
                 </header>
                 <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {projectsWithProgress.map(project => {
+                    <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 ${showArchived ? 'opacity-80' : ''}`}>
+                        {projectsToDisplay.map(project => {
                             const percentage = project.total > 0 ? (project.completed / project.total) * 100 : 0;
                             return (
-                                <div key={project.id} className="relative group bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col items-center justify-between gap-2">
+                                <div key={project.id} className="relative group bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
                                     <div className="absolute top-2 right-2 z-10">
                                         <button
                                             onClick={(e) => {
@@ -247,17 +285,28 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                         </button>
                                         {menuOpenFor === project.id && (
                                             <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl z-20 animate-pop-in origin-top-right p-1">
-                                                <button onClick={() => { setEditingProject({ id: project.id, name: project.name, emoji: project.emoji || null }); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
+                                                <button onClick={() => { setEditingProject({ id: project.id, name: project.name, emoji: project.emoji || null, color: project.color || null }); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
                                                     Renombrar
                                                 </button>
-                                                <button onClick={() => { setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">
-                                                    Eliminar
-                                                </button>
+                                                {showArchived ? (
+                                                    <>
+                                                        <button onClick={() => { handleArchiveProject(project.id, false); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">Desarchivar</button>
+                                                        <button onClick={() => { setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">Eliminar</button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button onClick={() => { handleArchiveProject(project.id, true); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">Archivar</button>
+                                                        <button onClick={() => { setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">
+                                                            Eliminar
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </div>
-                                    <button onClick={() => { if (!editingProject) { setViewingProject(project); onViewProjectChange?.(project.id); } }} className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
-                                        {editingProject?.id === project.id ? (
+                                    
+                                    {editingProject?.id === project.id ? (
+                                        <div className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
                                             <input
                                                 type="text"
                                                 value={editingProject.emoji || ''}
@@ -265,56 +314,76 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                                 placeholder="✨"
                                                 className="w-12 h-12 text-2xl text-center rounded-full bg-white dark:bg-gray-700 border-2 border-secondary-light dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary"
                                                 maxLength={4}
-                                                onClick={e => e.stopPropagation()}
                                             />
-                                        ) : (
-                                            <CircularProgressWithChicken percentage={percentage} emoji={project.emoji} />
-                                        )}
-                                        <div className="w-full">
-                                            {editingProject?.id === project.id ? (
-                                                <input
-                                                    type="text"
-                                                    value={editingProject.name}
-                                                    onChange={(e) => setEditingProject(p => p ? { ...p, name: e.target.value } : null)}
-                                                    onBlur={handleSaveProjectName}
-                                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveProjectName(); }}
-                                                    className="w-full bg-white dark:bg-gray-700 text-base p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-center font-bold"
-                                                    autoFocus
-                                                    onClick={e => e.stopPropagation()}
-                                                />
-                                            ) : (
-                                                <h3 className="font-bold text-base text-gray-800 dark:text-gray-200 truncate">{project.name}</h3>
-                                            )}
-                                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{project.completed} / {project.total} completadas</p>
+                                            <input
+                                                type="text"
+                                                value={editingProject.name}
+                                                onChange={(e) => setEditingProject(p => p ? { ...p, name: e.target.value } : null)}
+                                                onBlur={handleSaveProjectName}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveProjectName(); }}
+                                                className="w-full bg-white dark:bg-gray-700 text-base p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-center font-bold"
+                                                autoFocus
+                                            />
+                                            <div className="flex flex-wrap justify-center gap-1.5 mt-1">
+                                                {projectColors.map(color => (
+                                                    <button
+                                                        key={color}
+                                                        onClick={() => setEditingProject(p => p ? { ...p, color } : null)}
+                                                        className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${editingProject?.color === color ? 'ring-2 ring-offset-2 ring-primary dark:ring-offset-gray-800' : ''}`}
+                                                        style={{ backgroundColor: color }}
+                                                    />
+                                                ))}
+                                            </div>
+                                             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 invisible">{project.completed} / {project.total} completadas</p>
                                         </div>
-                                    </button>
+                                    ) : (
+                                        <button onClick={() => { setViewingProject(project); onViewProjectChange?.(project.id); }} className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
+                                            <CircularProgressWithChicken percentage={percentage} emoji={project.emoji} color={project.color} />
+                                            <div className="w-full">
+                                                <h3 className="font-bold text-base text-gray-800 dark:text-gray-200 truncate">{project.name}</h3>
+                                                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{project.completed} / {project.total} completadas</p>
+                                            </div>
+                                        </button>
+                                    )}
                                 </div>
                             );
                         })}
-                        <div className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-secondary-light dark:border-gray-600 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 aspect-square">
-                            {isAddingProject ? (
-                                <>
-                                    <input
-                                        type="text"
-                                        value={newProjectEmoji || ''}
-                                        onChange={(e) => setNewProjectEmoji(e.target.value)}
-                                        placeholder="✨"
-                                        className="w-12 h-12 text-2xl text-center rounded-full bg-white dark:bg-gray-700 border-2 border-secondary-light dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary"
-                                        maxLength={4}
-                                    />
-                                    <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} onKeyDown={e => {if (e.key === 'Enter') handleAddProject()}} placeholder="Nombre del proyecto" className="w-full bg-white dark:bg-gray-700 text-sm p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-center" autoFocus />
-                                    <div className="flex gap-2">
-                                        <button onClick={() => { setIsAddingProject(false); setNewProjectName(''); setNewProjectEmoji(null); }} className="mt-2 text-xs font-semibold text-gray-500 px-3 py-1 bg-gray-200/50 rounded-full">Cancelar</button>
-                                        <button onClick={handleAddProject} className="mt-2 text-xs font-semibold text-primary px-3 py-1 bg-primary-light/50 rounded-full">Guardar</button>
-                                    </div>
-                                </>
-                            ) : (
-                                <button onClick={() => setIsAddingProject(true)} className="text-center text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary transition-colors">
-                                    <PlusIcon />
-                                    <span className="text-sm font-semibold mt-1 block">Nuevo Proyecto</span>
-                                </button>
-                            )}
-                        </div>
+                        {!showArchived && (
+                            <div className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-secondary-light dark:border-gray-600 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 aspect-square">
+                                {isAddingProject ? (
+                                    <>
+                                        <input
+                                            type="text"
+                                            value={newProjectEmoji || ''}
+                                            onChange={(e) => setNewProjectEmoji(e.target.value)}
+                                            placeholder="✨"
+                                            className="w-12 h-12 text-2xl text-center rounded-full bg-white dark:bg-gray-700 border-2 border-secondary-light dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary"
+                                            maxLength={4}
+                                        />
+                                        <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} onKeyDown={e => {if (e.key === 'Enter') handleAddProject()}} placeholder="Nombre del proyecto" className="w-full bg-white dark:bg-gray-700 text-sm p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-center" autoFocus />
+                                        <div className="flex flex-wrap justify-center gap-2 mt-2">
+                                            {projectColors.map(color => (
+                                                <button
+                                                    key={color}
+                                                    onClick={() => setNewProjectColor(color)}
+                                                    className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${newProjectColor === color ? 'ring-2 ring-offset-2 ring-primary dark:ring-offset-gray-700' : ''}`}
+                                                    style={{ backgroundColor: color }}
+                                                />
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2 mt-auto">
+                                            <button onClick={() => { setIsAddingProject(false); setNewProjectName(''); setNewProjectEmoji(null); }} className="mt-2 text-xs font-semibold text-gray-500 px-3 py-1 bg-gray-200/50 rounded-full">Cancelar</button>
+                                            <button onClick={handleAddProject} className="mt-2 text-xs font-semibold text-primary px-3 py-1 bg-primary-light/50 rounded-full">Guardar</button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <button onClick={() => setIsAddingProject(true)} className="text-center text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary transition-colors">
+                                        <PlusIcon />
+                                        <span className="text-sm font-semibold mt-1 block">Nuevo Proyecto</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -351,7 +420,10 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                 </div>
                             </div>
                             <div className="space-y-3 overflow-y-auto custom-scrollbar p-3 flex-grow min-h-0">
-                                {sortedTodos.length > 0 ? sortedTodos.map(todo => <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo}/>) : (<div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-300 py-10"><p className="font-medium">{todosForSelectedDate.length > 0 && hideCompleted ? '¡Todas las tareas completadas!' : '¡No hay tareas para este día!'}</p><p className="text-sm">{todosForSelectedDate.length > 0 && hideCompleted ? 'Desactiva "Ocultar completadas" para verlas.' : '¡Añade una para empezar a organizarte!'}</p></div>)}
+                                {sortedTodos.length > 0 ? sortedTodos.map(todo => {
+                                    const projectForTodo = todo.project_id ? projects.find(p => p.id === todo.project_id) : null;
+                                    return <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} color={projectForTodo?.color} />
+                                }) : (<div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-300 py-10"><p className="font-medium">{todosForSelectedDate.length > 0 && hideCompleted ? '¡Todas las tareas completadas!' : '¡No hay tareas para este día!'}</p><p className="text-sm">{todosForSelectedDate.length > 0 && hideCompleted ? 'Desactiva "Ocultar completadas" para verlas.' : '¡Añade una para empezar a organizarte!'}</p></div>)}
                             </div>
                             {calendarVisible && (<div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCalendarVisible(false)}><div className="bg-secondary-lighter dark:bg-gray-800 rounded-2xl shadow-xl p-4 w-full max-w-xs animate-pop-in" onClick={e => e.stopPropagation()}><Calendar selectedDate={selectedDate} setDate={(date) => { setSelectedDate(date); setCalendarVisible(false); }} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} calendarEvents={calendarEvents}/></div></div>)}
                         </div>

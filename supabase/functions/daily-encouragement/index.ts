@@ -18,12 +18,11 @@ serve(async (req) => {
   try {
     const nowUTC = new Date();
 
-    // 1. Fetch all profiles that have opted in and have a timezone offset.
-    // The column `daily_encouragement_hour_local` stores the user's preferred local hour (0-23).
+    // 1. Fetch all profiles that have a timezone offset and ui_settings configured.
     const { data: profiles, error } = await supabaseAdmin
         .from('profiles')
-        .select('id, daily_encouragement_hour_local, timezone_offset')
-        .not('daily_encouragement_hour_local', 'is', null)
+        .select('id, ui_settings, timezone_offset')
+        .not('ui_settings', 'is', null)
         .not('timezone_offset', 'is', null);
     
     if (error) throw error;
@@ -38,8 +37,15 @@ serve(async (req) => {
     
     // 2. Iterate over each user and check their local time.
     for (const profile of profiles) {
+      // Safely access the nested property from the ui_settings JSONB column
+      const preferredLocalHour = profile.ui_settings?.dailyEncouragementLocalHour;
+
+      // Skip this user if the setting is not a valid number (0 is a valid hour)
+      if (typeof preferredLocalHour !== 'number') {
+        continue;
+      }
+
       const userOffsetMinutes = profile.timezone_offset;
-      const preferredLocalHour = profile.daily_encouragement_hour_local;
       
       // Calculate the user's current local time.
       // `timezone_offset` from JS `getTimezoneOffset` is positive for zones west of UTC.

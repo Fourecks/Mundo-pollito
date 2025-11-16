@@ -245,10 +245,11 @@ interface AppComponentProps {
   handleAddNote: (folderId: number) => Promise<Note | null>;
   handleUpdateNote: (note: Note) => Promise<void>;
   handleDeleteNote: (noteId: number, folderId: number) => Promise<void>;
-  handleAddProject: (name: string, emoji: string | null) => Promise<Project | null>;
-  handleUpdateProject: (projectId: number, name: string, emoji: string | null) => Promise<void>;
+  handleAddProject: (name: string, emoji: string | null, color: string | null) => Promise<Project | null>;
+  handleUpdateProject: (projectId: number, name: string, emoji: string | null, color: string | null) => Promise<void>;
   handleDeleteProject: (projectId: number) => Promise<void>;
   handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
+  handleArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
   handleAddPlaylist: (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   handleUpdatePlaylist: (playlist: Playlist) => Promise<void>;
   handleDeletePlaylist: (playlistId: number) => Promise<void>;
@@ -294,7 +295,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     allTodos, folders, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour, dailySummaryHour,
     activeTrack, activeSpotifyTrack,
-    handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
+    handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
@@ -603,6 +604,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 onUpdateProject={handleUpdateProject}
                 onDeleteProject={handleDeleteProject}
                 onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
+                handleArchiveProject={handleArchiveProject}
                 calendarEvents={calendarEvents}
               />
             </ModalWindow>
@@ -661,7 +663,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       allTodos, folders, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, dailyEncouragementLocalHour, dailySummaryHour,
       activeTrack, activeSpotifyTrack,
-      handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos,
+      handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
@@ -846,6 +848,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onUpdateProject={handleUpdateProject}
                             onDeleteProject={handleDeleteProject}
                             onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
+                            handleArchiveProject={handleArchiveProject}
                             onViewProjectChange={setViewingProjectId}
                             calendarEvents={calendarEvents}
                         />
@@ -1984,10 +1987,10 @@ const App: React.FC = () => {
     await syncableDelete('notes', noteId);
   };
   
-  const handleAddProject = useCallback(async (name: string, emoji: string | null): Promise<Project | null> => {
+  const handleAddProject = useCallback(async (name: string, emoji: string | null, color: string | null): Promise<Project | null> => {
       if (!user) return null;
       const tempId = -Date.now();
-      const newProject: Project = { id: tempId, name, user_id: user.id, created_at: new Date().toISOString(), emoji };
+      const newProject: Project = { id: tempId, name, user_id: user.id, created_at: new Date().toISOString(), emoji, color };
       
       setProjects(p => [...p, newProject]);
       
@@ -1999,12 +2002,24 @@ const App: React.FC = () => {
       return savedProject;
   }, [user]);
 
-  const handleUpdateProject = async (projectId: number, name: string, emoji: string | null) => {
+  const handleUpdateProject = async (projectId: number, name: string, emoji: string | null, color: string | null) => {
       const projectToUpdate = projects.find(p => p.id === projectId);
       if(!projectToUpdate) return;
-      const updatedProject = { ...projectToUpdate, name, emoji };
+      const updatedProject = { ...projectToUpdate, name, emoji, color };
       setProjects(p => p.map(project => project.id === projectId ? updatedProject : project));
       
+      const savedProject = await syncableUpdate('projects', updatedProject);
+      setProjects(p => p.map(project => project.id === projectId ? savedProject : project));
+  };
+
+  const handleArchiveProject = async (projectId: number, isArchived: boolean) => {
+      const projectToUpdate = projects.find(p => p.id === projectId);
+      if(!projectToUpdate) return;
+      const updatedProject = { ...projectToUpdate, is_archived: isArchived };
+
+      setProjects(p => p.map(project => project.id === projectId ? updatedProject : project));
+      
+      // Use syncableUpdate which handles both online and offline scenarios
       const savedProject = await syncableUpdate('projects', updatedProject);
       setProjects(p => p.map(project => project.id === projectId ? savedProject : project));
   };
@@ -2714,10 +2729,11 @@ const App: React.FC = () => {
     pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, 
     dailyEncouragementLocalHour: uiSettings.dailyEncouragementLocalHour,
     dailySummaryHour: uiSettings.dailySummaryHour,
-    activeTrack, activeSpotifyTrack,
+    activeTrack, activeSpotifyTrack, 
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos: () => setIsClearPastConfirmOpen(true),
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
+    handleArchiveProject,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setActiveBackground: handleSelectBackground, setParticleType: handleParticleChange, setAmbientSound: handleAmbientSoundChange, onSetDailyEncouragement: handleSetDailyEncouragement,

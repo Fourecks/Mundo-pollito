@@ -53,6 +53,8 @@ export interface Project {
   created_at: string;
   todos?: Todo[]; // Populated on the client
   emoji?: string | null;
+  is_archived?: boolean;
+  color?: string | null;
 }
 
 export interface Note {

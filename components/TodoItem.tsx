@@ -1,6 +1,3 @@
-
-
-
 import React, { useState } from 'react';
 import { Todo, Priority, Subtask } from '../types';
 import SubtaskIcon from './icons/SubtaskIcon';
@@ -13,6 +10,7 @@ interface TodoItemProps {
   onUpdate: (todo: Todo) => void;
   onEdit: (todo: Todo) => void;
   onToggleSubtask: (taskId: number, subtaskId: number) => void;
+  color?: string | null;
 }
 
 const priorityMap: { [key in Priority]: { color: string; label: string, borderColor: string } } = {
@@ -72,7 +70,7 @@ const formatDueDate = (todo: Todo): string => {
 };
 
 
-const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate, onEdit, onToggleSubtask }) => {
+const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate, onEdit, onToggleSubtask, color }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleSubtaskToggle = (subtaskId: number) => {
@@ -107,6 +105,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
 
         {/* Task Text & Subtask Toggle */}
         <div className="flex-grow flex items-center gap-2 ml-4 min-w-0">
+            {color && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />}
             {todo.start_time && !todo.end_date && (
                 <span className={`sm:hidden text-xs font-semibold text-primary-dark dark:text-primary flex-shrink-0 ${todo.completed ? 'opacity-70' : ''}`}>
                     {formatTime(todo.start_time)}

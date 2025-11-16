@@ -20,15 +20,15 @@ serve(async (req) => {
   try {
     const nowUTC = new Date();
 
-    // 1. Obtener todos los perfiles con una zona horaria configurada y resumen diario activado.
+    // 1. Obtener todos los perfiles con una zona horaria y ui_settings configuradas.
     const { data: profiles, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, timezone_offset, daily_summary_hour_local')
+      .select('id, timezone_offset, ui_settings')
       .not('timezone_offset', 'is', null)
-      .not('daily_summary_hour_local', 'is', null);
+      .not('ui_settings', 'is', null);
 
     if (profileError) {
-      console.error("Error al obtener perfiles. ¿Existe la columna 'daily_summary_hour_local' en 'profiles'?", profileError);
+      console.error("Error fetching profiles. Ensure 'ui_settings' and 'timezone_offset' columns exist.", profileError);
       throw profileError;
     }
 
@@ -42,8 +42,15 @@ serve(async (req) => {
 
     // 2. Iterar sobre cada perfil para verificar si es la hora preferida del usuario.
     for (const profile of profiles) {
+      // Safely access the nested property from the ui_settings JSONB column
+      const preferredLocalHour = profile.ui_settings?.dailySummaryHour;
+      
+      // Skip this user if the setting is not a valid number (0 is a valid hour)
+      if (typeof preferredLocalHour !== 'number') {
+        continue;
+      }
+      
       const userOffsetMinutes = profile.timezone_offset;
-      const preferredLocalHour = profile.daily_summary_hour_local;
       const userLocalTime = new Date(nowUTC.getTime() - userOffsetMinutes * 60 * 1000);
       
       // La función cron se ejecuta a HH:30 UTC. Usamos getUTCHours() en la hora local calculada
