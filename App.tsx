@@ -1092,6 +1092,8 @@ const App: React.FC = () => {
       activeBackgroundId: string | null;
       particleType: ParticleType;
       ambientSound: { type: AmbientSoundType; volume: number };
+      dailyEncouragementLocalHour: number | null;
+      dailySummaryHour: number | null;
   } | null>(null);
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -1122,8 +1124,6 @@ const App: React.FC = () => {
   const [isClearPastConfirmOpen, setIsClearPastConfirmOpen] = useState(false);
   const [quickCaptureMessage, setQuickCaptureMessage] = useState<string | null>(null);
 
-  const [dailyEncouragementLocalHour, setDailyEncouragementLocalHour] = useState<number | null>(null);
-  const [dailySummaryHour, setDailySummaryHour] = useState<number | null>(null);
   const [pomodoroState, setPomodoroState] = useState({
       timeLeft: 25 * 60,
       isActive: false,
@@ -1432,33 +1432,33 @@ const App: React.FC = () => {
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
       if(projectsData) { setProjects(projectsData); await clearAndPutAll('projects', projectsData); }
 
-      if(profileData) {
-        setDailyEncouragementLocalHour(profileData.daily_encouragement_hour_local);
-        setDailySummaryHour(profileData.daily_summary_hour_local);
-        if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
-            const savedSettings = profileData.pomodoro_settings as Partial<typeof pomodoroState>;
-            setPomodoroState(s => ({ ...s, durations: savedSettings.durations || s.durations, timeLeft: (savedSettings.durations || s.durations)[s.mode], isActive: false, endTime: null }));
-        }
-        if(profileData.gcal_settings) {
-            setGcalSettings(profileData.gcal_settings as GCalSettings);
-        }
-        if(profileData.ui_settings) {
-            const settings = profileData.ui_settings as any;
-            // Ensure settings object has all required keys to prevent crashes
+      if (profileData) {
+          if (profileData.pomodoro_settings && typeof profileData.pomodoro_settings === 'object') {
+              const savedSettings = profileData.pomodoro_settings as Partial<typeof pomodoroState>;
+              setPomodoroState(s => ({ ...s, durations: savedSettings.durations || s.durations, timeLeft: (savedSettings.durations || s.durations)[s.mode], isActive: false, endTime: null }));
+          }
+          if(profileData.gcal_settings) {
+              setGcalSettings(profileData.gcal_settings as GCalSettings);
+          }
+          
+          const settings = (profileData.ui_settings || {}) as any;
+          setUiSettings({
+              themeColors: settings.themeColors || DEFAULT_COLORS,
+              activeBackgroundId: settings.activeBackgroundId || null,
+              particleType: settings.particleType || 'none',
+              ambientSound: settings.ambientSound || { type: 'none', volume: 0.5 },
+              dailyEncouragementLocalHour: settings.dailyEncouragementLocalHour ?? profileData.daily_encouragement_hour_local ?? null,
+              dailySummaryHour: settings.dailySummaryHour ?? profileData.daily_summary_hour_local ?? null,
+          });
+      } else {
             setUiSettings({
-                themeColors: settings.themeColors || DEFAULT_COLORS,
-                activeBackgroundId: settings.activeBackgroundId || null,
-                particleType: settings.particleType || 'none',
-                ambientSound: settings.ambientSound || { type: 'none', volume: 0.5 },
+              themeColors: DEFAULT_COLORS,
+              activeBackgroundId: null,
+              particleType: 'none',
+              ambientSound: { type: 'none', volume: 0.5 },
+              dailyEncouragementLocalHour: null,
+              dailySummaryHour: null,
             });
-        } else {
-             setUiSettings({
-                themeColors: DEFAULT_COLORS,
-                activeBackgroundId: null,
-                particleType: 'none',
-                ambientSound: { type: 'none', volume: 0.5 }
-             });
-        }
       }
       setIsSyncing(false);
     }
@@ -1564,17 +1564,20 @@ const App: React.FC = () => {
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeTrack'), value: activeTrack }); }, [activeTrack, getUserKey, user, dataLoaded]);
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeSpotifyTrack'), value: activeSpotifyTrack }); }, [activeSpotifyTrack, getUserKey, user, dataLoaded]);
 
-  const handleSetDailyEncouragement = async (localHour: number | null) => {
-    if (!user) return;
-    setDailyEncouragementLocalHour(localHour);
-    await syncableUpdate('profiles', { id: user.id, daily_encouragement_hour_local: localHour });
-  };
+  const handleSetDailyEncouragement = useCallback((localHour: number | null) => {
+      setUiSettings(prev => {
+          if (!prev) return null;
+          return { ...prev, dailyEncouragementLocalHour: localHour };
+      });
+  }, []);
   
-  const handleSetDailySummary = async (localHour: number | null) => {
-    if (!user) return;
-    setDailySummaryHour(localHour);
-    await syncableUpdate('profiles', { id: user.id, daily_summary_hour_local: localHour });
-  };
+  const handleSetDailySummary = useCallback((localHour: number | null) => {
+      setUiSettings(prev => {
+          if (!prev) return null;
+          return { ...prev, dailySummaryHour: localHour };
+      });
+  }, []);
+
 
   // --- Data Handlers (Now with Offline Support) ---
   const handleAddTodo = useCallback(async (text: string, options?: { projectId?: number | null; isUndated?: boolean }) => {
@@ -2708,8 +2711,9 @@ const App: React.FC = () => {
     isOnline, isSyncing, currentUser: user, onLogout: handleLogout, 
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders: foldersWithNotes, projects, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
-    pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, dailyEncouragementLocalHour,
-    dailySummaryHour,
+    pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, 
+    dailyEncouragementLocalHour: uiSettings.dailyEncouragementLocalHour,
+    dailySummaryHour: uiSettings.dailySummaryHour,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos: () => setIsClearPastConfirmOpen(true),
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
