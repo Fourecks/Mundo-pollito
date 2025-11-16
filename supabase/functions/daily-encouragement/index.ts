@@ -70,7 +70,7 @@ serve(async (req) => {
     const notificationPromises = usersToNotify.map(userId => {
         const verse = verses[Math.floor(Math.random() * verses.length)];
         const title = 'Tu dosis de ánimo diario ☀️';
-        const message = `${verse.text} — ${verse.citation}`;
+        const message = `Buenos días pollito.\n\n${verse.text} — ${verse.citation}`;
         
         return sendOneSignalNotification(userId, title, message);
     });

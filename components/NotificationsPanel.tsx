@@ -1,4 +1,3 @@
-
 import React from 'react';
 import CloseIcon from './icons/CloseIcon';
 import BellIcon from './icons/BellIcon';
@@ -18,8 +17,13 @@ interface NotificationsPanelProps {
   onSendTestNotification: () => void;
 }
 
-const HourSelector: React.FC<{ selectedHour: number | null, onChange: (hour: number | null) => void }> = ({ selectedHour, onChange }) => {
-    const hours = Array.from({ length: 24 }, (_, i) => i);
+const HourSelector: React.FC<{ 
+    selectedHour: number | null, 
+    onChange: (hour: number | null) => void,
+    minHour?: number,
+    maxHour?: number
+}> = ({ selectedHour, onChange, minHour = 0, maxHour = 23 }) => {
+    const hours = Array.from({ length: (maxHour - minHour + 1) }, (_, i) => i + minHour);
     
     return (
         <select 
@@ -59,10 +63,10 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
                             </div>
                             <div>
                                 <h4 className="font-bold text-gray-800 dark:text-gray-100">Dosis de Ánimo</h4>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Recibe un texto bíblico de ánimo cada día.</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Recibe un saludo y un texto de ánimo en la mañana.</p>
                             </div>
                         </div>
-                        <HourSelector selectedHour={props.dailyEncouragementHour} onChange={props.onSetDailyEncouragement} />
+                        <HourSelector selectedHour={props.dailyEncouragementHour} onChange={props.onSetDailyEncouragement} minHour={5} maxHour={11} />
                     </div>
                     
                     {/* Resumen Diario */}
