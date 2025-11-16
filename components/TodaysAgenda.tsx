@@ -248,17 +248,17 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
     const [activeView, setActiveView] = useState<'agenda' | 'notes'>('agenda');
     
     return (
-        <div className="w-full md:bg-white/70 md:dark:bg-gray-800/70 md:backdrop-blur-sm md:rounded-2xl md:shadow-lg p-2">
+        <div className="w-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg p-2">
              <div className="flex border-b border-yellow-200/50 dark:border-gray-700/50 mb-2">
                 <button 
                     onClick={() => setActiveView('agenda')} 
-                    className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'agenda' ? 'text-pink-600 dark:text-pink-400 bg-white/50 dark:bg-gray-700/50' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'agenda' ? 'text-gray-800 dark:text-gray-100 bg-white/80 dark:bg-gray-600/80' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >
                     Agenda
                 </button>
                 <button 
                     onClick={() => setActiveView('notes')} 
-                    className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'notes' ? 'text-pink-600 dark:text-pink-400 bg-white/50 dark:bg-gray-700/50' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'notes' ? 'text-gray-800 dark:text-gray-100 bg-white/80 dark:bg-gray-600/80' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >
                     Notas Rápidas
                 </button>

@@ -809,7 +809,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                         <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-4 z-30 border-b border-gray-200/50 dark:border-gray-700/50">
                             <Greeting name={capitalizedUserName} />
                         </header>
-                        <div className="p-4">
+                        <div className="p-4 space-y-4">
                              <BibleVerse />
                              <MobilePomodoroWidget 
                                 timeLeft={pomodoroState.timeLeft} 
