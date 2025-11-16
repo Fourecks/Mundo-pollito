@@ -2548,7 +2548,7 @@ const App: React.FC = () => {
     }
   };
   
-  // --- UI Settings Handlers ---
+  // --- UI Settings Handlers & Media Playback ---
   const handleThemeColorChange = useCallback((colorName: keyof ThemeColors, value: string) => {
     setUiSettings(prev => prev ? { ...prev, themeColors: { ...prev.themeColors, [colorName]: value } } : null);
   }, []);
@@ -2559,81 +2559,65 @@ const App: React.FC = () => {
   
   const handleSelectBackground = (background: Background | null) => {
     setUiSettings(prev => prev ? { ...prev, activeBackgroundId: background ? background.id : null } : null);
+
+    const videoEl = videoRef.current;
+    if (videoEl) {
+        if (background && background.type === 'video') {
+            videoEl.src = background.url;
+            videoEl.load();
+            const playPromise = videoEl.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    if (error.name !== 'AbortError') console.error("Video play failed:", error);
+                });
+            }
+        } else {
+            if (!videoEl.paused) videoEl.pause();
+            if (videoEl.src) {
+                videoEl.removeAttribute('src');
+                videoEl.load();
+            }
+        }
+    }
   };
   
   const handleParticleChange = (type: ParticleType) => {
     setUiSettings(prev => prev ? { ...prev, particleType: type } : null);
   };
   
-  const handleAmbientSoundChange = (value: { type: AmbientSoundType; volume: number; }) => {
-    setUiSettings(prev => prev ? { ...prev, ambientSound: value } : null);
-  };
+  const handleAmbientSoundChange = (sound: { type: AmbientSoundType; volume: number; }) => {
+    setUiSettings(prev => prev ? { ...prev, ambientSound: sound } : null);
 
-  // --- Media Playback Effect ---
-  useEffect(() => {
-    // Video handling
-    const videoEl = videoRef.current;
-    if (videoEl) {
-        if (activeBackground && activeBackground.type === 'video') {
-            if (videoEl.src !== activeBackground.url) {
-                videoEl.src = activeBackground.url;
-            }
-            const playPromise = videoEl.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    if (error.name !== 'AbortError') {
-                        console.error("Video play failed:", error);
-                    }
-                });
-            }
-        } else {
-            if (!videoEl.paused) {
-                videoEl.pause();
-            }
-            if (videoEl.src) {
-                videoEl.src = '';
-                videoEl.removeAttribute('src'); // Force unload
-            }
-        }
-    }
-
-    // Audio handling
     const audioEl = ambientAudioRef.current;
-    if(audioEl) {
+    if (audioEl) {
         const soundMap: Record<AmbientSoundType, string | null> = {
             'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
         };
-        const newSound = uiSettings?.ambientSound;
-        const newSrc = newSound ? soundMap[newSound.type] : null;
-
+        const newSrc = soundMap[sound.type];
+        
         audioEl.loop = true;
-        if (newSound) {
-            audioEl.volume = newSound.volume;
-        }
+        audioEl.volume = sound.volume;
 
         if (newSrc) {
             if (audioEl.src !== newSrc) {
-                audioEl.src = newSrc;
+              audioEl.src = newSrc;
+              audioEl.load();
             }
             const playPromise = audioEl.play();
             if (playPromise !== undefined) {
                 playPromise.catch(error => {
-                    if (error.name !== 'AbortError') {
-                        console.error("Audio playback failed:", error);
-                    }
+                    if (error.name !== 'AbortError') console.error("Audio playback failed:", error);
                 });
             }
         } else {
-            if (!audioEl.paused) {
-                audioEl.pause();
-            }
+            if (!audioEl.paused) audioEl.pause();
             if (audioEl.src) {
-                audioEl.src = '';
-                audioEl.removeAttribute('src'); // Force unload
+                audioEl.removeAttribute('src');
+                audioEl.load();
             }
         }
     }
-  }, [activeBackground, uiSettings?.ambientSound]);
+  };
 
   // --- OneSignal / Notifications ---
   useEffect(() => {
