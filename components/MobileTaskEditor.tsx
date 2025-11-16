@@ -82,7 +82,6 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
     const [priority, setPriority] = useState<Priority>('medium');
     const [subtasks, setSubtasks] = useState<Subtask[]>([]);
     const [newSubtaskText, setNewSubtaskText] = useState('');
-    const [completed, setCompleted] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [projectId, setProjectId] = useState<number | null>(null);
 
@@ -114,7 +113,6 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
             setText(todo.text || '');
             setPriority(todo.priority || 'medium');
             setSubtasks(todo.subtasks || []);
-            setCompleted(todo.completed || false);
             setDueDate(todo.due_date || null);
             setProjectId(todo.project_id || null);
             setIsUndated(!todo.due_date);
@@ -207,7 +205,6 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
         const updatedTodoPayload: Partial<Todo> = { ...todo };
 
         updatedTodoPayload.text = text;
-        updatedTodoPayload.completed = completed;
         updatedTodoPayload.priority = priority;
         updatedTodoPayload.subtasks = subtasks;
         updatedTodoPayload.project_id = projectId;
@@ -410,11 +407,6 @@ const MobileTaskEditor: React.FC<MobileTaskEditorProps> = ({ isOpen, onClose, on
                     <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Añade detalles..." className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm" rows={4}></textarea>
                 </div>
             </SettingRow>
-
-            <div className="p-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Estado</span>
-                <Switch checked={completed} onChange={setCompleted} />
-            </div>
         </>
     );
     

@@ -39,6 +39,8 @@ interface TodoListModuleProps {
     handleArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
     onViewProjectChange?: (projectId: number | null) => void;
     calendarEvents: GoogleCalendarEvent[];
+    onOpenProjectCreator?: () => void;
+    onOpenProjectEditor?: (project: Project) => void;
 }
 
 const formatDateKey = (date: Date): string => {
@@ -50,14 +52,13 @@ const formatDateKey = (date: Date): string => {
 
 const priorityOrder: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
 
-const projectColors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899'];
-
 const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const {
         allTodos, addTodo, toggleTodo, toggleSubtask, deleteTodo, updateTodo, onEditTodo,
         selectedDate, setSelectedDate, datesWithTasks, datesWithAllTasksCompleted,
         isMobile = false, onClearPastTodos, projects, onAddProject, onUpdateProject, handleArchiveProject,
-        onDeleteProject, onDeleteProjectAndTasks, onViewProjectChange, calendarEvents
+        onDeleteProject, onDeleteProjectAndTasks, onViewProjectChange, calendarEvents,
+        onOpenProjectCreator, onOpenProjectEditor
     } = props;
     // Common State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -72,13 +73,8 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     
     // State for 'Projects' tab
     const [viewingProject, setViewingProject] = useState<Project | null>(null);
-    const [isAddingProject, setIsAddingProject] = useState(false);
-    const [newProjectName, setNewProjectName] = useState('');
-    const [newProjectEmoji, setNewProjectEmoji] = useState<string | null>(null);
-    const [newProjectColor, setNewProjectColor] = useState<string | null>(projectColors[0]);
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
-    const [editingProject, setEditingProject] = useState<{ id: number; name: string; emoji: string | null; color: string | null; } | null>(null);
     const [showArchived, setShowArchived] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     
@@ -115,7 +111,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     useEffect(() => { if (isNarrow && isCalendarPanelVisible) setIsCalendarPanelVisible(false); }, [isNarrow, isCalendarPanelVisible]);
 
     // Handlers for 'Tasks' tab
-    // FIX: Changed to non-functional update to match prop type (date: Date) => void.
     const handlePrevDay = () => { const newDate = new Date(selectedDate); newDate.setDate(newDate.getDate() - 1); setSelectedDate(newDate); };
     const handleNextDay = () => { const newDate = new Date(selectedDate); newDate.setDate(newDate.getDate() + 1); setSelectedDate(newDate); };
     const toggleSort = () => setSortBy(p => p === 'default' ? 'priority' : p === 'priority' ? 'dueDate' : 'default');
@@ -132,23 +127,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const completedCount = todosForSelectedDate.filter(t => t.completed).length;
 
     // Handlers for 'Projects' tab
-    const handleAddProject = async () => {
-        if (newProjectName.trim()) {
-            await onAddProject(newProjectName.trim(), newProjectEmoji, newProjectColor);
-            setNewProjectName('');
-            setNewProjectEmoji(null);
-            setNewProjectColor(projectColors[0]);
-            setIsAddingProject(false);
-        }
-    };
-    
-    const handleSaveProjectName = () => {
-        if (editingProject && editingProject.name.trim()) {
-            onUpdateProject(editingProject.id, editingProject.name.trim(), editingProject.emoji, editingProject.color);
-        }
-        setEditingProject(null);
-    };
-
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -285,7 +263,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                         </button>
                                         {menuOpenFor === project.id && (
                                             <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl z-20 animate-pop-in origin-top-right p-1">
-                                                <button onClick={() => { setEditingProject({ id: project.id, name: project.name, emoji: project.emoji || null, color: project.color || null }); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
+                                                <button onClick={() => { if(onOpenProjectEditor) onOpenProjectEditor(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
                                                     Renombrar
                                                 </button>
                                                 {showArchived ? (
@@ -305,83 +283,22 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                         )}
                                     </div>
                                     
-                                    {editingProject?.id === project.id ? (
-                                        <div className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
-                                            <input
-                                                type="text"
-                                                value={editingProject.emoji || ''}
-                                                onChange={(e) => setEditingProject(p => p ? { ...p, emoji: e.target.value } : null)}
-                                                placeholder="✨"
-                                                className="w-12 h-12 text-2xl text-center rounded-full bg-white dark:bg-gray-700 border-2 border-secondary-light dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary"
-                                                maxLength={4}
-                                            />
-                                            <input
-                                                type="text"
-                                                value={editingProject.name}
-                                                onChange={(e) => setEditingProject(p => p ? { ...p, name: e.target.value } : null)}
-                                                onBlur={handleSaveProjectName}
-                                                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveProjectName(); }}
-                                                className="w-full bg-white dark:bg-gray-700 text-base p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-center font-bold"
-                                                autoFocus
-                                            />
-                                            <div className="flex flex-wrap justify-center gap-1.5 mt-1">
-                                                {projectColors.map(color => (
-                                                    <button
-                                                        key={color}
-                                                        onClick={() => setEditingProject(p => p ? { ...p, color } : null)}
-                                                        className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${editingProject?.color === color ? 'ring-2 ring-offset-2 ring-primary dark:ring-offset-gray-800' : ''}`}
-                                                        style={{ backgroundColor: color }}
-                                                    />
-                                                ))}
-                                            </div>
-                                             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 invisible">{project.completed} / {project.total} completadas</p>
+                                    <button onClick={() => { setViewingProject(project); onViewProjectChange?.(project.id); }} className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
+                                        <CircularProgressWithChicken percentage={percentage} emoji={project.emoji} color={project.color} />
+                                        <div className="w-full">
+                                            <h3 className="font-bold text-base text-gray-800 dark:text-gray-200 truncate">{project.name}</h3>
+                                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{project.completed} / {project.total} completadas</p>
                                         </div>
-                                    ) : (
-                                        <button onClick={() => { setViewingProject(project); onViewProjectChange?.(project.id); }} className="w-full h-full p-4 text-center flex flex-col items-center justify-between gap-2">
-                                            <CircularProgressWithChicken percentage={percentage} emoji={project.emoji} color={project.color} />
-                                            <div className="w-full">
-                                                <h3 className="font-bold text-base text-gray-800 dark:text-gray-200 truncate">{project.name}</h3>
-                                                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{project.completed} / {project.total} completadas</p>
-                                            </div>
-                                        </button>
-                                    )}
+                                    </button>
                                 </div>
                             );
                         })}
                         {!showArchived && (
                             <div className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-secondary-light dark:border-gray-600 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 aspect-square">
-                                {isAddingProject ? (
-                                    <>
-                                        <input
-                                            type="text"
-                                            value={newProjectEmoji || ''}
-                                            onChange={(e) => setNewProjectEmoji(e.target.value)}
-                                            placeholder="✨"
-                                            className="w-12 h-12 text-2xl text-center rounded-full bg-white dark:bg-gray-700 border-2 border-secondary-light dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary"
-                                            maxLength={4}
-                                        />
-                                        <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} onKeyDown={e => {if (e.key === 'Enter') handleAddProject()}} placeholder="Nombre del proyecto" className="w-full bg-white dark:bg-gray-700 text-sm p-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-center" autoFocus />
-                                        <div className="flex flex-wrap justify-center gap-2 mt-2">
-                                            {projectColors.map(color => (
-                                                <button
-                                                    key={color}
-                                                    onClick={() => setNewProjectColor(color)}
-                                                    className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${newProjectColor === color ? 'ring-2 ring-offset-2 ring-primary dark:ring-offset-gray-700' : ''}`}
-                                                    style={{ backgroundColor: color }}
-                                                />
-                                            ))}
-                                        </div>
-                                        <div className="flex gap-2 mt-auto">
-                                            <button onClick={() => { setIsAddingProject(false); setNewProjectName(''); setNewProjectEmoji(null); }} className="mt-2 text-xs font-semibold text-gray-500 px-3 py-1 bg-gray-200/50 rounded-full">Cancelar</button>
-                                            <button onClick={handleAddProject} className="mt-2 text-xs font-semibold text-primary px-3 py-1 bg-primary-light/50 rounded-full">Guardar</button>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <button onClick={() => setIsAddingProject(true)} className="text-center text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary transition-colors">
-                                        <PlusIcon />
-                                        <span className="text-sm font-semibold mt-1 block">Nuevo Proyecto</span>
-                                    </button>
-                                )}
+                                <button onClick={onOpenProjectCreator || (() => onAddProject('Nuevo Proyecto', null, null))} className="text-center text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary transition-colors">
+                                    <PlusIcon />
+                                    <span className="text-sm font-semibold mt-1 block">Nuevo Proyecto</span>
+                                </button>
                             </div>
                         )}
                     </div>
