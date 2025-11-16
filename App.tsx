@@ -1466,7 +1466,7 @@ const App: React.FC = () => {
         supabase.from('projects').select('*').order('name'),
         supabase.from('habits').select('*').order('created_at'),
         supabase.from('habit_records').select('*').order('created_at'),
-        supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings').eq('id', user.id).single(),
+        supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).single(),
       ]);
       
       if (todosData) {
@@ -1559,6 +1559,19 @@ const App: React.FC = () => {
               dailyEncouragementLocalHour: settings.dailyEncouragementLocalHour ?? null,
               dailySummaryHour: settings.dailySummaryHour ?? null,
           });
+
+          // Check and update user's timezone offset for notifications
+          const currentUserTimezoneOffset = new Date().getTimezoneOffset();
+          if (profileData.timezone_offset !== currentUserTimezoneOffset) {
+              supabase.from('profiles').update({ timezone_offset: currentUserTimezoneOffset }).eq('id', user.id).then(({ error }) => {
+                  if (error) {
+                      console.error("Failed to update user timezone offset:", error);
+                  } else {
+                      console.log("User timezone offset updated to:", currentUserTimezoneOffset);
+                  }
+              });
+          }
+
       } else {
             setUiSettings({
               themeColors: DEFAULT_COLORS,
