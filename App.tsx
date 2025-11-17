@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -1944,16 +1946,53 @@ const App: React.FC = () => {
   const handleUpdateTodo = async (updatedTodo: Todo) => {
     const originalTodo = findTodoById(updatedTodo.id);
     const recurrenceChanged = originalTodo?.recurrence?.id && JSON.stringify(originalTodo.recurrence) !== JSON.stringify(updatedTodo.recurrence);
-    
+
     if (recurrenceChanged) {
         setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
     } else {
-        // Optimistic update
+        // Optimistic UI update
         setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
-        // Sync and get server-confirmed data
+
+        // Manual Subtask Sync (Online-only)
+        if (navigator.onLine && originalTodo) {
+            try {
+                const originalSubtasks = originalTodo.subtasks || [];
+                const updatedSubtasks = updatedTodo.subtasks || [];
+                
+                const toDelete = originalSubtasks.filter(ost => !updatedSubtasks.some(ust => ust.id === ost.id));
+                if (toDelete.length > 0) {
+                    await supabase.from('subtasks').delete().in('id', toDelete.map(st => st.id));
+                }
+
+                for (const subtask of updatedSubtasks) {
+                    if (subtask.id < 0) { // New subtask (negative temp ID)
+                        await supabase.from('subtasks').insert({ text: subtask.text, completed: subtask.completed, todo_id: updatedTodo.id });
+                    } else { // Existing subtask
+                        const original = originalSubtasks.find(ost => ost.id === subtask.id);
+                        if (original && (original.text !== subtask.text || original.completed !== subtask.completed)) {
+                            await supabase.from('subtasks').update({ text: subtask.text, completed: subtask.completed }).eq('id', subtask.id);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to sync subtasks online:", error);
+            }
+        }
+
+        // Sync main todo (subtasks property will be stripped by syncableUpdate)
         const savedTodo = await syncableUpdate('todos', updatedTodo);
-        // Ensure local state matches server state
-        setAllTodos(current => getUpdatedTodosState(current, savedTodo));
+        
+        let finalTodo = { ...savedTodo, subtasks: updatedTodo.subtasks || [] };
+
+        // If online, re-fetch to get correct subtask IDs
+        if (navigator.onLine) {
+             const { data: refreshedTodo } = await supabase.from('todos').select('*, subtasks(*)').eq('id', savedTodo.id).single();
+             if (refreshedTodo) {
+                finalTodo = refreshedTodo;
+             }
+        }
+        
+        setAllTodos(current => getUpdatedTodosState(current, finalTodo));
     }
   };
   
