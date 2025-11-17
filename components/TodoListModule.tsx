@@ -70,6 +70,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const [calendarVisible, setCalendarVisible] = useState(false);
     const [isCalendarPanelVisible, setIsCalendarPanelVisible] = useState(!isMobile);
     const [isNarrow, setIsNarrow] = useState(false);
+    const [selectedProjectId, setSelectedProjectId] = useState<number | 'all' | null>('all');
     
     // State for 'Projects' tab
     const [viewingProject, setViewingProject] = useState<Project | null>(null);
@@ -116,15 +117,57 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const toggleSort = () => setSortBy(p => p === 'default' ? 'priority' : p === 'priority' ? 'dueDate' : 'default');
     const getSortButtonText = () => sortBy === 'priority' ? 'Prioridad' : sortBy === 'dueDate' ? 'Fecha' : 'Original';
     
+    const handleProjectFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (value === 'all') {
+            setSelectedProjectId('all');
+        } else if (value === 'none') {
+            setSelectedProjectId(null);
+        } else {
+            setSelectedProjectId(Number(value));
+        }
+    };
+
+    const filteredTodos = useMemo(() => {
+        if (selectedProjectId === 'all') {
+            return todosForSelectedDate;
+        }
+        if (selectedProjectId === null) {
+            return todosForSelectedDate.filter(t => !t.project_id);
+        }
+        return todosForSelectedDate.filter(t => t.project_id === selectedProjectId);
+    }, [todosForSelectedDate, selectedProjectId]);
+    
     const sortedTodos = useMemo(() => {
-        const todosCopy = [...(hideCompleted ? todosForSelectedDate.filter(t => !t.completed) : todosForSelectedDate)];
+        const todosCopy = [...(hideCompleted ? filteredTodos.filter(t => !t.completed) : filteredTodos)];
         if (sortBy === 'priority') return todosCopy.sort((a, b) => (a.completed ? 1 : -1) - (b.completed ? 1 : -1) || priorityOrder[b.priority] - priorityOrder[a.priority] || a.id - b.id);
         if (sortBy === 'dueDate') return todosCopy.sort((a, b) => (a.completed ? 1 : -1) - (b.completed ? 1 : -1) || new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime() || a.id - b.id);
         return todosCopy.sort((a, b) => (a.completed ? 1 : -1) - (b.completed ? 1 : -1) || a.id - b.id);
-    }, [todosForSelectedDate, sortBy, hideCompleted]);
+    }, [filteredTodos, sortBy, hideCompleted]);
 
     const formattedDate = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).format(selectedDate).replace(/^\w/, c => c.toUpperCase());
-    const completedCount = todosForSelectedDate.filter(t => t.completed).length;
+    const completedCount = filteredTodos.filter(t => t.completed).length;
+
+    const getEmptyStateMessage = () => {
+        if (sortedTodos.length > 0) return { title: '', subtitle: '' };
+    
+        if (hideCompleted && filteredTodos.length > 0) {
+            return {
+                title: '¡Todas las tareas completadas!',
+                subtitle: 'Desactiva "Ocultar completadas" para verlas.'
+            };
+        }
+        if (selectedProjectId !== 'all') {
+            return {
+                title: 'No hay tareas en este filtro para hoy.',
+                subtitle: 'Prueba a seleccionar "Todos los proyectos" o añade una nueva tarea.'
+            };
+        }
+        return {
+            title: '¡No hay tareas para este día!',
+            subtitle: '¡Añade una para empezar a organizarte!'
+        };
+    };
 
     // Handlers for 'Projects' tab
     useEffect(() => {
@@ -307,6 +350,8 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         );
     };
 
+    const emptyState = getEmptyStateMessage();
+
     return (
         <div ref={containerRef} className="w-full bg-transparent flex flex-col h-full">
             <div className="flex-shrink-0 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center p-1 bg-black/5 dark:bg-black/20">
@@ -330,17 +375,36 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                     ) : (
                                         <div className="flex justify-between items-center"><div className="flex items-center gap-1 sm:gap-2"><button onClick={() => setIsCalendarPanelVisible(!isCalendarPanelVisible)} className="hidden md:flex p-2 items-center justify-center rounded-full hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-primary-dark transition-colors" aria-label={isCalendarPanelVisible ? 'Ocultar calendario' : 'Mostrar calendario'}><ChevronLeftIcon className={`h-5 w-5 transition-transform duration-300 ${!isCalendarPanelVisible ? 'rotate-180' : ''}`}/></button><div className="flex items-center"><button onClick={handlePrevDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día anterior"><ChevronLeftIcon /></button><h2 className="text-lg sm:text-xl font-bold text-primary-dark dark:text-primary text-center w-40 sm:w-auto flex-shrink-0">{formattedDate}</h2><button onClick={handleNextDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día siguiente"><ChevronRightIcon /></button></div></div><button onClick={() => setCalendarVisible(true)} className="md:hidden flex items-center gap-2 bg-white/70 dark:bg-gray-700/70 backdrop-blur-sm p-2 rounded-full shadow-sm text-primary dark:text-primary-dark hover:bg-primary-light/50 dark:hover:bg-primary/20 transition-colors" aria-label="Abrir calendario"><CalendarIcon /></button></div>
                                     )}
-                                    <p className="text-gray-500 dark:text-gray-300 text-sm mt-1 text-center md:text-left">{todosForSelectedDate.length > 0 ? `${completedCount} de ${todosForSelectedDate.length} tareas completadas.` : '¡Añade una tarea para empezar!'}</p>
-                                    <ProgressBar completed={completedCount} total={todosForSelectedDate.length} />
-                                    <div className="flex flex-wrap justify-between items-center mt-4 mb-2 gap-3"><label htmlFor="hide-completed-toggle" className="flex items-center cursor-pointer select-none"><div className="relative"><input type="checkbox" id="hide-completed-toggle" className="sr-only" checked={hideCompleted} onChange={() => setHideCompleted(!hideCompleted)} /><div className={`block w-10 h-6 rounded-full transition-colors ${hideCompleted ? 'bg-primary-light' : 'bg-gray-200 dark:bg-gray-600'}`}></div><div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${hideCompleted ? 'translate-x-full' : ''}`}></div></div><div className="ml-2 text-sm font-semibold text-gray-500 dark:text-gray-300">Ocultar completadas</div></label><div className="flex items-center gap-2 sm:gap-4"><button onClick={onClearPastTodos} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-red-100/50 dark:hover:bg-red-900/30" title="Limpiar tareas anteriores al día actual"><TrashIcon className="h-4 w-4" /><span className="hidden sm:inline">Limpiar</span></button><button onClick={toggleSort} className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-primary-light/30 dark:hover:bg-primary/10" aria-label="Cambiar orden de tareas"><SortIcon /><span className="hidden sm:inline">{getSortButtonText()}</span><span className="sm:hidden">{sortBy === 'default' ? 'Original' : sortBy === 'priority' ? 'Prioridad' : 'Fecha'}</span></button></div></div>
-                                    {!isMobile && <TodoInput onAddTodo={(text) => addTodo(text)} />}
+                                    <p className="text-gray-500 dark:text-gray-300 text-sm mt-1 text-center md:text-left">{filteredTodos.length > 0 ? `${completedCount} de ${filteredTodos.length} tareas completadas.` : '¡Añade una tarea para empezar!'}</p>
+                                    <ProgressBar completed={completedCount} total={filteredTodos.length} />
+                                    <div className="flex flex-wrap items-center justify-between mt-4 mb-2 gap-3">
+                                        <div className="relative flex items-center gap-1.5 p-1.5 rounded-lg bg-black/5 dark:bg-black/20">
+                                            <BriefcaseIcon className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                            <select
+                                                value={selectedProjectId === null ? 'none' : selectedProjectId}
+                                                onChange={handleProjectFilterChange}
+                                                className="text-sm font-semibold text-gray-500 dark:text-gray-300 bg-transparent focus:outline-none appearance-none pr-5 cursor-pointer"
+                                                aria-label="Filtrar por proyecto"
+                                            >
+                                                <option value="all">Todos los Proyectos</option>
+                                                <option value="none">Sin Proyecto</option>
+                                                {projects.filter(p => !p.is_archived).map(p => (
+                                                    <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDownIcon className="h-4 w-4 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                        </div>
+                                        <label htmlFor="hide-completed-toggle" className="flex items-center cursor-pointer select-none"><div className="relative"><input type="checkbox" id="hide-completed-toggle" className="sr-only" checked={hideCompleted} onChange={() => setHideCompleted(!hideCompleted)} /><div className={`block w-10 h-6 rounded-full transition-colors ${hideCompleted ? 'bg-primary-light' : 'bg-gray-200 dark:bg-gray-600'}`}></div><div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${hideCompleted ? 'translate-x-full' : ''}`}></div></div><div className="ml-2 text-sm font-semibold text-gray-500 dark:text-gray-300">Ocultar completadas</div></label>
+                                        <div className="flex items-center gap-2 sm:gap-4"><button onClick={onClearPastTodos} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-red-100/50 dark:hover:bg-red-900/30" title="Limpiar tareas anteriores al día actual"><TrashIcon className="h-4 w-4" /><span className="hidden sm:inline">Limpiar</span></button><button onClick={toggleSort} className="flex items-center gap-1 text-sm font-semibold text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-primary-light/30 dark:hover:bg-primary/10" aria-label="Cambiar orden de tareas"><SortIcon /><span className="hidden sm:inline">{getSortButtonText()}</span><span className="sm:hidden">{sortBy === 'default' ? 'Original' : sortBy === 'priority' ? 'Prioridad' : 'Fecha'}</span></button></div>
+                                    </div>
+                                    {!isMobile && <TodoInput onAddTodo={(text) => addTodo(text, { projectId: typeof selectedProjectId === 'number' ? selectedProjectId : null })} />}
                                 </div>
                             </div>
                             <div className="space-y-3 overflow-y-auto custom-scrollbar p-3 flex-grow min-h-0">
                                 {sortedTodos.length > 0 ? sortedTodos.map(todo => {
                                     const projectForTodo = todo.project_id ? projects.find(p => p.id === todo.project_id) : null;
                                     return <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} color={projectForTodo?.color} />
-                                }) : (<div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-300 py-10"><p className="font-medium">{todosForSelectedDate.length > 0 && hideCompleted ? '¡Todas las tareas completadas!' : '¡No hay tareas para este día!'}</p><p className="text-sm">{todosForSelectedDate.length > 0 && hideCompleted ? 'Desactiva "Ocultar completadas" para verlas.' : '¡Añade una para empezar a organizarte!'}</p></div>)}
+                                }) : (<div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-300 py-10"><p className="font-medium">{emptyState.title}</p><p className="text-sm">{emptyState.subtitle}</p></div>)}
                             </div>
                             {calendarVisible && (<div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCalendarVisible(false)}><div className="bg-secondary-lighter dark:bg-gray-800 rounded-2xl shadow-xl p-4 w-full max-w-xs animate-pop-in" onClick={e => e.stopPropagation()}><Calendar selectedDate={selectedDate} setDate={(date) => { setSelectedDate(date); setCalendarVisible(false); }} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} calendarEvents={calendarEvents}/></div></div>)}
                         </div>
