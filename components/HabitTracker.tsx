@@ -32,15 +32,18 @@ const getFrequencyText = (freq: HabitFrequency): string => {
 }
 
 const isDayApplicable = (date: Date, freq: HabitFrequency): boolean => {
+    if (!freq || !freq.type) return true;
     const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
     switch (freq.type) {
         case 'daily':
         case 'times_per_week':
             return true;
         case 'specific_days':
-            return freq.days.includes(utcDate.getUTCDay());
+            return Array.isArray(freq.days) && freq.days.includes(utcDate.getUTCDay());
         case 'interval': {
+            if (!freq.startDate || typeof freq.days !== 'number' || freq.days <= 0) return false;
             const startDate = new Date(freq.startDate + "T00:00:00Z");
+            if (isNaN(startDate.getTime())) return false; // Invalid start date
             const diffTime = Math.abs(utcDate.getTime() - startDate.getTime());
             const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
             return diffDays % freq.days === 0;
@@ -422,7 +425,6 @@ const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                                     const isCompleted = completedRecords.has(`${habit.id}-${dateKey}`);
                                     const today = new Date();
                                     today.setHours(0, 0, 0, 0);
-                                    // FIX: Pass habit.frequency to isDayApplicable and invert the logic to correctly disable the button.
                                     const isDisabled = !isDayApplicable(date, habit.frequency) || date > today;
 
                                     return (

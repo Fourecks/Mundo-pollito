@@ -377,29 +377,36 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                     )}
                                     <p className="text-gray-500 dark:text-gray-300 text-sm mt-1 text-center md:text-left">{filteredTodos.length > 0 ? `${completedCount} de ${filteredTodos.length} tareas completadas.` : '¡Añade una tarea para empezar!'}</p>
                                     <ProgressBar completed={completedCount} total={filteredTodos.length} />
-                                    <div className="flex items-center justify-end mt-4 mb-2 gap-2">
-                                        <div className="relative flex items-center px-2 py-1 rounded-lg bg-black/5 dark:bg-black/20">
-                                            <BriefcaseIcon className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                            <select
-                                                value={selectedProjectId === null ? 'none' : selectedProjectId}
-                                                onChange={handleProjectFilterChange}
-                                                className="text-xs font-semibold text-gray-500 dark:text-gray-300 bg-transparent focus:outline-none appearance-none pr-4 pl-1 cursor-pointer max-w-28"
-                                                aria-label="Filtrar por proyecto"
-                                            >
-                                                <option value="all">Proyectos</option>
-                                                <option value="none">Sin Proyecto</option>
-                                                {projects.filter(p => !p.is_archived).map(p => (
-                                                    <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
-                                                ))}
-                                            </select>
-                                            <ChevronDownIcon className="h-3 w-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    <div className="flex items-center justify-between mt-4 mb-2 gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative flex items-center px-2 py-1 rounded-lg bg-black/5 dark:bg-black/20">
+                                                <BriefcaseIcon className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                                <select
+                                                    value={selectedProjectId === null ? 'none' : selectedProjectId}
+                                                    onChange={handleProjectFilterChange}
+                                                    className="text-xs font-semibold text-gray-500 dark:text-gray-300 bg-transparent focus:outline-none appearance-none pr-4 pl-1 cursor-pointer max-w-28"
+                                                    aria-label="Filtrar por proyecto"
+                                                >
+                                                    <option value="all">Proyectos</option>
+                                                    <option value="none">Sin Proyecto</option>
+                                                    {projects.filter(p => !p.is_archived).map(p => (
+                                                        <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDownIcon className="h-3 w-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                            </div>
+                                            <label htmlFor="hide-completed-toggle" className="flex items-center cursor-pointer select-none gap-1.5 p-1.5 rounded-lg bg-black/5 dark:bg-black/20">
+                                                <div className="relative"><input type="checkbox" id="hide-completed-toggle" className="sr-only" checked={hideCompleted} onChange={() => setHideCompleted(!hideCompleted)} /><div className={`block w-8 h-4 rounded-full transition-colors ${hideCompleted ? 'bg-primary-light' : 'bg-gray-300 dark:bg-gray-600'}`}></div><div className={`dot absolute left-0 top-1/2 -translate-y-1/2 bg-white w-3 h-3 rounded-full transition-transform ${hideCompleted ? 'translate-x-[20px]' : ''}`}></div></div>
+                                                <div className="hidden sm:block text-xs font-semibold text-gray-500 dark:text-gray-300 whitespace-nowrap">Ocultar</div>
+                                            </label>
                                         </div>
-                                        <label htmlFor="hide-completed-toggle" className="flex items-center cursor-pointer select-none gap-1.5 p-1.5 rounded-lg bg-black/5 dark:bg-black/20">
-                                            <div className="relative"><input type="checkbox" id="hide-completed-toggle" className="sr-only" checked={hideCompleted} onChange={() => setHideCompleted(!hideCompleted)} /><div className={`block w-8 h-4 rounded-full transition-colors ${hideCompleted ? 'bg-primary-light' : 'bg-gray-300 dark:bg-gray-600'}`}></div><div className={`dot absolute left-0 top-1/2 -translate-y-1/2 bg-white w-3 h-3 rounded-full transition-transform ${hideCompleted ? 'translate-x-[20px]' : ''}`}></div></div>
-                                            <div className="hidden sm:block text-xs font-semibold text-gray-500 dark:text-gray-300 whitespace-nowrap">Ocultar</div>
-                                        </label>
-                                        <button onClick={onClearPastTodos} className="p-1.5 rounded-lg text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-900/30 transition-colors" title="Limpiar tareas pasadas"><TrashIcon className="h-4 w-4" /></button>
-                                        <button onClick={toggleSort} className="p-1.5 rounded-lg text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary hover:bg-primary-light/30 dark:hover:bg-primary/10 transition-colors" aria-label="Cambiar orden"><SortIcon /></button>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={onClearPastTodos} className="p-1.5 rounded-lg text-gray-500 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-100/50 dark:hover:bg-red-900/30 transition-colors" title="Limpiar tareas pasadas"><TrashIcon className="h-4 w-4" /></button>
+                                            <button onClick={toggleSort} className="flex items-center gap-1 p-1.5 px-2 rounded-lg text-gray-500 dark:text-gray-300 hover:text-primary-dark dark:hover:text-primary hover:bg-primary-light/30 dark:hover:bg-primary/10 transition-colors" aria-label="Cambiar orden">
+                                                <SortIcon />
+                                                <span className="text-xs font-semibold">{getSortButtonText()}</span>
+                                            </button>
+                                        </div>
                                     </div>
                                     {!isMobile && <TodoInput onAddTodo={(text) => addTodo(text, { projectId: typeof selectedProjectId === 'number' ? selectedProjectId : null })} />}
                                 </div>
