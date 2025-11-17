@@ -19,13 +19,6 @@ const priorityMap: { [key in Priority]: { color: string; label: string, borderCo
     high: { color: 'bg-red-500', label: 'Alta', borderColor: 'border-red-500' },
 };
 
-const formatDateKey = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 const formatTime = (timeStr: string) => {
     if (!timeStr) return '';
     const [hour, minute] = timeStr.split(':');
@@ -36,37 +29,22 @@ const formatTime = (timeStr: string) => {
 
 const formatDueDate = (todo: Todo): string => {
     if (!todo.due_date) return '';
-    
-    const todayKey = formatDateKey(new Date());
-    const tomorrowDate = new Date();
-    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    const tomorrowKey = formatDateKey(tomorrowDate);
 
     const formatDate = (dateStr: string) => {
-        if (dateStr === todayKey) return 'Hoy';
-        if (dateStr === tomorrowKey) return 'Mañana';
         const [year, month, day] = dateStr.split('-').map(Number);
         const date = new Date(Date.UTC(year, month - 1, day));
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
     };
 
-    const startDateString = formatDate(todo.due_date);
-
     // If there's an end date, format a range
     if (todo.end_date && todo.end_date > todo.due_date) {
+        const startDateString = formatDate(todo.due_date);
         const endDateString = formatDate(todo.end_date);
         return `${startDateString} - ${endDateString}`;
     }
     
-    // If it's a single day task, format with time if available
-    let timeString = '';
-    if (todo.start_time && todo.end_time) {
-        timeString = `${formatTime(todo.start_time)} - ${formatTime(todo.end_time)}`;
-    } else if (todo.start_time) {
-        timeString = formatTime(todo.start_time);
-    }
-
-    return `${startDateString}${timeString ? `, ${timeString}` : ''}`;
+    // For single day tasks, do not show any date.
+    return '';
 };
 
 
@@ -78,6 +56,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
   };
 
   const hasSubtasks = todo.subtasks && todo.subtasks.length > 0;
+  const dueDateText = formatDueDate(todo);
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 border-l-4 ${todo.completed ? 'opacity-70' : ''} ${priorityMap[todo.priority].borderColor}`}>
@@ -125,9 +104,9 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
         
         {/* Right side controls */}
         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-            {todo.due_date && (
+            {dueDateText && (
                 <span className="text-xs font-medium text-primary-dark dark:text-primary bg-primary-light/50 dark:bg-primary/20 px-2 py-0.5 rounded-full whitespace-nowrap">
-                    {formatDueDate(todo)}
+                    {dueDateText}
                 </span>
             )}
             {hasSubtasks && <SubtaskIcon className="text-gray-400 dark:text-gray-500 h-5 w-5" />}
