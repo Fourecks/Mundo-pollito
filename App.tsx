@@ -75,12 +75,14 @@ const formatDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-const generateRecurringTasks = async (sourceTodo: Todo, currentTodos: { [key: string]: Todo[] }): Promise<{ [key: string]: Todo[] }> => {
+const generateRecurringTasks = async (sourceTodo: Todo): Promise<Todo[]> => {
     if (!sourceTodo.recurrence || sourceTodo.recurrence.frequency === 'none' || !sourceTodo.due_date) {
-        return currentTodos;
+        return [];
     }
+    
+    // Get all existing recurring tasks from IndexedDB to prevent duplicates
+    const allLocalTodos = await getAll<Todo>('todos');
 
-    const allTasksFlat: Todo[] = Object.values(currentTodos).flat() as Todo[];
     const { frequency, customDays, ends_on } = sourceTodo.recurrence;
     const recurrenceId = sourceTodo.recurrence.id!;
 
@@ -123,9 +125,7 @@ const generateRecurringTasks = async (sourceTodo: Todo, currentTodos: { [key: st
         }
         
         if (foundNext && nextDueDate) {
-            if (nextDueDate > finalLimitDate) { // Post-check to ensure we don't go past the end date
-                break;
-            }
+            if (nextDueDate > finalLimitDate) break;
             potentialDates.push(nextDueDate);
             lastDueDate = nextDueDate;
         } else {
@@ -135,43 +135,39 @@ const generateRecurringTasks = async (sourceTodo: Todo, currentTodos: { [key: st
     }
 
     // 2. Filter out dates that already exist
-    const existingDates = new Set(allTasksFlat.filter(t => t.recurrence?.id === recurrenceId).map(t => t.due_date).filter(Boolean) as string[]);
+    const existingDates = new Set(allLocalTodos.filter(t => t.recurrence?.id === recurrenceId).map(t => t.due_date).filter(Boolean) as string[]);
     const datesToCreate = potentialDates.filter(d => !existingDates.has(d.toISOString().split('T')[0]));
 
-    if (datesToCreate.length === 0) { return currentTodos; }
+    if (datesToCreate.length === 0) return [];
 
-    // 3. Build payloads for batch insert
-    const { id, subtasks, user_id, ...payload } = sourceTodo;
-    const newTodosPayloads = datesToCreate.map(date => ({
-        ...payload,
-        completed: false,
-        notification_sent: false,
-        due_date: date.toISOString().split('T')[0],
-        user_id: sourceTodo.user_id,
-        recurrence: { ...sourceTodo.recurrence, sourceId: sourceTodo.id },
-    }));
+    // 3. Build payloads for batch creation
+    const { id, subtasks: subtasksTemplate, user_id, ...payload } = sourceTodo;
+    const newTodosPayloads: Todo[] = datesToCreate.map(date => {
+        const tempId = -Date.now() - Math.random();
+        const newSubtasks = subtasksTemplate?.map(st => ({ 
+            id: -Date.now() - Math.random(), // New temporary ID for each subtask
+            text: st.text, 
+            completed: false 
+        })) || [];
 
-    // 4. Batch insert into Supabase
-    const { data: newTodos, error } = await supabase.from('todos').insert(newTodosPayloads).select();
-    if (error || !newTodos) { console.error("Error batch creating recurring tasks:", error); return currentTodos; }
-
-    if (sourceTodo.subtasks && sourceTodo.subtasks.length > 0) {
-        const newSubtasksPayloads = newTodos.flatMap(newTodo => sourceTodo.subtasks!.map(st => ({ text: st.text, completed: false, todo_id: newTodo.id })));
-        await supabase.from('subtasks').insert(newSubtasksPayloads);
-    }
-
-    // 5. Add new todos to a copy of the state
-    let newAllTodos = JSON.parse(JSON.stringify(currentTodos));
-    const subtasksTemplate = sourceTodo.subtasks?.map(st => ({...st, id: 0, completed: false})) || [];
-
-    newTodos.forEach(newTodo => {
-        const dateKey = newTodo.due_date!;
-        if (!newAllTodos[dateKey]) { newAllTodos[dateKey] = []; }
-        const newTodoWithSubtasks = { ...newTodo, subtasks: subtasksTemplate.map(st => ({...st, id: Math.random()})) };
-        newAllTodos[dateKey].push(newTodoWithSubtasks);
+        return {
+            ...payload,
+            id: tempId,
+            completed: false,
+            notification_sent: false,
+            due_date: date.toISOString().split('T')[0],
+            user_id: sourceTodo.user_id,
+            recurrence: { ...sourceTodo.recurrence, sourceId: sourceTodo.id },
+            subtasks: newSubtasks,
+            created_at: new Date().toISOString(),
+        };
     });
-
-    return newAllTodos;
+    
+    // 4. Batch create using offline-first syncableCreate
+    const creationPromises = newTodosPayloads.map(p => syncableCreate('todos', p));
+    const createdTodos = await Promise.all(creationPromises);
+    
+    return createdTodos as Todo[];
 };
 
 
@@ -1944,29 +1940,24 @@ const App: React.FC = () => {
     const recurrenceRuleChanged = JSON.stringify(originalTodo?.recurrence) !== JSON.stringify(updatedTodo.recurrence);
 
     if (recurrenceRuleChanged && wasRecurring) {
-        // It was an existing recurring task and its rule changed, so ask the user what to do.
         setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
     } else {
-        // This handles:
-        // 1. A normal update.
-        // 2. A non-recurring task becoming a recurring task.
-        
-        // Optimistic UI update for the main task.
         let nextAllTodos = getUpdatedTodosState(allTodos, updatedTodo);
         setAllTodos(nextAllTodos);
 
-        // This saves the full updatedTodo (including subtasks) to IndexedDB
-        // and queues an update for the main 'todos' table on the server.
         const savedTodo = await syncableUpdate('todos', updatedTodo);
-
-        // If a task just became recurring, generate the future instances.
+        
         if (recurrenceRuleChanged && isNowRecurring) {
-            const finalState = await generateRecurringTasks(savedTodo, nextAllTodos);
-            setAllTodos(finalState);
-        } else {
-            // If it's just a normal update, we might have received a real ID from the server.
-            // Update the state again to replace the temporary ID with the real one.
-            setAllTodos(current => getUpdatedTodosState(current, savedTodo));
+            const newRecurringTodos = await generateRecurringTasks(savedTodo);
+            setAllTodos(current => {
+                const newState = { ...current };
+                newRecurringTodos.forEach(newTodo => {
+                    const dateKey = newTodo.due_date!;
+                    if (!newState[dateKey]) newState[dateKey] = [];
+                    newState[dateKey].push(newTodo);
+                });
+                return newState;
+            });
         }
     }
   };
@@ -1995,23 +1986,32 @@ const App: React.FC = () => {
                 }
                 return true;
             });
-            if (newAllTodos[dateKey].length === 0) {
+            if (newAllTodos[dateKey].length === 0 && dateKey !== 'undated') {
                 delete newAllTodos[dateKey];
             }
         }
     }
 
     newAllTodos = getUpdatedTodosState(newAllTodos, updatedTodo);
+    setAllTodos(newAllTodos);
     
-    // Generate new recurring tasks from the updated one
-    const finalState = await generateRecurringTasks(updatedTodo, newAllTodos);
-    setAllTodos(finalState);
-
     // Sync changes
-    for (const id of idsToDelete) {
-        await syncableDelete('todos', id);
+    if (idsToDelete.length > 0) {
+        await syncableDeleteMultiple('todos', idsToDelete);
     }
-    await syncableUpdate('todos', updatedTodo);
+    const savedTodo = await syncableUpdate('todos', updatedTodo);
+    
+    const newRecurringTodos = await generateRecurringTasks(savedTodo);
+    setAllTodos(current => {
+        const newState = { ...current };
+        newRecurringTodos.forEach(newTodo => {
+            const dateKey = newTodo.due_date!;
+            if (!newState[dateKey]) newState[dateKey] = [];
+            newState[dateKey].push(newTodo);
+        });
+        return newState;
+    });
+
     setUpdateOptions({ isOpen: false, original: null, updated: null });
   };
 
@@ -2029,7 +2029,12 @@ const App: React.FC = () => {
     let nextState = getUpdatedTodosState(allTodos, updatedTodo);
     
     if (newCompletedState && todoToToggle.recurrence && todoToToggle.recurrence.frequency !== 'none') {
-        nextState = await generateRecurringTasks(updatedTodo, nextState);
+        const newRecurringTodos = await generateRecurringTasks(updatedTodo);
+        newRecurringTodos.forEach(newTodo => {
+            const dateKey = newTodo.due_date!;
+            if (!nextState[dateKey]) nextState[dateKey] = [];
+            nextState[dateKey].push(newTodo);
+        });
     }
     
     setAllTodos(nextState);

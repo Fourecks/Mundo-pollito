@@ -156,47 +156,40 @@ export const syncableCreate = async (tableName: string, payload: any): Promise<a
     if (navigator.onLine) {
         try {
             const { id: tempId, ...insertData } = payload;
-            const relationalFields = ['subtasks', 'notes', 'todos'];
-            relationalFields.forEach(field => {
-                if (insertData.hasOwnProperty(field)) delete insertData[field];
-            });
-
-            let selectClause = '*';
-            if (tableName === 'todos') selectClause = '*, subtasks(*)';
-
-            const { data: newRecord, error } = await supabase.from(tableName).insert(insertData).select(selectClause).single();
-            
-            if (error && error.code === '23505') { // Unique constraint violation
-                console.warn(`Record already exists for ${tableName}, attempting to fetch (self-heal).`, payload);
-                let query = supabase.from(tableName);
-                let existingRecord = null;
-                
-                // Add specific self-healing logic for known unique constraints
-                if (tableName === 'habit_records') {
-                    const { data } = await query.select('*').eq('habit_id', payload.habit_id).eq('completed_at', payload.completed_at).single();
-                    existingRecord = data;
-                }
-                
-                if (existingRecord) {
-                    await set(tableName, existingRecord);
-                    return existingRecord;
-                } else {
-                    throw new Error(`Self-heal failed: Could not find existing record for ${tableName} despite 23505 error.`);
-                }
-            } else if (error) {
-                throw error;
+            const subtasksToCreate = (tableName === 'todos' && payload.subtasks) ? payload.subtasks : null;
+            if (subtasksToCreate) {
+                delete insertData.subtasks;
             }
 
+            const { data: newRecord, error } = await supabase.from(tableName).insert(insertData).select().single();
+            if (error) throw error;
+            
+            let finalRecord = { ...newRecord, subtasks: [] };
+
+            if (subtasksToCreate && subtasksToCreate.length > 0) {
+                const subtaskPayloads = subtasksToCreate.map((st: any) => ({
+                    text: st.text,
+                    completed: st.completed || false,
+                    todo_id: newRecord.id
+                }));
+                const { data: newSubtasks, error: subtaskError } = await supabase.from('subtasks').insert(subtaskPayloads).select();
+                if (subtaskError) {
+                    console.error("Online CREATE: Failed to create subtasks, but main task was created.", subtaskError);
+                } else {
+                    finalRecord.subtasks = newSubtasks;
+                }
+            }
+            
             await new Promise<void>((resolve, reject) => {
                 if (!db) return reject("DB not initialized for atomic create.");
                 const tx = db.transaction(tableName, 'readwrite');
                 tx.objectStore(tableName).delete(tempId);
-                tx.objectStore(tableName).put(newRecord);
+                tx.objectStore(tableName).put(finalRecord);
                 tx.oncomplete = () => resolve();
                 tx.onerror = () => reject(tx.error);
             });
             
-            return newRecord;
+            return finalRecord;
         } catch (error) {
             console.error(`Online CREATE failed for ${tableName}, falling back to offline.`, error);
             await queueMutation({ type: 'CREATE', tableName, payload });
@@ -222,19 +215,31 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
         try {
             const { id, ...updateData } = payload;
             
-            const relationalFields = ['subtasks', 'notes', 'todos'];
-            relationalFields.forEach(field => delete updateData[field]);
+            const subtasksToSync = (tableName === 'todos' && payload.subtasks) ? payload.subtasks : null;
+            if (subtasksToSync) {
+                delete updateData.subtasks;
+            }
+            
             delete updateData.created_at;
             delete updateData.user_id;
             
-            let selectClause = '*';
-            if (tableName === 'todos') selectClause = '*, subtasks(*)';
-
-            const { data: updatedRecord, error } = await supabase.from(tableName).update(updateData).eq('id', id).select(selectClause).single();
+            const { data: updatedRecord, error } = await supabase.from(tableName).update(updateData).eq('id', id).select().single();
             if (error) throw error;
+            
+            let finalRecord = { ...updatedRecord, subtasks: [] };
+            
+            if (subtasksToSync !== null) {
+                await supabase.from('subtasks').delete().eq('todo_id', id);
+                if (subtasksToSync.length > 0) {
+                    const subtaskPayloads = subtasksToSync.map((st: any) => ({ text: st.text, completed: st.completed, todo_id: id }));
+                    const { data: newSubtasks, error: subtaskError } = await supabase.from('subtasks').insert(subtaskPayloads).select();
+                     if (subtaskError) console.error("Online UPDATE: Failed to sync subtasks.", subtaskError);
+                     else finalRecord.subtasks = newSubtasks;
+                }
+            }
 
-            await set(tableName, updatedRecord);
-            return updatedRecord;
+            await set(tableName, finalRecord);
+            return finalRecord;
         } catch (error) {
             console.error(`Online UPDATE failed for ${tableName}, queueing for later.`, error);
             await queueMutation({ type: 'UPDATE', tableName, payload });
@@ -334,7 +339,8 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
             switch (op.type) {
                 case 'CREATE': {
                     const tempId = op.payload.id;
-                    const { id, ...originalInsertData } = op.payload;
+                    const subtasksToCreate = (op.tableName === 'todos' && op.payload.subtasks) ? op.payload.subtasks : null;
+                    const { id, subtasks, ...originalInsertData } = op.payload;
                     let insertData = { ...originalInsertData };
 
                     // Resolve foreign keys
@@ -352,9 +358,25 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                     const { data: newRecord, error } = await supabase.from(op.tableName).insert(insertData).select().single();
                     if (error) throw error;
                     
+                    let finalRecord = { ...newRecord, subtasks: [] };
+
+                    if (subtasksToCreate && subtasksToCreate.length > 0) {
+                        const subtaskPayloads = subtasksToCreate.map((st: any) => ({
+                            text: st.text,
+                            completed: st.completed || false,
+                            todo_id: newRecord.id
+                        }));
+                        const { data: newSubtasks, error: subtaskError } = await supabase.from('subtasks').insert(subtaskPayloads).select();
+                        if (subtaskError) {
+                            console.error("Failed to sync subtasks for new todo", subtaskError);
+                        } else {
+                            finalRecord.subtasks = newSubtasks;
+                        }
+                    }
+
                     if (tempId < 0) tempIdMap.set(tempId, newRecord.id);
                     await remove(op.tableName, tempId);
-                    await add(op.tableName, newRecord);
+                    await add(op.tableName, finalRecord);
                     break;
                 }
                 case 'UPDATE': {
@@ -364,7 +386,7 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                     if (typeof recordId === 'number' && recordId < 0) {
                         if (tempIdMap.has(recordId)) {
                             payload.id = tempIdMap.get(recordId)!;
-                        } else { continue; } // Skip if parent create op hasn't happened yet
+                        } else { continue; } 
                     }
 
                     for (const field of foreignKeyFields) {
@@ -376,6 +398,23 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                     }
 
                     const { id: finalId, ...updateData } = payload;
+                    const subtasksToSync = (op.tableName === 'todos' && payload.subtasks) ? payload.subtasks : null;
+
+                    if (subtasksToSync !== null) {
+                        const { error: deleteError } = await supabase.from('subtasks').delete().eq('todo_id', finalId);
+                        if (deleteError) console.error(`Failed to delete old subtasks for todo ${finalId}`, deleteError);
+
+                        if (subtasksToSync.length > 0) {
+                            const subtaskPayloads = subtasksToSync.map((st: any) => ({
+                                text: st.text,
+                                completed: st.completed,
+                                todo_id: finalId
+                            }));
+                            const { error: insertError } = await supabase.from('subtasks').insert(subtaskPayloads);
+                            if (insertError) console.error(`Failed to insert new subtasks for todo ${finalId}`, insertError);
+                        }
+                    }
+
                     const relationalFields = ['subtasks', 'notes', 'todos'];
                     relationalFields.forEach(field => delete updateData[field]);
 

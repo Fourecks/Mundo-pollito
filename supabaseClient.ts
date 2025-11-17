@@ -1,8 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
 import { config } from './config';
-
-// Accede a la función createClient desde el objeto global `supabase` 
-// que se carga a través de la etiqueta <script> en index.html.
-const { createClient } = window.supabase;
 
 // This logic will try to read Render's env vars first, and if they don't exist,
 // it will fall back to the Gemini editor's env vars (which don't have the VITE_ prefix),

@@ -126,7 +126,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
         {/* Right side controls */}
         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
             {todo.due_date && (
-                <span className="text-xs font-medium text-primary-dark dark:text-primary bg-primary-light/50 dark:bg-primary/20 px-2 py-0.5 rounded-full whitespace-nowrap hidden sm:inline">
+                <span className="text-xs font-medium text-primary-dark dark:text-primary bg-primary-light/50 dark:bg-primary/20 px-2 py-0.5 rounded-full whitespace-nowrap">
                     {formatDueDate(todo)}
                 </span>
             )}
