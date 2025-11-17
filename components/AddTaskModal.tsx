@@ -18,37 +18,14 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
   const prevIsOpen = useRef(isOpen);
   
   useEffect(() => {
-    // This effect runs only once to set up the recognition engine
+    // Just check for support on mount
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
         setIsSpeechSupported(true);
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.lang = 'es-ES';
-        recognition.interimResults = false;
-
-        recognition.onstart = () => {
-            setText(''); // Clear text right when listening starts
-            setIsListening(true);
-        };
-        recognition.onend = () => setIsListening(false);
-        recognition.onresult = (event: any) => {
-            const transcript = Array.from(event.results)
-                .map((result: any) => result[0])
-                .map((result: any) => result.transcript)
-                .join('');
-            if (transcript) { setText(transcript); }
-        };
-        recognition.onerror = (event: any) => {
-            console.error('Speech recognition error', event.error);
-            setIsListening(false);
-        };
-        recognitionRef.current = recognition;
     }
   }, []);
 
   useEffect(() => {
-    // Only clear the text when the modal is first opened, not on every change of `isListening`.
     if (isOpen && !prevIsOpen.current) {
       setText('');
       setTimeout(() => textareaRef.current?.focus(), 100);
@@ -57,6 +34,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
     // Stop recognition if the modal is closed while listening.
     if (!isOpen && isListening) {
       recognitionRef.current?.stop();
+      setIsListening(false);
     }
     
     // Update the ref for the next render cycle.
@@ -80,10 +58,52 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
   }, [text]);
   
   const handleMicClick = () => {
+    if (!isSpeechSupported) return;
+
     if (isListening) {
       recognitionRef.current?.stop();
-    } else {
-      recognitionRef.current?.start();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'es-ES';
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setText('');
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0])
+        .map((result: any) => result.transcript)
+        .join('');
+      if (transcript) { setText(transcript); }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error', event.error);
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        alert('El permiso para usar el micrófono fue denegado. Por favor, habilítalo en la configuración de tu navegador.');
+      }
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null; // Clean up
+    };
+
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error("Error starting recognition:", e);
+      setIsListening(false);
     }
   };
 
