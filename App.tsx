@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency } from './types';
 import CompletionModal from './components/CompletionModal';
@@ -64,7 +65,7 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- OneSignal Configuration ---
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
 
 
 // Helper to format date as YYYY-MM-DD key
@@ -1970,9 +1971,16 @@ const App: React.FC = () => {
   };
   
   const handleUpdateFutureOccurrences = async (updatedTodo: Todo) => {
-    const recurrenceId = updatedTodo.recurrence?.id;
-    if (!recurrenceId || !updatedTodo.due_date) return;
+    const originalTodo = updateOptions.original;
+    const recurrenceId = originalTodo?.recurrence?.id;
     
+    if (!recurrenceId || !updatedTodo.due_date) {
+        setUpdateOptions({ isOpen: false, original: null, updated: null });
+        return;
+    }
+    
+    setUpdateOptions({ isOpen: false, original: null, updated: null });
+
     const deleteFromDate = updatedTodo.due_date;
     const idsToDelete: number[] = [];
     let newAllTodos = { ...allTodos };
@@ -1992,27 +2000,39 @@ const App: React.FC = () => {
         }
     }
 
-    newAllTodos = getUpdatedTodosState(newAllTodos, updatedTodo);
+    let finalUpdatedTodo = { ...updatedTodo };
+    const isStillRecurring = finalUpdatedTodo.recurrence && finalUpdatedTodo.recurrence.frequency !== 'none';
+
+    if (isStillRecurring) {
+         // Generate a new recurrence ID for this new series to separate it from past tasks
+        const newSeriesId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `rec-${Date.now()}-${Math.random()}`;
+        finalUpdatedTodo.recurrence = {
+            ...finalUpdatedTodo.recurrence!,
+            id: newSeriesId,
+            sourceId: finalUpdatedTodo.id
+        };
+    }
+
+    newAllTodos = getUpdatedTodosState(newAllTodos, finalUpdatedTodo);
     setAllTodos(newAllTodos);
     
-    // Sync changes
     if (idsToDelete.length > 0) {
         await syncableDeleteMultiple('todos', idsToDelete);
     }
-    const savedTodo = await syncableUpdate('todos', updatedTodo);
+    const savedTodo = await syncableUpdate('todos', finalUpdatedTodo);
     
-    const newRecurringTodos = await generateRecurringTasks(savedTodo);
-    setAllTodos(current => {
-        const newState = { ...current };
-        newRecurringTodos.forEach(newTodo => {
-            const dateKey = newTodo.due_date!;
-            if (!newState[dateKey]) newState[dateKey] = [];
-            newState[dateKey].push(newTodo);
+    if (isStillRecurring) {
+        const newRecurringTodos = await generateRecurringTasks(savedTodo);
+        setAllTodos(current => {
+            const newState = { ...current };
+            newRecurringTodos.forEach(newTodo => {
+                const dateKey = newTodo.due_date!;
+                if (!newState[dateKey]) newState[dateKey] = [];
+                newState[dateKey].push(newTodo);
+            });
+            return newState;
         });
-        return newState;
-    });
-
-    setUpdateOptions({ isOpen: false, original: null, updated: null });
+    }
   };
 
 
