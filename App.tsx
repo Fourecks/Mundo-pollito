@@ -65,7 +65,8 @@ const APP_FOLDER_NAME = 'Lista de Tareas App Files';
 // --- OneSignal Configuration ---
 const ONE_SIGNAL_APP_ID = (import.meta as any).env?.VITE_ONE_SIGNAL_APP_ID || (process.env as any).ONE_SIGNAL_APP_ID || config.ONE_SIGNAL_APP_ID;
 
-const pomodoroAudioSrc = "data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAYAAAAD//wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A/wD/AP8A";
+// Short beep sound for Pomodoro to avoid base64 errors
+const pomodoroAudioSrc = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU";
 
 
 // Helper to format date as YYYY-MM-DD key
@@ -81,72 +82,116 @@ const generateRecurringTasks = async (sourceTodo: Todo): Promise<Todo[]> => {
         return [];
     }
     
-    // Get all existing recurring tasks from IndexedDB to prevent duplicates
+    // Get all existing tasks to avoid duplicates
     const allLocalTodos = await getAll<Todo>('todos');
+    const recurrenceId = sourceTodo.recurrence.id;
 
     const { frequency, customDays, ends_on } = sourceTodo.recurrence;
-    const recurrenceId = sourceTodo.recurrence.id!;
+    
+    // 1. Determine start date (use the latest existing task date or the source date)
+    let startDate = new Date(sourceTodo.due_date + 'T00:00:00Z');
+    
+    // Find the furthest date currently generated for this chain
+    if (recurrenceId) {
+        const existingChainTasks = allLocalTodos.filter(t => t.recurrence?.id === recurrenceId);
+        if (existingChainTasks.length > 0) {
+            const dates = existingChainTasks.map(t => t.due_date).filter(Boolean) as string[];
+            dates.sort();
+            const lastDate = dates[dates.length - 1];
+            if (lastDate && new Date(lastDate + 'T00:00:00Z') > startDate) {
+                startDate = new Date(lastDate + 'T00:00:00Z');
+            }
+        }
+    }
 
-    // 1. Calculate all potential future dates
-    let lastDueDate = new Date(sourceTodo.due_date + 'T00:00:00Z');
+    // 2. Set Limit Date
     let limitDate = new Date();
+    // Generate enough for a smooth UI, but not too many to clog DB
     switch (frequency) {
-        case 'daily': limitDate.setMonth(limitDate.getMonth() + 1); break;
-        case 'weekly': case 'biweekly': case 'custom': limitDate.setMonth(limitDate.getMonth() + 3); break;
-        case 'monthly': limitDate.setMonth(limitDate.getMonth() + 6); break;
-        default: limitDate.setDate(limitDate.getDate() + 90);
+        case 'daily': limitDate.setDate(limitDate.getDate() + 14); break; // 2 weeks
+        case 'weekly': 
+        case 'biweekly': 
+        case 'custom': limitDate.setMonth(limitDate.getMonth() + 2); break; // 2 months
+        case 'monthly': limitDate.setMonth(limitDate.getMonth() + 6); break; // 6 months
+        default: limitDate.setDate(limitDate.getDate() + 30);
     }
 
     const recurrenceEndDate = ends_on ? new Date(ends_on + 'T00:00:00Z') : null;
     const finalLimitDate = (recurrenceEndDate && recurrenceEndDate < limitDate) ? recurrenceEndDate : limitDate;
 
-    const potentialDates: Date[] = [];
-    let loopGuard = 0; // Prevent infinite loops
-    while (lastDueDate < finalLimitDate && loopGuard < 365) {
-        let nextDueDate: Date | null = new Date(lastDueDate.valueOf());
-        let foundNext = false;
+    const datesToCreate: string[] = [];
+    let loopDate = new Date(startDate.valueOf());
+    let safetyCounter = 0;
+
+    // Move one step forward immediately to start generating *after* the last known date
+    // (Logic inside loop handles increment)
+    
+    while (loopDate < finalLimitDate && safetyCounter < 100) {
+        let nextDate: Date | null = new Date(loopDate.valueOf());
+        let found = false;
 
         switch (frequency) {
-            case 'daily': nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 1); foundNext = true; break;
-            case 'weekly': nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 7); foundNext = true; break;
-            case 'biweekly': nextDueDate.setUTCDate(nextDueDate.getUTCDate() + 14); foundNext = true; break;
-            case 'monthly': nextDueDate.setUTCMonth(nextDueDate.getUTCMonth() + 1); foundNext = true; break;
+            case 'daily': 
+                nextDate.setUTCDate(nextDate.getUTCDate() + 1); 
+                found = true; 
+                break;
+            case 'weekly': 
+                nextDate.setUTCDate(nextDate.getUTCDate() + 7); 
+                found = true; 
+                break;
+            case 'biweekly': 
+                nextDate.setUTCDate(nextDate.getUTCDate() + 14); 
+                found = true; 
+                break;
+            case 'monthly': 
+                nextDate.setUTCMonth(nextDate.getUTCMonth() + 1); 
+                found = true; 
+                break;
             case 'custom': {
-                if (!customDays || customDays.length === 0) { nextDueDate = null; break; }
-                const sortedCustomDays = [...customDays].sort((a,b) => a - b);
-                const lastDayOfWeek = lastDueDate.getUTCDay();
-                let daysToAdd = Infinity;
-                for (const customDay of sortedCustomDays) { if(customDay > lastDayOfWeek) { daysToAdd = customDay - lastDayOfWeek; break; } }
-                if(daysToAdd === Infinity) { daysToAdd = (7 - lastDayOfWeek) + sortedCustomDays[0]; }
-                nextDueDate.setUTCDate(lastDueDate.getUTCDate() + daysToAdd);
-                foundNext = true;
+                if (!customDays || customDays.length === 0) { nextDate = null; break; }
+                // Find next applicable day of week
+                // 0 = Sunday, 6 = Saturday.
+                const currentDay = loopDate.getUTCDay();
+                const sortedDays = [...customDays].sort((a,b) => a - b);
+                
+                // Find next day in the list larger than current
+                let nextDayDiff = -1;
+                for (const day of sortedDays) {
+                    if (day > currentDay) {
+                        nextDayDiff = day - currentDay;
+                        break;
+                    }
+                }
+                // If not found, wrap around to the first day in list next week
+                if (nextDayDiff === -1) {
+                    nextDayDiff = (7 - currentDay) + sortedDays[0];
+                }
+                
+                nextDate.setUTCDate(nextDate.getUTCDate() + nextDayDiff);
+                found = true;
                 break;
             }
-            default: nextDueDate = null;
+            default: nextDate = null;
         }
-        
-        if (foundNext && nextDueDate) {
-            if (nextDueDate > finalLimitDate) break;
-            potentialDates.push(nextDueDate);
-            lastDueDate = nextDueDate;
+
+        if (found && nextDate) {
+            if (nextDate > finalLimitDate) break;
+            datesToCreate.push(nextDate.toISOString().split('T')[0]);
+            loopDate = nextDate;
         } else {
             break;
         }
-        loopGuard++;
+        safetyCounter++;
     }
-
-    // 2. Filter out dates that already exist
-    const existingDates = new Set(allLocalTodos.filter(t => t.recurrence?.id === recurrenceId).map(t => t.due_date).filter(Boolean) as string[]);
-    const datesToCreate = potentialDates.filter(d => !existingDates.has(d.toISOString().split('T')[0]));
 
     if (datesToCreate.length === 0) return [];
 
-    // 3. Build payloads for batch creation
+    // 3. Create Payloads
     const { id, subtasks: subtasksTemplate, user_id, ...payload } = sourceTodo;
-    const newTodosPayloads: Todo[] = datesToCreate.map(date => {
+    const newTodosPayloads: Todo[] = datesToCreate.map(dateStr => {
         const tempId = -Date.now() - Math.random();
         const newSubtasks = subtasksTemplate?.map(st => ({ 
-            id: -Date.now() - Math.random(), // New temporary ID for each subtask
+            id: -Date.now() - Math.random(), 
             text: st.text, 
             completed: false 
         })) || [];
@@ -156,7 +201,7 @@ const generateRecurringTasks = async (sourceTodo: Todo): Promise<Todo[]> => {
             id: tempId,
             completed: false,
             notification_sent: false,
-            due_date: date.toISOString().split('T')[0],
+            due_date: dateStr,
             user_id: sourceTodo.user_id,
             recurrence: { ...sourceTodo.recurrence, sourceId: sourceTodo.id },
             subtasks: newSubtasks,
@@ -164,7 +209,7 @@ const generateRecurringTasks = async (sourceTodo: Todo): Promise<Todo[]> => {
         };
     });
     
-    // 4. Batch create using offline-first syncableCreate
+    // 4. Batch create
     const creationPromises = newTodosPayloads.map(p => syncableCreate('todos', p));
     const createdTodos = await Promise.all(creationPromises);
     
@@ -1936,35 +1981,52 @@ const App: React.FC = () => {
   
   const handleUpdateTodo = async (updatedTodo: Todo) => {
     const originalTodo = findTodoById(updatedTodo.id);
+    
     const wasRecurring = originalTodo?.recurrence?.frequency && originalTodo.recurrence.frequency !== 'none';
     const isNowRecurring = updatedTodo.recurrence?.frequency && updatedTodo.recurrence.frequency !== 'none';
+    
+    // Check if recurrence rules actually changed
     const recurrenceRuleChanged = JSON.stringify(originalTodo?.recurrence) !== JSON.stringify(updatedTodo.recurrence);
 
-    if (recurrenceRuleChanged && wasRecurring) {
-        setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
-    } else {
-        let nextAllTodos = getUpdatedTodosState(allTodos, updatedTodo);
-        setAllTodos(nextAllTodos);
-
-        const savedTodo = await syncableUpdate('todos', updatedTodo);
-        
-        if (recurrenceRuleChanged && isNowRecurring) {
-            const newRecurringTodos = await generateRecurringTasks(savedTodo);
-            setAllTodos(current => {
-                const newState = { ...current };
-                newRecurringTodos.forEach(newTodo => {
-                    const dateKey = newTodo.due_date!;
-                    if (!newState[dateKey]) newState[dateKey] = [];
-                    newState[dateKey].push(newTodo);
-                });
-                return newState;
-            });
+    if (recurrenceRuleChanged && (wasRecurring || isNowRecurring)) {
+        // If it WAS recurring, we need to ask user what to do with future tasks
+        if (wasRecurring) {
+             setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
+             return;
         }
+        // If it wasn't recurring but is now, just save and generate future tasks
+    } 
+
+    // Standard update (no recurrence change prompt needed)
+    let nextAllTodos = getUpdatedTodosState(allTodos, updatedTodo);
+    setAllTodos(nextAllTodos);
+
+    const savedTodo = await syncableUpdate('todos', updatedTodo);
+    
+    if (recurrenceRuleChanged && isNowRecurring) {
+        // Generate new recurrence chain
+        const newRecurringTodos = await generateRecurringTasks(savedTodo);
+        setAllTodos(current => {
+            const newState = { ...current };
+            newRecurringTodos.forEach(newTodo => {
+                const dateKey = newTodo.due_date!;
+                if (!newState[dateKey]) newState[dateKey] = [];
+                newState[dateKey].push(newTodo);
+            });
+            return newState;
+        });
     }
   };
   
   const handleUpdateThisOccurrenceOnly = async (updatedTodo: Todo) => {
-    const newTodo = { ...updatedTodo, recurrence: { frequency: 'none' as 'none' }};
+    // The user chose "This task only". This implies breaking the recurrence chain for THIS specific task.
+    // We set its frequency to 'none' so it stops generating, but we keep the recurrence ID on the *others* implicitly by not touching them.
+    // Ideally, we should remove the recurrence ID from this task to detach it completely.
+    const newTodo = { 
+        ...updatedTodo, 
+        recurrence: { frequency: 'none' as const } // Detach from chain
+    };
+    
     setAllTodos(current => getUpdatedTodosState(current, newTodo));
     await syncableUpdate('todos', newTodo);
     setUpdateOptions({ isOpen: false, original: null, updated: null });
@@ -1972,15 +2034,16 @@ const App: React.FC = () => {
   
   const handleUpdateFutureOccurrences = async (updatedTodo: Todo) => {
     const originalTodo = updateOptions.original;
-    const recurrenceId = originalTodo?.recurrence?.id;
+    const oldRecurrenceId = originalTodo?.recurrence?.id;
     
-    if (!recurrenceId || !updatedTodo.due_date) {
+    if (!oldRecurrenceId || !updatedTodo.due_date) {
         setUpdateOptions({ isOpen: false, original: null, updated: null });
         return;
     }
     
     setUpdateOptions({ isOpen: false, original: null, updated: null });
 
+    // 1. Delete ALL future tasks belonging to the OLD chain
     const deleteFromDate = updatedTodo.due_date;
     const idsToDelete: number[] = [];
     let newAllTodos = { ...allTodos };
@@ -1988,7 +2051,9 @@ const App: React.FC = () => {
     for (const dateKey in newAllTodos) {
         if(dateKey >= deleteFromDate) {
             newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => {
-                if (t.recurrence?.id === recurrenceId && t.id !== updatedTodo.id) {
+                // Don't delete the task we are currently editing (updatedTodo.id)
+                // even if it has the old ID, because we are about to update it.
+                if (t.recurrence?.id === oldRecurrenceId && t.id !== updatedTodo.id) {
                     idsToDelete.push(t.id);
                     return false;
                 }
@@ -2000,28 +2065,36 @@ const App: React.FC = () => {
         }
     }
 
+    // 2. Update the current task
     let finalUpdatedTodo = { ...updatedTodo };
-    const isStillRecurring = finalUpdatedTodo.recurrence && finalUpdatedTodo.recurrence.frequency !== 'none';
+    const isNowRecurring = finalUpdatedTodo.recurrence && finalUpdatedTodo.recurrence.frequency !== 'none';
 
-    if (isStillRecurring) {
-         // Generate a new recurrence ID for this new series to separate it from past tasks
+    if (isNowRecurring) {
+         // Generate a NEW recurrence ID for this new series to separate it from the old chain history
         const newSeriesId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `rec-${Date.now()}-${Math.random()}`;
         finalUpdatedTodo.recurrence = {
             ...finalUpdatedTodo.recurrence!,
             id: newSeriesId,
             sourceId: finalUpdatedTodo.id
         };
+    } else {
+        // Ensure we explicitly clear recurrence if setting to None
+        finalUpdatedTodo.recurrence = { frequency: 'none' }; 
     }
 
+    // Update local state
     newAllTodos = getUpdatedTodosState(newAllTodos, finalUpdatedTodo);
     setAllTodos(newAllTodos);
     
+    // 3. Perform DB Operations
     if (idsToDelete.length > 0) {
         await syncableDeleteMultiple('todos', idsToDelete);
     }
+    
     const savedTodo = await syncableUpdate('todos', finalUpdatedTodo);
     
-    if (isStillRecurring) {
+    // 4. Generate NEW future tasks if applicable
+    if (isNowRecurring) {
         const newRecurringTodos = await generateRecurringTasks(savedTodo);
         setAllTodos(current => {
             const newState = { ...current };

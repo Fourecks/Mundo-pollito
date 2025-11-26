@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, ReactNode, useMemo } from 'react';
 import { Todo, Subtask, Priority, RecurrenceRule, Project } from '../types';
 import CloseIcon from './icons/CloseIcon';
@@ -219,10 +220,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
         updatedTodoPayload.notes = hasNotes ? notes : undefined;
 
         const currentRecurrence = { ...recurrence };
-        if (hasRecurrence && !currentRecurrence.id) {
-            currentRecurrence.id = crypto.randomUUID();
+        // If user is activating recurrence, ensure it has an ID.
+        if (hasRecurrence && !isUndated) {
+             if (!currentRecurrence.id) {
+                 currentRecurrence.id = crypto.randomUUID();
+             }
+             updatedTodoPayload.recurrence = currentRecurrence;
+        } else {
+             // Explicitly set to none if disabled
+             updatedTodoPayload.recurrence = { frequency: 'none' };
         }
-        updatedTodoPayload.recurrence = hasRecurrence && !isUndated ? currentRecurrence : { frequency: 'none' };
         
         let reminderChanged = false;
 
