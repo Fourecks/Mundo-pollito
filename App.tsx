@@ -88,45 +88,51 @@ const generateRecurringTasks = async (sourceTodo: Todo): Promise<Todo[]> => {
 
     const { frequency, customDays, ends_on } = sourceTodo.recurrence;
     
-    // 1. Determine start date (use the latest existing task date or the source date)
-    let startDate = new Date(sourceTodo.due_date + 'T00:00:00Z');
+    // 1. Determine start date.
+    // IMPORTANT: We want to generate tasks *after* the source task's date.
+    // If the source task is today, we start generating from tomorrow (or next valid cycle).
+    // If we have existing future tasks, we start after the latest one.
     
-    // Find the furthest date currently generated for this chain
+    let referenceDate = new Date(sourceTodo.due_date + 'T00:00:00Z');
+    
     if (recurrenceId) {
         const existingChainTasks = allLocalTodos.filter(t => t.recurrence?.id === recurrenceId);
         if (existingChainTasks.length > 0) {
             const dates = existingChainTasks.map(t => t.due_date).filter(Boolean) as string[];
             dates.sort();
-            const lastDate = dates[dates.length - 1];
-            if (lastDate && new Date(lastDate + 'T00:00:00Z') > startDate) {
-                startDate = new Date(lastDate + 'T00:00:00Z');
+            const lastDateStr = dates[dates.length - 1];
+            if (lastDateStr) {
+                const lastDate = new Date(lastDateStr + 'T00:00:00Z');
+                if (lastDate > referenceDate) {
+                    referenceDate = lastDate;
+                }
             }
         }
     }
 
-    // 2. Set Limit Date
+    // 2. Set Limit Date (Generation Window)
     let limitDate = new Date();
-    // Generate enough for a smooth UI, but not too many to clog DB
+    // Use current real time as base for limit, not the task date
+    const now = new Date(); 
+    
     switch (frequency) {
-        case 'daily': limitDate.setDate(limitDate.getDate() + 14); break; // 2 weeks
+        case 'daily': limitDate.setDate(now.getDate() + 14); break; // 2 weeks ahead
         case 'weekly': 
         case 'biweekly': 
-        case 'custom': limitDate.setMonth(limitDate.getMonth() + 2); break; // 2 months
-        case 'monthly': limitDate.setMonth(limitDate.getMonth() + 6); break; // 6 months
-        default: limitDate.setDate(limitDate.getDate() + 30);
+        case 'custom': limitDate.setMonth(now.getMonth() + 2); break; // 2 months ahead
+        case 'monthly': limitDate.setMonth(now.getMonth() + 6); break; // 6 months ahead
+        default: limitDate.setDate(now.getDate() + 30);
     }
 
     const recurrenceEndDate = ends_on ? new Date(ends_on + 'T00:00:00Z') : null;
+    // If recurrence end date is sooner than our limit, stop there.
     const finalLimitDate = (recurrenceEndDate && recurrenceEndDate < limitDate) ? recurrenceEndDate : limitDate;
 
     const datesToCreate: string[] = [];
-    let loopDate = new Date(startDate.valueOf());
+    let loopDate = new Date(referenceDate.valueOf());
     let safetyCounter = 0;
 
-    // Move one step forward immediately to start generating *after* the last known date
-    // (Logic inside loop handles increment)
-    
-    while (loopDate < finalLimitDate && safetyCounter < 100) {
+    while (loopDate < finalLimitDate && safetyCounter < 60) { // 60 iterations max for safety
         let nextDate: Date | null = new Date(loopDate.valueOf());
         let found = false;
 
@@ -149,7 +155,6 @@ const generateRecurringTasks = async (sourceTodo: Todo): Promise<Todo[]> => {
                 break;
             case 'custom': {
                 if (!customDays || customDays.length === 0) { nextDate = null; break; }
-                // Find next applicable day of week
                 // 0 = Sunday, 6 = Saturday.
                 const currentDay = loopDate.getUTCDay();
                 const sortedDays = [...customDays].sort((a,b) => a - b);
@@ -1940,16 +1945,13 @@ const App: React.FC = () => {
     const newAllTodos = JSON.parse(JSON.stringify(current));
     
     // Find and remove the original task
-    let foundAndRemoved = false;
     for (const key in newAllTodos) {
         const index = newAllTodos[key].findIndex(t => t.id === todoToUpdate.id);
         if (index !== -1) {
             newAllTodos[key].splice(index, 1);
-            // Don't delete the key if it's 'undated', even if it becomes empty
             if (newAllTodos[key].length === 0 && key !== 'undated') {
                 delete newAllTodos[key];
             }
-            foundAndRemoved = true;
             break;
         }
     }
@@ -1990,6 +1992,7 @@ const App: React.FC = () => {
 
     if (recurrenceRuleChanged && (wasRecurring || isNowRecurring)) {
         // If it WAS recurring, we need to ask user what to do with future tasks
+        // OR if we are changing from one recurring type to another (or to none)
         if (wasRecurring) {
              setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
              return;
@@ -2036,20 +2039,25 @@ const App: React.FC = () => {
     const originalTodo = updateOptions.original;
     const oldRecurrenceId = originalTodo?.recurrence?.id;
     
-    if (!oldRecurrenceId || !updatedTodo.due_date) {
+    // If we don't have an original recurrence ID, we can't find the chain. 
+    // Just perform a normal update.
+    if (!oldRecurrenceId) {
         setUpdateOptions({ isOpen: false, original: null, updated: null });
+        await handleUpdateTodo(updatedTodo); // Fallback to normal update
         return;
     }
     
     setUpdateOptions({ isOpen: false, original: null, updated: null });
 
     // 1. Delete ALL future tasks belonging to the OLD chain
-    const deleteFromDate = updatedTodo.due_date;
+    // We use the updated task's due date as the starting point for deletion.
+    const deleteFromDate = updatedTodo.due_date || new Date().toISOString().split('T')[0];
     const idsToDelete: number[] = [];
-    let newAllTodos = { ...allTodos };
+    let newAllTodos = JSON.parse(JSON.stringify(allTodos)); // Deep copy
 
     for (const dateKey in newAllTodos) {
         if(dateKey >= deleteFromDate) {
+            const initialLength = newAllTodos[dateKey].length;
             newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => {
                 // Don't delete the task we are currently editing (updatedTodo.id)
                 // even if it has the old ID, because we are about to update it.
@@ -2059,7 +2067,8 @@ const App: React.FC = () => {
                 }
                 return true;
             });
-            if (newAllTodos[dateKey].length === 0 && dateKey !== 'undated') {
+            
+            if (newAllTodos[dateKey].length === 0 && initialLength > 0 && dateKey !== 'undated') {
                 delete newAllTodos[dateKey];
             }
         }
@@ -2070,7 +2079,8 @@ const App: React.FC = () => {
     const isNowRecurring = finalUpdatedTodo.recurrence && finalUpdatedTodo.recurrence.frequency !== 'none';
 
     if (isNowRecurring) {
-         // Generate a NEW recurrence ID for this new series to separate it from the old chain history
+         // Generate a NEW recurrence ID for this new series to separate it from the old chain history.
+         // This prevents future edits from accidentally affecting the old chain (or what's left of it).
         const newSeriesId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `rec-${Date.now()}-${Math.random()}`;
         finalUpdatedTodo.recurrence = {
             ...finalUpdatedTodo.recurrence!,
@@ -2078,11 +2088,12 @@ const App: React.FC = () => {
             sourceId: finalUpdatedTodo.id
         };
     } else {
-        // Ensure we explicitly clear recurrence if setting to None
+        // CRITICAL: Explicitly ensure recurrence is cleared and ID removed if setting to None.
+        // We set it to a clean object to avoid any lingering IDs.
         finalUpdatedTodo.recurrence = { frequency: 'none' }; 
     }
 
-    // Update local state
+    // Update local state with the modified current task
     newAllTodos = getUpdatedTodosState(newAllTodos, finalUpdatedTodo);
     setAllTodos(newAllTodos);
     
@@ -2091,6 +2102,7 @@ const App: React.FC = () => {
         await syncableDeleteMultiple('todos', idsToDelete);
     }
     
+    // Save the updated task (which now has either a NEW ID or NO ID)
     const savedTodo = await syncableUpdate('todos', finalUpdatedTodo);
     
     // 4. Generate NEW future tasks if applicable
