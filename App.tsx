@@ -652,7 +652,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       
         <main className={`${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {openWindows.includes('todo') && (
-            <ModalWindow isOpen={true} onClose={() => toggleWindow('todo')} title="Lista de Tareas" isDraggable isResizable zIndex={focusedWindow === 'todo' ? 50 : 40} onFocus={() => bringToFront('todo')} className="w-full max-w-3xl h-[80vh]" windowState={windowStates.todo} onStateChange={s => setWindowStates(ws => ({...ws, todo: s}))}>
+            <ModalWindow isOpen={true} onClose={() => toggleWindow('todo')} title="Lista de Tareas" isDraggable isResizable zIndex={focusedWindow === 'todo' ? 50 : 40} onFocus={() => bringToFront('todo')} className="w-full max-w-3xl h-[80vh]" windowState={windowStates.todo} onStateChange={s => setWindowStates(ws => ({...ws, todo: s}))} allowFullscreen>
               <TodoListModule 
                 allTodos={allTodos} 
                 addTodo={handleAddTodo} 
@@ -663,10 +663,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 onEditTodo={setTaskToEdit} 
                 selectedDate={selectedDate} 
                 setSelectedDate={setSelectedDate} 
-                datesWithTasks={datesWithTasks} 
-                datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
-                onClearPastTodos={onClearPastTodos}
-                projects={projects}
+                focusMode={isFocusMode}
                 onAddProject={handleAddProject}
                 onUpdateProject={handleUpdateProject}
                 onDeleteProject={handleDeleteProject}
@@ -676,11 +673,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 calendarEvents={calendarEvents}
                 onOpenProjectCreator={handleOpenProjectCreator}
                 onOpenProjectEditor={handleOpenProjectEditor}
+                datesWithTasks={datesWithTasks} 
+                datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
+                onClearPastTodos={onClearPastTodos}
+                projects={projects}
               />
             </ModalWindow>
           )}
           {openWindows.includes('calendar') && (
-            <ModalWindow isOpen={true} onClose={() => toggleWindow('calendar')} title="Calendario y Sincronización" isDraggable isResizable zIndex={focusedWindow === 'calendar' ? 50 : 40} onFocus={() => bringToFront('calendar')} className="w-full max-w-5xl h-[85vh]" windowState={windowStates.calendar} onStateChange={s => setWindowStates(ws => ({...ws, calendar: s}))}>
+            <ModalWindow isOpen={true} onClose={() => toggleWindow('calendar')} title="Calendario y Sincronización" isDraggable isResizable zIndex={focusedWindow === 'calendar' ? 50 : 40} onFocus={() => bringToFront('calendar')} className="w-full max-w-5xl h-[85vh]" windowState={windowStates.calendar} onStateChange={s => setWindowStates(ws => ({...ws, calendar: s}))} allowFullscreen>
               <CalendarModule
                 allTodos={allTodos}
                 calendarEvents={calendarEvents}
@@ -704,7 +705,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             </ModalWindow>
           )}
           {openWindows.includes('habits') && (
-            <ModalWindow isOpen={true} onClose={() => toggleWindow('habits')} title="Seguimiento de Hábitos" isDraggable isResizable zIndex={focusedWindow === 'habits' ? 50 : 40} onFocus={() => bringToFront('habits')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.habits} onStateChange={s => setWindowStates(ws => ({...ws, habits: s}))}>
+            <ModalWindow isOpen={true} onClose={() => toggleWindow('habits')} title="Seguimiento de Hábitos" isDraggable isResizable zIndex={focusedWindow === 'habits' ? 50 : 40} onFocus={() => bringToFront('habits')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.habits} onStateChange={s => setWindowStates(ws => ({...ws, habits: s}))} allowFullscreen>
               <HabitTracker 
                 habits={habits} 
                 records={habitRecords} 
@@ -716,7 +717,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             </ModalWindow>
           )}
           {openWindows.includes('progreso') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('progreso')} title="Informe de Crecimiento" isDraggable isResizable zIndex={focusedWindow === 'progreso' ? 50 : 40} onFocus={() => bringToFront('progreso')} className="w-full max-w-4xl h-[85vh]" windowState={windowStates.progreso} onStateChange={s => setWindowStates(ws => ({...ws, progreso: s}))}>
+              <ModalWindow isOpen onClose={() => toggleWindow('progreso')} title="Informe de Crecimiento" isDraggable isResizable zIndex={focusedWindow === 'progreso' ? 50 : 40} onFocus={() => bringToFront('progreso')} className="w-full max-w-4xl h-[85vh]" windowState={windowStates.progreso} onStateChange={s => setWindowStates(ws => ({...ws, progreso: s}))} allowFullscreen>
                   <ProgressView 
                       allTodos={allTodos} 
                       projects={projects} 
@@ -726,7 +727,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               </ModalWindow>
           )}
           {openWindows.includes('notes') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas del Pollito" isDraggable isResizable zIndex={focusedWindow === 'notes' ? 50 : 40} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStates.notes} onStateChange={s => setWindowStates(ws => ({...ws, notes: s}))}>
+              <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas del Pollito" isDraggable isResizable zIndex={focusedWindow === 'notes' ? 50 : 40} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStates.notes} onStateChange={s => setWindowStates(ws => ({...ws, notes: s}))} allowFullscreen>
                   <NotesSection folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
               </ModalWindow>
           )}
@@ -741,7 +742,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               </ModalWindow>
           )}
           {openWindows.includes('browser') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('browser')} title="IA Pollito" isDraggable isResizable zIndex={focusedWindow === 'browser' ? 50 : 40} onFocus={() => bringToFront('browser')} className="w-full max-w-xl h-[85vh]" windowState={windowStates.browser} onStateChange={s => setWindowStates(ws => ({...ws, browser: s}))}>
+              <ModalWindow isOpen onClose={() => toggleWindow('browser')} title="IA Pollito" isDraggable isResizable zIndex={focusedWindow === 'browser' ? 50 : 40} onFocus={() => bringToFront('browser')} className="w-full max-w-xl h-[85vh]" windowState={windowStates.browser} onStateChange={s => setWindowStates(ws => ({...ws, browser: s}))} allowFullscreen>
                   <Browser session={browserSession} setSession={setBrowserSession} currentUser={currentUser} />
               </ModalWindow>
           )}

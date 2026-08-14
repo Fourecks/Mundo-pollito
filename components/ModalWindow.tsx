@@ -1,5 +1,6 @@
 import React, { ReactNode, useRef, useState, useEffect, useCallback } from 'react';
 import CloseIcon from './icons/CloseIcon';
+import ExpandIcon from './icons/ExpandIcon';
 import { WindowState } from '../types';
 
 interface ModalWindowProps {
@@ -16,14 +17,31 @@ interface ModalWindowProps {
   zIndex?: number;
   onFocus?: () => void;
   noHeader?: boolean;
+  allowFullscreen?: boolean;
 }
 
-const ModalWindow: React.FC<ModalWindowProps> = ({ isOpen, onClose, title, children, className = '', frameless = false, isDraggable = false, isResizable = false, windowState, onStateChange, zIndex, onFocus, noHeader = false }) => {
+const ModalWindow: React.FC<ModalWindowProps> = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  className = '', 
+  frameless = false, 
+  isDraggable = false, 
+  isResizable = false, 
+  windowState, 
+  onStateChange, 
+  zIndex, 
+  onFocus, 
+  noHeader = false,
+  allowFullscreen = false
+}) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   const [hasInteracted, setHasInteracted] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const lastPos = useRef(pos);
   useEffect(() => { lastPos.current = pos; }, [pos]);
@@ -138,7 +156,14 @@ const ModalWindow: React.FC<ModalWindowProps> = ({ isOpen, onClose, title, child
 
   if (!isOpen) return null;
   
-  const modalStyle: React.CSSProperties = hasInteracted ? {
+  const modalStyle: React.CSSProperties = isFullscreen ? {
+      position: 'fixed',
+      left: 0,
+      top: 0,
+      width: '100vw',
+      height: '100vh',
+      margin: 0,
+  } : hasInteracted ? {
       position: 'fixed',
       left: `${pos.x}px`,
       top: `${pos.y}px`,
@@ -161,14 +186,14 @@ const ModalWindow: React.FC<ModalWindowProps> = ({ isOpen, onClose, title, child
 
   return (
     <div
-      className={`fixed inset-0 p-1 sm:p-4 ${!hasInteracted ? 'flex items-center justify-center' : ''} pointer-events-none`}
+      className={`fixed inset-0 ${isFullscreen ? 'p-0' : 'p-1 sm:p-4'} ${(!hasInteracted && !isFullscreen) ? 'flex items-center justify-center' : ''} pointer-events-none`}
       aria-modal="true"
       role="dialog"
-      style={{ zIndex }}
+      style={{ zIndex: isFullscreen ? 80000 : zIndex }}
     >
       <div
         ref={modalRef}
-        onMouseDown={isDraggable ? (e) => {
+        onMouseDown={isDraggable && !isFullscreen ? (e) => {
           if ((e.target as HTMLElement).closest('.drag-handle')) {
             handleInteractionStart(e as React.MouseEvent<HTMLElement>, 'drag');
           }
@@ -176,10 +201,12 @@ const ModalWindow: React.FC<ModalWindowProps> = ({ isOpen, onClose, title, child
         } : onFocus}
         style={modalStyle}
         className={`
-          ${!frameless ? 'bg-white/70 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl flex flex-col' : ''}
-          ${!hasInteracted && 'animate-deploy'}
-          ${!hasInteracted ? className : ''}
-          ${hasInteracted && !frameless ? 'max-h-none max-w-none' : ''}
+          ${!frameless ? 'bg-white/70 dark:bg-gray-800/80 backdrop-blur-xl flex flex-col' : ''}
+          ${!frameless && !isFullscreen ? 'rounded-3xl shadow-2xl' : ''}
+          ${isFullscreen ? 'rounded-none shadow-none w-full h-full' : ''}
+          ${(!hasInteracted && !isFullscreen) && 'animate-deploy'}
+          ${(!hasInteracted && !isFullscreen) ? className : ''}
+          ${(hasInteracted || isFullscreen) && !frameless ? 'max-h-none max-w-none' : ''}
           relative pointer-events-auto
         `}
         onClick={e => e.stopPropagation()}
@@ -190,17 +217,35 @@ const ModalWindow: React.FC<ModalWindowProps> = ({ isOpen, onClose, title, child
           <>
             {!noHeader && (
               <header 
-                className="flex items-center justify-between p-2 border-b border-secondary-light/30 dark:border-gray-700/50 flex-shrink-0 drag-handle"
-                style={{ cursor: isDraggable ? 'move' : 'default' }}
+                className="flex items-center justify-between p-2 border-b border-secondary-light/30 dark:border-gray-700/50 flex-shrink-0 drag-handle animate-fade-in"
+                style={{ cursor: isDraggable && !isFullscreen ? 'move' : 'default' }}
               >
                 <h2 className="text-lg font-bold text-primary-dark dark:text-primary truncate pl-2">{title}</h2>
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-primary-light/50 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors cursor-pointer"
-                  aria-label="Cerrar ventana"
-                >
-                  <CloseIcon />
-                </button>
+                <div className="flex items-center gap-1">
+                  {allowFullscreen && (
+                    <button
+                      onClick={() => setIsFullscreen(!isFullscreen)}
+                      className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-primary-light/50 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors cursor-pointer"
+                      aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                      title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                    >
+                      {isFullscreen ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 4v5H4m5 0L3 3m11 1v5h5m-5 0l6-6M9 20v-5H4m5 0l-6 6m11-1v-5h5m-5 0l6 6" />
+                        </svg>
+                      ) : (
+                        <ExpandIcon />
+                      )}
+                    </button>
+                  )}
+                  <button
+                    onClick={onClose}
+                    className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-primary-light/50 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors cursor-pointer"
+                    aria-label="Cerrar ventana"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
               </header>
             )}
             <main className="flex-grow flex flex-col overflow-y-auto custom-scrollbar min-h-0 relative">
@@ -208,7 +253,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({ isOpen, onClose, title, child
             </main>
           </>
         )}
-        {isResizable && <Resizer />}
+        {isResizable && !isFullscreen && <Resizer />}
       </div>
     </div>
   );
