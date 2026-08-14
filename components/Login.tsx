@@ -41,7 +41,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
                         type="text"
-                        value={username}
+                        value={username || ''}
                         onChange={(e) => setUsername(e.target.value)}
                         placeholder="Usuario"
                         className="w-full bg-black/5 dark:bg-white/5 backdrop-blur-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-500/80 dark:placeholder:text-gray-400/80 border-0 rounded-xl py-3.5 px-5 focus:outline-none focus:ring-2 focus:ring-primary/70 transition-all duration-300"
@@ -49,7 +49,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     />
                     <input
                         type="password"
-                        value={password}
+                        value={password || ''}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Contraseña"
                         className="w-full bg-black/5 dark:bg-white/5 backdrop-blur-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-500/80 dark:placeholder:text-gray-400/80 border-0 rounded-xl py-3.5 px-5 focus:outline-none focus:ring-2 focus:ring-primary/70 transition-all duration-300"

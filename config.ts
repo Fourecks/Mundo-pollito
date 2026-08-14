@@ -26,4 +26,11 @@ export const config = {
   // Get this from your OneSignal account dashboard after creating a "Web" app.
   // It's recommended to set this as an environment variable in production.
   ONE_SIGNAL_APP_ID: "cd59f391-d7ba-4d08-9e9e-80de89efed4d",
+
+  // --- Notion OAuth Integration (Para conexión de 1-clic real) ---
+  // Si creas una integración pública en Notion (https://www.notion.so/my-integrations)
+  // puedes configurar el Client ID y Client Secret aquí o como variables de entorno.
+  // Esto habilitará la redirección directa al login oficial de Notion sin copiar/pegar nada.
+  NOTION_CLIENT_ID: import.meta.env.VITE_NOTION_CLIENT_ID || "",
+  NOTION_CLIENT_SECRET: import.meta.env.VITE_NOTION_CLIENT_SECRET || "",
 };

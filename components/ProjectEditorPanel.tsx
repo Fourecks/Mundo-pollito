@@ -40,30 +40,46 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({ isOpen, onClose
   if (!isOpen) return null;
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60000] animate-fade-in" onClick={onClose}></div>
-      <div className="fixed bottom-0 left-0 right-0 max-h-[90vh] bg-secondary-lighter dark:bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col z-[60001] animate-slide-up" onClick={e => e.stopPropagation()}>
-        <header className="flex-shrink-0 p-3 text-center relative border-b border-secondary-light/50 dark:border-gray-700/50 flex items-center justify-between">
+    <div className="fixed inset-0 z-[60000] flex items-center justify-center p-4 animate-fade-in">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="relative w-full max-w-md max-h-[90vh] bg-secondary-lighter dark:bg-gray-800 rounded-3xl shadow-2xl flex flex-col z-[60001] animate-pop-in overflow-hidden border border-black/5 dark:border-white/10" onClick={e => e.stopPropagation()}>
+        <header className="flex-shrink-0 p-4 text-center relative border-b border-secondary-light/50 dark:border-gray-700/50 flex items-center justify-between">
           <h3 className="font-bold text-lg text-primary-dark dark:text-primary w-full text-center">{projectToEdit ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h3>
-          <button onClick={onClose} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+          <button onClick={onClose} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400">
             <CloseIcon />
           </button>
         </header>
-        <main className="flex-grow p-4 overflow-y-auto custom-scrollbar">
+        <main className="flex-grow p-5 overflow-y-auto custom-scrollbar">
           <div className="w-full max-w-sm mx-auto space-y-4">
             <div>
               <label className="font-medium text-gray-700 dark:text-gray-200 text-sm">Nombre del Proyecto</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Viaje a la playa" className="mt-1 w-full bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary"/>
+              <input 
+                type="text" 
+                value={name || ''} 
+                onChange={(e) => setName(e.target.value)} 
+                onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleSave(); }}
+                placeholder="Ej: Viaje a la playa" 
+                className="mt-1 w-full bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-xl py-2.5 px-3.5 focus:outline-none focus:ring-2 focus:ring-primary font-medium"
+                autoFocus
+              />
             </div>
             <div>
               <label className="font-medium text-gray-700 dark:text-gray-200 text-sm">Emoji</label>
-              <input type="text" value={emoji || ''} onChange={(e) => setEmoji(e.target.value)} placeholder="✨" className="mt-1 w-full bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl" maxLength={4} />
+              <input 
+                type="text" 
+                value={emoji || ''} 
+                onChange={(e) => setEmoji(e.target.value)} 
+                onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleSave(); }}
+                placeholder="✨" 
+                className="mt-1 w-full bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl" 
+                maxLength={4} 
+              />
             </div>
             <div>
               <label className="font-medium text-gray-700 dark:text-gray-200 text-sm">Color</label>
               <div className="mt-2 flex flex-wrap justify-center gap-3">
                 {projectColors.map(c => (
-                  <button key={c} onClick={() => setColor(c)} className={`w-8 h-8 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-2 ring-primary dark:ring-offset-gray-800' : ''}`} style={{ backgroundColor: c }} />
+                  <button key={c} type="button" onClick={() => setColor(c)} className={`w-8 h-8 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-offset-2 ring-primary dark:ring-offset-gray-800 scale-105' : ''}`} style={{ backgroundColor: c }} />
                 ))}
               </div>
             </div>
@@ -75,7 +91,7 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({ isOpen, onClose
           </button>
         </footer>
       </div>
-    </>
+    </div>
   );
 };
 

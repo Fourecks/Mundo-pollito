@@ -59,14 +59,14 @@ const MobilePomodoroPanel: React.FC<MobilePomodoroPanelProps> = (props) => {
                 <div className="flex items-center justify-between">
                     <label className="font-medium text-gray-700 dark:text-gray-200">Pomodoro</label>
                     <div className="flex items-center gap-2">
-                      <input type="number" min="1" value={tempDurations.work} onChange={(e) => setTempDurations(d => ({...d, work: Math.max(1, parseInt(e.target.value, 10) || 1)}))} className="w-24 bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-1 px-3 focus:outline-none focus:ring-2 focus:ring-primary text-center"/>
+                      <input type="number" min="1" value={tempDurations.work ?? 25} onChange={(e) => setTempDurations(d => ({...d, work: Math.max(1, parseInt(e.target.value, 10) || 1)}))} className="w-24 bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-1 px-3 focus:outline-none focus:ring-2 focus:ring-primary text-center"/>
                       <span className="font-medium text-gray-500 dark:text-gray-400">min</span>
                     </div>
                 </div>
                 <div className="flex items-center justify-between">
                     <label className="font-medium text-gray-700 dark:text-gray-200">Descanso</label>
                     <div className="flex items-center gap-2">
-                      <input type="number" min="1" value={tempDurations.break} onChange={(e) => setTempDurations(d => ({...d, break: Math.max(1, parseInt(e.target.value, 10) || 1)}))} className="w-24 bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-1 px-3 focus:outline-none focus:ring-2 focus:ring-primary text-center"/>
+                      <input type="number" min="1" value={tempDurations.break ?? 5} onChange={(e) => setTempDurations(d => ({...d, break: Math.max(1, parseInt(e.target.value, 10) || 1)}))} className="w-24 bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-1 px-3 focus:outline-none focus:ring-2 focus:ring-primary text-center"/>
                       <span className="font-medium text-gray-500 dark:text-gray-400">min</span>
                     </div>
                 </div>
@@ -74,14 +74,14 @@ const MobilePomodoroPanel: React.FC<MobilePomodoroPanelProps> = (props) => {
                   <label htmlFor="bg-timer-toggle-mobile" className="flex items-center justify-between cursor-pointer select-none">
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Temporizador de fondo</span>
                       <div className="relative">
-                          <input type="checkbox" id="bg-timer-toggle-mobile" className="sr-only" checked={props.showBackgroundTimer} onChange={props.onToggleBackgroundTimer} />
+                          <input type="checkbox" id="bg-timer-toggle-mobile" className="sr-only" checked={!!props.showBackgroundTimer} onChange={props.onToggleBackgroundTimer} />
                           <div className={`block w-10 h-6 rounded-full transition-colors ${props.showBackgroundTimer ? 'bg-primary-light' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
                           <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${props.showBackgroundTimer ? 'translate-x-full' : ''}`}></div>
                       </div>
                   </label>
                   <div className={`transition-opacity duration-300 ${!props.showBackgroundTimer ? 'opacity-50' : ''}`}>
-                      <label htmlFor="bg-timer-opacity-mobile" className="text-sm font-medium text-gray-700 dark:text-gray-200">Opacidad ({props.backgroundTimerOpacity}%)</label>
-                      <input type="range" id="bg-timer-opacity-mobile" min="10" max="100" step="5" value={props.backgroundTimerOpacity} onChange={(e) => props.onSetBackgroundTimerOpacity(Number(e.target.value))} disabled={!props.showBackgroundTimer} className="w-full mt-1 h-2 bg-secondary-light/80 dark:bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary dark:[&::-webkit-slider-thumb]:bg-primary-dark" />
+                      <label htmlFor="bg-timer-opacity-mobile" className="text-sm font-medium text-gray-700 dark:text-gray-200">Opacidad ({props.backgroundTimerOpacity ?? 20}%)</label>
+                      <input type="range" id="bg-timer-opacity-mobile" min="10" max="100" step="5" value={props.backgroundTimerOpacity ?? 20} onChange={(e) => props.onSetBackgroundTimerOpacity(Number(e.target.value))} disabled={!props.showBackgroundTimer} className="w-full mt-1 h-2 bg-secondary-light/80 dark:bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary dark:[&::-webkit-slider-thumb]:bg-primary-dark" />
                   </div>
                 </div>
             </div>

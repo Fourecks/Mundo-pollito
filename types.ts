@@ -7,7 +7,7 @@ export interface WindowState {
 
 export type Priority = 'low' | 'medium' | 'high';
 
-export type WindowType = 'todo' | 'notes' | 'gallery' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso';
+export type WindowType = 'todo' | 'calendar' | 'notes' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso';
 
 export interface Subtask {
   id: number;
@@ -44,6 +44,11 @@ export interface Todo {
   notification_sent?: boolean;
   project_id?: number | null;
   gcal_event_id?: string | null;
+  calendar_provider?: 'google' | 'outlook' | null;
+  calendar_event_link?: string | null;
+  kanban_column?: string | null;
+  notion_page_id?: string | null;
+  notion_url?: string | null;
 }
 
 export interface Project {
@@ -55,6 +60,7 @@ export interface Project {
   emoji?: string | null;
   is_archived?: boolean;
   color?: string | null;
+  kanban_columns?: string[];
 }
 
 export interface Note {
@@ -83,11 +89,6 @@ export interface Background {
   url: string;
   type: 'video' | 'image';
   is_favorite: boolean;
-}
-
-export interface GalleryImage {
-  id: string;
-  url: string;
 }
 
 export interface QuickNote {
@@ -182,7 +183,23 @@ export interface HabitRecord {
 }
 // --- End Habit Tracker Types ---
 
-// --- Google Calendar Types ---
+// --- Calendar Integration Types ---
+export type CalendarProvider = 'google' | 'outlook' | 'none';
+
+export interface CalendarIntegrationAccount {
+  provider: 'google' | 'outlook';
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  token?: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  selectedCalendarId?: string;
+  selectedCalendarName?: string;
+  autoSyncOnCreate: boolean;
+  connectedAt: string;
+}
+
 export interface GoogleCalendarEvent {
   id: string;
   summary: string;
@@ -195,20 +212,26 @@ export interface GoogleCalendarEvent {
     dateTime?: string;
     date?: string;
   };
-  htmlLink: string;
+  htmlLink?: string;
+  provider?: 'google' | 'outlook';
+  location?: string;
 }
 
 export interface GoogleCalendar {
   id: string;
   summary: string;
   primary?: boolean;
+  provider?: 'google' | 'outlook';
 }
 
 export interface GCalSettings {
   enabled: boolean;
   calendarId: string;
+  provider?: 'google' | 'outlook';
+  autoSyncOnCreate?: boolean;
+  calendarName?: string;
 }
-// --- End Google Calendar Types ---
+// --- End Calendar Integration Types ---
 
 // Centralized YouTube IFrame API type definitions.
 declare global {

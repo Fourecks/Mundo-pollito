@@ -54,15 +54,15 @@ const ColorsTab: React.FC<Pick<CustomizationPanelProps, 'colors' | 'onThemeColor
                     <input
                         type="color"
                         id="primary-color"
-                        value={colors.primary}
+                        value={colors?.primary || '#ff80bf'}
                         onChange={(e) => onThemeColorChange('primary', e.target.value)}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
-                    <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors.primary }}></div>
+                    <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors?.primary || '#ff80bf' }}></div>
                 </div>
                 <input
                     type="text"
-                    value={colors.primary}
+                    value={colors?.primary || '#ff80bf'}
                     onChange={(e) => onThemeColorChange('primary', e.target.value)}
                     className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-dark dark:focus:ring-primary-dark text-sm"
                 />
@@ -75,15 +75,15 @@ const ColorsTab: React.FC<Pick<CustomizationPanelProps, 'colors' | 'onThemeColor
                     <input
                         type="color"
                         id="secondary-color"
-                        value={colors.secondary}
+                        value={colors?.secondary || '#ffdfba'}
                         onChange={(e) => onThemeColorChange('secondary', e.target.value)}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
-                    <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors.secondary }}></div>
+                    <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors?.secondary || '#ffdfba' }}></div>
                 </div>
                 <input
                     type="text"
-                    value={colors.secondary}
+                    value={colors?.secondary || '#ffdfba'}
                     onChange={(e) => onThemeColorChange('secondary', e.target.value)}
                     className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-dark dark:focus:ring-primary-dark text-sm"
                 />
@@ -141,7 +141,7 @@ const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setP
             <div className={`mt-4 pt-3 border-t border-secondary-light/50 dark:border-gray-700/50 transition-opacity ${ambientSound.type === 'none' ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="flex items-center gap-2">
                     <VolumeIcon />
-                    <input type="range" min="0" max="1" step="0.05" value={ambientSound.volume} onChange={(e) => setAmbientSound({ ...ambientSound, volume: parseFloat(e.target.value) })} className="w-full h-2 bg-secondary-light/80 dark:bg-gray-600/80 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary" />
+                    <input type="range" min="0" max="1" step="0.05" value={ambientSound?.volume ?? 0.5} onChange={(e) => setAmbientSound({ ...ambientSound, volume: parseFloat(e.target.value) })} className="w-full h-2 bg-secondary-light/80 dark:bg-gray-600/80 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary" />
                 </div>
             </div>
         </div>

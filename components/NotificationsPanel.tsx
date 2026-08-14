@@ -27,7 +27,7 @@ const HourSelector: React.FC<{
     
     return (
         <select 
-            value={selectedHour === null ? '' : selectedHour} 
+            value={selectedHour === null || selectedHour === undefined ? '' : selectedHour} 
             onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))}
             className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 border-2 border-secondary-light dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm text-on-transparent"
         >

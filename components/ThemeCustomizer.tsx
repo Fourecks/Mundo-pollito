@@ -21,15 +21,15 @@ const ThemeCustomizer: React.FC<ThemeCustomizerProps> = ({ colors, onThemeColorC
               <input
                 type="color"
                 id="primary-color"
-                value={colors.primary}
+                value={colors?.primary || '#F472B6'}
                 onChange={(e) => onThemeColorChange('primary', e.target.value)}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors.primary }}></div>
+              <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors?.primary || '#F472B6' }}></div>
             </div>
             <input
               type="text"
-              value={colors.primary}
+              value={colors?.primary || ''}
               onChange={(e) => onThemeColorChange('primary', e.target.value)}
               className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary-dark dark:focus:ring-primary-dark text-xs"
             />
@@ -44,15 +44,15 @@ const ThemeCustomizer: React.FC<ThemeCustomizerProps> = ({ colors, onThemeColorC
               <input
                 type="color"
                 id="secondary-color"
-                value={colors.secondary}
+                value={colors?.secondary || '#FDE047'}
                 onChange={(e) => onThemeColorChange('secondary', e.target.value)}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors.secondary }}></div>
+              <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors?.secondary || '#FDE047' }}></div>
             </div>
             <input
               type="text"
-              value={colors.secondary}
+              value={colors?.secondary || ''}
               onChange={(e) => onThemeColorChange('secondary', e.target.value)}
               className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-primary-dark dark:focus:ring-primary-dark text-xs"
             />

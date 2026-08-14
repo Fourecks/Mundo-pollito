@@ -139,7 +139,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
         <div className="relative w-full">
           <textarea
             ref={textareaRef}
-            value={text}
+            value={text || ''}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="¿Tienes algo en mente, pollito?"

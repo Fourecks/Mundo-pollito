@@ -17,12 +17,12 @@ interface ConfirmationModalWithOptionsProps {
 const getButtonStyle = (style: ModalOption['style']) => {
     switch (style) {
         case 'danger':
-            return 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500';
+            return 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500';
         case 'primary':
-            return 'bg-primary text-white hover:bg-primary-dark focus:ring-primary';
+            return 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white';
         case 'default':
         default:
-            return 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-500 focus:ring-gray-400';
+            return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700';
     }
 }
 
@@ -37,34 +37,39 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-[70000] p-4"
+      className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-[70000] p-4 animate-fade-in"
       aria-modal="true"
       role="dialog"
       onClick={onClose}
     >
       <div 
-        className="bg-gradient-to-br from-secondary-lighter to-primary-light/30 dark:from-gray-800 dark:to-gray-900 rounded-3xl shadow-2xl p-8 text-center relative max-w-sm mx-auto transform transition-all duration-300 scale-95 opacity-0 animate-pop-in border-4 border-white dark:border-gray-700"
+        className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-5 text-left z-[70001] animate-pop-in"
         onClick={e => e.stopPropagation()}
       >
-        <h2 className="text-2xl md:text-3xl font-bold text-primary-dark dark:text-primary drop-shadow-sm">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           {title}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-100 mt-4 text-md">
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
           {message}
         </p>
-        <div className="flex flex-col gap-3 mt-6">
+        <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
           {options.map((option, index) => (
              <button
                 key={index}
-                onClick={option.onClick}
-                className={`w-full font-bold rounded-full px-6 py-3 shadow-md transform hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${getButtonStyle(option.style)}`}
+                type="button"
+                onClick={() => {
+                  option.onClick();
+                  onClose();
+                }}
+                className={`w-full py-2 px-3 text-xs font-semibold rounded-lg transition-colors ${getButtonStyle(option.style)}`}
             >
                 {option.label}
             </button>
           ))}
           <button
+            type="button"
             onClick={onClose}
-            className="w-full text-sm font-semibold text-gray-500 dark:text-gray-400 mt-2 hover:underline"
+            className="w-full py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
           >
             Cancelar
           </button>

@@ -55,6 +55,16 @@ export const initDB = (username: string): Promise<IDBDatabase> => {
 
 
 // --- Generic DB Helpers ---
+const CLIENT_ONLY_FIELDS = ['subtasks', 'notes', 'todos', 'kanban_column', 'kanban_columns', 'notion_page_id', 'notion_url'];
+
+const sanitizeForSupabase = (tableName: string, data: any) => {
+    const copy = { ...data };
+    CLIENT_ONLY_FIELDS.forEach(field => {
+        delete copy[field];
+    });
+    return copy;
+};
+
 const getStore = (storeName: string, mode: IDBTransactionMode) => {
     if (!db) throw new Error("Database is not initialized. Call initDB first.");
     const tx = db.transaction(storeName, mode);
@@ -155,16 +165,14 @@ export const syncableCreate = async (tableName: string, payload: any): Promise<a
 
     if (navigator.onLine) {
         try {
-            const { id: tempId, ...insertData } = payload;
+            const { id: tempId, ...rawInsertData } = payload;
             const subtasksToCreate = (tableName === 'todos' && payload.subtasks) ? payload.subtasks : null;
-            if (subtasksToCreate) {
-                delete insertData.subtasks;
-            }
+            const insertData = sanitizeForSupabase(tableName, rawInsertData);
 
             const { data: newRecord, error } = await supabase.from(tableName).insert(insertData).select().single();
             if (error) throw error;
             
-            let finalRecord = { ...newRecord, subtasks: [] };
+            let finalRecord = { ...payload, ...newRecord, subtasks: [] };
 
             if (subtasksToCreate && subtasksToCreate.length > 0) {
                 const subtaskPayloads = subtasksToCreate.map((st: any) => ({
@@ -213,12 +221,10 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
 
     if (navigator.onLine) {
         try {
-            const { id, ...updateData } = payload;
+            const { id, ...rawUpdateData } = payload;
             
             const subtasksToSync = (tableName === 'todos' && payload.subtasks) ? payload.subtasks : null;
-            if (subtasksToSync) {
-                delete updateData.subtasks;
-            }
+            const updateData = sanitizeForSupabase(tableName, rawUpdateData);
             
             delete updateData.created_at;
             delete updateData.user_id;
@@ -226,7 +232,7 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
             const { data: updatedRecord, error } = await supabase.from(tableName).update(updateData).eq('id', id).select().single();
             if (error) throw error;
             
-            let finalRecord = { ...updatedRecord, subtasks: [] };
+            let finalRecord = { ...payload, ...updatedRecord, subtasks: payload.subtasks || [] };
             
             if (subtasksToSync !== null) {
                 await supabase.from('subtasks').delete().eq('todo_id', id);
@@ -333,6 +339,7 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
     const errors: any[] = [];
     const tempIdMap = new Map<number, number | string>();
     const foreignKeyFields = ['habit_id', 'project_id', 'folder_id', 'todo_id'];
+    let hasNetworkError = false;
 
     for (const op of operations) {
         try {
@@ -340,8 +347,8 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                 case 'CREATE': {
                     const tempId = op.payload.id;
                     const subtasksToCreate = (op.tableName === 'todos' && op.payload.subtasks) ? op.payload.subtasks : null;
-                    const { id, subtasks, ...originalInsertData } = op.payload;
-                    let insertData = { ...originalInsertData };
+                    const { id, ...originalInsertData } = op.payload;
+                    let insertData = sanitizeForSupabase(op.tableName, originalInsertData);
 
                     // Resolve foreign keys
                     for (const field of foreignKeyFields) {
@@ -358,7 +365,7 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                     const { data: newRecord, error } = await supabase.from(op.tableName).insert(insertData).select().single();
                     if (error) throw error;
                     
-                    let finalRecord = { ...newRecord, subtasks: [] };
+                    let finalRecord = { ...op.payload, ...newRecord, subtasks: [] };
 
                     if (subtasksToCreate && subtasksToCreate.length > 0) {
                         const subtaskPayloads = subtasksToCreate.map((st: any) => ({
@@ -397,7 +404,7 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                         }
                     }
 
-                    const { id: finalId, ...updateData } = payload;
+                    const { id: finalId, ...rawUpdateData } = payload;
                     const subtasksToSync = (op.tableName === 'todos' && payload.subtasks) ? payload.subtasks : null;
 
                     if (subtasksToSync !== null) {
@@ -410,13 +417,14 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                                 completed: st.completed,
                                 todo_id: finalId
                             }));
-                            const { error: insertError } = await supabase.from('subtasks').insert(subtaskPayloads);
+                            const { error: insertError = null } = await supabase.from('subtasks').insert(subtaskPayloads);
                             if (insertError) console.error(`Failed to insert new subtasks for todo ${finalId}`, insertError);
                         }
                     }
 
-                    const relationalFields = ['subtasks', 'notes', 'todos'];
-                    relationalFields.forEach(field => delete updateData[field]);
+                    let updateData = sanitizeForSupabase(op.tableName, rawUpdateData);
+                    delete updateData.created_at;
+                    delete updateData.user_id;
 
                     const { error } = await supabase.from(op.tableName).update(updateData).eq('id', finalId);
                     if (error) throw error;
@@ -448,12 +456,20 @@ export const processSyncQueue = async (): Promise<{ success: boolean; errors: an
                 }
             }
             await remove('sync_queue', op.id!);
-        } catch (error) {
-            console.error('Sync operation failed, but continuing with the next one:', op, error);
+        } catch (error: any) {
+            const isNetworkError = !navigator.onLine || error?.message?.includes('Failed to fetch') || error?.name === 'TypeError';
+            if (isNetworkError) {
+                console.warn('Network unavailable during sync queue processing. Queue will resume when online.', error);
+                errors.push({ op, error });
+                hasNetworkError = true;
+                break; // Stop iterating remaining queue until connectivity is restored
+            }
+            console.error('Sync operation failed permanently, removing from queue to avoid blocking future syncs:', op, error);
+            await remove('sync_queue', op.id!);
             errors.push({ op, error });
         }
     }
     
     isSyncing = false;
-    return { success: errors.length === 0, errors };
+    return { success: !hasNetworkError, errors };
 };

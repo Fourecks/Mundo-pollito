@@ -1,32 +1,27 @@
-
-import React, { useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Todo, Subtask, Priority, RecurrenceRule, Project } from '../types';
+import { NotionService } from '../services/notionService';
 import CloseIcon from './icons/CloseIcon';
 import PlusIcon from './icons/PlusIcon';
 import TrashIcon from './icons/TrashIcon';
 import CalendarIcon from './icons/CalendarIcon';
 import ClockIcon from './icons/ClockIcon';
-import FlagIcon from './icons/FlagIcon';
 import BellIcon from './icons/BellIcon';
 import RefreshIcon from './icons/RefreshIcon';
-import NotesIcon from './icons/NotesIcon';
-import ChevronRightIcon from './icons/ChevronRightIcon';
-import ChevronLeftIcon from './icons/ChevronLeftIcon';
-import BriefcaseIcon from './icons/BriefcaseIcon';
+import GoogleIcon from './icons/GoogleIcon';
+import OutlookIcon from './icons/OutlookIcon';
+import ConfirmationModal from './ConfirmationModal';
 
 interface TaskDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (todo: Todo) => void;
+  onDelete?: (id: number) => void;
+  onRemoveFromCalendar?: (todoId: number) => Promise<void> | void;
+  onSyncToCalendar?: (todo: Todo) => Promise<void> | void;
   todo: Todo | null;
   projects: Project[];
 }
-
-const priorityMap: { [key in Priority]: { base: string; text: string; label: string } } = {
-    low: { base: 'bg-blue-400', text: 'text-white', label: 'Baja' },
-    medium: { base: 'bg-yellow-500', text: 'text-white', label: 'Media' },
-    high: { base: 'bg-red-500', text: 'text-white', label: 'Alta' },
-};
 
 const formatDateKey = (date: Date): string => {
   const year = date.getFullYear();
@@ -35,494 +30,801 @@ const formatDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-const Switch: React.FC<{ checked: boolean; onChange: (checked: boolean) => void; }> = ({ checked, onChange }) => (
-    <div className="relative" onClick={() => onChange(!checked)}>
-        <input type="checkbox" className="sr-only" checked={checked} readOnly />
-        <div className={`block w-10 h-6 rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
-        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${checked ? 'translate-x-full' : ''}`}></div>
-    </div>
-);
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, onSave, onDelete, onRemoveFromCalendar, onSyncToCalendar, todo, projects = [] }) => {
+  const [text, setText] = useState('');
+  const [priority, setPriority] = useState<Priority>('medium');
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [newSubtaskText, setNewSubtaskText] = useState('');
+  const [projectId, setProjectId] = useState<number | null>(null);
 
-const SettingRow: React.FC<{ icon: ReactNode; label: string; enabled: boolean; onToggle: (enabled: boolean) => void; children: ReactNode;}> = ({ icon, label, enabled, onToggle, children }) => (
-    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
-        <div className="flex items-center justify-between cursor-pointer" onClick={() => onToggle(!enabled)}>
-            <div className="flex items-center gap-2">
-                <span className="text-gray-500 dark:text-gray-400">{icon}</span>
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{label}</span>
-            </div>
-            <Switch checked={enabled} onChange={onToggle} />
-        </div>
-        {enabled && (
-            <div className="mt-3 pt-3 border-t border-yellow-200/50 dark:border-gray-600/50 animate-pop-in">
-                {children}
-            </div>
-        )}
-    </div>
-);
+  // Date State
+  const [isUndated, setIsUndated] = useState(false);
+  const [due_date, setDueDate] = useState<string | null>('');
+  const [hasEndDate, setHasEndDate] = useState(false);
+  const [end_date, setEndDate] = useState('');
 
-const NavSettingRow: React.FC<{ icon: ReactNode; label: string; value: string; onClick: () => void;}> = ({ icon, label, value, onClick }) => (
-    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
-        <div className="flex items-center justify-between cursor-pointer" onClick={onClick}>
-            <div className="flex items-center gap-2">
-                <span className="text-gray-500 dark:text-gray-400">{icon}</span>
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{label}</span>
-            </div>
-            <div className="flex items-center gap-1">
-                <span className="text-sm text-gray-500 dark:text-gray-400 truncate">{value}</span>
-                <ChevronRightIcon /> 
-            </div>
-        </div>
-    </div>
-);
+  // Time State
+  const [hasTime, setHasTime] = useState(false);
+  const [start_time, setStartTime] = useState('');
+  const [end_time, setEndTime] = useState('');
 
+  // Reminder State
+  const [hasReminder, setHasReminder] = useState(false);
+  const [reminderType, setReminderType] = useState('0');
+  const [customReminderDate, setCustomReminderDate] = useState('');
+  const [customReminderTime, setCustomReminderTime] = useState('');
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, onSave, todo, projects = [] }) => {
-    const [text, setText] = useState('');
-    const [priority, setPriority] = useState<Priority>('medium');
-    const [subtasks, setSubtasks] = useState<Subtask[]>([]);
-    const [newSubtaskText, setNewSubtaskText] = useState('');
-    const [completed, setCompleted] = useState(false);
-    const [projectId, setProjectId] = useState<number | null>(null);
+  // Recurrence State
+  const [hasRecurrence, setHasRecurrence] = useState(false);
+  const [recurrence, setRecurrence] = useState<RecurrenceRule>({ frequency: 'none' });
 
-    // Main date
-    const [isUndated, setIsUndated] = useState(false);
-    const [due_date, setDueDate] = useState<string | null>('');
+  // Notes State
+  const [notes, setNotes] = useState('');
 
-    // Toggles
-    const [hasTime, setHasTime] = useState(false);
-    const [hasEndDate, setHasEndDate] = useState(false);
-    const [hasNotes, setHasNotes] = useState(false);
-    
-    // Sub-view state
-    const [activeSubView, setActiveSubView] = useState<'main' | 'reminder' | 'recurrence'>('main');
+  // Calendar Event State
+  const [isRemovingCalendar, setIsRemovingCalendar] = useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const [calendarSyncStatus, setCalendarSyncStatus] = useState<string | null>(null);
 
-    // Conditional State
-    const [start_time, setStartTime] = useState('');
-    const [end_time, setEndTime] = useState('');
-    const [end_date, setEndDate] = useState('');
-    const [notes, setNotes] = useState('');
+  // Confirmation modal state
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [isConfirmRemoveCalOpen, setIsConfirmRemoveCalOpen] = useState(false);
 
-    // Reminder State
-    const [hasReminder, setHasReminder] = useState(false);
-    const [reminderType, setReminderType] = useState('0'); // '0', '10', '30', '60', '1440', 'custom'
-    const [customReminderDate, setCustomReminderDate] = useState('');
-    const [customReminderTime, setCustomReminderTime] = useState('');
+  const [isLoadingNotionNotes, setIsLoadingNotionNotes] = useState(false);
 
-    // Recurrence State
-    const [hasRecurrence, setHasRecurrence] = useState(false);
-    const [recurrence, setRecurrence] = useState<RecurrenceRule>({ frequency: 'none' });
+  const handleFetchNotionNotes = async () => {
+    if (!todo?.notion_page_id) return;
+    setIsLoadingNotionNotes(true);
+    try {
+      const pageNotes = await NotionService.getPageNotes(todo.notion_page_id);
+      if (pageNotes) {
+        setNotes(prev => prev ? `${prev}\n\n[Notas de Notion]\n${pageNotes}` : pageNotes);
+      }
+    } catch (error) {
+      console.error("Error fetching Notion notes:", error);
+    } finally {
+      setIsLoadingNotionNotes(false);
+    }
+  };
 
-    useEffect(() => {
-        if (todo) {
-            setText(todo.text || '');
-            setPriority(todo.priority || 'medium');
-            setSubtasks(todo.subtasks || []);
-            setCompleted(todo.completed || false);
-            setDueDate(todo.due_date || null);
-            setProjectId(todo.project_id || null);
-            setIsUndated(!todo.due_date);
+  useEffect(() => {
+    if (isOpen && todo) {
+      setText(todo.text || '');
+      setPriority(todo.priority || 'medium');
+      setSubtasks(todo.subtasks || []);
+      setDueDate(todo.due_date || null);
+      setProjectId(todo.project_id || null);
+      setIsUndated(!todo.due_date);
 
-            // Set toggles based on existing data
-            setHasTime(!!todo.start_time);
-            setHasEndDate(!!todo.end_date);
-            setHasNotes(!!todo.notes);
-            setHasReminder(!!todo.reminder_at || !!(todo.reminder_offset && todo.reminder_offset > 0));
-            setHasRecurrence(todo.recurrence?.frequency !== 'none' && !!todo.recurrence);
-            
-            // Set conditional data
-            setStartTime(todo.start_time || '');
-            setEndTime(todo.end_time || '');
-            setEndDate(todo.end_date || '');
-            setNotes(todo.notes || '');
-            setRecurrence(todo.recurrence || { frequency: 'none' });
-            
-            if (todo.reminder_at) {
-                setReminderType('custom');
-                try {
-                    const d = new Date(todo.reminder_at); // d is a Date object representing UTC time
-                    // CONVERT TO LOCAL FOR DISPLAY
-                    const year = d.getFullYear();
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const hour = String(d.getHours()).padStart(2, '0');
-                    const minute = String(d.getMinutes()).padStart(2, '0');
+      setHasTime(!!todo.start_time);
+      setHasEndDate(!!todo.end_date);
+      setHasReminder(!!todo.reminder_at || !!(todo.reminder_offset && todo.reminder_offset > 0));
+      setHasRecurrence(todo.recurrence?.frequency !== 'none' && !!todo.recurrence);
 
-                    setCustomReminderDate(`${year}-${month}-${day}`);
-                    setCustomReminderTime(`${hour}:${minute}`);
-                } catch(e) {/* ignore invalid date */}
-            } else {
-                setReminderType(String(todo.reminder_offset || '0'));
-                setCustomReminderDate('');
-                setCustomReminderTime('');
-            }
-        }
-        setActiveSubView('main');
-    }, [todo]);
+      setStartTime(todo.start_time || '');
+      setEndTime(todo.end_time || '');
+      setEndDate(todo.end_date || '');
+      setNotes(todo.notes || '');
+      setRecurrence(todo.recurrence || { frequency: 'none' });
+      setCalendarSyncStatus(null);
+      setIsRemovingCalendar(false);
+      setIsSyncingCalendar(false);
 
-    const handleToggleUndated = (enabled: boolean) => {
-        setIsUndated(enabled);
-        if (enabled) {
-            setDueDate(null);
-            setHasEndDate(false);
-        } else {
-            setDueDate(todo?.due_date || formatDateKey(new Date()));
-        }
-    };
-    
-    const handleToggleTime = (enabled: boolean) => {
-        setHasTime(enabled);
-        if (!enabled) {
-            setStartTime('');
-            setEndTime('');
-        }
-    };
+      if (todo.reminder_at) {
+        setReminderType('custom');
+        try {
+          const d = new Date(todo.reminder_at);
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const hour = String(d.getHours()).padStart(2, '0');
+          const minute = String(d.getMinutes()).padStart(2, '0');
 
-    const handleToggleNotes = (enabled: boolean) => {
-        setHasNotes(enabled);
-        if (!enabled) setNotes('');
-    };
+          setCustomReminderDate(`${year}-${month}-${day}`);
+          setCustomReminderTime(`${hour}:${minute}`);
+        } catch (e) { /* invalid date */ }
+      } else {
+        setReminderType(String(todo.reminder_offset || '0'));
+        setCustomReminderDate('');
+        setCustomReminderTime('');
+      }
+      setIsConfirmDeleteOpen(false);
+      setIsConfirmRemoveCalOpen(false);
+    }
+  }, [isOpen, todo]);
 
-    const handleToggleReminder = (enabled: boolean) => {
-        setHasReminder(enabled);
-        if (!enabled) {
-            setReminderType('0');
-            setCustomReminderDate('');
-            setCustomReminderTime('');
-        }
-    };
+  const handleRemoveFromCalendarAction = async () => {
+    if (!todo) return;
+    setIsRemovingCalendar(true);
+    try {
+      if (onRemoveFromCalendar) {
+        await onRemoveFromCalendar(todo.id);
+      }
+      setCalendarSyncStatus('removed');
+    } catch (e) {
+      console.error('Error removing from calendar:', e);
+    } finally {
+      setIsRemovingCalendar(false);
+      setIsConfirmRemoveCalOpen(false);
+    }
+  };
 
-    const handleToggleRecurrence = (enabled: boolean) => {
-        setHasRecurrence(enabled);
-        if (!enabled) {
-            setRecurrence({ frequency: 'none' });
-        }
-    };
-
-    const handleSave = async () => {
-        if (!todo) return;
-
-        if (hasReminder && 'Notification' in window && Notification.permission !== 'granted') {
-             alert("Para recibir recordatorios, activa las notificaciones usando el ícono de la campana en la pantalla principal.");
-        }
-
-        const updatedTodoPayload: Partial<Todo> = { ...todo };
-
-        updatedTodoPayload.text = text;
-        updatedTodoPayload.completed = completed;
-        updatedTodoPayload.priority = priority;
-        updatedTodoPayload.subtasks = subtasks;
-        updatedTodoPayload.project_id = projectId;
-
-        updatedTodoPayload.due_date = due_date;
-        updatedTodoPayload.end_date = hasEndDate && !isUndated ? (end_date || undefined) : undefined;
-        updatedTodoPayload.start_time = hasTime && !isUndated ? (start_time || undefined) : undefined;
-        updatedTodoPayload.end_time = hasTime && !isUndated ? (end_time || undefined) : undefined;
-        updatedTodoPayload.notes = hasNotes ? notes : undefined;
-
-        const currentRecurrence = { ...recurrence };
-        // If user is activating recurrence, ensure it has an ID.
-        if (hasRecurrence && !isUndated) {
-             if (!currentRecurrence.id) {
-                 currentRecurrence.id = crypto.randomUUID();
-             }
-             updatedTodoPayload.recurrence = currentRecurrence;
-        } else {
-             // Explicitly set to none if disabled
-             updatedTodoPayload.recurrence = { frequency: 'none' };
-        }
-        
-        let reminderChanged = false;
-
-        if (hasReminder && !isUndated) {
-            if (reminderType === 'custom' && customReminderTime) {
-                const reminderDateStr = customReminderDate || due_date; // Fallback to task's due_date
-                if (reminderDateStr) {
-                    const [year, month, day] = reminderDateStr.split('-').map(Number);
-                    const [hour, minute] = customReminderTime.split(':').map(Number);
-                    const localReminderDate = new Date(year, month - 1, day, hour, minute);
-                    
-                    updatedTodoPayload.reminder_at = localReminderDate.toISOString();
-                    updatedTodoPayload.reminder_offset = undefined;
-                } else {
-                    updatedTodoPayload.reminder_at = undefined;
-                    updatedTodoPayload.reminder_offset = undefined;
-                }
-            } else if (reminderType !== 'custom') {
-                updatedTodoPayload.reminder_offset = Number(reminderType) as Todo['reminder_offset'];
-                updatedTodoPayload.reminder_at = undefined;
-            } else {
-                updatedTodoPayload.reminder_offset = undefined;
-                updatedTodoPayload.reminder_at = undefined;
-            }
-        } else {
-            updatedTodoPayload.reminder_offset = undefined;
-            updatedTodoPayload.reminder_at = undefined;
-        }
-
-        if (todo.reminder_at !== updatedTodoPayload.reminder_at || todo.reminder_offset !== updatedTodoPayload.reminder_offset) {
-            reminderChanged = true;
-        }
-        updatedTodoPayload.notification_sent = reminderChanged ? false : todo.notification_sent;
-
-        onSave(updatedTodoPayload as Todo);
-        onClose();
-    };
-
-    const handleAddSubtask = () => {
-        if (newSubtaskText.trim() === '') return;
-        setSubtasks([...subtasks, { id: Date.now(), text: newSubtaskText, completed: false }]);
-        setNewSubtaskText('');
-    };
-
-    const handleToggleSubtask = (id: number) => setSubtasks(subtasks.map(st => st.id === id ? { ...st, completed: !st.completed } : st));
-    const handleDeleteSubtask = (id: number) => setSubtasks(subtasks.filter(st => st.id !== id));
-    
-    const handleCustomDayToggle = (dayIndex: number) => {
-        setRecurrence(prev => {
-            const currentDays = prev.customDays || [];
-            const newDays = currentDays.includes(dayIndex) ? currentDays.filter(d => d !== dayIndex) : [...currentDays, dayIndex];
-            return { ...prev, customDays: newDays.sort((a,b) => a - b) };
+  const handleSyncToCalendarAction = async () => {
+    if (!todo) return;
+    setIsSyncingCalendar(true);
+    try {
+      if (onSyncToCalendar) {
+        await onSyncToCalendar({
+          ...todo,
+          text: text.trim() || todo.text,
+          due_date,
+          end_date: hasEndDate ? end_date : undefined,
+          start_time: hasTime ? start_time : undefined,
+          end_time: hasTime ? end_time : undefined,
+          notes,
+          priority,
         });
-    };
-    
-    const reminderSummary = useMemo(() => {
-        if (!hasReminder || isUndated) return 'Nunca';
+      }
+      setCalendarSyncStatus('synced');
+    } catch (e) {
+      console.error('Error syncing to calendar:', e);
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
 
-        if (reminderType === 'custom') {
-            if (customReminderTime) {
-                const timePart = new Date(`1970-01-01T${customReminderTime}:00`).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                if (customReminderDate) {
-                    try {
-                        const d = new Date(`${customReminderDate}T${customReminderTime}:00`);
-                        return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ' ' + timePart;
-                    } catch (e) { /* ignore */ }
-                }
-                return `El día de la tarea a las ${timePart}`;
-            }
-            return 'Personalizado';
+  const handleToggleUndated = (enabled: boolean) => {
+    setIsUndated(enabled);
+    if (enabled) {
+      setDueDate(null);
+      setHasEndDate(false);
+    } else {
+      setDueDate(todo?.due_date || formatDateKey(new Date()));
+    }
+  };
+
+  const handleToggleTime = (enabled: boolean) => {
+    setHasTime(enabled);
+    if (!enabled) {
+      setStartTime('');
+      setEndTime('');
+    }
+  };
+
+  const handleToggleReminder = (enabled: boolean) => {
+    setHasReminder(enabled);
+    if (!enabled) {
+      setReminderType('0');
+      setCustomReminderDate('');
+      setCustomReminderTime('');
+    }
+  };
+
+  const handleToggleRecurrence = (enabled: boolean) => {
+    setHasRecurrence(enabled);
+    if (!enabled) {
+      setRecurrence({ frequency: 'none' });
+    }
+  };
+
+  const handleAddSubtask = () => {
+    if (newSubtaskText.trim() === '') return;
+    setSubtasks([...subtasks, { id: Date.now(), text: newSubtaskText, completed: false }]);
+    setNewSubtaskText('');
+  };
+
+  const handleToggleSubtask = (id: number) => {
+    setSubtasks(subtasks.map(st => st.id === id ? { ...st, completed: !st.completed } : st));
+  };
+
+  const handleDeleteSubtask = (id: number) => {
+    setSubtasks(subtasks.filter(st => st.id !== id));
+  };
+
+  const handleCustomDayToggle = (dayIndex: number) => {
+    setRecurrence(prev => {
+      const currentDays = prev.customDays || [];
+      const newDays = currentDays.includes(dayIndex)
+        ? currentDays.filter(d => d !== dayIndex)
+        : [...currentDays, dayIndex];
+      return { ...prev, customDays: newDays.sort((a, b) => a - b) };
+    });
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!todo || !text.trim()) return;
+
+    const updatedTodoPayload: Partial<Todo> = { ...todo };
+
+    updatedTodoPayload.text = text.trim();
+    updatedTodoPayload.priority = priority;
+    updatedTodoPayload.subtasks = subtasks;
+    updatedTodoPayload.project_id = projectId;
+
+    updatedTodoPayload.due_date = due_date;
+    updatedTodoPayload.end_date = hasEndDate && !isUndated ? (end_date || undefined) : undefined;
+    updatedTodoPayload.start_time = hasTime && !isUndated ? (start_time || undefined) : undefined;
+    updatedTodoPayload.end_time = hasTime && !isUndated ? (end_time || undefined) : undefined;
+    updatedTodoPayload.notes = notes.trim() ? notes.trim() : undefined;
+
+    const currentRecurrence = { ...recurrence };
+    if (hasRecurrence && !isUndated) {
+      if (!currentRecurrence.id) {
+        currentRecurrence.id = crypto.randomUUID();
+      }
+      updatedTodoPayload.recurrence = currentRecurrence;
+    } else {
+      updatedTodoPayload.recurrence = { frequency: 'none' };
+    }
+
+    let reminderChanged = false;
+    if (hasReminder && !isUndated) {
+      if (reminderType === 'custom' && customReminderTime) {
+        const reminderDateStr = customReminderDate || due_date;
+        if (reminderDateStr) {
+          const [year, month, day] = reminderDateStr.split('-').map(Number);
+          const [hour, minute] = customReminderTime.split(':').map(Number);
+          const localReminderDate = new Date(year, month - 1, day, hour, minute);
+
+          updatedTodoPayload.reminder_at = localReminderDate.toISOString();
+          updatedTodoPayload.reminder_offset = undefined;
+        } else {
+          updatedTodoPayload.reminder_at = undefined;
+          updatedTodoPayload.reminder_offset = undefined;
         }
+      } else if (reminderType !== 'custom') {
+        updatedTodoPayload.reminder_offset = Number(reminderType) as Todo['reminder_offset'];
+        updatedTodoPayload.reminder_at = undefined;
+      } else {
+        updatedTodoPayload.reminder_offset = undefined;
+        updatedTodoPayload.reminder_at = undefined;
+      }
+    } else {
+      updatedTodoPayload.reminder_offset = undefined;
+      updatedTodoPayload.reminder_at = undefined;
+    }
 
-        switch(reminderType) {
-            case '10': return '10 min antes';
-            case '30': return '30 min antes';
-            case '60': return '1 hora antes';
-            case '1440': return '1 día antes';
-            default: return 'Nunca';
-        }
-    }, [hasReminder, reminderType, customReminderDate, customReminderTime, isUndated]);
+    if (todo.reminder_at !== updatedTodoPayload.reminder_at || todo.reminder_offset !== updatedTodoPayload.reminder_offset) {
+      reminderChanged = true;
+    }
+    updatedTodoPayload.notification_sent = reminderChanged ? false : todo.notification_sent;
 
-    const recurrenceSummary = useMemo(() => {
-        if (!hasRecurrence || isUndated) return 'Nunca';
-        switch(recurrence.frequency) {
-            case 'daily': return 'Diariamente';
-            case 'weekly': return 'Semanalmente';
-            case 'custom': return 'Personalizado';
-            default: return 'Nunca';
-        }
-    }, [hasRecurrence, recurrence.frequency, isUndated]);
+    onSave(updatedTodoPayload as Todo);
+    onClose();
+  };
 
-    if (!isOpen || !todo) return null;
-
-    const renderMainSettings = () => (
-        <>
-            {/* Date Section */}
-            <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                    <label htmlFor="due-date" className="text-sm font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1.5"><CalendarIcon className="h-4 w-4" /> Fecha</label>
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Sin fecha</span>
-                        <Switch checked={isUndated} onChange={handleToggleUndated} />
-                    </div>
-                </div>
-                <div className={`mt-2 transition-opacity duration-300 ${isUndated ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <div className="flex items-center justify-end">
-                        <div className="flex items-center gap-1">
-                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Rango</span>
-                            <Switch checked={hasEndDate} onChange={setHasEndDate} />
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                        <input type="date" id="due-date" value={due_date || ''} onChange={e => setDueDate(e.target.value)} disabled={isUndated} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm disabled:bg-gray-100 dark:disabled:bg-gray-600"/>
-                        {hasEndDate && <span className="text-gray-500 dark:text-gray-400 font-semibold text-sm">a</span>}
-                        {hasEndDate && <input type="date" value={end_date} onChange={e => setEndDate(e.target.value)} disabled={isUndated} className="w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 text-sm disabled:bg-gray-100 dark:disabled:bg-gray-600"/>}
-                    </div>
-                </div>
-            </div>
-
-             {/* Project */}
-            <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2"><BriefcaseIcon className="h-4 w-4 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Proyecto</span></div>
-                    <select value={projectId === null ? '' : projectId} onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)} className="w-full bg-white/80 dark:bg-gray-600/80 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm appearance-none">
-                        <option value="">Sin proyecto</option>
-                        {projects.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-            </div>
-            
-            {/* Priority */}
-            <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2"><FlagIcon className="h-4 w-4 text-gray-500 dark:text-gray-400"/><span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prioridad</span></div>
-                    <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-600/50 p-1 rounded-full">
-                    {(['low', 'medium', 'high'] as Priority[]).map(p => (
-                        <button key={p} onClick={() => setPriority(p)} className={`w-full text-xs py-1 rounded-full transition-colors ${priority === p ? `${priorityMap[p].base} ${priorityMap[p].text} font-semibold shadow` : 'text-gray-900 dark:text-gray-200 hover:bg-yellow-100 dark:hover:bg-gray-600'}`}>{priorityMap[p].label}</button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Conditional Settings */}
-            <div className={`${isUndated ? 'opacity-50 pointer-events-none' : ''}`}>
-                <SettingRow icon={<ClockIcon className="h-4 w-4"/>} label="Añadir hora" enabled={hasTime} onToggle={handleToggleTime}>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                            <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Inicio</label>
-                            <input type="time" value={start_time} onChange={e => setStartTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                        </div>
-                            <div>
-                            <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Fin (opcional)</label>
-                            <input type="time" value={end_time} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full bg-white/60 dark:bg-gray-600/50 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                        </div>
-                        </div>
-                </SettingRow>
-
-                <NavSettingRow icon={<BellIcon className="h-4 w-4"/>} label="Recordatorio" value={reminderSummary} onClick={() => setActiveSubView('reminder')} />
-                <NavSettingRow icon={<RefreshIcon className="h-4 w-4"/>} label="Repetir tarea" value={recurrenceSummary} onClick={() => setActiveSubView('recurrence')} />
-            </div>
-            
-            <SettingRow icon={<NotesIcon />} label="Añadir notas" enabled={hasNotes} onToggle={handleToggleNotes}><div/></SettingRow>
-            
-            <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Estado</span>
-                <Switch checked={completed} onChange={setCompleted} />
-            </div>
-        </>
-    );
-    
-    const renderReminderSettings = () => (
-        <div className="animate-fade-in">
-            <header className="flex items-center gap-2 mb-3">
-                <button onClick={() => setActiveSubView('main')} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">Configurar Recordatorio</h3>
-            </header>
-            <div className="space-y-3">
-                <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Activar recordatorio</span>
-                    <Switch checked={hasReminder} onChange={handleToggleReminder} />
-                </div>
-                {hasReminder && (
-                     <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 space-y-2 animate-pop-in">
-                        <select value={reminderType} onChange={e => setReminderType(e.target.value)} className="w-full bg-white/80 dark:bg-gray-600/80 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm appearance-none">
-                            <option value="0">Nunca</option>
-                            <option value="10">10 min antes</option>
-                            <option value="30">30 min antes</option>
-                            <option value="60">1 hora antes</option>
-                            <option value="1440">1 día antes</option>
-                            <option value="custom">Personalizado...</option>
-                        </select>
-                        {reminderType === 'custom' && (
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                                <input type="date" value={customReminderDate} onChange={e => setCustomReminderDate(e.target.value)} disabled={!due_date} className="bg-white/80 dark:bg-gray-600/80 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm disabled:opacity-50"/>
-                                <input type="time" value={customReminderTime} onChange={e => setCustomReminderTime(e.target.value)} disabled={!due_date} className="bg-white/80 dark:bg-gray-600/80 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm disabled:opacity-50"/>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-    
-    const renderRecurrenceSettings = () => (
-         <div className="animate-fade-in">
-            <header className="flex items-center gap-2 mb-3">
-                <button onClick={() => setActiveSubView('main')} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">Configurar Repetición</h3>
-            </header>
-            <div className="space-y-3">
-                <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Repetir tarea</span>
-                    <Switch checked={hasRecurrence} onChange={handleToggleRecurrence} />
-                </div>
-                 {hasRecurrence && (
-                    <div className="bg-white/60 dark:bg-gray-700/60 rounded-lg p-3 space-y-3 animate-pop-in">
-                        <select value={recurrence.frequency} onChange={e => setRecurrence(r => ({ ...r, frequency: e.target.value as any }))} className="w-full bg-white/80 dark:bg-gray-600/80 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm appearance-none">
-                           <option value="none">Nunca</option>
-                           <option value="daily">Diariamente</option>
-                           <option value="weekly">Semanalmente</option>
-                           <option value="custom">Días personalizados</option>
-                       </select>
-                        {recurrence.frequency === 'custom' && (
-                           <div className="flex justify-around gap-1 p-1 bg-white/80 dark:bg-gray-600/80 rounded-lg">
-                               {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map((dayLabel, index) => (
-                                   <button key={index} onClick={() => handleCustomDayToggle(index)} className={`w-8 h-8 text-xs rounded-full transition-colors font-semibold ${recurrence.customDays?.includes(index) ? 'bg-pink-400 text-white shadow' : 'hover:bg-yellow-100 text-gray-700'}`}>{dayLabel}</button>
-                               ))}
-                           </div>
-                       )}
-                        <div>
-                           <label className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Finaliza</label>
-                           <input type="date" value={recurrence.ends_on || ''} onChange={e => setRecurrence(r => ({ ...r, ends_on: e.target.value }))} className="mt-1 w-full bg-white/80 dark:bg-gray-600/80 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-500 rounded-lg p-1.5 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm"/>
-                       </div>
-                    </div>
-                 )}
-            </div>
-        </div>
-    );
+  if (!isOpen || !todo) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-[1001] p-2 sm:p-4" onClick={onClose}>
-        <div className="bg-gradient-to-br from-yellow-50 to-pink-50 dark:from-gray-800 dark:to-gray-900 rounded-3xl shadow-2xl max-w-4xl w-full flex flex-col h-auto max-h-[90vh] animate-pop-in" onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <header className="flex items-center justify-between p-3 md:p-4 flex-shrink-0 border-b border-yellow-300/50 dark:border-gray-700/50">
-                <input type="text" value={text} onChange={e => setText(e.target.value)} className="text-lg font-bold text-pink-500 dark:text-pink-400 bg-transparent focus:outline-none w-full" placeholder="Nombre de la tarea" />
-                <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-pink-100 dark:hover:bg-gray-700 hover:text-pink-500 dark:hover:text-pink-400 transition-colors"><CloseIcon /></button>
-            </header>
+    <div className="fixed inset-0 z-[60000] flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
 
-            {/* Body */}
-            <main className="flex-grow flex flex-col md:flex-row gap-4 overflow-y-auto min-h-0 custom-scrollbar">
-                {/* Left Column */}
-                <div className="flex-grow md:w-3/5 p-3 md:p-4 space-y-4">
-                    {/* Subtasks */}
-                    <div>
-                        <label className="text-sm font-bold text-gray-600 dark:text-gray-300">Sub-tareas</label>
-                        <div className="mt-2 space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                            {subtasks.map(subtask => (
-                                <div key={subtask.id} className="flex items-center bg-white/60 dark:bg-gray-700/60 p-2 rounded-lg group">
-                                    <input type="checkbox" id={`subtask-${subtask.id}`} checked={subtask.completed} onChange={() => handleToggleSubtask(subtask.id)} className="sr-only"/>
-                                    <label htmlFor={`subtask-${subtask.id}`} className={`w-5 h-5 rounded-md border-2 transition-all duration-200 cursor-pointer ${subtask.completed ? 'bg-pink-300 border-pink-300' : 'bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500'}`}>
-                                        {subtask.completed && <svg className="w-full h-full text-white p-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
-                                    </label>
-                                    <span className={`ml-3 flex-grow text-sm ${subtask.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>{subtask.text}</span>
-                                    <button onClick={() => handleDeleteSubtask(subtask.id)} className="p-1 rounded-full hover:bg-red-100 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><TrashIcon className="h-4 w-4" /></button>
-                                </div>
-                            ))}
-                        </div>
-                        <form onSubmit={(e) => { e.preventDefault(); handleAddSubtask(); }} className="mt-2 flex gap-2">
-                            <input type="text" value={newSubtaskText} onChange={e => setNewSubtaskText(e.target.value)} placeholder="Añadir nueva sub-tarea" className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-100 border-2 border-yellow-200 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 transition-colors text-sm"/>
-                            <button type="submit" className="bg-pink-400 text-white p-2 rounded-lg hover:bg-pink-500 transition-colors flex-shrink-0"><PlusIcon /></button>
-                        </form>
+      <div 
+        className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex flex-col z-[60001] overflow-hidden max-h-[92vh]"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <header className="flex-shrink-0 px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 rounded-t-2xl">
+          <div>
+            <h3 className="font-semibold text-base text-slate-900 dark:text-slate-100">
+              Editar Tarea
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Modifica los detalles de tu tarea
+            </p>
+          </div>
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <CloseIcon />
+          </button>
+        </header>
+
+        {/* Form Body */}
+        <form onSubmit={handleSave} className="flex flex-col flex-grow overflow-hidden rounded-b-2xl">
+          <main className="flex-grow p-5 overflow-y-auto custom-scrollbar space-y-4 text-left">
+            
+            {/* Task Name */}
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                Nombre de la Tarea
+              </label>
+              <input 
+                type="text" 
+                required
+                value={text || ''} 
+                onChange={(e) => setText(e.target.value)} 
+                placeholder="Ej. Comprar víveres, Enviar informe..." 
+                className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100 placeholder:text-slate-400 transition-all"
+              />
+            </div>
+
+            {/* Subtasks */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                Sub-tareas
+              </label>
+              {subtasks.length > 0 && (
+                <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                  {subtasks.map(subtask => (
+                    <div key={subtask.id} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 p-2 rounded-lg border border-slate-200 dark:border-slate-800 group">
+                      <input 
+                        type="checkbox" 
+                        checked={subtask.completed} 
+                        onChange={() => handleToggleSubtask(subtask.id)}
+                        className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0 cursor-pointer"
+                      />
+                      <span className={`flex-1 text-xs ${subtask.completed ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>
+                        {subtask.text}
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={() => handleDeleteSubtask(subtask.id)} 
+                        className="text-slate-400 hover:text-red-500 p-1 rounded transition-colors"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    
-                    {hasNotes && (
-                        <div className="animate-pop-in">
-                            <label className="text-sm font-bold text-gray-600 dark:text-gray-300">Notas</label>
-                            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Añade detalles..." className="mt-1 w-full bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-yellow-200 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 transition-colors text-sm" rows={4}></textarea>
-                        </div>
-                    )}
-
+                  ))}
                 </div>
+              )}
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={newSubtaskText || ''} 
+                  onChange={e => setNewSubtaskText(e.target.value)} 
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
+                  placeholder="Añadir nueva sub-tarea..." 
+                  className="flex-1 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100 placeholder:text-slate-400"
+                />
+                <button 
+                  type="button" 
+                  onClick={handleAddSubtask} 
+                  className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  Añadir
+                </button>
+              </div>
+            </div>
 
-                {/* Right Column */}
-                <aside className="md:w-2/5 flex-shrink-0 bg-black/5 dark:bg-black/20 p-3 md:p-4 md:border-l border-yellow-300/50 dark:border-gray-700/50 space-y-3">
-                    {activeSubView === 'main' && renderMainSettings()}
-                    {activeSubView === 'reminder' && renderReminderSettings()}
-                    {activeSubView === 'recurrence' && renderRecurrenceSettings()}
-                </aside>
-            </main>
+            <hr className="border-slate-100 dark:border-slate-800" />
 
-            {/* Footer */}
-            <footer className="flex-shrink-0 p-3 border-t border-yellow-300/50 dark:border-gray-700/50 flex justify-end bg-black/5 dark:bg-black/20 rounded-b-3xl">
-                <button onClick={handleSave} className="bg-pink-400 text-white font-bold rounded-full px-6 py-2 shadow-md hover:bg-pink-500 transform hover:scale-105 active:scale-95 transition-all duration-200">Guardar Cambios</button>
-            </footer>
-        </div>
+            {/* Project & Priority */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                  Proyecto
+                </label>
+                <select 
+                  value={projectId === null ? '' : projectId} 
+                  onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)} 
+                  className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                >
+                  <option value="">Sin proyecto</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                  Prioridad
+                </label>
+                <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                  {(['low', 'medium', 'high'] as Priority[]).map(p => {
+                    const labels: Record<Priority, string> = { low: 'Baja', medium: 'Media', high: 'Alta' };
+                    const isSelected = priority === p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        className={`flex-1 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          isSelected
+                            ? p === 'high' ? 'bg-red-600 text-white' : p === 'medium' ? 'bg-amber-500 text-white' : 'bg-blue-600 text-white'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                        }`}
+                      >
+                        {labels[p]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Date Section */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-slate-500" />
+                  Fecha
+                </span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Sin fecha</span>
+                  <input 
+                    type="checkbox" 
+                    checked={isUndated} 
+                    onChange={e => handleToggleUndated(e.target.checked)} 
+                    className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0"
+                  />
+                </label>
+              </div>
+
+              {!isUndated && (
+                <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Rango de fechas (Fin)</span>
+                    <input 
+                      type="checkbox" 
+                      checked={hasEndDate} 
+                      onChange={e => setHasEndDate(e.target.checked)} 
+                      className="w-3.5 h-3.5 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="date" 
+                      value={due_date || ''} 
+                      onChange={e => setDueDate(e.target.value)} 
+                      className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                    />
+                    {hasEndDate && <span className="text-xs text-slate-400 font-medium">a</span>}
+                    {hasEndDate && (
+                      <input 
+                        type="date" 
+                        value={end_date || ''} 
+                        onChange={e => setEndDate(e.target.value)} 
+                        className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Time Section */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <ClockIcon className="w-3.5 h-3.5 text-slate-500" />
+                  Añadir Hora
+                </span>
+                <input 
+                  type="checkbox" 
+                  checked={hasTime} 
+                  onChange={e => handleToggleTime(e.target.checked)} 
+                  disabled={isUndated}
+                  className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0 disabled:opacity-40"
+                />
+              </div>
+
+              {hasTime && !isUndated && (
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 animate-fade-in">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Inicio</label>
+                    <input 
+                      type="time" 
+                      value={start_time || ''} 
+                      onChange={e => setStartTime(e.target.value)} 
+                      className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Fin (opcional)</label>
+                    <input 
+                      type="time" 
+                      value={end_time || ''} 
+                      onChange={e => setEndTime(e.target.value)} 
+                      className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Reminder Section */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <BellIcon className="w-3.5 h-3.5 text-slate-500" />
+                  Recordatorio
+                </span>
+                <input 
+                  type="checkbox" 
+                  checked={hasReminder} 
+                  onChange={e => handleToggleReminder(e.target.checked)} 
+                  disabled={isUndated}
+                  className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0 disabled:opacity-40"
+                />
+              </div>
+
+              {hasReminder && !isUndated && (
+                <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 animate-fade-in">
+                  <select 
+                    value={reminderType || '0'} 
+                    onChange={e => setReminderType(e.target.value)} 
+                    className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                  >
+                    <option value="0">En el momento de la tarea</option>
+                    <option value="10">10 minutos antes</option>
+                    <option value="30">30 minutos antes</option>
+                    <option value="60">1 hora antes</option>
+                    <option value="1440">1 día antes</option>
+                    <option value="custom">Personalizado...</option>
+                  </select>
+
+                  {reminderType === 'custom' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input 
+                        type="date" 
+                        value={customReminderDate || ''} 
+                        onChange={e => setCustomReminderDate(e.target.value)} 
+                        className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      />
+                      <input 
+                        type="time" 
+                        value={customReminderTime || ''} 
+                        onChange={e => setCustomReminderTime(e.target.value)} 
+                        className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Recurrence Section */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <RefreshIcon className="w-3.5 h-3.5 text-slate-500" />
+                  Repetir tarea
+                </span>
+                <input 
+                  type="checkbox" 
+                  checked={hasRecurrence} 
+                  onChange={e => handleToggleRecurrence(e.target.checked)} 
+                  disabled={isUndated}
+                  className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0 disabled:opacity-40"
+                />
+              </div>
+
+              {hasRecurrence && !isUndated && (
+                <div className="space-y-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 animate-fade-in">
+                  <select 
+                    value={recurrence?.frequency || 'none'} 
+                    onChange={e => setRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
+                    className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                  >
+                    <option value="none">Nunca</option>
+                    <option value="daily">Diariamente</option>
+                    <option value="weekly">Semanalmente</option>
+                    <option value="custom">Días específicos</option>
+                  </select>
+
+                  {recurrence.frequency === 'custom' && (
+                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600">
+                      {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map((dayLabel, index) => {
+                        const isSelected = recurrence.customDays?.includes(index);
+                        return (
+                          <button 
+                            key={index} 
+                            type="button" 
+                            onClick={() => handleCustomDayToggle(index)} 
+                            className={`flex-1 py-1 text-xs font-semibold rounded-md transition-colors ${
+                              isSelected ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                            }`}
+                          >
+                            {dayLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Finaliza repetición (opcional)</label>
+                    <input 
+                      type="date" 
+                      value={recurrence?.ends_on || ''} 
+                      onChange={e => setRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
+                      className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  Notas
+                </label>
+                {todo?.notion_page_id && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleFetchNotionNotes}
+                      disabled={isLoadingNotionNotes}
+                      className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                    >
+                      {isLoadingNotionNotes ? 'Cargando...' : 'Importar de Notion ⚡'}
+                    </button>
+                    {todo.notion_url && (
+                      <a
+                        href={todo.notion_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline flex items-center gap-0.5"
+                      >
+                        Abrir Notion ↗
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+              <textarea 
+                value={notes || ''} 
+                onChange={e => setNotes(e.target.value)} 
+                placeholder="Añade notas o detalles adicionales..." 
+                rows={3} 
+                className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100 placeholder:text-slate-400 transition-all resize-none"
+              />
+            </div>
+
+            {/* Calendar Integration Section */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
+                  Sincronización de Calendario
+                </span>
+                {(todo.gcal_event_id || todo.calendar_provider) && calendarSyncStatus !== 'removed' ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    Sincronizado
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400">
+                    {calendarSyncStatus === 'removed' ? 'Desvinculado' : 'No sincronizado'}
+                  </span>
+                )}
+              </div>
+
+              {(todo.gcal_event_id || todo.calendar_provider) && calendarSyncStatus !== 'removed' ? (
+                <div className="bg-white dark:bg-slate-900/80 p-3 rounded-lg border border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center gap-2">
+                      {todo.calendar_provider === 'outlook' ? (
+                        <OutlookIcon className="w-4 h-4" />
+                      ) : (
+                        <GoogleIcon className="w-4 h-4" />
+                      )}
+                      <span>
+                        Evento en {todo.calendar_provider === 'outlook' ? 'Outlook Calendar' : 'Google Calendar'}
+                      </span>
+                    </div>
+                    {todo.calendar_event_link && (
+                      <a
+                        href={todo.calendar_event_link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-500 hover:text-blue-600 underline text-[11px]"
+                      >
+                        Abrir
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Puedes eliminar el evento del calendario sin borrar la tarea de la app.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmRemoveCalOpen(true)}
+                      disabled={isRemovingCalendar}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800/60 rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5"
+                    >
+                      {isRemovingCalendar ? (
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <CalendarIcon className="w-3 h-3 text-amber-600" />
+                      )}
+                      Eliminar del Calendario
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900/80 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {calendarSyncStatus === 'removed' 
+                      ? '✓ Evento eliminado del calendario. La tarea permanece guardada.'
+                      : 'Esta tarea no está vinculada a un evento de calendario.'}
+                  </span>
+                  {onSyncToCalendar && !isUndated && (
+                    <button
+                      type="button"
+                      onClick={handleSyncToCalendarAction}
+                      disabled={isSyncingCalendar}
+                      className="px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors flex items-center gap-1"
+                    >
+                      {isSyncingCalendar ? 'Sincronizando...' : 'Sincronizar ahora'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+          </main>
+
+          {/* Modal Footer */}
+          <footer className="flex-shrink-0 px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between gap-2 rounded-b-2xl">
+            {todo && onDelete ? (
+              <button
+                type="button"
+                onClick={() => setIsConfirmDeleteOpen(true)}
+                className="px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <TrashIcon className="w-3.5 h-3.5" />
+                Eliminar
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-2">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                disabled={!text.trim()} 
+                className="px-5 py-2 text-xs font-semibold bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white rounded-lg transition-colors disabled:opacity-40"
+              >
+                Guardar Cambios
+              </button>
+            </div>
+          </footer>
+        </form>
+      </div>
+
+      <ConfirmationModal
+        isOpen={isConfirmDeleteOpen}
+        onClose={() => setIsConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          if (todo && onDelete) {
+            onDelete(todo.id);
+          }
+          onClose();
+        }}
+        title="Eliminar Tarea"
+        message={`¿Seguro que quieres eliminar la tarea "${text}"?`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+      />
+
+      <ConfirmationModal
+        isOpen={isConfirmRemoveCalOpen}
+        onClose={() => setIsConfirmRemoveCalOpen(false)}
+        onConfirm={handleRemoveFromCalendarAction}
+        title="Eliminar del Calendario"
+        message={`¿Deseas eliminar el evento de tu calendario externo? La tarea "${text}" seguirá existiendo en Pollito Productivo.`}
+        confirmText="Eliminar del calendario"
+        cancelText="Cancelar"
+      />
     </div>
   );
 };

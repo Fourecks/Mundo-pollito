@@ -7,7 +7,6 @@ import MusicIcon from './icons/MusicIcon';
 import DotsVerticalIcon from './icons/DotsVerticalIcon';
 import TrashIcon from './icons/TrashIcon';
 import ConfirmationModal from './ConfirmationModal';
-import { ensureYoutubeApiReady } from '../utils/youtubeApi';
 
 interface MusicPlayerProps {
   onSelectTrack: (track: Playlist, queue: Playlist[]) => void;
@@ -27,7 +26,6 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   onClose
 }) => {
   const [view, setView] = useState<'all' | 'favorites'>('all');
-  const [platform, setPlatform] = useState<'youtube' | 'spotify'>('youtube');
   const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -36,57 +34,6 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<YT.Player | null>(null);
-  
-  // Effect to create and destroy the YouTube background player for the header
-  useEffect(() => {
-    const videoId = '5qap5aO4i9A'; // Changed from a livestream to a loopable video.
-    
-    const createPlayer = () => {
-      // Ensure the target element exists before creating the player
-      if (document.getElementById('music-header-video-container')) {
-        playerRef.current = new window.YT.Player('music-header-video-container', {
-          videoId: videoId,
-          playerVars: {
-            autoplay: 1,
-            controls: 0,
-            loop: 1,
-            mute: 1,
-            playlist: videoId, // Required for loop to work on single video
-            playsinline: 1,
-            origin: window.location.origin,
-          },
-          events: {
-            onReady: (e) => {
-              const playerElement = e.target.getIframe();
-              if (playerElement) {
-                playerElement.style.position = 'absolute';
-                playerElement.style.top = '50%';
-                playerElement.style.left = '50%';
-                playerElement.style.minWidth = '100%';
-                playerElement.style.minHeight = '100%';
-                playerElement.style.transform = 'translate(-50%, -50%)';
-                playerElement.style.pointerEvents = 'none';
-                playerElement.style.opacity = '0.8';
-              }
-              e.target.playVideo();
-            }
-          }
-        });
-      }
-    };
-  
-    ensureYoutubeApiReady().then(() => {
-        createPlayer();
-    });
-  
-    // Cleanup function to destroy the player when the component unmounts
-    return () => {
-      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
-        playerRef.current.destroy();
-      }
-    };
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -98,21 +45,15 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const parseYouTubeUrl = (url: string): { videoId: string | null; playlistId: string | null } => {
-    if (!url) return { videoId: null, playlistId: null };
-    const videoIdMatch = url.match(/(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*)/);
-    const playlistIdMatch = url.match(/[?&]list=([^#&?]*)/);
-    return {
-      videoId: (videoIdMatch && videoIdMatch[1].length === 11) ? videoIdMatch[1] : null,
-      playlistId: playlistIdMatch ? playlistIdMatch[1] : null,
-    };
-  };
-
   const parseSpotifyUrl = (url: string): { type: 'track' | 'album' | 'playlist' | null; id: string | null } => {
-    const spotifyUrlRegex = /https:\/\/open\.spotify\.com\/(track|album|playlist)\/([a-zA-Z0-9]+)/;
-    const match = url.match(spotifyUrlRegex);
-    if (match && (match[1] === 'track' || match[1] === 'album' || match[1] === 'playlist')) {
-        return { type: match[1], id: match[2] };
+    if (!url) return { type: null, id: null };
+    const uriMatch = url.match(/spotify:(track|album|playlist):([a-zA-Z0-9]+)/i);
+    if (uriMatch) {
+      return { type: uriMatch[1].toLowerCase() as 'track' | 'album' | 'playlist', id: uriMatch[2] };
+    }
+    const webMatch = url.match(/(?:open\.spotify\.com(?:\/intl-[a-z]+)?(?:\/embed)?)\/(track|album|playlist)\/([a-zA-Z0-9]+)/i);
+    if (webMatch) {
+      return { type: webMatch[1].toLowerCase() as 'track' | 'album' | 'playlist', id: webMatch[2] };
     }
     return { type: null, id: null };
   };
@@ -131,7 +72,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const handleSavePlaylist = async () => {
     setFormError(null);
     if (!newPlaylistUrl.trim()) {
-      setFormError("Por favor, introduce un enlace.");
+      setFormError("Por favor, introduce un enlace de Spotify.");
       return;
     }
     
@@ -156,37 +97,25 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     } catch (e) {
         console.error("Error fetching metadata from Microlink", e);
     }
-    
-    const finalName = newPlaylistName.trim() || fetchedTitle;
-    if (!finalName) {
-         setFormError("No se pudo obtener el nombre. Por favor, añádelo manualmente.");
-         setIsSaving(false);
-         return;
+
+    const { type, id } = parseSpotifyUrl(newPlaylistUrl);
+    if (!type || !id) {
+        setFormError("Enlace de Spotify no válido (track, album, o playlist).");
+        setIsSaving(false);
+        return;
     }
+    
+    const finalName = newPlaylistName.trim() || fetchedTitle || `Spotify ${type}`;
 
     try {
-        if (platform === 'youtube') {
-            const { videoId, playlistId } = parseYouTubeUrl(newPlaylistUrl);
-            if (!videoId && !playlistId) {
-                setFormError("Enlace de YouTube no válido.");
-                setIsSaving(false); return;
-            }
-            if (videoId && !thumbnailUrl) thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-            newEntry = {
-                source_id: playlistId || videoId!, name: finalName, is_favorite: false,
-                type: playlistId ? 'playlist' : 'video', platform: 'youtube', thumbnail_url: thumbnailUrl
-            };
-        } else if (platform === 'spotify') {
-            const { type, id } = parseSpotifyUrl(newPlaylistUrl);
-            if (!type || !id) {
-                setFormError("Enlace de Spotify no válido (track, album, o playlist).");
-                setIsSaving(false); return;
-            }
-            newEntry = {
-                source_id: id, name: finalName, is_favorite: false, type,
-                platform: 'spotify', thumbnail_url: thumbnailUrl
-            };
-        }
+        newEntry = {
+            source_id: id,
+            name: finalName,
+            is_favorite: false,
+            type,
+            platform: 'spotify',
+            thumbnail_url: thumbnailUrl
+        };
 
         if (newEntry) {
             await onAddPlaylist(newEntry);
@@ -199,7 +128,6 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
         setIsSaving(false);
     }
   };
-
 
   const handleToggleFavorite = (playlist: Playlist) => {
     onUpdatePlaylist({ ...playlist, is_favorite: !playlist.is_favorite });
@@ -222,52 +150,53 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
     setPlaylistToDelete(null);
   };
   
-  const filteredPlaylists = (view === 'favorites' ? playlists.filter(p => p.is_favorite) : playlists)
-    .filter(p => p.platform === platform);
-
+  const spotifyPlaylists = playlists.filter(p => p.platform === 'spotify');
+  const filteredPlaylists = view === 'favorites' 
+    ? spotifyPlaylists.filter(p => p.is_favorite) 
+    : spotifyPlaylists;
 
   return (
     <div className="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 rounded-3xl overflow-hidden flex flex-col sm:flex-row h-full">
       <aside className="flex sm:flex-col items-center p-2 sm:p-4 bg-black/5 dark:bg-black/20 flex-shrink-0">
         <div className="flex flex-row sm:flex-col items-center gap-2 sm:gap-4">
-          <button onClick={() => setView('all')} className={`p-3 rounded-full transition-colors ${view === 'all' ? 'bg-primary text-white' : 'hover:bg-primary-light/50 dark:hover:bg-primary/20 text-gray-600 dark:text-gray-300'}`}>
+          <button onClick={() => setView('all')} className={`p-3 rounded-full transition-colors ${view === 'all' ? 'bg-[#1DB954] text-black font-bold' : 'hover:bg-primary-light/50 dark:hover:bg-primary/20 text-gray-600 dark:text-gray-300'}`} title="Todas las listas">
             <MusicIcon />
           </button>
-          <button onClick={() => setView('favorites')} className={`p-3 rounded-full transition-colors ${view === 'favorites' ? 'bg-primary text-white' : 'hover:bg-primary-light/50 dark:hover:bg-primary/20 text-gray-600 dark:text-gray-300'}`}>
+          <button onClick={() => setView('favorites')} className={`p-3 rounded-full transition-colors ${view === 'favorites' ? 'bg-[#1DB954] text-black font-bold' : 'hover:bg-primary-light/50 dark:hover:bg-primary/20 text-gray-600 dark:text-gray-300'}`} title="Favoritos">
             <StarIcon filled={view === 'favorites'} />
           </button>
         </div>
       </aside>
 
       <main className="flex flex-col flex-grow min-w-0 relative h-full">
-        <header className="relative h-28 sm:h-36 w-full flex-shrink-0 overflow-hidden drag-handle cursor-move">
-          <div id="music-header-video-container" className="absolute inset-0" />
-          <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-gray-900 via-white/40 dark:via-gray-900/40 to-transparent flex flex-col justify-end p-4 md:p-6">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold truncate text-primary-dark dark:text-primary drop-shadow-sm">Musica para Pollos</h1>
-            <p className="text-gray-500 dark:text-gray-400 font-semibold text-sm sm:text-base">by Pollito</p>
+        <header className="relative h-40 sm:h-48 w-full flex-shrink-0 overflow-hidden drag-handle cursor-move bg-gradient-to-r from-emerald-950 via-green-900 to-gray-900">
+          <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-gray-900 via-black/20 to-black/40 flex flex-col justify-end p-4 md:p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-5 h-5 text-[#1DB954]" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-.1.2-1.02-.36-.18-.6.36-1.02.96-1.2 4.2-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z" />
+              </svg>
+              <span className="text-xs font-extrabold uppercase tracking-widest text-[#1DB954]">Spotify</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold truncate text-white drop-shadow-sm">Música para Pollos</h1>
+            <p className="text-gray-300 dark:text-gray-400 font-semibold text-xs sm:text-sm">Música y Playlists de Spotify</p>
           </div>
           <div className="absolute top-2 right-2 flex items-center gap-2">
             <button
               onClick={handleOpenAddForm}
-              className="bg-primary text-white p-2 rounded-full backdrop-blur-sm shadow-md hover:bg-primary-dark transition-colors"
+              className="bg-[#1DB954] hover:bg-[#1ed760] text-black p-2 rounded-full backdrop-blur-sm shadow-md transition-colors font-bold"
               aria-label="Agregar música"
+              title="Agregar música de Spotify"
             >
               <PlusIcon />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-full bg-black/20 text-white hover:bg-black/40 backdrop-blur-sm transition-colors cursor-pointer"
+              className="p-2 rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm transition-colors cursor-pointer"
               aria-label="Cerrar ventana"
             >
               <CloseIcon />
             </button>
           </div>
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
-            <div className="bg-black/10 dark:bg-black/20 backdrop-blur-sm rounded-full p-1 flex items-center gap-1">
-                 <button onClick={() => setPlatform('youtube')} className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-colors ${platform === 'youtube' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-primary' : 'text-white/80 dark:text-gray-200/80 hover:bg-white/20 dark:hover:bg-white/10'}`}>YouTube</button>
-                 <button onClick={() => setPlatform('spotify')} className={`px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-colors ${platform === 'spotify' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-primary' : 'text-white/80 dark:text-gray-200/80 hover:bg-white/20 dark:hover:bg-white/10'}`}>Spotify</button>
-            </div>
-        </div>
         </header>
         
         <section className="flex-grow p-3 md:p-6 overflow-y-auto custom-scrollbar">
@@ -276,20 +205,29 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
               {filteredPlaylists.map(playlist => (
                 <div key={playlist.id} className="group">
                   <button onClick={() => onSelectTrack(playlist, filteredPlaylists)} className="text-left w-full transform hover:-translate-y-1 transition-transform duration-200">
-                    <div className="rounded-lg overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow duration-200 aspect-square bg-primary-light">
+                    <div className="rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow duration-200 aspect-square bg-gray-800 relative">
                       {playlist.thumbnail_url ? (
                          <img src={playlist.thumbnail_url} alt={playlist.name} className="w-full h-full object-cover" />
                       ) : (
-                         <div className="w-full h-full flex items-center justify-center text-white p-4">
-                            <MusicIcon />
+                         <div className="w-full h-full flex flex-col items-center justify-center text-[#1DB954] p-4 bg-emerald-950/40">
+                            <svg className="w-10 h-10 mb-1" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-.1.2-1.02-.36-.18-.6.36-1.02.96-1.2 4.2-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z" />
+                            </svg>
                          </div>
                       )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-[#1DB954] text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                          <svg className="w-6 h-6 fill-current ml-0.5" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
+                      </div>
                     </div>
                   </button>
                   <div className="flex items-start justify-between mt-2">
                      <div className="flex-grow min-w-0">
                         <h3 className="font-bold truncate text-sm sm:text-base">{playlist.name}</h3>
-                        {playlist.is_favorite && <p className="text-xs text-secondary-dark font-semibold">Favorito</p>}
+                        {playlist.is_favorite && <p className="text-xs text-[#1DB954] font-semibold">Favorito</p>}
                      </div>
                      <div className="relative flex-shrink-0">
                         <button onClick={() => setMenuOpenFor(playlist.id)} className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200">
@@ -297,13 +235,13 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
                         </button>
                         {menuOpenFor === playlist.id && (
                              <div ref={menuRef} className="absolute right-0 mt-1 w-48 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-xl z-10 animate-pop-in origin-top-right">
-                                <button onClick={() => handleToggleFavorite(playlist)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700 flex items-center gap-2">
+                                <button onClick={() => handleToggleFavorite(playlist)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-[#1DB954]/10 flex items-center gap-2">
                                     <StarIcon filled={!!playlist.is_favorite} className="h-4 w-4" /> {playlist.is_favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                                 </button>
                                 <button onClick={() => handleDeleteClick(playlist)} className="w-full text-left px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40 flex items-center gap-2">
                                     <TrashIcon className="h-4 w-4" /> Eliminar
                                 </button>
-                            </div>
+                             </div>
                         )}
                      </div>
                   </div>
@@ -312,8 +250,8 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
             </div>
           ) : (
             <div className="text-center text-gray-500 dark:text-gray-400 pt-10">
-                <p className="font-medium">{view === 'favorites' ? `No tienes favoritos de ${platform}.` : 'No hay nada aquí.'}</p>
-                <p className="text-sm">¡Agrega música para empezar!</p>
+                <p className="font-medium">{view === 'favorites' ? 'No tienes favoritos de Spotify.' : 'No hay música guardada.'}</p>
+                <p className="text-sm">¡Añade un enlace de Spotify (playlist, álbum o canción) para empezar!</p>
             </div>
           )}
         </section>
@@ -321,35 +259,40 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
         {showAddForm && (
             <div className="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-20 flex items-center justify-center p-6 animate-pop-in">
                 <div className="bg-white/95 dark:bg-gray-800/95 rounded-2xl shadow-xl p-6 w-full max-w-sm">
-                    <h3 className="font-bold text-lg text-primary-dark dark:text-primary mb-4 text-center">Agregar a {platform}</h3>
+                    <div className="flex items-center justify-center gap-2 mb-4">
+                      <svg className="w-6 h-6 text-[#1DB954]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-.1.2-1.02-.36-.18-.6.36-1.02.96-1.2 4.2-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z" />
+                      </svg>
+                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">Agregar de Spotify</h3>
+                    </div>
                     <div className="space-y-3">
                         <input 
                             type="text" 
                             value={newPlaylistName} 
                             onChange={e => { setNewPlaylistName(e.target.value); setFormError(null); }} 
-                            placeholder="Nombre (opcional)"
-                            className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300" 
+                            placeholder="Nombre personalizado (opcional)"
+                            className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-[#1DB954] focus:border-transparent transition-all duration-300 text-sm" 
                         />
                         <input 
                             type="text" 
                             value={newPlaylistUrl} 
                             onChange={e => { setNewPlaylistUrl(e.target.value); setFormError(null); }} 
-                            placeholder={`Enlace de ${platform}`}
-                            className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300" 
+                            placeholder="https://open.spotify.com/playlist/..."
+                            className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-[#1DB954] focus:border-transparent transition-all duration-300 text-sm" 
                         />
                     </div>
-                    {formError && <p className="text-red-500 text-sm text-center mt-3">{formError}</p>}
+                    {formError && <p className="text-red-500 text-xs text-center mt-3">{formError}</p>}
                     <div className="flex justify-end gap-3 mt-4">
                         <button 
                             onClick={handleCancelAdd} 
-                            className="bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-full px-4 py-2 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors duration-200"
+                            className="bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-full px-4 py-2 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors duration-200 text-sm"
                         >
                             Cancelar
                         </button>
                         <button 
                             onClick={handleSavePlaylist}
                             disabled={isSaving}
-                            className="bg-primary text-white font-bold rounded-full px-4 py-2 shadow-md hover:bg-primary-dark transition-colors duration-200 disabled:bg-primary-light disabled:cursor-wait"
+                            className="bg-[#1DB954] text-black font-bold rounded-full px-4 py-2 shadow-md hover:bg-[#1ed760] transition-colors duration-200 disabled:opacity-50 disabled:cursor-wait text-sm"
                         >
                             {isSaving ? 'Guardando...' : 'Guardar'}
                         </button>

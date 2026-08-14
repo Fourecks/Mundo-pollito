@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, GalleryImage, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -10,10 +10,7 @@ import Dock from './components/Dock';
 import ModalWindow from './components/ModalWindow';
 import TodoListModule from './components/TodoListModule';
 import NotesSection from './components/NotesSection';
-import ImageGallery from './components/ImageGallery';
-import MemoriesCarousel from './components/MemoriesCarousel';
 import MusicPlayer from './components/MusicPlayer';
-import FloatingPlayer from './components/FloatingPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
@@ -33,7 +30,6 @@ import ThemeToggleButton from './components/ThemeToggleButton';
 import PaletteIcon from './components/icons/PaletteIcon';
 import CustomizationPanel from './components/CustomizationPanel';
 import ChevronRightIcon from './components/icons/ChevronRightIcon';
-import GamesHub from './components/GamesHub';
 import { supabase } from './supabaseClient';
 import { config } from './config';
 import { ensureYoutubeApiReady } from './utils/youtubeApi';
@@ -47,15 +43,15 @@ import ConfirmationModalWithOptions from './components/ConfirmationModalWithOpti
 import ConfirmationModal from './components/ConfirmationModal';
 import QuickCaptureSetupModal from './components/QuickCaptureSetupModal';
 import MotivationalToast from './components/MotivationalToast';
-import IntegrationsPanel from './components/IntegrationsPanel';
-import LinkIcon from './components/icons/LinkIcon';
 import NotificationsPanel from './components/NotificationsPanel';
 import ProjectEditorPanel from './components/ProjectEditorPanel';
 import HabitTracker from './components/HabitTracker';
 import HabitEditorPanel from './components/HabitEditorPanel';
 import ProgressView from './components/ProgressView';
-import GalleryIcon from './components/icons/GalleryIcon';
 import ChevronLeftIcon from './components/icons/ChevronLeftIcon';
+import CalendarModule from './components/CalendarModule';
+import { CalendarSyncService } from './services/calendarSyncService';
+import { NotionService } from './services/notionService';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -272,7 +268,6 @@ interface AppComponentProps {
   projects: Project[];
   habits: Habit[];
   habitRecords: HabitRecord[];
-  galleryImages: GalleryImage[];
   userBackgrounds: Background[];
   playlists: Playlist[];
   quickNotes: QuickNote[];
@@ -300,7 +295,7 @@ interface AppComponentProps {
   handleUpdateNote: (note: Note) => Promise<void>;
   handleDeleteNote: (noteId: number, folderId: number) => Promise<void>;
   handleAddProject: (name: string, emoji: string | null, color: string | null) => Promise<Project | null>;
-  handleUpdateProject: (projectId: number, name: string, emoji: string | null, color: string | null) => Promise<void>;
+  handleUpdateProject: (projectId: number, name: string, emoji: string | null, color: string | null, kanban_columns?: string[]) => Promise<void>;
   handleDeleteProject: (projectId: number) => Promise<void>;
   handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
   handleArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
@@ -325,11 +320,11 @@ interface AppComponentProps {
   setActiveSpotifyTrack: React.Dispatch<React.SetStateAction<Playlist | null>>;
   // Google API Props
   googleApiToken: string | null;
-  galleryIsLoading: boolean;
   backgroundsAreLoading: boolean;
   handleAuthClick: () => void;
-  handleAddGalleryImages: (files: File[]) => Promise<void>;
-  handleDeleteGalleryImage: (id: string) => Promise<void>;
+  onConnectOutlook: () => void;
+  onDisconnectOutlook: () => void;
+  outlookAccount: CalendarIntegrationAccount | null;
   handleAddBackground: (file: File) => Promise<void>;
   handleDeleteBackground: (id: string) => Promise<void>;
   handleToggleFavoriteBackground: (id: string) => Promise<void>;
@@ -339,6 +334,11 @@ interface AppComponentProps {
   onGCalSettingsChange: (settings: GCalSettings) => void;
   userCalendars: GoogleCalendar[];
   calendarEvents: GoogleCalendarEvent[];
+  loadAndValidateCalendarData: () => Promise<void>;
+  onRemoveFromCalendar: (todo: Todo) => Promise<void>;
+  onSyncToCalendar: (todo: Todo) => Promise<void>;
+  // Notion Props
+  onSyncNotion: () => Promise<{ success: boolean; message: string }>;
   // Notifications
   isSubscribed: boolean;
   isPermissionBlocked: boolean;
@@ -348,7 +348,7 @@ interface AppComponentProps {
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
     isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
-    allTodos, folders, projects, habits, habitRecords, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos, folders, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, uiSettings,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
@@ -359,9 +359,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
     setActiveTrack, setActiveSpotifyTrack,
-    googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
-    handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+    googleApiToken, backgroundsAreLoading, handleAuthClick, onConnectOutlook, onDisconnectOutlook, outlookAccount,
+    handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
     gcalSettings, onGCalSettingsChange, userCalendars, calendarEvents,
+    loadAndValidateCalendarData, onRemoveFromCalendar, onSyncToCalendar,
+    onSyncNotion,
     isSubscribed, isPermissionBlocked, handleNotificationAction
   } = props;
   
@@ -374,9 +376,31 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [focusedWindow, setFocusedWindow] = useState<WindowType | null>(null);
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
   const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
-  const [isIntegrationsPanelOpen, setIsIntegrationsPanelOpen] = useState(false);
   const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
+  const [viewingProjectId, setViewingProjectId] = useState<number | null>(null);
+  const [isProjectEditorOpen, setIsProjectEditorOpen] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const pomodoroStartedRef = useRef(false);
+
+  const handleOpenProjectCreator = () => {
+    setProjectToEdit(null);
+    setIsProjectEditorOpen(true);
+  };
+
+  const handleOpenProjectEditor = (project: Project) => {
+    setProjectToEdit(project);
+    setIsProjectEditorOpen(true);
+  };
+
+  const handleSaveProject = async (name: string, emoji: string | null, color: string | null) => {
+    if (projectToEdit) {
+      await handleUpdateProject(projectToEdit.id, name, emoji, color);
+    } else {
+      await handleAddProject(name, emoji, color);
+    }
+    setIsProjectEditorOpen(false);
+    setProjectToEdit(null);
+  };
 
   const getUserKey = useCallback((key: string) => `${currentUser.email}_${key}`, [currentUser]);
   
@@ -545,13 +569,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             >
               <PaletteIcon />
             </button>
-            <button
-                onClick={() => setIsIntegrationsPanelOpen(true)}
-                className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-300 hover:text-primary p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110"
-                aria-label="Integraciones"
-              >
-                <LinkIcon />
-              </button>
+
             <button
                 onClick={() => setIsNotificationsPanelOpen(true)}
                 className={`relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
@@ -600,16 +618,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setAmbientSound={(sound) => setUiSettings((s: any) => ({ ...s, ambientSound: sound }))}
       />
       
-      <IntegrationsPanel
-        isOpen={isIntegrationsPanelOpen}
-        onClose={() => setIsIntegrationsPanelOpen(false)}
-        isSignedIn={!!googleApiToken}
-        onAuthClick={handleAuthClick}
-        isGapiReady={props.gapiReady}
-        gcalSettings={gcalSettings}
-        onGCalSettingsChange={onGCalSettingsChange}
-        userCalendars={userCalendars}
-      />
+
 
       <NotificationsPanel
         isOpen={isNotificationsPanelOpen}
@@ -621,7 +630,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         onSendTestNotification={handleNotificationAction}
       />
       
-      <div className={`fixed top-4 left-4 z-30 space-y-4 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block`}>
+      <div className={`fixed top-4 left-4 z-30 space-y-3 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block w-[22vw] min-w-[220px] max-w-[320px]`}>
           <div className="flex items-center gap-2">
             <Greeting name={capitalizedUserName} />
             <button onClick={() => toggleWindow('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800">
@@ -641,10 +650,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           />
       </div>
       
-      <div className={`transition-opacity duration-500 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-        <MemoriesCarousel images={galleryImages} />
-      </div>
-
         <main className={`${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {openWindows.includes('todo') && (
             <ModalWindow isOpen={true} onClose={() => toggleWindow('todo')} title="Lista de Tareas" isDraggable isResizable zIndex={focusedWindow === 'todo' ? 50 : 40} onFocus={() => bringToFront('todo')} className="w-full max-w-3xl h-[80vh]" windowState={windowStates.todo} onStateChange={s => setWindowStates(ws => ({...ws, todo: s}))}>
@@ -667,11 +672,38 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 onDeleteProject={handleDeleteProject}
                 onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
                 handleArchiveProject={handleArchiveProject}
+                onViewProjectChange={setViewingProjectId}
                 calendarEvents={calendarEvents}
+                onOpenProjectCreator={handleOpenProjectCreator}
+                onOpenProjectEditor={handleOpenProjectEditor}
               />
             </ModalWindow>
           )}
-           {openWindows.includes('habits') && (
+          {openWindows.includes('calendar') && (
+            <ModalWindow isOpen={true} onClose={() => toggleWindow('calendar')} title="Calendario y Sincronización" isDraggable isResizable zIndex={focusedWindow === 'calendar' ? 50 : 40} onFocus={() => bringToFront('calendar')} className="w-full max-w-5xl h-[85vh]" windowState={windowStates.calendar} onStateChange={s => setWindowStates(ws => ({...ws, calendar: s}))}>
+              <CalendarModule
+                allTodos={allTodos}
+                calendarEvents={calendarEvents}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                onEditTodo={setTaskToEdit}
+                onToggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
+                googleToken={googleApiToken}
+                gcalSettings={gcalSettings}
+                onGCalSettingsChange={onGCalSettingsChange}
+                userCalendars={userCalendars}
+                onAuthGoogle={handleAuthClick}
+                onConnectOutlook={onConnectOutlook}
+                onDisconnectOutlook={onDisconnectOutlook}
+                outlookAccount={outlookAccount}
+                onRefreshEvents={loadAndValidateCalendarData}
+                onRemoveFromCalendar={onRemoveFromCalendar}
+                onSyncToCalendar={onSyncToCalendar}
+                onSyncNotion={onSyncNotion}
+              />
+            </ModalWindow>
+          )}
+          {openWindows.includes('habits') && (
             <ModalWindow isOpen={true} onClose={() => toggleWindow('habits')} title="Seguimiento de Hábitos" isDraggable isResizable zIndex={focusedWindow === 'habits' ? 50 : 40} onFocus={() => bringToFront('habits')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.habits} onStateChange={s => setWindowStates(ws => ({...ws, habits: s}))}>
               <HabitTracker 
                 habits={habits} 
@@ -698,11 +730,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                   <NotesSection folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
               </ModalWindow>
           )}
-          {openWindows.includes('gallery') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('gallery')} title="Recuerdos y Juegos" isDraggable isResizable zIndex={focusedWindow === 'gallery' ? 50 : 40} onFocus={() => bringToFront('gallery')} className="w-full max-w-4xl h-[85vh]" windowState={windowStates.gallery} onStateChange={s => setWindowStates(ws => ({...ws, gallery: s}))} noHeader>
-                  <ImageGallery images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} currentUser={capitalizedUserName} />
-              </ModalWindow>
-          )}
           {openWindows.includes('pomodoro') && (
               <ModalWindow isOpen onClose={() => toggleWindow('pomodoro')} title="Pomodoro" isDraggable isResizable zIndex={focusedWindow === 'pomodoro' ? 50 : 40} onFocus={() => bringToFront('pomodoro')} className="w-80 h-96" windowState={windowStates.pomodoro} onStateChange={s => setWindowStates(ws => ({...ws, pomodoro: s}))}>
                   <Pomodoro timeLeft={pomodoroState.timeLeft} isActive={pomodoroState.isActive} mode={pomodoroState.mode} durations={pomodoroState.durations} onToggle={handlePomodoroToggle} onReset={() => setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null }))} onSwitchMode={(mode) => setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null }))} onSaveSettings={(d) => setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null }))} showBackgroundTimer={pomodoroState.showBackgroundTimer} onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))} backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity} onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))} />
@@ -722,9 +749,23 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       
       <div className={`transition-opacity duration-500 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <CompletionModal isOpen={showCompletionModal} onClose={() => setShowCompletionModal(false)} quote={completionQuote}/>
-        <TaskDetailsModal isOpen={!!taskToEdit} onClose={() => setTaskToEdit(null)} onSave={handleUpdateTodo} todo={taskToEdit} projects={projects} />
-        {activeTrack && <FloatingPlayer track={activeTrack} queue={activeTrack.queue} onSelectTrack={handleSelectTrack} onClose={() => setActiveTrack(null)} />}
-        {activeSpotifyTrack && <SpotifyFloatingPlayer track={activeSpotifyTrack} onClose={() => setActiveSpotifyTrack(null)} />}
+        <TaskDetailsModal 
+          isOpen={!!taskToEdit} 
+          onClose={() => setTaskToEdit(null)} 
+          onSave={handleUpdateTodo} 
+          onDelete={handleDeleteTodo} 
+          todo={taskToEdit} 
+          projects={projects}
+          onRemoveFromCalendar={onRemoveFromCalendar}
+          onSyncToCalendar={onSyncToCalendar}
+        />
+        {(activeSpotifyTrack || activeTrack) && <SpotifyFloatingPlayer track={activeSpotifyTrack || activeTrack!} onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} />}
+        <ProjectEditorPanel
+          isOpen={isProjectEditorOpen}
+          onClose={() => setIsProjectEditorOpen(false)}
+          onSave={handleSaveProject}
+          projectToEdit={projectToEdit}
+        />
       </div>
 
       <div className={`fixed bottom-0 left-0 right-0 transition-opacity duration-500 z-[40000] ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -739,7 +780,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
       isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
-      allTodos, folders, projects, habits, habitRecords, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+      allTodos, folders, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, uiSettings,
       activeTrack, activeSpotifyTrack,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
@@ -750,9 +791,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
       setActiveTrack, setActiveSpotifyTrack,
-      googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
-      handleAddGalleryImages, handleDeleteGalleryImage, handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
+      googleApiToken, backgroundsAreLoading, handleAuthClick, onConnectOutlook, onDisconnectOutlook, outlookAccount,
+      handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
       gcalSettings, onGCalSettingsChange, userCalendars, calendarEvents,
+      loadAndValidateCalendarData, onRemoveFromCalendar, onSyncToCalendar,
+      onSyncNotion,
       isSubscribed, isPermissionBlocked, handleNotificationAction
     } = props;
 
@@ -764,7 +807,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isPomodoroModalOpen, setIsPomodoroModalOpen] = useState(false);
     const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
-    const [isIntegrationsPanelOpen, setIsIntegrationsPanelOpen] = useState(false);
     const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
     const [isQuickCaptureSetupOpen, setIsQuickCaptureSetupOpen] = useState(false);
@@ -895,8 +937,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
 
     const handleSelectTrack = (track: Playlist, queue: Playlist[]) => {
-      if(track.platform === 'youtube') { setActiveTrack({ ...track, queue }); if(activeSpotifyTrack) setActiveSpotifyTrack(null); }
-      else { setActiveSpotifyTrack({ ...track, queue }); if(activeTrack) setActiveTrack(null); }
+      setActiveSpotifyTrack({ ...track, queue });
+      if (activeTrack) setActiveTrack(null);
     };
 
     const capitalizedUserName = useMemo(() => {
@@ -916,7 +958,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 Progreso
                             </button>
                         </header>
-                        <div className="p-4 space-y-4">
+                        <div className="w-[90%] max-w-sm mx-auto py-3 space-y-3">
                              <BibleVerse />
                              <MobilePomodoroWidget 
                                 timeLeft={pomodoroState.timeLeft} 
@@ -964,6 +1006,31 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                         </button>
                     </div>
                 );
+            case 'calendar':
+                return (
+                    <div className="h-full pt-4 px-2">
+                        <CalendarModule
+                            allTodos={allTodos}
+                            calendarEvents={calendarEvents}
+                            selectedDate={selectedDate}
+                            onSelectDate={setSelectedDate}
+                            onEditTodo={setTaskToEdit}
+                            onToggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
+                            googleToken={googleApiToken}
+                            gcalSettings={gcalSettings}
+                            onGCalSettingsChange={onGCalSettingsChange}
+                            userCalendars={userCalendars}
+                            onAuthGoogle={handleAuthClick}
+                            onConnectOutlook={onConnectOutlook}
+                            onDisconnectOutlook={onDisconnectOutlook}
+                            outlookAccount={outlookAccount}
+                            onRefreshEvents={loadAndValidateCalendarData}
+                            onRemoveFromCalendar={onRemoveFromCalendar}
+                            onSyncToCalendar={onSyncToCalendar}
+                            onSyncNotion={onSyncNotion}
+                        />
+                    </div>
+                );
             case 'habits':
                 return (
                      <div className="h-full pt-8">
@@ -995,12 +1062,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                         />
                     </div>
                 );
-            case 'gallery':
-                 return (
-                    <div className="flex flex-col h-full animate-fade-in">
-                        <ImageGallery isMobile={true} images={galleryImages} onAddImages={handleAddGalleryImages} onDeleteImage={handleDeleteGalleryImage} isSignedIn={!!googleApiToken} onAuthClick={handleAuthClick} isGapiReady={props.gapiReady} isLoading={galleryIsLoading} currentUser={capitalizedUserName} />
-                    </div>
-                );
             case 'more':
                 return (
                      <>
@@ -1015,11 +1076,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
                                     <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
                                         <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Personalización</h3>
-                                        <ChevronRightIcon />
-                                    </button>
-
-                                    <button onClick={() => setIsIntegrationsPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Integraciones</h3>
                                         <ChevronRightIcon />
                                     </button>
 
@@ -1070,7 +1126,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 {renderContent()}
             </main>
             
-            {activeTab !== 'tasks' && activeTab !== 'notes' && activeTab !== 'gallery' && (
+            {activeTab !== 'tasks' && activeTab !== 'notes' && (
               <button onClick={() => setIsAiBrowserOpen(true)} className="mobile-ai-button fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40">
                   <ChickenIcon className="w-6 h-6" />
               </button>
@@ -1108,17 +1164,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               ambientSound={ambientSound}
               setAmbientSound={(sound) => setUiSettings((s: any) => ({ ...s, ambientSound: sound }))}
             />
-            <IntegrationsPanel
-                isOpen={isIntegrationsPanelOpen}
-                onClose={() => setIsIntegrationsPanelOpen(false)}
-                isMobile={true}
-                isSignedIn={!!googleApiToken}
-                onAuthClick={handleAuthClick}
-                isGapiReady={props.gapiReady}
-                gcalSettings={gcalSettings}
-                onGCalSettingsChange={onGCalSettingsChange}
-                userCalendars={userCalendars}
-            />
+
             <NotificationsPanel
                 isOpen={isNotificationsPanelOpen}
                 onClose={() => setIsNotificationsPanelOpen(false)}
@@ -1159,6 +1205,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 onDelete={handleDeleteTodo} 
                 todo={taskToEdit}
                 projects={projects}
+                onRemoveFromCalendar={onRemoveFromCalendar}
+                onSyncToCalendar={onSyncToCalendar}
             />
             
             {isAiBrowserOpen && (
@@ -1253,6 +1301,7 @@ const App: React.FC = () => {
   const [browserSession, setBrowserSession] = useState<BrowserSession>({});
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [deleteOptions, setDeleteOptions] = useState<{ isOpen: boolean; todo: Todo | null; }>({ isOpen: false, todo: null });
+  const [singleTaskToDelete, setSingleTaskToDelete] = useState<Todo | null>(null);
   const [updateOptions, setUpdateOptions] = useState<{ isOpen: boolean; original: Todo | null; updated: Todo | null; }>({ isOpen: false, original: null, updated: null });
   const [isClearPastConfirmOpen, setIsClearPastConfirmOpen] = useState(false);
   const [quickCaptureMessage, setQuickCaptureMessage] = useState<string | null>(null);
@@ -1273,14 +1322,30 @@ const App: React.FC = () => {
   const [gapiReady, setGapiReady] = useState(false);
   const [gisReady, setGisReady] = useState(false);
   const [googleApiToken, setGoogleApiToken] = useState<string | null>(null);
-  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
-  const [galleryIsLoading, setGalleryIsLoading] = useState(false);
   const appFolderId = useRef<string | null>(null);
   const tokenClientRef = useRef<any>(null);
   // Google Calendar State
   const [gcalSettings, setGcalSettings] = useState<GCalSettings>({ enabled: false, calendarId: 'primary' });
   const [userCalendars, setUserCalendars] = useState<GoogleCalendar[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
+  const [outlookAccount, setOutlookAccount] = useState<CalendarIntegrationAccount | null>(null);
+
+  useEffect(() => {
+    setOutlookAccount(CalendarSyncService.getAccount('outlook'));
+  }, []);
+
+  const handleConnectOutlook = async () => {
+    const account = await CalendarSyncService.connectOutlookAccount();
+    if (account) {
+      setOutlookAccount(account);
+      loadAndValidateCalendarData();
+    }
+  };
+
+  const handleDisconnectOutlook = () => {
+    CalendarSyncService.removeAccount('outlook');
+    setOutlookAccount(null);
+  };
   
   // Supabase Backgrounds State
   const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
@@ -1433,7 +1498,7 @@ const App: React.FC = () => {
             // Reset all state
             setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
             setProjects([]); setHabits([]); setHabitRecords([]);
-            setGalleryImages([]); setUserBackgrounds([]);
+            setUserBackgrounds([]);
             setGoogleApiToken(null);
         }
     });
@@ -1494,7 +1559,16 @@ const App: React.FC = () => {
     setAllTodos(todosByDate);
     setFolders(cachedFolders);
     setNotes(cachedNotes);
-    setPlaylists(cachedPlaylists);
+    if (cachedPlaylists && cachedPlaylists.length > 0) {
+      setPlaylists(cachedPlaylists);
+    } else {
+      const defaultPlaylistsList: Playlist[] = [
+        { id: 1, user_id: user?.id || 'default', name: 'Lofi Beats', source_id: '37i9dQZF1DXcBWIGoYBM5M', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003002f232e08e6ff05f5904838' },
+        { id: 2, user_id: user?.id || 'default', name: 'Peaceful Piano', source_id: '37i9dQZF1DX4sWSpwq3LiO', type: 'playlist', platform: 'spotify', is_favorite: false, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003ca22a83e01dd89a1fa9f123f' },
+        { id: 3, user_id: user?.id || 'default', name: 'Deep Focus', source_id: '37i9dQZF1DWZeKCadgRdKQ', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f0000000355482310ff97c2a7813a0785' }
+      ];
+      setPlaylists(defaultPlaylistsList);
+    }
     setQuickNotes(cachedQuickNotes);
     setProjects(cachedProjects);
     setHabitRecords(cachedHabitRecords);
@@ -1701,7 +1775,7 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('online', handleOnline);
-    window.removeEventListener('offline', handleOffline);
+    window.addEventListener('offline', handleOffline);
 
     const startup = async () => {
       await initDB(user.email!);
@@ -1732,8 +1806,8 @@ const App: React.FC = () => {
     }
 
     return () => {
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, [user, dataLoaded, loadData]);
 
@@ -1839,7 +1913,7 @@ const App: React.FC = () => {
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeTrack'), value: activeTrack }); }, [activeTrack, getUserKey, user, dataLoaded]);
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeSpotifyTrack'), value: activeSpotifyTrack }); }, [activeSpotifyTrack, getUserKey, user, dataLoaded]);
 
-  // --- Data Handlers (Now with Offline Support) ---
+  // --- Data Handlers (Now with Offline Support & Auto Calendar Sync) ---
   const handleAddTodo = useCallback(async (text: string, options?: { projectId?: number | null; isUndated?: boolean }) => {
     if (!user) return;
 
@@ -1868,20 +1942,70 @@ const App: React.FC = () => {
         return { ...current, [dateKey]: newDateTodos };
     });
     
-    // Sync
-    const savedTodo = await syncableCreate('todos', newTodo) as Todo;
+    // Sync to local DB / cloud
+    let savedTodo = await syncableCreate('todos', newTodo) as Todo;
+
+    // Automatic Notion Sync if enabled
+    try {
+      const notionSet = NotionService.getSettings();
+      if (notionSet.enabled && notionSet.autoSync) {
+        const res = await NotionService.insertPage(savedTodo);
+        if (res) {
+          savedTodo = {
+            ...savedTodo,
+            notion_page_id: res.id,
+            notion_url: res.url,
+          };
+          await syncableUpdate('todos', savedTodo);
+        }
+      }
+    } catch (notionErr) {
+      console.warn("Auto Notion sync notice:", notionErr);
+    }
+
+    // Automatic Calendar Sync if integration is enabled
+    try {
+      const activeProvider = CalendarSyncService.getActiveProvider();
+      const outlookAccount = CalendarSyncService.getAccount('outlook');
+
+      if (gcalSettings.enabled && googleApiToken && gapiReady) {
+        const calId = gcalSettings.calendarId || 'primary';
+        const calResult = await CalendarSyncService.insertGoogleEvent(savedTodo, googleApiToken, calId);
+        if (calResult && calResult.id) {
+          savedTodo = {
+            ...savedTodo,
+            gcal_event_id: calResult.id,
+            calendar_event_link: calResult.htmlLink,
+            calendar_provider: 'google',
+          };
+          await syncableUpdate('todos', savedTodo);
+        }
+      } else if (outlookAccount && outlookAccount.token && outlookAccount.autoSyncOnCreate) {
+        const calId = outlookAccount.selectedCalendarId || 'primary';
+        const calResult = await CalendarSyncService.insertOutlookEvent(savedTodo, outlookAccount.token, calId);
+        if (calResult && calResult.id) {
+          savedTodo = {
+            ...savedTodo,
+            gcal_event_id: calResult.id,
+            calendar_event_link: calResult.htmlLink,
+            calendar_provider: 'outlook',
+          };
+          await syncableUpdate('todos', savedTodo);
+        }
+      }
+    } catch (calErr) {
+      console.warn("Auto calendar sync notice:", calErr);
+    }
 
     // Replace temporary item with server-confirmed item
-    if (savedTodo.id !== tempId) {
-        setAllTodos(current => {
-            const dateTodos = current[dateKey] || [];
-            return {
-                ...current,
-                [dateKey]: dateTodos.map(t => t.id === tempId ? savedTodo : t)
-            };
-        });
-    }
-  }, [user, selectedDate]);
+    setAllTodos(current => {
+        const dateTodos = current[dateKey] || [];
+        return {
+            ...current,
+            [dateKey]: dateTodos.map(t => (t.id === tempId || t.id === savedTodo.id) ? savedTodo : t)
+        };
+    });
+  }, [user, selectedDate, gcalSettings, googleApiToken, gapiReady]);
   
   // --- Quick Capture from URL (PWA only) ---
   useEffect(() => {
@@ -2005,6 +2129,16 @@ const App: React.FC = () => {
     setAllTodos(nextAllTodos);
 
     const savedTodo = await syncableUpdate('todos', updatedTodo);
+    
+    // Sync to Notion if page ID exists and Notion is enabled
+    try {
+      const notionSet = NotionService.getSettings();
+      if (notionSet.enabled && savedTodo.notion_page_id) {
+        NotionService.updatePage(savedTodo);
+      }
+    } catch (notionErr) {
+      console.warn("Auto Notion update sync notice:", notionErr);
+    }
     
     if (recurrenceRuleChanged && isNowRecurring) {
         // Generate new recurrence chain
@@ -2186,13 +2320,21 @@ const App: React.FC = () => {
     if (todoToDelete.recurrence && todoToDelete.recurrence.frequency !== 'none') {
         setDeleteOptions({ isOpen: true, todo: todoToDelete });
     } else {
-        handleDeleteThisOccurrence(id);
+        setSingleTaskToDelete(todoToDelete);
     }
   };
 
   const handleDeleteThisOccurrence = async (id: number) => {
     let keyToDeleteFrom: string | null = null;
-    for(const key in allTodos) { if(allTodos[key].some(t => t.id === id)) { keyToDeleteFrom = key; break; } }
+    let todoToDelete: Todo | null = null;
+    for(const key in allTodos) { 
+        const found = allTodos[key].find(t => t.id === id);
+        if (found) {
+            keyToDeleteFrom = key;
+            todoToDelete = found;
+            break;
+        }
+    }
     
     if (keyToDeleteFrom) {
         setAllTodos(current => {
@@ -2205,6 +2347,17 @@ const App: React.FC = () => {
             }
         });
     }
+
+    // Delete associated Notion page if exists and Notion is enabled
+    try {
+      const notionSet = NotionService.getSettings();
+      if (notionSet.enabled && todoToDelete?.notion_page_id) {
+        NotionService.deletePage(todoToDelete.notion_page_id);
+      }
+    } catch (notionErr) {
+      console.warn("Auto Notion delete error:", notionErr);
+    }
+
     await syncableDelete('todos', id);
     setDeleteOptions({ isOpen: false, todo: null });
   };
@@ -2340,14 +2493,22 @@ const App: React.FC = () => {
       return savedProject;
   }, [user]);
 
-  const handleUpdateProject = async (projectId: number, name: string, emoji: string | null, color: string | null) => {
+  const handleUpdateProject = async (projectId: number, name: string, emoji: string | null, color: string | null, kanban_columns?: string[]) => {
       const projectToUpdate = projects.find(p => p.id === projectId);
       if(!projectToUpdate) return;
-      const updatedProject = { ...projectToUpdate, name, emoji, color };
+      const updatedProject = { 
+        ...projectToUpdate, 
+        name, 
+        emoji, 
+        color, 
+        kanban_columns: kanban_columns !== undefined ? kanban_columns : projectToUpdate.kanban_columns 
+      };
       setProjects(p => p.map(project => project.id === projectId ? updatedProject : project));
       
       const savedProject = await syncableUpdate('projects', updatedProject);
-      setProjects(p => p.map(project => project.id === projectId ? savedProject : project));
+      if (savedProject) {
+        setProjects(p => p.map(project => project.id === projectId ? (savedProject as Project) : project));
+      }
   };
 
   const handleArchiveProject = async (projectId: number, isArchived: boolean) => {
@@ -2549,20 +2710,6 @@ const App: React.FC = () => {
       setHabitToEdit(null);
   };
 
-  // --- Blob URL Cleanup ---
-  useEffect(() => {
-    // This effect runs when the component unmounts or when the dependencies change.
-    // The cleanup function from the *previous* render is called, which has the old URLs.
-    const urlsToClean = [...galleryImages.map(i => i.url)];
-    return () => {
-        urlsToClean.forEach(url => {
-            if (url.startsWith('blob:')) {
-                URL.revokeObjectURL(url);
-            }
-        });
-    };
-  }, [galleryImages]);
-
   // --- Google API Integration ---
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
@@ -2675,62 +2822,126 @@ const App: React.FC = () => {
       }
     } catch (error) { console.error("Error finding/creating app folder:", error); return null; }
   }, []);
-  
-  const loadGalleryFromDrive = useCallback(async () => {
-      if (!googleApiToken) return;
-      setGalleryIsLoading(true);
 
-      try {
-          const parentFolderId = await findOrCreateAppFolder();
-          if (!parentFolderId) throw new Error("Could not access app folder.");
-          
-          let subFolderId: string | null = null;
-          const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='gallery' and trashed=false`, fields: 'files(id)' });
-          if(folderResponse.result.files && folderResponse.result.files.length > 0) {
-              subFolderId = folderResponse.result.files[0].id!;
-          } else {
-              const subFolderMeta = { name: 'gallery', mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
-              const createSubResponse = await window.gapi.client.drive.files.create({ resource: subFolderMeta, fields: 'id' });
-              subFolderId = createSubResponse.result.id!;
-          }
-
-          if(!subFolderId) throw new Error(`Could not access gallery folder.`);
-          
-          const filesResponse = await window.gapi.client.drive.files.list({ q: `'${subFolderId}' in parents and trashed=false`, fields: 'files(id, name, appProperties)' });
-          const files = filesResponse.result.files || [];
-
-          const fileDataPromises = files.map(async (file) => {
-            try {
-                const mediaResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
-                    headers: { 'Authorization': `Bearer ${googleApiToken}` }
-                });
-                if (!mediaResponse.ok) {
-                    if (mediaResponse.status === 401 || mediaResponse.status === 403) {
-                       console.error('Google API token expired during fetch. Resetting auth.');
-                       setGoogleApiToken(null);
-                       localStorage.removeItem(getUserKey('google_api_token'));
-                    }
-                    throw new Error(`Failed to fetch file media for ${file.id}, status: ${mediaResponse.status}`);
-                }
-                const blob = await mediaResponse.blob();
-                const url = URL.createObjectURL(blob);
-                return { ...file, url };
-            } catch (e) {
-                console.error(`Could not process file ${file.name}:`, e);
-                return null;
-            }
-          });
-        
-          const processedFiles = (await Promise.all(fileDataPromises)).filter(Boolean);
-          const images: GalleryImage[] = processedFiles.map(file => ({ id: file!.id!, url: file!.url }));
-          setGalleryImages(images);
-
-      } catch (error) { console.error(`Error loading gallery:`, error); }
-      finally {
-          setGalleryIsLoading(false);
+  // --- Notion Bidirectional Sync ---
+  const handleSyncNotion = useCallback(async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const settings = NotionService.getSettings();
+      if (!settings.enabled || !settings.token || !settings.databaseId) {
+        return { success: false, message: 'La integración con Notion no está activa o configurada.' };
       }
-  }, [googleApiToken, findOrCreateAppFolder, getUserKey]);
 
+      // 1. Fetch current database pages from Notion
+      const notionPages = await NotionService.fetchDatabasePages();
+
+      // 2. Fetch all local todos
+      const localTodos = await getAll<Todo>('todos');
+
+      let importedCount = 0;
+      let updatedLocalCount = 0;
+      let exportedCount = 0;
+
+      // Step A: Compare Notion pages with local todos
+      for (const page of notionPages) {
+        const matchingLocal = localTodos.find(t => t.notion_page_id === page.id);
+
+        if (matchingLocal) {
+          // Compare properties
+          const needsLocalUpdate = 
+            matchingLocal.text !== page.title ||
+            matchingLocal.completed !== page.completed ||
+            matchingLocal.priority !== page.priority ||
+            matchingLocal.due_date !== page.dueDate;
+
+          if (needsLocalUpdate) {
+            const updatedLocal: Todo = {
+              ...matchingLocal,
+              text: page.title,
+              completed: page.completed,
+              priority: page.priority,
+              due_date: page.dueDate,
+            };
+            await syncableUpdate('todos', updatedLocal);
+            updatedLocalCount++;
+          }
+        } else {
+          // Check for matching title to avoid duplicates
+          const duplicateLocal = localTodos.find(t => t.text === page.title && !t.notion_page_id);
+          if (duplicateLocal) {
+            const updatedLocal: Todo = {
+              ...duplicateLocal,
+              notion_page_id: page.id,
+              notion_url: page.url,
+              completed: page.completed,
+              priority: page.priority,
+              due_date: page.dueDate,
+            };
+            await syncableUpdate('todos', updatedLocal);
+            updatedLocalCount++;
+          } else {
+            // Import new task from Notion!
+            const newTodo: Todo = {
+              id: -Date.now() - Math.floor(Math.random() * 1000000),
+              text: page.title,
+              completed: page.completed,
+              priority: page.priority,
+              due_date: page.dueDate,
+              user_id: user?.id || 'default',
+              created_at: new Date().toISOString(),
+              subtasks: [],
+              notion_page_id: page.id,
+              notion_url: page.url,
+            };
+            await syncableCreate('todos', newTodo);
+            importedCount++;
+          }
+        }
+      }
+
+      // Step B: Export local tasks that are enabled for autoSync and don't have page id
+      for (const localTodo of localTodos) {
+        if (!localTodo.notion_page_id && settings.autoSync) {
+          const res = await NotionService.insertPage(localTodo);
+          if (res) {
+            const updatedLocal: Todo = {
+              ...localTodo,
+              notion_page_id: res.id,
+              notion_url: res.url,
+            };
+            await syncableUpdate('todos', updatedLocal);
+            exportedCount++;
+          }
+        }
+      }
+
+      // Reload local todos state
+      const updatedTodosList = await getAll<Todo>('todos');
+      const todosByDate: { [key: string]: Todo[] } = {};
+      const undatedTodos: Todo[] = [];
+      updatedTodosList.forEach(todo => {
+        if (todo.due_date) {
+          const dateKey = todo.due_date;
+          if (!todosByDate[dateKey]) todosByDate[dateKey] = [];
+          todosByDate[dateKey].push(todo);
+        } else {
+          undatedTodos.push(todo);
+        }
+      });
+      if (undatedTodos.length > 0) {
+        todosByDate['undated'] = undatedTodos;
+      }
+      setAllTodos(todosByDate);
+
+      return {
+        success: true,
+        message: `Sincronización con Notion exitosa. Importadas: ${importedCount}, Actualizadas: ${updatedLocalCount}, Exportadas: ${exportedCount}.`,
+      };
+    } catch (err: any) {
+      console.error('Error syncing with Notion:', err);
+      return { success: false, message: err.message || 'Error desconocido al sincronizar.' };
+    }
+  }, [user]);
+  
   // --- Google Calendar Sync ---
   const handleGCalSettingsChange = useCallback(async (settings: GCalSettings) => {
     if (!user) return;
@@ -2793,59 +3004,69 @@ const App: React.FC = () => {
       }
   }, [googleApiToken, gapiReady, isOnline, gcalSettings, handleGCalSettingsChange, user, getUserKey]);
 
-  useEffect(() => {
-      if (googleApiToken && isOnline) {
-          loadGalleryFromDrive();
-      }
-  }, [googleApiToken, isOnline, loadGalleryFromDrive]);
-
   // This new effect handles all calendar logic
   useEffect(() => {
       loadAndValidateCalendarData();
   }, [loadAndValidateCalendarData]);
   
-  const uploadGalleryImageToDrive = useCallback(async (file: File): Promise<any> => {
-      const parentFolderId = await findOrCreateAppFolder();
-      if (!parentFolderId) throw new Error("No parent folder");
-      
-      let subFolderId: string | null = null;
-      const folderResponse = await window.gapi.client.drive.files.list({ q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='gallery' and trashed=false`, fields: 'files(id)' });
-      subFolderId = folderResponse.result.files?.[0]?.id || null;
-      if (!subFolderId) {
-          const subFolderMeta = { name: 'gallery', mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] };
-          const createSubResponse = await window.gapi.client.drive.files.create({ resource: subFolderMeta, fields: 'id' });
-          subFolderId = createSubResponse.result.id!;
+  const handleRemoveFromCalendar = useCallback(async (todo: Todo) => {
+    if (!todo.gcal_event_id || !todo.calendar_provider) return;
+    
+    try {
+      if (todo.calendar_provider === 'google' && googleApiToken && gapiReady) {
+        const calId = gcalSettings.calendarId || 'primary';
+        await CalendarSyncService.deleteGoogleEvent(todo.gcal_event_id, googleApiToken, calId);
+      } else if (todo.calendar_provider === 'outlook' && outlookAccount?.token) {
+        await CalendarSyncService.deleteOutlookEvent(todo.gcal_event_id, outlookAccount.token);
       }
+      
+      const updatedTodo = {
+        ...todo,
+        gcal_event_id: undefined,
+        calendar_event_link: undefined,
+        calendar_provider: undefined,
+      };
+      await syncableUpdate('todos', updatedTodo);
+    } catch (e) {
+      console.error('Error removing event from calendar:', e);
+    }
+  }, [googleApiToken, gapiReady, gcalSettings.calendarId, outlookAccount?.token]);
 
-      const metadata = { name: file.name, parents: [subFolderId] };
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', file);
+  const handleSyncToCalendar = useCallback(async (todo: Todo) => {
+    try {
+      const provider = CalendarSyncService.getActiveProvider();
+      const currentOutlook = CalendarSyncService.getAccount('outlook');
 
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${googleApiToken}` },
-          body: form,
-      });
-      return response.json();
-  }, [googleApiToken, findOrCreateAppFolder]);
+      if (provider === 'google' && gcalSettings.enabled && googleApiToken && gapiReady) {
+        const calId = gcalSettings.calendarId || 'primary';
+        const calResult = await CalendarSyncService.insertGoogleEvent(todo, googleApiToken, calId);
+        if (calResult && calResult.id) {
+          const updatedTodo = {
+            ...todo,
+            gcal_event_id: calResult.id,
+            calendar_event_link: calResult.htmlLink,
+            calendar_provider: 'google' as CalendarProvider,
+          };
+          await syncableUpdate('todos', updatedTodo);
+        }
+      } else if (currentOutlook && currentOutlook.token) {
+        const calId = currentOutlook.selectedCalendarId || 'primary';
+        const calResult = await CalendarSyncService.insertOutlookEvent(todo, currentOutlook.token, calId);
+        if (calResult && calResult.id) {
+          const updatedTodo = {
+            ...todo,
+            gcal_event_id: calResult.id,
+            calendar_event_link: calResult.htmlLink,
+            calendar_provider: 'outlook' as CalendarProvider,
+          };
+          await syncableUpdate('todos', updatedTodo);
+        }
+      }
+    } catch (e) {
+      console.error('Error syncing event to calendar:', e);
+    }
+  }, [googleApiToken, gapiReady, gcalSettings.enabled, gcalSettings.calendarId]);
 
-  const handleAddGalleryImages = async (files: File[]) => {
-      setGalleryIsLoading(true);
-      try {
-          const uploadPromises = files.map(file => uploadGalleryImageToDrive(file));
-          await Promise.all(uploadPromises);
-          await loadGalleryFromDrive();
-      } catch (error) { console.error("Error uploading images:", error); }
-      finally { setGalleryIsLoading(false); }
-  };
-  const handleDeleteGalleryImage = async (id: string) => {
-      try {
-          await window.gapi.client.drive.files.delete({ fileId: id });
-          setGalleryImages(i => i.filter(img => img.id !== id));
-      } catch (error) { console.error(`Error deleting gallery item:`, error); }
-  };
-  
   // --- Supabase Backgrounds Logic ---
   const loadBackgroundsFromSupabase = useCallback(async () => {
     if (!user) return;
@@ -2863,11 +3084,39 @@ const App: React.FC = () => {
         });
 
         setUserBackgrounds(backgrounds);
+        try {
+          localStorage.setItem(`pollito_cached_backgrounds_${user.id}`, JSON.stringify(backgrounds));
+        } catch (e) {
+          console.warn('Failed to save backgrounds to localStorage:', e);
+        }
 
     } catch (error) {
         console.error("Error loading backgrounds from Supabase:", error);
+        try {
+          const cached = localStorage.getItem(`pollito_cached_backgrounds_${user.id}`);
+          if (cached) {
+            setUserBackgrounds(JSON.parse(cached));
+          }
+        } catch (e) {
+          console.error("Failed to parse cached backgrounds:", e);
+        }
     } finally {
         setBackgroundsAreLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      try {
+        const cached = localStorage.getItem(`pollito_cached_backgrounds_${user.id}`);
+        if (cached) {
+          setUserBackgrounds(JSON.parse(cached));
+        }
+      } catch (e) {
+        console.warn('Failed to read backgrounds from localStorage:', e);
+      }
+    } else {
+      setUserBackgrounds([]);
     }
   }, [user]);
 
@@ -3162,7 +3411,7 @@ const App: React.FC = () => {
   const appProps: AppComponentProps = {
     isOnline, isSyncing, currentUser: user, onLogout: handleLogout, 
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
-    allTodos, folders: foldersWithNotes, projects, habits, habitRecords, galleryImages, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos, folders: foldersWithNotes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, 
     uiSettings,
     activeTrack, activeSpotifyTrack, 
@@ -3175,12 +3424,14 @@ const App: React.FC = () => {
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
     setActiveTrack, setActiveSpotifyTrack,
-    googleApiToken, galleryIsLoading, backgroundsAreLoading, handleAuthClick,
-    handleAddGalleryImages, handleDeleteGalleryImage,
+    googleApiToken, backgroundsAreLoading, handleAuthClick,
+    onConnectOutlook: handleConnectOutlook, onDisconnectOutlook: handleDisconnectOutlook, outlookAccount,
     handleAddBackground, handleDeleteBackground,
     handleToggleFavoriteBackground, gapiReady,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
-    gcalSettings, onGCalSettingsChange: handleGCalSettingsChange, userCalendars, calendarEvents
+    gcalSettings, onGCalSettingsChange: handleGCalSettingsChange, userCalendars, calendarEvents,
+    loadAndValidateCalendarData, onRemoveFromCalendar: handleRemoveFromCalendar, onSyncToCalendar: handleSyncToCalendar,
+    onSyncNotion: handleSyncNotion
   };
 
   return (
@@ -3270,6 +3521,20 @@ const App: React.FC = () => {
         title="Limpiar Tareas Pasadas"
         message={`¿Seguro que quieres eliminar todas las tareas anteriores al ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}? Esta acción es permanente.`}
         confirmText="Sí, limpiar"
+        cancelText="Cancelar"
+      />
+      <ConfirmationModal
+        isOpen={!!singleTaskToDelete}
+        onClose={() => setSingleTaskToDelete(null)}
+        onConfirm={() => {
+          if (singleTaskToDelete) {
+            handleDeleteThisOccurrence(singleTaskToDelete.id);
+            setSingleTaskToDelete(null);
+          }
+        }}
+        title="Eliminar Tarea"
+        message={singleTaskToDelete ? `¿Seguro que deseas eliminar la tarea "${singleTaskToDelete.text}"?` : ''}
+        confirmText="Eliminar"
         cancelText="Cancelar"
       />
       <HabitEditorPanel 

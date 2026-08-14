@@ -16,6 +16,7 @@ import DotsVerticalIcon from './icons/DotsVerticalIcon';
 import ConfirmationModal from './ConfirmationModal';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import ConfirmationModalWithOptions from './ConfirmationModalWithOptions';
+import ProjectKanbanView from './ProjectKanbanView';
 
 interface TodoListModuleProps {
     allTodos: { [key: string]: Todo[] };
@@ -79,6 +80,16 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const [showArchived, setShowArchived] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     
+    // Sync viewingProject if project list changes (e.g. after editing name/color/emoji)
+    useEffect(() => {
+        if (viewingProject) {
+            const updated = projects.find(p => p.id === viewingProject.id);
+            if (updated) {
+                setViewingProject(updated);
+            }
+        }
+    }, [projects]);
+
     // Memoized calculations
     const todosForSelectedDate = useMemo(() => {
         const dateKey = formatDateKey(selectedDate);
@@ -217,61 +228,21 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const renderProjectsView = () => {
         if (viewingProject) {
             const projectTasks = allTasksFlat.filter(t => t.project_id === viewingProject.id);
-            const completedTasks = projectTasks.filter(t => t.completed).length;
-            const percentage = projectTasks.length > 0 ? (completedTasks / projectTasks.length) * 100 : 0;
-            
-            const radius = 60;
-            const circumference = 2 * Math.PI * radius;
-            const offset = circumference - (percentage / 100) * circumference;
-        
             return (
-                <div className="flex flex-col h-full animate-fade-in p-4 space-y-4">
-                    
-                    <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg relative flex flex-col items-center justify-center p-4 flex-shrink-0">
-                        <button onClick={() => { setViewingProject(null); onViewProjectChange?.(null); }} className="absolute top-3 left-3 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 z-10">
-                            <ChevronLeftIcon />
-                        </button>
-                        <div className="relative w-36 h-36">
-                            <svg className="w-full h-full" viewBox="0 0 140 140">
-                                <circle cx="70" cy="70" r={radius} stroke="currentColor" strokeWidth="10" fill="transparent" className="text-secondary-light/50 dark:text-gray-700" />
-                                <circle
-                                    cx="70"
-                                    cy="70"
-                                    r={radius}
-                                    strokeWidth="10"
-                                    fill="transparent"
-                                    strokeLinecap="round"
-                                    strokeDasharray={circumference}
-                                    strokeDashoffset={offset}
-                                    className="transform -rotate-90 origin-center transition-all duration-700 ease-out"
-                                    style={{ stroke: viewingProject.color || 'var(--color-primary)' }}
-                                />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                {viewingProject.emoji ? (
-                                    <span className="text-5xl drop-shadow-sm">{viewingProject.emoji}</span>
-                                ) : (
-                                    <ChickenIcon className="w-16 h-16 text-secondary-dark drop-shadow-sm" />
-                                )}
-                            </div>
-                        </div>
-                        <h2 className="text-2xl font-bold text-primary-dark dark:text-primary mt-4">{viewingProject.name}</h2>
-                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">{completedTasks} de {projectTasks.length} completadas</p>
-                    </div>
-
-                    <div className="flex-grow overflow-y-auto custom-scrollbar space-y-3">
-                        {projectTasks.length > 0 ? (
-                            [...projectTasks]
-                                .sort((a,b) => (a.completed ? 1 : -1) - (b.completed ? 1 : -1) || (new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()))
-                                .map(todo => {
-                                    const projectForTodo = todo.project_id ? projects.find(p => p.id === todo.project_id) : null;
-                                    return <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} color={projectForTodo?.color} />
-                                })
-                        ) : (
-                            <p className="text-center text-gray-500 dark:text-gray-400 py-10">Este proyecto no tiene tareas. ¡Añade una!</p>
-                        )}
-                    </div>
-                </div>
+                <ProjectKanbanView
+                    project={viewingProject}
+                    projectTasks={projectTasks}
+                    allProjects={projects}
+                    toggleTodo={toggleTodo}
+                    toggleSubtask={toggleSubtask}
+                    deleteTodo={deleteTodo}
+                    updateTodo={updateTodo}
+                    onEditTodo={onEditTodo}
+                    onBack={() => { setViewingProject(null); onViewProjectChange?.(null); }}
+                    onOpenProjectEditor={onOpenProjectEditor}
+                    onUpdateProject={onUpdateProject}
+                    addTodo={addTodo}
+                />
             );
         }
 
@@ -297,27 +268,27 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setMenuOpenFor(project.id);
+                                                setMenuOpenFor(menuOpenFor === project.id ? null : project.id);
                                             }}
-                                            className="p-1.5 rounded-full text-gray-500 hover:bg-black/10 dark:hover:bg-white/10 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                                            className="p-1.5 rounded-full text-gray-500 hover:bg-black/10 dark:hover:bg-white/10 opacity-100 sm:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                                             aria-label={`Opciones para ${project.name}`}
                                         >
                                             <DotsVerticalIcon />
                                         </button>
                                         {menuOpenFor === project.id && (
-                                            <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl z-20 animate-pop-in origin-top-right p-1">
-                                                <button onClick={() => { if(onOpenProjectEditor) onOpenProjectEditor(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">
+                                            <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl z-20 animate-pop-in origin-top-right p-1" onClick={e => e.stopPropagation()}>
+                                                <button onClick={(e) => { e.stopPropagation(); if(onOpenProjectEditor) onOpenProjectEditor(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700 font-medium">
                                                     Renombrar
                                                 </button>
                                                 {showArchived ? (
                                                     <>
-                                                        <button onClick={() => { handleArchiveProject(project.id, false); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">Desarchivar</button>
-                                                        <button onClick={() => { setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">Eliminar</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleArchiveProject(project.id, false); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">Desarchivar</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">Eliminar</button>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <button onClick={() => { handleArchiveProject(project.id, true); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">Archivar</button>
-                                                        <button onClick={() => { setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">
+                                                        <button onClick={(e) => { e.stopPropagation(); handleArchiveProject(project.id, true); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700">Archivar</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setProjectToDelete(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40">
                                                             Eliminar
                                                         </button>
                                                     </>

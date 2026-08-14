@@ -130,11 +130,11 @@ const Pomodoro: React.FC<PomodoroProps> = ({
                 <div className="space-y-3">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Pomodoro (min)</label>
-                        <input type="number" min="0" value={tempDurations.work} onChange={(e) => setTempDurations(d => ({...d, work: Math.max(0, parseInt(e.target.value, 10) || 0)}))} className="w-full mt-1 bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-1 px-3 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark"/>
+                        <input type="number" min="0" value={tempDurations.work ?? 25} onChange={(e) => setTempDurations(d => ({...d, work: Math.max(0, parseInt(e.target.value, 10) || 0)}))} className="w-full mt-1 bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-1 px-3 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark"/>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Descanso (min)</label>
-                        <input type="number" min="0" value={tempDurations.break} onChange={(e) => setTempDurations(d => ({...d, break: Math.max(0, parseInt(e.target.value, 10) || 0)}))} className="w-full mt-1 bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-1 px-3 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark"/>
+                        <input type="number" min="0" value={tempDurations.break ?? 5} onChange={(e) => setTempDurations(d => ({...d, break: Math.max(0, parseInt(e.target.value, 10) || 0)}))} className="w-full mt-1 bg-white/80 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-lg py-1 px-3 focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark"/>
                     </div>
                 </div>
                  <div className="mt-4 pt-3 border-t border-secondary-lighter/50 dark:border-gray-600/50 space-y-3">
@@ -145,7 +145,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
                                 type="checkbox"
                                 id="bg-timer-toggle"
                                 className="sr-only"
-                                checked={showBackgroundTimer}
+                                checked={!!showBackgroundTimer}
                                 onChange={onToggleBackgroundTimer}
                             />
                             <div className={`block w-10 h-6 rounded-full transition-colors ${showBackgroundTimer ? 'bg-primary-light' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
@@ -153,14 +153,14 @@ const Pomodoro: React.FC<PomodoroProps> = ({
                         </div>
                     </label>
                     <div className={`transition-opacity duration-300 ${!showBackgroundTimer ? 'opacity-50' : ''}`}>
-                        <label htmlFor="bg-timer-opacity" className="text-sm font-medium text-gray-700 dark:text-gray-200">Opacidad ({backgroundTimerOpacity}%)</label>
+                        <label htmlFor="bg-timer-opacity" className="text-sm font-medium text-gray-700 dark:text-gray-200">Opacidad ({backgroundTimerOpacity ?? 20}%)</label>
                         <input
                             type="range"
                             id="bg-timer-opacity"
                             min="10"
                             max="100"
                             step="5"
-                            value={backgroundTimerOpacity}
+                            value={backgroundTimerOpacity ?? 20}
                             onChange={(e) => onSetBackgroundTimerOpacity(Number(e.target.value))}
                             disabled={!showBackgroundTimer}
                             className="w-full mt-1 h-2 bg-secondary-light/80 dark:bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary dark:[&::-webkit-slider-thumb]:bg-primary-dark"

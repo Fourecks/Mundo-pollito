@@ -2,260 +2,659 @@ import React, { useState, useMemo } from 'react';
 import { Todo, Project, Habit, HabitRecord, HabitFrequency } from '../types';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
-import ChickenIcon from './ChickenIcon';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 
-// --- Helper Functions (copied/adapted from HabitTracker) ---
-const weekdayLabelsShort = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
-
+// --- Helper Functions ---
 const isDayApplicable = (date: Date, freq: HabitFrequency): boolean => {
-    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    switch (freq.type) {
-        case 'daily':
-        case 'times_per_week':
-            return true;
-        case 'specific_days':
-            return freq.days.includes(utcDate.getUTCDay());
-        case 'interval': {
-            if (!freq.startDate) return false;
-            const startDate = new Date(freq.startDate + "T00:00:00Z");
-            const diffTime = Math.abs(utcDate.getTime() - startDate.getTime());
-            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-            return diffDays % freq.days === 0;
-        }
-        default:
-            return true;
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  switch (freq.type) {
+    case 'daily':
+    case 'times_per_week':
+      return true;
+    case 'specific_days':
+      return freq.days.includes(utcDate.getUTCDay());
+    case 'interval': {
+      if (!freq.startDate) return false;
+      const startDate = new Date(freq.startDate + "T00:00:00Z");
+      const diffTime = Math.abs(utcDate.getTime() - startDate.getTime());
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays % freq.days === 0;
     }
+    default:
+      return true;
+  }
 };
 
 const calculateStreak = (habit: Habit, records: HabitRecord[]): number => {
-    const habitRecords = records.filter(r => r.habit_id === habit.id);
-    if (habitRecords.length === 0) return 0;
+  const habitRecords = records.filter(r => r.habit_id === habit.id);
+  if (habitRecords.length === 0) return 0;
 
-    const completedDates = new Set(habitRecords.map(r => r.completed_at));
-    const sortedDateStrings = Array.from(completedDates).sort((a, b) => b.localeCompare(a));
-    
-    if (sortedDateStrings.length === 0) return 0;
-    
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+  const completedDates = new Set(habitRecords.map(r => r.completed_at));
+  const sortedDateStrings = Array.from(completedDates).sort((a, b) => b.localeCompare(a));
 
-    let streak = 0;
-    for (let i = 0; i < 365; i++) {
-        const dateToCheck = new Date(today);
-        dateToCheck.setUTCDate(today.getUTCDate() - i);
+  if (sortedDateStrings.length === 0) return 0;
 
-        if (isDayApplicable(dateToCheck, habit.frequency)) {
-            const dateKey = dateToCheck.toISOString().split('T')[0];
-            if (completedDates.has(dateKey)) {
-                streak++;
-            } else {
-                break; 
-            }
-        }
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  let streak = 0;
+  for (let i = 0; i < 365; i++) {
+    const dateToCheck = new Date(today);
+    dateToCheck.setUTCDate(today.getUTCDate() - i);
+
+    if (isDayApplicable(dateToCheck, habit.frequency)) {
+      const dateKey = dateToCheck.toISOString().split('T')[0];
+      if (completedDates.has(dateKey)) {
+        streak++;
+      } else {
+        break;
+      }
     }
-    return streak;
+  }
+  return streak;
 };
-// --- End Helper Functions ---
 
+// Clean Custom Tooltip
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 rounded-lg shadow-sm text-xs space-y-1 min-w-[120px]">
+        <p className="font-semibold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 pb-1">
+          {label}
+        </p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center justify-between gap-3 font-medium text-slate-600 dark:text-slate-300">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.stroke || entry.fill }} />
+              <span>{entry.name}:</span>
+            </span>
+            <span className="font-bold text-slate-900 dark:text-white">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+const PROJECT_COLORS = [
+  '#059669', // Emerald
+  '#6366f1', // Indigo
+  '#0284c7', // Sky
+  '#d97706', // Amber
+  '#e11d48', // Rose
+  '#8b5cf6', // Violet
+  '#0d9488', // Teal
+];
 
 interface ProgressViewProps {
-    allTodos: { [key: string]: Todo[] };
-    projects: Project[];
-    habits: Habit[];
-    habitRecords: HabitRecord[];
-    onBack?: () => void;
+  allTodos: { [key: string]: Todo[] };
+  projects: Project[];
+  habits: Habit[];
+  habitRecords: HabitRecord[];
+  onBack?: () => void;
 }
 
-const ProgressView: React.FC<ProgressViewProps> = ({ allTodos, projects, habits, habitRecords, onBack }) => {
-    const [period, setPeriod] = useState<'week' | 'month'>('week');
-    const [offset, setOffset] = useState(0);
+export const ProgressView: React.FC<ProgressViewProps> = ({
+  allTodos,
+  projects,
+  habits,
+  habitRecords,
+  onBack
+}) => {
+  const [period, setPeriod] = useState<'week' | 'month'>('week');
+  const [offset, setOffset] = useState(0);
+  const [chartMode, setChartMode] = useState<'line' | 'area' | 'bar'>('area');
 
-    const { start, end, rangeLabel } = useMemo(() => {
-        const now = new Date();
-        now.setHours(0,0,0,0);
+  // Calculate Date Range
+  const { rangeLabel, daysList, prevStart, prevEnd } = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
 
-        if (period === 'week') {
-            const currentDay = now.getDay();
-            const dayOffset = currentDay === 0 ? -6 : 1 - currentDay;
-            
-            const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset + (offset * 7));
-            const endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 6);
-            
-            const startStr = startDate.toLocaleDateString('es-ES', { day: 'numeric' });
-            const endStr = endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-            
-            return { start: startDate, end: endDate, rangeLabel: offset === 0 ? 'Esta Semana' : `${startStr} - ${endStr}` };
-        } else { // month
-            const startDate = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-            const endDate = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+    if (period === 'week') {
+      const currentDay = now.getDay();
+      const dayOffset = currentDay === 0 ? -6 : 1 - currentDay;
 
-            const label = startDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-            return { start: startDate, end: endDate, rangeLabel: label.charAt(0).toUpperCase() + label.slice(1) };
+      const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset + (offset * 7));
+      const endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 6);
+
+      const pStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 7);
+      const pEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() - 7);
+
+      const days = [];
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        days.push(new Date(d));
+      }
+
+      const startStr = startDate.toLocaleDateString('es-ES', { day: 'numeric' });
+      const endStr = endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+
+      return {
+        start: startDate,
+        end: endDate,
+        rangeLabel: offset === 0 ? 'Esta Semana' : `${startStr} - ${endStr}`,
+        daysList: days,
+        prevStart: pStart,
+        prevEnd: pEnd
+      };
+    } else {
+      const startDate = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      const endDate = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+
+      const pStart = new Date(now.getFullYear(), now.getMonth() + offset - 1, 1);
+      const pEnd = new Date(now.getFullYear(), now.getMonth() + offset, 0);
+
+      const days = [];
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        days.push(new Date(d));
+      }
+
+      const label = startDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+      return {
+        start: startDate,
+        end: endDate,
+        rangeLabel: label.charAt(0).toUpperCase() + label.slice(1),
+        daysList: days,
+        prevStart: pStart,
+        prevEnd: pEnd
+      };
+    }
+  }, [period, offset]);
+
+  // Tasks Data for current period and previous period
+  const { chartData, totalCompleted, previousTotal, mostProductiveDay } = useMemo(() => {
+    let runningTotal = 0;
+    let maxTasks = 0;
+    let topDay = { dayName: '', count: 0 };
+
+    const data = daysList.map((d) => {
+      const dateKey = d.toISOString().split('T')[0];
+      const dayTasks = allTodos[dateKey] || [];
+      const completedTasks = dayTasks.filter(t => t.completed);
+      const count = completedTasks.length;
+
+      runningTotal += count;
+      if (count > maxTasks) {
+        maxTasks = count;
+        const dayName = d.toLocaleDateString('es-ES', period === 'week' ? { weekday: 'short' } : { day: 'numeric', month: 'short' });
+        topDay = { dayName: dayName.toUpperCase(), count };
+      }
+
+      const dayLabel = period === 'week'
+        ? d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase()
+        : d.getDate().toString();
+
+      return {
+        dateKey,
+        label: dayLabel,
+        Tareas: count,
+        Acumulado: runningTotal,
+      };
+    });
+
+    // Previous Period Count
+    let prevTotal = 0;
+    for (let d = new Date(prevStart); d <= prevEnd; d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toISOString().split('T')[0];
+      const dayTasks = allTodos[dateKey] || [];
+      prevTotal += dayTasks.filter(t => t.completed).length;
+    }
+
+    return {
+      chartData: data,
+      totalCompleted: runningTotal,
+      previousTotal: prevTotal,
+      maxTasksOnSingleDay: Math.max(1, maxTasks),
+      mostProductiveDay: topDay.count > 0 ? topDay : null
+    };
+  }, [daysList, allTodos, period, prevStart, prevEnd]);
+
+  // Growth Percentage
+  const growthPercentage = useMemo(() => {
+    if (previousTotal === 0) return totalCompleted > 0 ? 100 : 0;
+    return Math.round(((totalCompleted - previousTotal) / previousTotal) * 100);
+  }, [totalCompleted, previousTotal]);
+
+  // Daily Average
+  const dailyAverage = useMemo(() => {
+    if (daysList.length === 0) return '0';
+    return (totalCompleted / daysList.length).toFixed(1);
+  }, [totalCompleted, daysList]);
+
+  // Project Focus Breakdown
+  const projectFocusData = useMemo(() => {
+    const counts = new Map<number, { count: number; name: string; color: string }>();
+
+    daysList.forEach(d => {
+      const dateKey = d.toISOString().split('T')[0];
+      const dayTasks = allTodos[dateKey] || [];
+      dayTasks.forEach(t => {
+        if (t.completed && t.project_id) {
+          const existing = counts.get(t.project_id) || { count: 0, name: '', color: '' };
+          counts.set(t.project_id, { ...existing, count: existing.count + 1 });
         }
-    }, [period, offset]);
+      });
+    });
 
-    const completedTasksInPeriod = useMemo(() => {
-        const tasks = [];
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const dateKey = d.toISOString().split('T')[0];
-            const dayTasks = allTodos[dateKey] || [];
-            tasks.push(...dayTasks.filter(t => t.completed && new Date(t.due_date!) >= start && new Date(t.due_date!) <= end));
-        }
-        return tasks;
-    }, [allTodos, start, end]);
-
-    const tasksByDay = useMemo(() => {
-        const days = new Map<string, number>();
-        let labels: string[];
-        if (period === 'week') {
-            labels = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
-            labels.forEach(l => days.set(l, 0));
-        } else {
-            labels = Array.from({ length: end.getDate() }, (_, i) => String(i + 1));
-            labels.forEach(l => days.set(l, 0));
-        }
-
-        completedTasksInPeriod.forEach(task => {
-            const taskDate = new Date(task.due_date! + 'T00:00:00Z');
-            const dayOfWeek = (taskDate.getUTCDay() + 6) % 7; // Monday is 0
-            const dayLabel = period === 'week' ? labels[dayOfWeek] : String(taskDate.getUTCDate());
-            if (days.has(dayLabel)) {
-                days.set(dayLabel, days.get(dayLabel)! + 1);
-            }
+    projects.forEach(p => {
+      if (counts.has(p.id)) {
+        const item = counts.get(p.id)!;
+        counts.set(p.id, {
+          ...item,
+          name: p.name,
+          color: p.color || PROJECT_COLORS[p.id % PROJECT_COLORS.length]
         });
-        
-        return { data: Array.from(days.entries()), labels };
-    }, [completedTasksInPeriod, period, end]);
-    
-    const mostProductiveDay = useMemo(() => {
-        if (tasksByDay.data.length === 0) return null;
-        const productiveDay = tasksByDay.data.reduce((max, current) => current[1] > max[1] ? current : max, tasksByDay.data[0]);
-        if (productiveDay[1] === 0) return null;
-        return { day: productiveDay[0], count: productiveDay[1] };
-    }, [tasksByDay]);
+      }
+    });
 
-    const maxTasksOnDay = Math.max(1, ...tasksByDay.data.map(([, count]) => count));
+    const list = Array.from(counts.values()).filter(p => p.count > 0).sort((a, b) => b.count - a.count);
+    return list;
+  }, [daysList, allTodos, projects]);
 
-    const topHabits = useMemo(() => {
-        return habits
-            .map(h => ({ ...h, streak: calculateStreak(h, habitRecords) }))
-            .filter(h => h.streak > 0)
-            .sort((a, b) => b.streak - a.streak)
-            .slice(0, 3);
-    }, [habits, habitRecords]);
+  // Top Habit Streaks
+  const topHabits = useMemo(() => {
+    return habits
+      .map(h => ({ ...h, streak: calculateStreak(h, habitRecords) }))
+      .sort((a, b) => b.streak - a.streak)
+      .slice(0, 4);
+  }, [habits, habitRecords]);
 
-    const projectFocus = useMemo(() => {
-        const counts = new Map<number, { count: number; name: string; color: string | null }>();
-        completedTasksInPeriod.forEach(task => {
-            if (task.project_id) {
-                const existing = counts.get(task.project_id) || { count: 0, name: '', color: null };
-                counts.set(task.project_id, { ...existing, count: existing.count + 1 });
-            }
-        });
+  return (
+    <div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950/40 p-3 sm:p-5 space-y-4">
+      {/* Mobile Back Header */}
+      {onBack && (
+        <header className="flex-shrink-0 flex items-center gap-2 md:hidden">
+          <button onClick={onBack} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+            <ChevronLeftIcon />
+          </button>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Estadísticas y Progreso</h2>
+        </header>
+      )}
 
-        projects.forEach(p => {
-            if (counts.has(p.id)) {
-                const data = counts.get(p.id)!;
-                counts.set(p.id, { ...data, name: p.name, color: p.color });
-            }
-        });
-        const total = Array.from(counts.values()).reduce((sum, p) => sum + p.count, 0);
-        return {
-            data: Array.from(counts.values()).sort((a, b) => b.count - a.count),
-            total: total
-        };
-    }, [completedTasksInPeriod, projects]);
-
-    return (
-        <div className="flex flex-col h-full bg-transparent p-4">
-            {onBack && (
-                <header className="flex-shrink-0 flex items-center gap-2 mb-2 md:hidden">
-                    <button onClick={onBack} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                    <h2 className="font-bold text-lg text-primary-dark dark:text-primary">Informe de Crecimiento</h2>
-                </header>
-            )}
-            <header className="flex-shrink-0 flex items-center justify-between gap-4 mb-4">
-                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full p-1 flex items-center gap-1 shadow-md">
-                    <button onClick={() => setPeriod('week')} className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${period === 'week' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-primary' : 'text-gray-600 dark:text-gray-300'}`}>Semana</button>
-                    <button onClick={() => setPeriod('month')} className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${period === 'month' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-primary' : 'text-gray-600 dark:text-gray-300'}`}>Mes</button>
-                </div>
-                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full p-1 flex items-center gap-1 shadow-md">
-                    <button onClick={() => setOffset(offset - 1)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                    <span className="text-xs font-bold text-gray-700 dark:text-gray-200 w-32 text-center">{rangeLabel}</span>
-                    <button onClick={() => setOffset(offset + 1)} disabled={offset >= 0} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRightIcon /></button>
-                </div>
-            </header>
-
-            <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 -mr-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Tareas Completadas */}
-                    <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-4 shadow-sm">
-                        <h3 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-3">Tareas Completadas ({completedTasksInPeriod.length})</h3>
-                        <div className={`flex items-end justify-between gap-1 h-32 bg-black/5 dark:bg-black/20 p-2 rounded-lg ${period === 'month' ? 'overflow-x-auto custom-scrollbar' : ''}`}>
-                            {tasksByDay.data.map(([label, count], i) => (
-                                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1 group min-w-[20px]">
-                                    <div className="relative w-full h-full flex items-end">
-                                        <div className={`w-full bg-primary rounded-t-sm group-hover:bg-primary-dark transition-all`} style={{ height: `${(count / maxTasksOnDay) * 100}%` }}>
-                                            <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-xs font-bold text-primary-dark dark:text-primary opacity-0 group-hover:opacity-100 transition-opacity">{count}</span>
-                                        </div>
-                                    </div>
-                                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500">{label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    {/* Rachas de Hábitos */}
-                    <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-4 shadow-sm">
-                        <h3 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-3">Rachas de Hábitos</h3>
-                        {topHabits.length > 0 ? (
-                            <div className="space-y-2">
-                                {topHabits.map((habit, index) => (
-                                    <div key={habit.id} className="bg-black/5 dark:bg-black/20 p-2 rounded-lg flex items-center gap-3">
-                                        <span className={`font-bold text-lg ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-gray-400' : 'text-orange-400'}`}>{index + 1}</span>
-                                        <span className="text-xl">{habit.emoji}</span>
-                                        <p className="font-semibold text-gray-700 dark:text-gray-200 text-sm truncate flex-grow">{habit.name}</p>
-                                        <p className="font-bold text-orange-500 dark:text-orange-400 text-sm">🔥 {habit.streak} días</p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-10">¡Sigue con tus hábitos para ver tus rachas aquí!</div>
-                        )}
-                    </div>
-                    {/* Tu Día Más Productivo */}
-                    <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-4 shadow-sm">
-                        <h3 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-3">Tu Día Más Productivo</h3>
-                         {mostProductiveDay ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center">
-                                <ChickenIcon className="w-16 h-16 text-yellow-500 drop-shadow-lg" />
-                                <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 mt-2">{period === 'week' ? ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][tasksByDay.labels.indexOf(mostProductiveDay.day)] : `Día ${mostProductiveDay.day}`}</p>
-                                <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{mostProductiveDay.count} tareas completadas</p>
-                            </div>
-                        ) : (
-                            <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-10">¡Completa algunas tareas para descubrir tu día más productivo!</div>
-                        )}
-                    </div>
-                     {/* Enfoque en Proyectos */}
-                    <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-4 shadow-sm">
-                        <h3 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-3">Enfoque en Proyectos</h3>
-                        {projectFocus.data.length > 0 ? (
-                            <div className="space-y-2">
-                                {projectFocus.data.map((p) => (
-                                    <div key={p.name} className="flex items-center gap-3">
-                                        <div style={{ backgroundColor: p.color || 'var(--color-primary)' }} className="w-2 h-5 rounded-full" />
-                                        <p className="font-semibold text-gray-700 dark:text-gray-200 text-sm truncate flex-grow">{p.name}</p>
-                                        <p className="font-bold text-gray-500 dark:text-gray-400 text-sm">{p.count}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-10">Completa tareas de tus proyectos para ver tu enfoque.</div>
-                        )}
-                    </div>
-                </div>
-            </div>
+      {/* Header Bar */}
+      <header className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Progreso & Rendimiento</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Resumen de actividad, tareas y hábitos</p>
         </div>
-    );
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Period Selector */}
+          <div className="bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg flex items-center text-xs font-medium">
+            <button
+              onClick={() => { setPeriod('week'); setOffset(0); }}
+              className={`px-3 py-1 rounded-md transition-colors ${
+                period === 'week'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Semana
+            </button>
+            <button
+              onClick={() => { setPeriod('month'); setOffset(0); }}
+              className={`px-3 py-1 rounded-md transition-colors ${
+                period === 'month'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Mes
+            </button>
+          </div>
+
+          {/* Date Navigator */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+            <button
+              onClick={() => setOffset(offset - 1)}
+              className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+              title="Anterior"
+            >
+              <ChevronLeftIcon />
+            </button>
+            <span className="font-medium text-slate-700 dark:text-slate-200 px-2 min-w-[90px] text-center">
+              {rangeLabel}
+            </span>
+            <button
+              onClick={() => setOffset(offset + 1)}
+              disabled={offset >= 0}
+              className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Siguiente"
+            >
+              <ChevronRightIcon />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <div className="flex-grow overflow-y-auto custom-scrollbar space-y-4">
+
+        {/* Metric Cards Grid - Simple & Clean */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200 dark:border-slate-800">
+            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              Tareas Completadas
+            </div>
+            <div className="text-2xl font-semibold text-slate-900 dark:text-white">
+              {totalCompleted}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-normal">
+              {growthPercentage >= 0 ? `+${growthPercentage}%` : `${growthPercentage}%`} vs periodo anterior
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200 dark:border-slate-800">
+            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              Promedio Diario
+            </div>
+            <div className="text-2xl font-semibold text-slate-900 dark:text-white">
+              {dailyAverage}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-normal">
+              tareas por día
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200 dark:border-slate-800">
+            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              Día Más Activo
+            </div>
+            <div className="text-xl font-semibold text-slate-900 dark:text-white truncate">
+              {mostProductiveDay ? mostProductiveDay.dayName : '---'}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-normal">
+              {mostProductiveDay ? `${mostProductiveDay.count} tareas` : 'Sin registros'}
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200 dark:border-slate-800">
+            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              Racha Destacada
+            </div>
+            <div className="text-2xl font-semibold text-slate-900 dark:text-white">
+              {topHabits[0]?.streak || 0} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">días</span>
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-1 font-normal">
+              {topHabits[0] ? topHabits[0].name : 'Sin hábitos'}
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 1: MAIN PERFORMANCE CHART */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+            <div>
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">
+                Evolución de Rendimiento
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Tareas completadas a lo largo del tiempo</p>
+            </div>
+
+            {/* Chart Mode Selector */}
+            <div className="bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg flex items-center text-xs font-medium self-end sm:self-auto">
+              <button
+                onClick={() => setChartMode('area')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  chartMode === 'area'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-semibold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                Área
+              </button>
+              <button
+                onClick={() => setChartMode('line')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  chartMode === 'line'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-semibold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                Línea
+              </button>
+              <button
+                onClick={() => setChartMode('bar')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  chartMode === 'bar'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-semibold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                Barras
+              </button>
+            </div>
+          </div>
+
+          <div className="w-full h-60 pt-1">
+            <ResponsiveContainer width="100%" height="100%">
+              {chartMode === 'area' ? (
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="emeraldGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#059669" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#059669" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: '#64748b', fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fill: '#64748b', fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="Tareas"
+                    name="Completadas"
+                    stroke="#059669"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#emeraldGradient)"
+                  />
+                </AreaChart>
+              ) : chartMode === 'line' ? (
+                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: '#64748b', fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fill: '#64748b', fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="Tareas"
+                    name="Completadas"
+                    stroke="#059669"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#059669' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Acumulado"
+                    name="Acumulado"
+                    stroke="#6366f1"
+                    strokeWidth={1.5}
+                    strokeDasharray="3 3"
+                    dot={false}
+                  />
+                </LineChart>
+              ) : (
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: '#64748b', fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fill: '#64748b', fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar
+                    dataKey="Tareas"
+                    name="Completadas"
+                    fill="#059669"
+                    radius={[3, 3, 0, 0]}
+                  />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* SECTION 2: GRID FOR PROJECTS AND HABITS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* Project Distribution */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 space-y-3">
+            <div>
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">
+                Distribución por Proyectos
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Proporción de tareas según proyecto</p>
+            </div>
+
+            {projectFocusData.length > 0 ? (
+              <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+                <div className="w-32 h-32 relative flex-shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={projectFocusData}
+                        dataKey="count"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={32}
+                        outerRadius={55}
+                        paddingAngle={2}
+                      >
+                        {projectFocusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                    <span className="text-[10px] text-slate-400 font-medium">TOTAL</span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {projectFocusData.reduce((acc, p) => acc + p.count, 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex-grow space-y-2 w-full">
+                  {projectFocusData.map((proj) => {
+                    const totalProjs = projectFocusData.reduce((acc, p) => acc + p.count, 0);
+                    const pct = Math.round((proj.count / totalProjs) * 100);
+                    return (
+                      <div key={proj.name} className="flex flex-col gap-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: proj.color }} />
+                            <span className="truncate">{proj.name}</span>
+                          </span>
+                          <span className="text-slate-500 font-medium">{proj.count} ({pct}%)</span>
+                        </div>
+                        <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${pct}%`, backgroundColor: proj.color }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-xs text-slate-400 py-8">
+                No hay tareas de proyectos completadas en este periodo.
+              </div>
+            )}
+          </div>
+
+          {/* Top Habit Streaks */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 space-y-3">
+            <div>
+              <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">
+                Hábitos en Crecimiento
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Rachas activas de tus hábitos</p>
+            </div>
+
+            {topHabits.length > 0 ? (
+              <div className="space-y-2 pt-1">
+                {topHabits.map((habit) => (
+                  <div
+                    key={habit.id}
+                    className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base">{habit.emoji}</span>
+                      <div className="min-w-0">
+                        <div className="font-medium text-xs text-slate-800 dark:text-slate-200 truncate">
+                          {habit.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {habit.frequency.type === 'daily' ? 'Diario' : 'Periódico'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-600">
+                      {habit.streak} días
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-xs text-slate-400 py-8">
+                No hay hábitos registrados.
+              </div>
+            )}
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  );
 };
 
 export default ProgressView;

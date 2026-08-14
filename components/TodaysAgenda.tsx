@@ -180,7 +180,7 @@ const NotesView: React.FC<Pick<TodaysAgendaProps, 'quickNotes' | 'onAddQuickNote
         <form onSubmit={handleAddNote} className="flex items-center gap-2 mb-2 p-1">
             <input 
                 type="text" 
-                value={newNoteText} 
+                value={newNoteText || ''} 
                 onChange={(e) => setNewNoteText(e.target.value)} 
                 placeholder="Anota algo rápido..."
                 className="flex-grow min-w-0 bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-100 border-2 border-yellow-200 dark:border-gray-600 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500 transition-colors text-sm"

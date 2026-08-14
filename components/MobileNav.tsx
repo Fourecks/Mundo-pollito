@@ -1,24 +1,24 @@
 import React from 'react';
 import HomeIcon from './icons/HomeIcon';
 import ListIcon from './icons/ListIcon';
+import CalendarIcon from './icons/CalendarIcon';
 import NotesIcon from './icons/NotesIcon';
 import MoreIcon from './icons/MoreIcon';
 import CheckBadgeIcon from './icons/CheckBadgeIcon';
-import GalleryIcon from './icons/GalleryIcon';
 
 interface MobileNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
-type TabName = 'home' | 'tasks' | 'habits' | 'notes' | 'gallery' | 'more';
+type TabName = 'home' | 'tasks' | 'calendar' | 'habits' | 'notes' | 'more';
 
 const navItems: { id: TabName; label: string; icon: React.FC }[] = [
   { id: 'home', label: 'Hoy', icon: HomeIcon },
   { id: 'tasks', label: 'Tareas', icon: ListIcon },
+  { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
   { id: 'habits', label: 'Hábitos', icon: CheckBadgeIcon },
   { id: 'notes', label: 'Notas', icon: NotesIcon },
-  { id: 'gallery', label: 'Galería', icon: GalleryIcon },
   { id: 'more', label: 'Más', icon: MoreIcon },
 ];
 

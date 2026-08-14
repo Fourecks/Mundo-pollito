@@ -102,7 +102,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ onAddTodo }) => {
       <div className="relative flex-grow">
         <textarea
           ref={textareaRef}
-          value={text}
+          value={text || ''}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="¿Tienes algo en mente, pollito?"

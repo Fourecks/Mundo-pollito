@@ -485,7 +485,7 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
             <footer className="p-2 border-t border-yellow-300/50 dark:border-gray-700/50 flex-shrink-0 bg-yellow-50 dark:bg-gray-800 max-h-[25vh] overflow-y-auto">
                 <form onSubmit={handleAskAi} className="flex gap-2">
                     <textarea 
-                        value={aiQuery} 
+                        value={aiQuery || ''} 
                         onChange={e => setAiQuery(e.target.value)} 
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
@@ -517,7 +517,7 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Dale al pollito instrucciones especiales para que las recuerde.</p>
                              <textarea 
                                 id="custom-instructions"
-                                value={tempInstructions}
+                                value={tempInstructions || ''}
                                 onChange={e => setTempInstructions(e.target.value)}
                                 placeholder="Ej: 'Actúa como un pirata' o 'Siempre responde con un dato curioso.'"
                                 className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-yellow-200 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm"

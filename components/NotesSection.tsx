@@ -204,7 +204,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                                                 <FolderIcon />
                                                 <input
                                                     type="text"
-                                                    value={editingFolder.name}
+                                                    value={editingFolder?.name || ''}
                                                     onChange={(e) => setEditingFolder(f => f ? { ...f, name: e.target.value } : null)}
                                                     onBlur={handleSaveFolderName}
                                                     onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFolderName(); }}
@@ -267,7 +267,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     <div className="flex flex-col h-full w-full bg-transparent dark:bg-transparent animate-fade-in">
                         <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-3 z-10 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2">
                             <button onClick={() => setSelectedFolderId(null)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5"><ChevronLeftIcon /></button>
-                            <input type="text" placeholder={selectedFolder?.name || "Buscar..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent text-lg font-bold text-pink-500 dark:text-pink-400 w-full focus:outline-none" />
+                            <input type="text" placeholder={selectedFolder?.name || "Buscar..."} value={searchTerm || ''} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent text-lg font-bold text-pink-500 dark:text-pink-400 w-full focus:outline-none" />
                         </header>
                          <div className="flex-grow p-4 pt-0">
                             <div className="bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm rounded-xl shadow-lg h-full overflow-hidden flex flex-col">
@@ -314,8 +314,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                         <div className="flex-grow p-4 pt-0">
                             <div className="bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm rounded-xl shadow-lg h-full overflow-hidden flex flex-col">
                                 <main className="flex-grow overflow-y-auto p-4 custom-scrollbar">
-                                    <input type="text" value={activeNoteTitle} onChange={e => setActiveNoteTitle(e.target.value)} placeholder="Título" className="text-2xl font-bold text-gray-800 dark:text-gray-100 bg-transparent focus:outline-none w-full mb-4"/>
-                                    <textarea value={activeNoteContent} onChange={e => setActiveNoteContent(e.target.value)} placeholder="Escribe algo..." className="w-full bg-transparent focus:outline-none resize-none text-md text-gray-700 dark:text-gray-200 leading-relaxed" style={{minHeight: '60vh'}}></textarea>
+                                    <input type="text" value={activeNoteTitle || ''} onChange={e => setActiveNoteTitle(e.target.value)} placeholder="Título" className="text-2xl font-bold text-gray-800 dark:text-gray-100 bg-transparent focus:outline-none w-full mb-4"/>
+                                    <textarea value={activeNoteContent || ''} onChange={e => setActiveNoteContent(e.target.value)} placeholder="Escribe algo..." className="w-full bg-transparent focus:outline-none resize-none text-md text-gray-700 dark:text-gray-200 leading-relaxed" style={{minHeight: '60vh'}}></textarea>
                                 </main>
                             </div>
                         </div>
@@ -354,7 +354,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
      const NoteList = () => (
          <div className="flex flex-col w-48 lg:w-64 flex-shrink-0 border-r border-secondary-light/30 dark:border-gray-700/50">
              <div className="p-2 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center flex-shrink-0">
-                 <input type="text" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent text-sm w-full focus:outline-none px-2 py-1" />
+                 <input type="text" placeholder="Buscar..." value={searchTerm || ''} onChange={e => setSearchTerm(e.target.value)} className="bg-transparent text-sm w-full focus:outline-none px-2 py-1" />
                  <button onClick={handleAddNewNote} className="p-2 rounded-full text-primary-dark dark:text-primary hover:bg-primary-light/30 dark:hover:bg-primary/10"><PlusIcon/></button>
              </div>
              <div className="flex-grow overflow-y-auto custom-scrollbar p-2 space-y-1">
@@ -373,7 +373,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
             {selectedNote ? (
                 <>
                     <div className="p-2 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center justify-between flex-shrink-0">
-                         <input type="text" value={activeNoteTitle} onChange={e => setActiveNoteTitle(e.target.value)} placeholder="Título de la nota" className="font-bold text-gray-800 dark:text-gray-100 bg-transparent focus:outline-none w-full px-2 py-1"/>
+                         <input type="text" value={activeNoteTitle || ''} onChange={e => setActiveNoteTitle(e.target.value)} placeholder="Título de la nota" className="font-bold text-gray-800 dark:text-gray-100 bg-transparent focus:outline-none w-full px-2 py-1"/>
                          <div className="flex items-center">
                             <button onClick={handleMagicNote} disabled={isAiLoading || !activeNoteContent} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed" title="Resumen Mágico">
                                 <SparklesIcon className={isAiLoading ? 'animate-pulse' : ''} />
@@ -381,7 +381,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                             <button onClick={() => setNoteToDelete(selectedNote)} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400" title="Eliminar nota"><TrashIcon className="h-5 w-5"/></button>
                          </div>
                     </div>
-                    <textarea value={activeNoteContent} onChange={e => setActiveNoteContent(e.target.value)} placeholder="Escribe algo..." className="flex-grow w-full p-4 bg-transparent focus:outline-none resize-none text-sm custom-scrollbar"></textarea>
+                    <textarea value={activeNoteContent || ''} onChange={e => setActiveNoteContent(e.target.value)} placeholder="Escribe algo..." className="flex-grow w-full p-4 bg-transparent focus:outline-none resize-none text-sm custom-scrollbar"></textarea>
                 </>
             ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400 p-4">

@@ -1,7 +1,7 @@
 import React from 'react';
 import ListIcon from './icons/ListIcon';
+import CalendarIcon from './icons/CalendarIcon';
 import NotesIcon from './icons/NotesIcon';
-import GalleryIcon from './icons/GalleryIcon';
 import MusicIcon from './icons/MusicIcon';
 import ClockIcon from './icons/ClockIcon';
 import ChickenIcon from './ChickenIcon';
@@ -16,10 +16,10 @@ interface DockProps {
 
 const dockItems: { id: WindowType; label: string; icon: React.FC }[] = [
   { id: 'todo', label: 'Tareas', icon: ListIcon },
+  { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
   { id: 'habits', label: 'Hábitos', icon: CheckBadgeIcon },
   { id: 'pomodoro', label: 'Pomodoro', icon: ClockIcon },
   { id: 'notes', label: 'Notas', icon: NotesIcon },
-  { id: 'gallery', label: 'Galería', icon: GalleryIcon },
   { id: 'music', label: 'Música', icon: MusicIcon },
   { id: 'browser', label: 'IA Pollito', icon: ChickenIcon },
 ];

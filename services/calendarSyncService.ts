@@ -1,0 +1,541 @@
+import { Todo, GoogleCalendarEvent, GoogleCalendar, CalendarIntegrationAccount } from '../types';
+
+declare global {
+  interface Window {
+    gapi?: any;
+    google?: any;
+  }
+}
+
+// Storage keys
+const CALENDAR_ACCOUNTS_KEY = 'pollito_calendar_accounts';
+const ACTIVE_CALENDAR_PROVIDER_KEY = 'pollito_active_calendar_provider';
+
+// Microsoft Graph API endpoints
+const MS_GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
+
+export class CalendarSyncService {
+  /**
+   * Save calendar account to local storage
+   */
+  static saveAccount(account: CalendarIntegrationAccount): void {
+    try {
+      const accounts = this.getSavedAccounts();
+      const index = accounts.findIndex(a => a.provider === account.provider);
+      if (index >= 0) {
+        accounts[index] = account;
+      } else {
+        accounts.push(account);
+      }
+      localStorage.setItem(CALENDAR_ACCOUNTS_KEY, JSON.stringify(accounts));
+    } catch (e) {
+      console.error('Error saving calendar account:', e);
+    }
+  }
+
+  /**
+   * Get all saved calendar accounts
+   */
+  static getSavedAccounts(): CalendarIntegrationAccount[] {
+    try {
+      const data = localStorage.getItem(CALENDAR_ACCOUNTS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      console.error('Error loading calendar accounts:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Get account by provider
+   */
+  static getAccount(provider: 'google' | 'outlook'): CalendarIntegrationAccount | null {
+    const accounts = this.getSavedAccounts();
+    return accounts.find(a => a.provider === provider) || null;
+  }
+
+  /**
+   * Remove account by provider
+   */
+  static removeAccount(provider: 'google' | 'outlook'): void {
+    try {
+      const accounts = this.getSavedAccounts().filter(a => a.provider !== provider);
+      localStorage.setItem(CALENDAR_ACCOUNTS_KEY, JSON.stringify(accounts));
+      if (this.getActiveProvider() === provider) {
+        localStorage.removeItem(ACTIVE_CALENDAR_PROVIDER_KEY);
+      }
+    } catch (e) {
+      console.error('Error removing calendar account:', e);
+    }
+  }
+
+  /**
+   * Set active calendar provider
+   */
+  static setActiveProvider(provider: 'google' | 'outlook' | 'none'): void {
+    localStorage.setItem(ACTIVE_CALENDAR_PROVIDER_KEY, provider);
+  }
+
+  /**
+   * Get active calendar provider
+   */
+  static getActiveProvider(): 'google' | 'outlook' | 'none' {
+    return (localStorage.getItem(ACTIVE_CALENDAR_PROVIDER_KEY) as 'google' | 'outlook' | 'none') || 'none';
+  }
+
+  // ==========================================
+  // GOOGLE CALENDAR API INTEGRATION
+  // ==========================================
+
+  /**
+   * Insert event into Google Calendar
+   */
+  static async insertGoogleEvent(
+    todo: Todo,
+    token: string,
+    calendarId: string = 'primary'
+  ): Promise<{ id: string; htmlLink?: string } | null> {
+    try {
+      // Calculate start and end date/time
+      const todayStr = new Date().toISOString().split('T')[0];
+      const startDateStr = todo.due_date || todayStr;
+      const endDateStr = todo.end_date || startDateStr;
+
+      let eventResource: any;
+
+      if (todo.start_time) {
+        const startDateTime = `${startDateStr}T${todo.start_time}:00`;
+        let endDateTime = `${endDateStr}T${todo.end_time || todo.start_time}:00`;
+        
+        // If end_time equals start_time or missing, default to +30 minutes
+        if (!todo.end_time || todo.end_time === todo.start_time) {
+          const [h, m] = todo.start_time.split(':').map(Number);
+          const endD = new Date(`${startDateStr}T${todo.start_time}:00`);
+          endD.setMinutes(endD.getMinutes() + 30);
+          const endHours = String(endD.getHours()).padStart(2, '0');
+          const endMins = String(endD.getMinutes()).padStart(2, '0');
+          endDateTime = `${startDateStr}T${endHours}:${endMins}:00`;
+        }
+
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+        eventResource = {
+          summary: todo.text,
+          description: `🐥 Creado desde Pollito Productivo\n${todo.notes ? '\nNotas: ' + todo.notes : ''}\nPrioridad: ${todo.priority}`,
+          start: {
+            dateTime: new Date(startDateTime).toISOString(),
+            timeZone,
+          },
+          end: {
+            dateTime: new Date(endDateTime).toISOString(),
+            timeZone,
+          },
+        };
+      } else {
+        // All-day event
+        // For Google Calendar, end date for all day events is exclusive (day + 1)
+        const nextDay = new Date(`${endDateStr}T00:00:00`);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const endDayStr = nextDay.toISOString().split('T')[0];
+
+        eventResource = {
+          summary: todo.text,
+          description: `🐥 Creado desde Pollito Productivo\n${todo.notes ? '\nNotas: ' + todo.notes : ''}\nPrioridad: ${todo.priority}`,
+          start: {
+            date: startDateStr,
+          },
+          end: {
+            date: endDayStr,
+          },
+        };
+      }
+
+      // Try GAPI first if available
+      if (window.gapi && window.gapi.client && window.gapi.client.calendar) {
+        const response = await window.gapi.client.calendar.events.insert({
+          calendarId: calendarId || 'primary',
+          resource: eventResource,
+        });
+        if (response?.result?.id) {
+          return {
+            id: response.result.id,
+            htmlLink: response.result.htmlLink,
+          };
+        }
+      }
+
+      // Fallback to direct REST API
+      const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId || 'primary')}/events`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventResource),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('Failed to create Google Calendar event:', err);
+        return null;
+      }
+
+      const data = await res.json();
+      return {
+        id: data.id,
+        htmlLink: data.htmlLink,
+      };
+    } catch (error) {
+      console.error('Error inserting Google Calendar event:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete event from Google Calendar
+   */
+  static async deleteGoogleEvent(
+    eventId: string,
+    token: string,
+    calendarId: string = 'primary'
+  ): Promise<boolean> {
+    try {
+      if (window.gapi && window.gapi.client && window.gapi.client.calendar) {
+        await window.gapi.client.calendar.events.delete({
+          calendarId: calendarId || 'primary',
+          eventId: eventId,
+        });
+        return true;
+      }
+
+      const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId || 'primary')}/events/${encodeURIComponent(eventId)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      return res.ok || res.status === 404; // 404 means it's already gone
+    } catch (error) {
+      console.error('Error deleting Google Calendar event:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Fetch events from Google Calendar
+   */
+  static async fetchGoogleEvents(
+    token: string,
+    calendarId: string = 'primary',
+    timeMin?: string,
+    timeMax?: string
+  ): Promise<GoogleCalendarEvent[]> {
+    try {
+      const now = new Date();
+      const minDate = timeMin || new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+      const maxDate = timeMax || new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+
+      if (window.gapi && window.gapi.client && window.gapi.client.calendar) {
+        const res = await window.gapi.client.calendar.events.list({
+          calendarId: calendarId || 'primary',
+          timeMin: minDate,
+          timeMax: maxDate,
+          showDeleted: false,
+          singleEvents: true,
+          orderBy: 'startTime',
+        });
+        const items = res?.result?.items || [];
+        return items.map((item: any) => ({
+          id: item.id,
+          summary: item.summary || '(Sin título)',
+          description: item.description,
+          start: item.start || {},
+          end: item.end || {},
+          htmlLink: item.htmlLink || `https://calendar.google.com/calendar/event?eid=${item.id}`,
+          provider: 'google',
+          location: item.location,
+        }));
+      }
+
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId || 'primary')}/events?timeMin=${encodeURIComponent(minDate)}&timeMax=${encodeURIComponent(maxDate)}&singleEvents=true&orderBy=startTime`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.items || []).map((item: any) => ({
+        id: item.id,
+        summary: item.summary || '(Sin título)',
+        description: item.description,
+        start: item.start || {},
+        end: item.end || {},
+        htmlLink: item.htmlLink || `https://calendar.google.com/calendar/event?eid=${item.id}`,
+        provider: 'google',
+        location: item.location,
+      }));
+    } catch (e) {
+      console.error('Error fetching Google Calendar events:', e);
+      return [];
+    }
+  }
+
+  // ==========================================
+  // OUTLOOK / MICROSOFT GRAPH INTEGRATION
+  // ==========================================
+
+  /**
+   * Insert event into Outlook Calendar
+   */
+  static async insertOutlookEvent(
+    todo: Todo,
+    token: string,
+    calendarId?: string
+  ): Promise<{ id: string; htmlLink?: string } | null> {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const startDateStr = todo.due_date || todayStr;
+      const endDateStr = todo.end_date || startDateStr;
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+      let startDateTime = `${startDateStr}T00:00:00`;
+      let endDateTime = `${endDateStr}T23:59:59`;
+      let isAllDay = true;
+
+      if (todo.start_time) {
+        isAllDay = false;
+        startDateTime = `${startDateStr}T${todo.start_time}:00`;
+        if (todo.end_time && todo.end_time !== todo.start_time) {
+          endDateTime = `${endDateStr}T${todo.end_time}:00`;
+        } else {
+          const [h, m] = todo.start_time.split(':').map(Number);
+          const endD = new Date(`${startDateStr}T${todo.start_time}:00`);
+          endD.setMinutes(endD.getMinutes() + 30);
+          const endHours = String(endD.getHours()).padStart(2, '0');
+          const endMins = String(endD.getMinutes()).padStart(2, '0');
+          endDateTime = `${startDateStr}T${endHours}:${endMins}:00`;
+        }
+      }
+
+      const eventPayload = {
+        subject: todo.text,
+        body: {
+          contentType: 'text',
+          content: `🐥 Creado desde Pollito Productivo\n${todo.notes ? '\nNotas: ' + todo.notes : ''}\nPrioridad: ${todo.priority}`,
+        },
+        start: {
+          dateTime: startDateTime,
+          timeZone,
+        },
+        end: {
+          dateTime: endDateTime,
+          timeZone,
+        },
+        isAllDay,
+      };
+
+      const endpoint = calendarId && calendarId !== 'primary'
+        ? `${MS_GRAPH_BASE}/me/calendars/${calendarId}/events`
+        : `${MS_GRAPH_BASE}/me/events`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventPayload),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        console.error('Failed to create Outlook event:', error);
+        return null;
+      }
+
+      const data = await res.json();
+      return {
+        id: data.id,
+        htmlLink: data.webLink || `https://outlook.live.com/calendar/0/deeplink/read/${data.id}`,
+      };
+    } catch (error) {
+      console.error('Error inserting Outlook event:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete event from Outlook Calendar
+   */
+  static async deleteOutlookEvent(eventId: string, token: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${MS_GRAPH_BASE}/me/events/${encodeURIComponent(eventId)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return res.ok || res.status === 404;
+    } catch (error) {
+      console.error('Error deleting Outlook event:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Fetch events from Outlook Calendar
+   */
+  static async fetchOutlookEvents(
+    token: string,
+    calendarId?: string,
+    timeMin?: string,
+    timeMax?: string
+  ): Promise<GoogleCalendarEvent[]> {
+    try {
+      const now = new Date();
+      const minDate = timeMin || new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+      const maxDate = timeMax || new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+
+      const endpoint = calendarId && calendarId !== 'primary'
+        ? `${MS_GRAPH_BASE}/me/calendars/${calendarId}/calendarView?startDateTime=${encodeURIComponent(minDate)}&endDateTime=${encodeURIComponent(maxDate)}`
+        : `${MS_GRAPH_BASE}/me/calendarView?startDateTime=${encodeURIComponent(minDate)}&endDateTime=${encodeURIComponent(maxDate)}`;
+
+      const res = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.value || []).map((item: any) => ({
+        id: item.id,
+        summary: item.subject || '(Sin título)',
+        description: item.bodyPreview || item.body?.content,
+        start: {
+          dateTime: item.isAllDay ? undefined : item.start?.dateTime,
+          date: item.isAllDay ? item.start?.dateTime?.split('T')[0] : undefined,
+        },
+        end: {
+          dateTime: item.isAllDay ? undefined : item.end?.dateTime,
+          date: item.isAllDay ? item.end?.dateTime?.split('T')[0] : undefined,
+        },
+        htmlLink: item.webLink || `https://outlook.live.com/calendar/0/deeplink/read/${item.id}`,
+        provider: 'outlook',
+        location: item.location?.displayName,
+      }));
+    } catch (e) {
+      console.error('Error fetching Outlook events:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch Outlook calendars
+   */
+  static async fetchOutlookCalendars(token: string): Promise<GoogleCalendar[]> {
+    try {
+      const res = await fetch(`${MS_GRAPH_BASE}/me/calendars`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.value || []).map((cal: any) => ({
+        id: cal.id,
+        summary: cal.name,
+        primary: cal.isDefaultCalendar,
+        provider: 'outlook',
+      }));
+    } catch (e) {
+      console.error('Error fetching Outlook calendars:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Authenticate Outlook with Microsoft OAuth Popup
+   */
+  static async connectOutlookAccount(clientId?: string): Promise<CalendarIntegrationAccount | null> {
+    return new Promise((resolve) => {
+      // In web apps, we can connect using Microsoft identity OAuth endpoint
+      const msClientId = clientId || 'c8383f94-b258-45a7-bc18-2d8869c9b5aa'; // common public client or configurable
+      const redirectUri = window.location.origin;
+      const scopes = encodeURIComponent('openid profile email Calendars.ReadWrite offline_access');
+      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${msClientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account`;
+
+      const popup = window.open(
+        authUrl,
+        'OutlookAuthPopup',
+        'width=600,height=700,status=no,toolbar=no,menubar=no'
+      );
+
+      if (!popup) {
+        alert('Por favor permite las ventanas emergentes para iniciar sesión con Outlook.');
+        resolve(null);
+        return;
+      }
+
+      // Check for token in popup URL or message
+      const interval = setInterval(() => {
+        try {
+          if (popup.closed) {
+            clearInterval(interval);
+            resolve(null);
+            return;
+          }
+
+          if (popup.location.href.includes('access_token=')) {
+            const hash = popup.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const token = params.get('access_token');
+            const expiresIn = Number(params.get('expires_in')) || 3600;
+
+            popup.close();
+            clearInterval(interval);
+
+            if (token) {
+              // Fetch user profile from Microsoft Graph
+              fetch(`${MS_GRAPH_BASE}/me`, {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+                .then(r => r.json())
+                .then(user => {
+                  const account: CalendarIntegrationAccount = {
+                    provider: 'outlook',
+                    email: user.userPrincipalName || user.mail || 'usuario@outlook.com',
+                    name: user.displayName || 'Usuario Microsoft',
+                    token,
+                    expiresAt: Date.now() + expiresIn * 1000,
+                    selectedCalendarId: 'primary',
+                    selectedCalendarName: 'Calendario Principal',
+                    autoSyncOnCreate: true,
+                    connectedAt: new Date().toISOString(),
+                  };
+                  CalendarSyncService.saveAccount(account);
+                  CalendarSyncService.setActiveProvider('outlook');
+                  resolve(account);
+                })
+                .catch(() => {
+                  const account: CalendarIntegrationAccount = {
+                    provider: 'outlook',
+                    email: 'cuenta@outlook.com',
+                    token,
+                    expiresAt: Date.now() + expiresIn * 1000,
+                    selectedCalendarId: 'primary',
+                    autoSyncOnCreate: true,
+                    connectedAt: new Date().toISOString(),
+                  };
+                  CalendarSyncService.saveAccount(account);
+                  CalendarSyncService.setActiveProvider('outlook');
+                  resolve(account);
+                });
+            } else {
+              resolve(null);
+            }
+          }
+        } catch {
+          // Cross-origin errors until redirect finishes
+        }
+      }, 500);
+    });
+  }
+}
