@@ -1496,8 +1496,8 @@ const App: React.FC = () => {
     setOutlookAccount(CalendarSyncService.getAccount('outlook'));
   }, []);
 
-  const handleConnectOutlook = async () => {
-    const account = await CalendarSyncService.connectOutlookAccount();
+  const handleConnectOutlook = async (clientId?: string) => {
+    const account = await CalendarSyncService.connectOutlookAccount(clientId);
     if (account) {
       setOutlookAccount(account);
       loadAndValidateCalendarData();

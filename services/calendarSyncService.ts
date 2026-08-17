@@ -476,7 +476,7 @@ export class CalendarSyncService {
       const msClientId = clientId || 'c8383f94-b258-45a7-bc18-2d8869c9b5aa';
       const redirectUri = window.location.origin;
       const scopes = encodeURIComponent('openid profile email Calendars.ReadWrite offline_access');
-      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${msClientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account`;
+      const authUrl = `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?client_id=${msClientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account`;
 
       const popup = window.open(
         authUrl,

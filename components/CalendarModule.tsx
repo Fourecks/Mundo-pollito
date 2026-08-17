@@ -44,7 +44,7 @@ export interface CalendarModuleProps {
   onGCalSettingsChange: (settings: GCalSettings) => void;
   userCalendars?: GoogleCalendar[];
   outlookAccount?: CalendarIntegrationAccount | null;
-  onConnectOutlook?: (account?: any) => void | Promise<void>;
+  onConnectOutlook?: (clientId?: string) => void | Promise<void>;
   onDisconnectOutlook?: () => void;
   onRefreshCalendarEvents?: () => Promise<void>;
   onRefreshEvents?: () => Promise<void>;
@@ -150,6 +150,8 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
       setLocalOutlookAccount(propOutlookAccount);
     }
   }, [propOutlookAccount]);
+
+  const [outlookClientIdInput, setOutlookClientIdInput] = useState(() => localStorage.getItem('outlook_client_id') || '');
 
   // Notion Settings
   const [notionSettings, setNotionSettings] = useState<NotionSettings>(() => NotionService.getSettings());
@@ -370,12 +372,13 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
   // Connect / Disconnect Outlook Handlers
   const handleConnectOutlookClick = async () => {
+    localStorage.setItem('outlook_client_id', outlookClientIdInput);
     if (onConnectOutlook) {
-      await onConnectOutlook();
+      await onConnectOutlook(outlookClientIdInput || undefined);
       const updated = CalendarSyncService.getAccount('outlook');
       setLocalOutlookAccount(updated);
     } else {
-      const account = await CalendarSyncService.connectOutlookAccount();
+      const account = await CalendarSyncService.connectOutlookAccount(outlookClientIdInput || undefined);
       if (account) {
         setLocalOutlookAccount(account);
         if (handleRefreshEvents) handleRefreshEvents();
@@ -1758,6 +1761,26 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                   </div>
                 )}
               </div>
+              
+              {!localOutlookAccount && (
+                <div className="space-y-2 pt-2 border-t border-blue-200/50 dark:border-blue-800/40 text-xs">
+                  <div>
+                    <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Client ID de Azure (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={outlookClientIdInput}
+                      onChange={(e) => setOutlookClientIdInput(e.target.value)}
+                      placeholder="Deja en blanco para usar el por defecto..."
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                    />
+                    <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                      Si creaste tu propia app en Azure, pega el Client ID aquí. Asegúrate de configurar los tipos de cuenta como <b>"Cualquier directorio organizativo y cuentas personales (Skype, Xbox, etc.)"</b> o te dará error <i>unauthorized_client</i>.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* INTEGRATION CARD 3: NOTION */}
