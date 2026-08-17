@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Todo, Priority, Project, GoogleCalendarEvent } from '../types';
+import { Todo, Priority, Project, GoogleCalendarEvent, FocusSession } from '../types';
 import ProgressBar from './ProgressBar';
 import TodoInput from './TodoInput';
 import TodoItem from './TodoItem';
@@ -42,6 +42,10 @@ interface TodoListModuleProps {
     calendarEvents: GoogleCalendarEvent[];
     onOpenProjectCreator?: () => void;
     onOpenProjectEditor?: (project: Project) => void;
+    activeFocusTaskId?: number | null;
+    onSelectFocusTask?: (taskId: number | null) => void;
+    focusSessions?: FocusSession[];
+    isFocusTimerRunning?: boolean;
 }
 
 const formatDateKey = (date: Date): string => {
@@ -59,7 +63,11 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         selectedDate, setSelectedDate, datesWithTasks, datesWithAllTasksCompleted,
         isMobile = false, onClearPastTodos, projects, onAddProject, onUpdateProject, handleArchiveProject,
         onDeleteProject, onDeleteProjectAndTasks, onViewProjectChange, calendarEvents,
-        onOpenProjectCreator, onOpenProjectEditor
+        onOpenProjectCreator, onOpenProjectEditor,
+        activeFocusTaskId = null,
+        onSelectFocusTask,
+        focusSessions = [],
+        isFocusTimerRunning = false
     } = props;
     // Common State
     const containerRef = useRef<HTMLDivElement>(null);
@@ -385,7 +393,22 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                             <div className="space-y-3 overflow-y-auto custom-scrollbar p-3 flex-grow min-h-0">
                                 {sortedTodos.length > 0 ? sortedTodos.map(todo => {
                                     const projectForTodo = todo.project_id ? projects.find(p => p.id === todo.project_id) : null;
-                                    return <TodoItem key={todo.id} todo={todo} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo} onUpdate={updateTodo} onEdit={onEditTodo} color={projectForTodo?.color} />
+                                    return (
+                                        <TodoItem 
+                                            key={todo.id} 
+                                            todo={todo} 
+                                            onToggle={toggleTodo} 
+                                            onToggleSubtask={toggleSubtask} 
+                                            onDelete={deleteTodo} 
+                                            onUpdate={updateTodo} 
+                                            onEdit={onEditTodo} 
+                                            color={projectForTodo?.color} 
+                                            activeFocusTaskId={activeFocusTaskId}
+                                            onSelectFocusTask={onSelectFocusTask}
+                                            focusSessions={focusSessions}
+                                            isFocusTimerRunning={isFocusTimerRunning}
+                                        />
+                                    );
                                 }) : (<div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-300 py-10"><p className="font-medium">{emptyState.title}</p><p className="text-sm">{emptyState.subtitle}</p></div>)}
                             </div>
                             {calendarVisible && (<div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCalendarVisible(false)}><div className="bg-secondary-lighter dark:bg-gray-800 rounded-2xl shadow-xl p-4 w-full max-w-xs animate-pop-in" onClick={e => e.stopPropagation()}><Calendar selectedDate={selectedDate} setDate={(date) => { setSelectedDate(date); setCalendarVisible(false); }} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} calendarEvents={calendarEvents}/></div></div>)}

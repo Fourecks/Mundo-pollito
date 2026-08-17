@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -14,6 +14,7 @@ import MusicPlayer from './components/MusicPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
+import { useBatteryStatus } from './utils/battery';
 import { initDB, getAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue, syncableDeleteMultiple, clearAndPutAll } from './db';
 import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
@@ -343,6 +344,10 @@ interface AppComponentProps {
   isSubscribed: boolean;
   isPermissionBlocked: boolean;
   handleNotificationAction: () => void;
+  isPowerSavingActive: boolean;
+  batteryStatus: any;
+  focusSessions: FocusSession[];
+  onLogFocusSession: (minutes: number) => void;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -364,7 +369,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     gcalSettings, onGCalSettingsChange, userCalendars, calendarEvents,
     loadAndValidateCalendarData, onRemoveFromCalendar, onSyncToCalendar,
     onSyncNotion,
-    isSubscribed, isPermissionBlocked, handleNotificationAction
+    isSubscribed, isPermissionBlocked, handleNotificationAction,
+    isPowerSavingActive, batteryStatus,
+    focusSessions, onLogFocusSession
   } = props;
   
   // Local UI State for Desktop
@@ -425,37 +432,80 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   // Memoized values derived from props
   const datesWithTasks = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0)), [allTodos]);
   const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
-  const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
+  const todayKey = formatDateKey(new Date());
+  const isFocusTimerRunning = pomodoroState.isActive && pomodoroState.mode === 'work';
+  const activeFocusTaskId = pomodoroState.activeFocusTaskId;
 
-  // Pomodoro Timer Logic
+  const todayAgendaTasks = useMemo(() => {
+    const todayList = allTodos[todayKey] || [];
+    const undatedList = allTodos['undated'] || [];
+    const combined = [...todayList, ...undatedList];
+    return combined.sort((a, b) => {
+      if (isFocusTimerRunning && activeFocusTaskId) {
+        if (a.id === activeFocusTaskId) return -1;
+        if (b.id === activeFocusTaskId) return 1;
+      }
+      return (a.start_time || '23:59').localeCompare(b.start_time || '23:59');
+    });
+  }, [allTodos, todayKey, isFocusTimerRunning, activeFocusTaskId]);
+
+  const activeFocusTask = useMemo(() => {
+    if (!activeFocusTaskId) return null;
+    for (const key of Object.keys(allTodos)) {
+      const found = allTodos[key]?.find(t => t.id === activeFocusTaskId);
+      if (found) return found;
+    }
+    return null;
+  }, [allTodos, activeFocusTaskId]);
+
+  const pomodoroTasks = useMemo(() => {
+    const todayList = (allTodos[todayKey] || []).filter(t => !t.completed);
+    const undatedList = (allTodos['undated'] || []).filter(t => !t.completed);
+    return [...todayList, ...undatedList].sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59'));
+  }, [allTodos, todayKey]);
+  const pendingTasks = useMemo(() => {
+    const list: Todo[] = [];
+    Object.keys(allTodos).forEach(dateKey => {
+      (allTodos[dateKey] || []).forEach(todo => {
+        if (!todo.completed) {
+          list.push(todo);
+        }
+      });
+    });
+    return list;
+  }, [allTodos]);
+
   const handleTimerCompletion = useCallback(() => {
     pomodoroAudioRef.current?.play();
 
-    setPomodoroState(s => {
-      const newMode = s.mode === 'work' ? 'break' : 'work';
-      const message = s.mode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
+    const currentMode = pomodoroState.mode;
+    const nextMode = currentMode === 'work' ? 'break' : 'work';
+    const message = currentMode === 'work' ? "¡Tiempo de descanso! Buen trabajo." : "¡De vuelta al trabajo! Tú puedes.";
 
-      if (isSubscribed) {
-        supabase.functions.invoke('send-pushalert-notification', {
-          body: { title: "Pomodoro Terminado", message: message },
-        });
-      }
+    if (isSubscribed) {
+      supabase.functions.invoke('send-pushalert-notification', {
+        body: { title: "Pomodoro Terminado", message: message },
+      });
+    }
 
-      const newDuration = s.durations[newMode];
-      return {
-        ...s,
-        mode: newMode,
-        timeLeft: newDuration,
-        isActive: true,
-        endTime: Date.now() + newDuration * 1000,
-      };
-    });
-  }, [isSubscribed, setPomodoroState]);
+    if (currentMode === 'work') {
+      onLogFocusSession(Math.round(pomodoroState.durations.work / 60));
+    }
+
+    const newDuration = pomodoroState.durations[nextMode];
+    setPomodoroState((s: any) => ({
+      ...s,
+      mode: nextMode,
+      timeLeft: newDuration,
+      isActive: true,
+      endTime: Date.now() + newDuration * 1000,
+    }));
+  }, [isSubscribed, pomodoroState, onLogFocusSession, setPomodoroState]);
 
   const handlePomodoroToggle = useCallback(() => {
-    setPomodoroState(s => {
-      const isStarting = !s.isActive;
-      if (isStarting) {
+    setPomodoroState((s: any) => {
+      const willStart = !s.isActive;
+      if (willStart) {
         const endTime = Date.now() + s.timeLeft * 1000;
         if (!pomodoroStartedRef.current) {
           pomodoroStartedRef.current = true;
@@ -463,7 +513,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         }
         return { ...s, isActive: true, endTime };
       } else {
-        // Preserve timeLeft when pausing
         const remaining = s.endTime ? s.endTime - Date.now() : s.timeLeft * 1000;
         return { ...s, isActive: false, endTime: null, timeLeft: Math.max(0, Math.ceil(remaining / 1000)) };
       }
@@ -521,6 +570,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   };
   const bringToFront = (windowType: WindowType) => setFocusedWindow(windowType);
 
+  const handleSelectFocusTask = (taskId: number | null) => {
+    setPomodoroState(s => ({ ...s, activeFocusTaskId: taskId }));
+    if (taskId !== null) {
+      if (!openWindows.includes('pomodoro')) {
+        setOpenWindows(open => [...open, 'pomodoro']);
+      }
+      bringToFront('pomodoro');
+    }
+  };
+
   const handleSelectTrack = (track: Playlist, queue: Playlist[]) => {
       if(track.platform === 'youtube') {
           setActiveTrack({ ...track, queue });
@@ -539,8 +598,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 
   return (
     <div className="h-screen w-screen text-gray-800 dark:text-gray-100 font-sans overflow-hidden">
-        {pomodoroState.isActive && pomodoroState.showBackgroundTimer && <BackgroundTimer timeLeft={pomodoroState.timeLeft} opacity={pomodoroState.backgroundTimerOpacity} />}
-        <ParticleLayer type={particleType} />
+        {(pomodoroState.isActive && (pomodoroState.showBackgroundTimer || isFocusMode)) && (
+          <BackgroundTimer 
+            timeLeft={pomodoroState.timeLeft} 
+            opacity={pomodoroState.backgroundTimerOpacity} 
+            focusedTask={activeFocusTask}
+            isFocusMode={isFocusMode}
+          />
+        )}
+        <ParticleLayer type={particleType} reduceParticles={isPowerSavingActive} />
 
       <header className="fixed top-4 right-4 z-[70000] flex flex-col items-end gap-3">
         {isSyncing && (
@@ -616,6 +682,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         setParticleType={(type) => setUiSettings((s: any) => ({ ...s, particleType: type }))}
         ambientSound={ambientSound}
         setAmbientSound={(sound) => setUiSettings((s: any) => ({ ...s, ambientSound: sound }))}
+        enableBatterySaver={uiSettings?.enableBatterySaver || false}
+        setEnableBatterySaver={(enabled) => setUiSettings((s: any) => ({ ...s, enableBatterySaver: enabled }))}
+        batteryStatus={batteryStatus}
       />
       
 
@@ -647,6 +716,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             onAddQuickNote={handleAddQuickNote}
             onDeleteQuickNote={handleDeleteQuickNote}
             onClearAllQuickNotes={handleClearAllQuickNotes}
+            activeFocusTaskId={pomodoroState.activeFocusTaskId}
+            onSelectFocusTask={handleSelectFocusTask}
+            focusSessions={focusSessions}
+            isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
           />
       </div>
       
@@ -677,6 +750,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
                 onClearPastTodos={onClearPastTodos}
                 projects={projects}
+                activeFocusTaskId={pomodoroState.activeFocusTaskId}
+                onSelectFocusTask={handleSelectFocusTask}
+                focusSessions={focusSessions}
+                isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
               />
             </ModalWindow>
           )}
@@ -689,6 +766,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 onSelectDate={setSelectedDate}
                 onEditTodo={setTaskToEdit}
                 onToggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
+                onAddTodo={handleAddTodo}
+                projects={projects}
                 googleToken={googleApiToken}
                 gcalSettings={gcalSettings}
                 onGCalSettingsChange={onGCalSettingsChange}
@@ -723,6 +802,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       projects={projects} 
                       habits={habits} 
                       habitRecords={habitRecords} 
+                      focusSessions={focusSessions}
                   />
               </ModalWindow>
           )}
@@ -732,8 +812,24 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               </ModalWindow>
           )}
           {openWindows.includes('pomodoro') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('pomodoro')} title="Pomodoro" isDraggable isResizable zIndex={focusedWindow === 'pomodoro' ? 50 : 40} onFocus={() => bringToFront('pomodoro')} className="w-80 h-96" windowState={windowStates.pomodoro} onStateChange={s => setWindowStates(ws => ({...ws, pomodoro: s}))}>
-                  <Pomodoro timeLeft={pomodoroState.timeLeft} isActive={pomodoroState.isActive} mode={pomodoroState.mode} durations={pomodoroState.durations} onToggle={handlePomodoroToggle} onReset={() => setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null }))} onSwitchMode={(mode) => setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null }))} onSaveSettings={(d) => setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null }))} showBackgroundTimer={pomodoroState.showBackgroundTimer} onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))} backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity} onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))} />
+              <ModalWindow isOpen onClose={() => toggleWindow('pomodoro')} title="Pomodoro" isDraggable isResizable minWidth={440} minHeight={215} overflowVisible zIndex={focusedWindow === 'pomodoro' ? 50 : 40} onFocus={() => bringToFront('pomodoro')} className="w-[520px] h-[215px]" windowState={windowStates.pomodoro} onStateChange={s => setWindowStates(ws => ({...ws, pomodoro: s}))}>
+                  <Pomodoro 
+                      timeLeft={pomodoroState.timeLeft} 
+                      isActive={pomodoroState.isActive} 
+                      mode={pomodoroState.mode} 
+                      durations={pomodoroState.durations} 
+                      onToggle={handlePomodoroToggle} 
+                      onReset={() => setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null }))} 
+                      onSwitchMode={(mode) => setPomodoroState(s => ({ ...s, mode, timeLeft: s.durations[mode], isActive: false, endTime: null }))} 
+                      onSaveSettings={(d) => setPomodoroState(s => ({ ...s, durations: d, timeLeft: d[s.mode], isActive: false, endTime: null }))} 
+                      showBackgroundTimer={pomodoroState.showBackgroundTimer} 
+                      onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))} 
+                      backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity} 
+                      onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))}
+                      tasks={pomodoroTasks}
+                      activeTaskId={pomodoroState.activeFocusTaskId}
+                      onSelectTask={(id) => setPomodoroState(s => ({ ...s, activeFocusTaskId: id }))}
+                  />
               </ModalWindow>
           )}
            {openWindows.includes('music') && (
@@ -797,7 +893,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       gcalSettings, onGCalSettingsChange, userCalendars, calendarEvents,
       loadAndValidateCalendarData, onRemoveFromCalendar, onSyncToCalendar,
       onSyncNotion,
-      isSubscribed, isPermissionBlocked, handleNotificationAction
+      isSubscribed, isPermissionBlocked, handleNotificationAction,
+      isPowerSavingActive, batteryStatus,
+      focusSessions, onLogFocusSession
     } = props;
 
     // Local UI state for Mobile
@@ -832,6 +930,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         setIsProjectEditorOpen(true);
     };
 
+    const handleSelectFocusTask = (taskId: number | null) => {
+        setPomodoroState(s => ({ ...s, activeFocusTaskId: taskId }));
+        if (taskId !== null) {
+            setIsPomodoroModalOpen(true);
+        }
+    };
+
     const handleSaveProject = async (name: string, emoji: string | null, color: string | null) => {
         if (projectToEdit) {
             await handleUpdateProject(projectToEdit.id, name, emoji, color);
@@ -844,32 +949,55 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
     const datesWithTasks = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0)), [allTodos]);
     const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
-    const todayAgendaTasks = useMemo(() => (allTodos[formatDateKey(new Date())] || []).sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59')), [allTodos]);
+    const todayKey = formatDateKey(new Date());
+    const isFocusTimerRunningMobile = pomodoroState.isActive && pomodoroState.mode === 'work';
+    const activeFocusTaskIdMobile = pomodoroState.activeFocusTaskId;
+
+    const todayAgendaTasks = useMemo(() => {
+        const todayList = allTodos[todayKey] || [];
+        const undatedList = allTodos['undated'] || [];
+        const combined = [...todayList, ...undatedList];
+        return combined.sort((a, b) => {
+            if (isFocusTimerRunningMobile && activeFocusTaskIdMobile) {
+                if (a.id === activeFocusTaskIdMobile) return -1;
+                if (b.id === activeFocusTaskIdMobile) return 1;
+            }
+            return (a.start_time || '23:59').localeCompare(b.start_time || '23:59');
+        });
+    }, [allTodos, todayKey, isFocusTimerRunningMobile, activeFocusTaskIdMobile]);
+    const pomodoroTasks = useMemo(() => {
+        const todayList = (allTodos[todayKey] || []).filter(t => !t.completed);
+        const undatedList = (allTodos['undated'] || []).filter(t => !t.completed);
+        return [...todayList, ...undatedList].sort((a, b) => (a.start_time || '23:59').localeCompare(b.start_time || '23:59'));
+    }, [allTodos, todayKey]);
     
     // Pomodoro Timer Logic
     const handleTimerCompletion = useCallback(() => {
         pomodoroAudioRef.current?.play();
 
-        setPomodoroState(s => {
-            const newMode = s.mode === 'work' ? 'break' : 'work';
-            const message = s.mode === 'work' ? "¡Tiempo de descansar! ¡Bien hecho!" : "¡Se acabó el descanso! Tú puedes.";
+        const currentMode = pomodoroState.mode;
+        const nextMode = currentMode === 'work' ? 'break' : 'work';
+        const message = currentMode === 'work' ? "¡Tiempo de descansar! ¡Bien hecho!" : "¡Se acabó el descanso! Tú puedes.";
 
-            if (isSubscribed) {
-                supabase.functions.invoke('send-pushalert-notification', {
-                    body: { title: "Pomodoro Terminado", message: message },
-                });
-            }
+        if (isSubscribed) {
+            supabase.functions.invoke('send-pushalert-notification', {
+                body: { title: "Pomodoro Terminado", message: message },
+            });
+        }
 
-            const newDuration = s.durations[newMode];
-            return {
-                ...s,
-                mode: newMode,
-                timeLeft: newDuration,
-                isActive: true,
-                endTime: Date.now() + newDuration * 1000,
-            };
-        });
-    }, [isSubscribed, setPomodoroState]);
+        if (currentMode === 'work') {
+            onLogFocusSession(Math.round(pomodoroState.durations.work / 60));
+        }
+
+        const newDuration = pomodoroState.durations[nextMode];
+        setPomodoroState((s: any) => ({
+            ...s,
+            mode: nextMode,
+            timeLeft: newDuration,
+            isActive: true,
+            endTime: Date.now() + newDuration * 1000,
+        }));
+    }, [isSubscribed, pomodoroState, onLogFocusSession, setPomodoroState]);
 
     const handlePomodoroToggle = useCallback(() => {
         setPomodoroState(s => {
@@ -970,7 +1098,20 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 onSwitchMode={handleSwitchMode}
                                 onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
                              />
-                            <TodaysAgenda tasks={todayAgendaTasks} calendarEvents={calendarEvents} onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} quickNotes={quickNotes} onAddQuickNote={handleAddQuickNote} onDeleteQuickNote={handleDeleteQuickNote} onClearAllQuickNotes={handleClearAllQuickNotes} />
+                            <TodaysAgenda 
+                                tasks={todayAgendaTasks} 
+                                calendarEvents={calendarEvents} 
+                                onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} 
+                                onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} 
+                                quickNotes={quickNotes} 
+                                onAddQuickNote={handleAddQuickNote} 
+                                onDeleteQuickNote={handleDeleteQuickNote} 
+                                onClearAllQuickNotes={handleClearAllQuickNotes} 
+                                activeFocusTaskId={pomodoroState.activeFocusTaskId}
+                                onSelectFocusTask={handleSelectFocusTask}
+                                focusSessions={focusSessions}
+                                isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
+                            />
                         </div>
                     </>
                 );
@@ -1001,6 +1142,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             calendarEvents={calendarEvents}
                             onOpenProjectCreator={handleOpenProjectCreator}
                             onOpenProjectEditor={handleOpenProjectEditor}
+                            activeFocusTaskId={pomodoroState.activeFocusTaskId}
+                            onSelectFocusTask={handleSelectFocusTask}
+                            focusSessions={focusSessions}
+                            isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
                         />
                          <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
@@ -1011,12 +1156,15 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 return (
                     <div className="h-full pt-4 px-2">
                         <CalendarModule
+                            isMobile={true}
                             allTodos={allTodos}
                             calendarEvents={calendarEvents}
                             selectedDate={selectedDate}
                             onSelectDate={setSelectedDate}
                             onEditTodo={setTaskToEdit}
                             onToggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
+                            onAddTodo={handleAddTodo}
+                            projects={projects}
                             googleToken={googleApiToken}
                             gcalSettings={gcalSettings}
                             onGCalSettingsChange={onGCalSettingsChange}
@@ -1059,6 +1207,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             projects={projects} 
                             habits={habits} 
                             habitRecords={habitRecords}
+                            focusSessions={focusSessions}
                             onBack={() => setActiveTab('home')}
                         />
                     </div>
@@ -1107,7 +1256,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
     return (
         <div className="h-[100dvh] w-screen text-gray-800 dark:text-gray-100 font-sans flex flex-col">
-            <ParticleLayer type={particleType} />
+            <ParticleLayer type={particleType} reduceParticles={isPowerSavingActive} />
             
             <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[90000] flex items-center gap-2">
                 {isSyncing && (
@@ -1164,6 +1313,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               setParticleType={(type) => setUiSettings((s: any) => ({ ...s, particleType: type }))}
               ambientSound={ambientSound}
               setAmbientSound={(sound) => setUiSettings((s: any) => ({ ...s, ambientSound: sound }))}
+              enableBatterySaver={uiSettings?.enableBatterySaver || false}
+              setEnableBatterySaver={(enabled) => setUiSettings((s: any) => ({ ...s, enableBatterySaver: enabled }))}
+              batteryStatus={batteryStatus}
             />
 
             <NotificationsPanel
@@ -1225,6 +1377,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 onToggleBackgroundTimer={() => setPomodoroState(s => ({...s, showBackgroundTimer: !s.showBackgroundTimer}))}
                 backgroundTimerOpacity={pomodoroState.backgroundTimerOpacity}
                 onSetBackgroundTimerOpacity={op => setPomodoroState(s => ({...s, backgroundTimerOpacity: op}))}
+                tasks={pomodoroTasks}
+                activeTaskId={pomodoroState.activeFocusTaskId}
+                onSelectTask={(id) => setPomodoroState(s => ({ ...s, activeFocusTaskId: id }))}
+                isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
             />
 
             <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
@@ -1273,6 +1429,9 @@ const App: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [uiSettings, setUiSettings] = useState<any>(null);
 
+  const batteryStatus = useBatteryStatus();
+  const isPowerSavingActive = !!(uiSettings?.enableBatterySaver && batteryStatus.isLow);
+
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const isMobile = useMediaQuery('(max-width: 767px)');
   
@@ -1301,6 +1460,7 @@ const App: React.FC = () => {
   // UI state
   const [browserSession, setBrowserSession] = useState<BrowserSession>({});
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
   const [deleteOptions, setDeleteOptions] = useState<{ isOpen: boolean; todo: Todo | null; }>({ isOpen: false, todo: null });
   const [singleTaskToDelete, setSingleTaskToDelete] = useState<Todo | null>(null);
   const [updateOptions, setUpdateOptions] = useState<{ isOpen: boolean; original: Todo | null; updated: Todo | null; }>({ isOpen: false, original: null, updated: null });
@@ -1315,6 +1475,7 @@ const App: React.FC = () => {
       showBackgroundTimer: false,
       backgroundTimerOpacity: 50,
       endTime: null as (number | null),
+      activeFocusTaskId: null as (number | null),
   });
   const [activeTrack, setActiveTrack] = useState<Playlist | null>(null);
   const [activeSpotifyTrack, setActiveSpotifyTrack] = useState<Playlist | null>(null);
@@ -1712,6 +1873,7 @@ const App: React.FC = () => {
               ambientSound: settings.ambientSound || { type: 'none', volume: 0.5 },
               dailyEncouragementLocalHour: settings.dailyEncouragementLocalHour ?? null,
               dailySummaryHour: settings.dailySummaryHour ?? null,
+              enableBatterySaver: settings.enableBatterySaver ?? false,
           });
 
           // Check and update user's timezone offset for notifications
@@ -1734,6 +1896,7 @@ const App: React.FC = () => {
               ambientSound: { type: 'none', volume: 0.5 },
               dailyEncouragementLocalHour: null,
               dailySummaryHour: null,
+              enableBatterySaver: false,
             });
       }
       setIsSyncing(false);
@@ -1817,8 +1980,8 @@ const App: React.FC = () => {
     if (user && dataLoaded) {
       if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
       settingsSaveTimeout.current = window.setTimeout(async () => {
-        const { durations, showBackgroundTimer, backgroundTimerOpacity } = pomodoroState;
-        const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity };
+        const { durations, showBackgroundTimer, backgroundTimerOpacity, autoMinimizeWindows } = pomodoroState;
+        const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity, autoMinimizeWindows };
         if(isOnline) await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
       }, 1500);
     }
@@ -1914,23 +2077,100 @@ const App: React.FC = () => {
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeTrack'), value: activeTrack }); }, [activeTrack, getUserKey, user, dataLoaded]);
   useEffect(() => { if (user && dataLoaded) set('settings', { key: getUserKey('activeSpotifyTrack'), value: activeSpotifyTrack }); }, [activeSpotifyTrack, getUserKey, user, dataLoaded]);
 
+  // --- Focus Sessions Persistence ---
+  useEffect(() => {
+    if (user && dataLoaded) {
+      const savedSessions = localStorage.getItem(getUserKey('focus_sessions'));
+      if (savedSessions) {
+        try {
+          setFocusSessions(JSON.parse(savedSessions));
+        } catch (e) {
+          console.error("Error parsing focus sessions:", e);
+        }
+      } else {
+        const sessions: FocusSession[] = [];
+        const today = new Date();
+        for (let i = 21; i >= 0; i--) {
+          const date = new Date(today);
+          date.setDate(today.getDate() - i);
+          const dateString = date.toISOString().split('T')[0];
+          if (Math.random() > 0.35) {
+            const numSessions = Math.floor(Math.random() * 3) + 1;
+            for (let j = 0; j < numSessions; j++) {
+              sessions.push({
+                id: Date.now() - i * 86400000 - j * 3600000,
+                completed_at: dateString,
+                duration: Math.random() > 0.45 ? 25 : 50,
+              });
+            }
+          }
+        }
+        setFocusSessions(sessions);
+        localStorage.setItem(getUserKey('focus_sessions'), JSON.stringify(sessions));
+      }
+    }
+  }, [user, dataLoaded, getUserKey]);
+
+  const handleLogFocusSession = useCallback((minutes: number, taskId?: number | null) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const resolvedTaskId = taskId !== undefined ? taskId : pomodoroState.activeFocusTaskId;
+    let resolvedTaskTitle: string | undefined = undefined;
+
+    if (resolvedTaskId) {
+      let foundTask: Todo | undefined;
+      for (const dateKey of Object.keys(allTodos)) {
+        foundTask = (allTodos[dateKey] || []).find(t => t.id === resolvedTaskId);
+        if (foundTask) break;
+      }
+      if (foundTask) {
+        resolvedTaskTitle = foundTask.text;
+      }
+    }
+
+    const newSession: FocusSession = {
+      id: Date.now(),
+      completed_at: todayStr,
+      duration: minutes,
+      task_id: resolvedTaskId || undefined,
+      task_title: resolvedTaskTitle,
+    };
+    setFocusSessions(prev => {
+      const updated = [...prev, newSession];
+      localStorage.setItem(getUserKey('focus_sessions'), JSON.stringify(updated));
+      return updated;
+    });
+  }, [getUserKey, pomodoroState.activeFocusTaskId, allTodos]);
+
   // --- Data Handlers (Now with Offline Support & Auto Calendar Sync) ---
-  const handleAddTodo = useCallback(async (text: string, options?: { projectId?: number | null; isUndated?: boolean }) => {
+  const handleAddTodo = useCallback(async (text: string, options?: {
+    projectId?: number | null;
+    isUndated?: boolean;
+    dueDate?: string | null;
+    startTime?: string;
+    endTime?: string;
+    priority?: Priority;
+    notes?: string;
+    syncToGoogle?: boolean;
+    syncToOutlook?: boolean;
+  }) => {
     if (!user) return;
 
     const projectId = options?.projectId || null;
     const isUndated = options?.isUndated || false;
 
-    const dateKey = isUndated ? 'undated' : formatDateKey(selectedDate);
-    const dueDate = isUndated ? null : formatDateKey(selectedDate);
+    const targetDueDate = options?.dueDate !== undefined ? options.dueDate : (isUndated ? null : formatDateKey(selectedDate));
+    const dateKey = isUndated || !targetDueDate ? 'undated' : targetDueDate;
 
     const tempId = -Date.now();
     const newTodo: Todo = { 
         id: tempId, 
         text, 
         completed: false, 
-        priority: 'medium', 
-        due_date: dueDate, 
+        priority: options?.priority || 'medium', 
+        due_date: targetDueDate, 
+        start_time: options?.startTime,
+        end_time: options?.endTime,
+        notes: options?.notes,
         user_id: user.id, 
         created_at: new Date().toISOString(), 
         subtasks: [],
@@ -1966,10 +2206,11 @@ const App: React.FC = () => {
 
     // Automatic Calendar Sync if integration is enabled
     try {
-      const activeProvider = CalendarSyncService.getActiveProvider();
+      const shouldSyncGoogle = options?.syncToGoogle || (gcalSettings.enabled && googleApiToken && gapiReady);
       const outlookAccount = CalendarSyncService.getAccount('outlook');
+      const shouldSyncOutlook = options?.syncToOutlook || (outlookAccount && outlookAccount.token && outlookAccount.autoSyncOnCreate);
 
-      if (gcalSettings.enabled && googleApiToken && gapiReady) {
+      if (shouldSyncGoogle && googleApiToken && gapiReady) {
         const calId = gcalSettings.calendarId || 'primary';
         const calResult = await CalendarSyncService.insertGoogleEvent(savedTodo, googleApiToken, calId);
         if (calResult && calResult.id) {
@@ -1981,7 +2222,7 @@ const App: React.FC = () => {
           };
           await syncableUpdate('todos', savedTodo);
         }
-      } else if (outlookAccount && outlookAccount.token && outlookAccount.autoSyncOnCreate) {
+      } else if (shouldSyncOutlook && outlookAccount && outlookAccount.token) {
         const calId = outlookAccount.selectedCalendarId || 'primary';
         const calResult = await CalendarSyncService.insertOutlookEvent(savedTodo, outlookAccount.token, calId);
         if (calResult && calResult.id) {
@@ -3279,7 +3520,7 @@ const App: React.FC = () => {
       const activeBg = userBackgrounds.find(bg => bg.id === uiSettings?.activeBackgroundId);
       
       if (videoEl) {
-          const isVideoActive = activeBg?.type === 'video';
+          const isVideoActive = activeBg?.type === 'video' && !isPowerSavingActive;
           const newSrc = isVideoActive ? activeBg.url : '';
           
           if (videoEl.src !== newSrc) {
@@ -3311,7 +3552,7 @@ const App: React.FC = () => {
               }
           }
       }
-  }, [uiSettings?.activeBackgroundId, uiSettings?.ambientSound, userBackgrounds, handleMediaPlay]);
+  }, [uiSettings?.activeBackgroundId, uiSettings?.ambientSound, userBackgrounds, handleMediaPlay, isPowerSavingActive]);
 
 
   // --- OneSignal / Notifications ---
@@ -3432,7 +3673,11 @@ const App: React.FC = () => {
     isSubscribed, isPermissionBlocked, handleNotificationAction,
     gcalSettings, onGCalSettingsChange: handleGCalSettingsChange, userCalendars, calendarEvents,
     loadAndValidateCalendarData, onRemoveFromCalendar: handleRemoveFromCalendar, onSyncToCalendar: handleSyncToCalendar,
-    onSyncNotion: handleSyncNotion
+    onSyncNotion: handleSyncNotion,
+    isPowerSavingActive,
+    batteryStatus,
+    focusSessions,
+    onLogFocusSession: handleLogFocusSession
   };
 
   return (
@@ -3457,8 +3702,8 @@ const App: React.FC = () => {
           playsInline 
           className="absolute top-0 left-0 w-full h-full object-cover -z-20 transition-opacity duration-500"
           style={{ 
-              opacity: activeBackground?.type === 'video' ? 1 : 0,
-              pointerEvents: activeBackground?.type === 'video' ? 'auto' : 'none'
+              opacity: (activeBackground?.type === 'video' && !isPowerSavingActive) ? 1 : 0,
+              pointerEvents: (activeBackground?.type === 'video' && !isPowerSavingActive) ? 'auto' : 'none'
           }}
       />
       

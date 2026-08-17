@@ -3,6 +3,7 @@ import { ParticleType } from '../types';
 
 interface ParticleLayerProps {
   type: ParticleType;
+  reduceParticles?: boolean;
 }
 
 // Simple CSS-based particles. In a real-world scenario, a library like particles.js or tsParticles would be better.
@@ -16,17 +17,19 @@ const createParticles = (count: number, createStyle: (i: number) => React.CSSPro
     return particles;
 };
 
-const ParticleLayer: React.FC<ParticleLayerProps> = ({ type }) => {
+const ParticleLayer: React.FC<ParticleLayerProps> = ({ type, reduceParticles }) => {
     if (type === 'none') {
         return null;
     }
+
+    const multiplier = reduceParticles ? 0.25 : 1;
 
     let particles = null;
     let styles = '';
 
     switch (type) {
         case 'snow':
-            particles = createParticles(100, i => ({
+            particles = createParticles(Math.max(5, Math.floor(100 * multiplier)), i => ({
                 left: `${Math.random() * 100}%`,
                 width: `${Math.random() * 6 + 3}px`,
                 height: `${Math.random() * 6 + 3}px`,
@@ -54,7 +57,7 @@ const ParticleLayer: React.FC<ParticleLayerProps> = ({ type }) => {
             break;
         
         case 'rain':
-            particles = createParticles(150, i => ({
+            particles = createParticles(Math.max(5, Math.floor(150 * multiplier)), i => ({
                 left: `${Math.random() * 100}%`,
                 width: '1px',
                 height: `${Math.random() * 20 + 10}px`,
@@ -79,7 +82,7 @@ const ParticleLayer: React.FC<ParticleLayerProps> = ({ type }) => {
             break;
 
         case 'stars':
-            particles = createParticles(80, i => ({
+            particles = createParticles(Math.max(5, Math.floor(80 * multiplier)), i => ({
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
                 width: `${Math.random() * 2 + 1}px`,
@@ -101,7 +104,7 @@ const ParticleLayer: React.FC<ParticleLayerProps> = ({ type }) => {
             break;
 
         case 'bubbles':
-            particles = createParticles(40, i => ({
+            particles = createParticles(Math.max(2, Math.floor(40 * multiplier)), i => ({
                 left: `${Math.random() * 100}%`,
                 width: `${Math.random() * 20 + 5}px`,
                 height: `${Math.random() * 20 + 5}px`,
@@ -129,7 +132,7 @@ const ParticleLayer: React.FC<ParticleLayerProps> = ({ type }) => {
             break;
             
         case 'sparks':
-             particles = createParticles(50, i => ({
+             particles = createParticles(Math.max(2, Math.floor(50 * multiplier)), i => ({
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
                 width: `${Math.random() * 3 + 1}px`,

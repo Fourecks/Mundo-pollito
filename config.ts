@@ -31,6 +31,6 @@ export const config = {
   // Si creas una integración pública en Notion (https://www.notion.so/my-integrations)
   // puedes configurar el Client ID y Client Secret aquí o como variables de entorno.
   // Esto habilitará la redirección directa al login oficial de Notion sin copiar/pegar nada.
-  NOTION_CLIENT_ID: import.meta.env.VITE_NOTION_CLIENT_ID || "",
-  NOTION_CLIENT_SECRET: import.meta.env.VITE_NOTION_CLIENT_SECRET || "",
+  NOTION_CLIENT_ID: (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_NOTION_CLIENT_ID) || "",
+  NOTION_CLIENT_SECRET: (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_NOTION_CLIENT_SECRET) || "",
 };

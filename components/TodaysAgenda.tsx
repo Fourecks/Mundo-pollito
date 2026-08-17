@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Todo, Subtask, QuickNote, GoogleCalendarEvent } from '../types';
+import { Todo, Subtask, QuickNote, GoogleCalendarEvent, FocusSession } from '../types';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import ClockIcon from './icons/ClockIcon';
 import PlusIcon from './icons/PlusIcon';
@@ -18,14 +18,38 @@ interface AgendaItemProps {
   task: Todo;
   onToggleTask: (taskId: number) => void;
   onToggleSubtask: (taskId: number, subtaskId: number) => void;
+  activeFocusTaskId?: number | null;
+  onSelectFocusTask?: (taskId: number | null) => void;
+  focusSessions?: FocusSession[];
+  isFocusTimerRunning?: boolean;
 }
 
-const AgendaItem: React.FC<AgendaItemProps> = ({ task, onToggleTask, onToggleSubtask }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+const AgendaItem: React.FC<AgendaItemProps> = ({ 
+  task, 
+  onToggleTask, 
+  onToggleSubtask,
+  activeFocusTaskId = null,
+  onSelectFocusTask,
+  focusSessions = [],
+  isFocusTimerRunning = false
+}) => {
+  const [isExpanded, useState_isExpanded] = useState(false);
   const hasSubtasks = task.subtasks && task.subtasks.length > 0;
 
+  const isCurrentlyFocused = activeFocusTaskId === task.id;
+
+  const focusTimeForTask = useMemo(() => {
+    return focusSessions
+      .filter(s => s.task_id === task.id)
+      .reduce((acc, curr) => acc + curr.duration, 0);
+  }, [focusSessions, task.id]);
+
   return (
-    <div className="bg-white/60 dark:bg-gray-700/50 p-2 rounded-lg text-sm transition-all duration-200">
+    <div className={`p-2 rounded-lg text-sm transition-all duration-200 border ${
+      isCurrentlyFocused && isFocusTimerRunning
+        ? 'bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900/40 ring-1 ring-red-200/50 dark:ring-red-900/30 shadow-sm animate-pulse'
+        : 'bg-white/60 dark:bg-gray-700/50 border-transparent'
+    }`}>
       <div className="flex items-center gap-2">
         <div className="flex-shrink-0">
           <label className="flex items-center cursor-pointer">
@@ -59,8 +83,41 @@ const AgendaItem: React.FC<AgendaItemProps> = ({ task, onToggleTask, onToggleSub
             {task.text}
           </p>
         </div>
+        
+        {/* Focus timer indicator & target button */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {focusTimeForTask > 0 && (
+            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100/70 dark:bg-red-950/60 text-red-600 dark:text-red-400 text-[10px] font-bold rounded border border-red-200/50 dark:border-red-900/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+              {focusTimeForTask}m
+            </span>
+          )}
+          {!task.completed && onSelectFocusTask && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectFocusTask(isCurrentlyFocused ? null : task.id);
+              }}
+              title={isCurrentlyFocused ? (isFocusTimerRunning ? "Detener enfoque" : "Enfoque pausado") : "Enfocar en esta tarea con Pomodoro"}
+              className={`p-1 rounded-md transition-all duration-150 ${
+                isCurrentlyFocused 
+                  ? isFocusTimerRunning 
+                    ? 'bg-red-500 text-white shadow-sm ring-2 ring-red-300 dark:ring-red-900/60' 
+                    : 'bg-sky-50 text-sky-600 dark:bg-sky-950/30 dark:text-sky-400 ring-1 ring-sky-300/50 dark:ring-sky-800/50'
+                  : 'text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-gray-600/50'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                <circle cx="12" cy="12" r="5" strokeWidth="2" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+          )}
+        </div>
+
         {hasSubtasks && (
-          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 rounded-full hover:bg-yellow-200 dark:hover:bg-gray-600 transition-colors flex-shrink-0">
+          <button onClick={() => useState_isExpanded(!isExpanded)} className="p-1 rounded-full hover:bg-yellow-200 dark:hover:bg-gray-600 transition-colors flex-shrink-0">
             <ChevronDownIcon className={`h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
           </button>
         )}
@@ -124,7 +181,16 @@ const CalendarEventItem: React.FC<{ event: GoogleCalendarEvent }> = ({ event }) 
     );
 };
 
-const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'calendarEvents' | 'onToggleTask' | 'onToggleSubtask'>> = ({ tasks, calendarEvents, onToggleTask, onToggleSubtask }) => {
+const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'calendarEvents' | 'onToggleTask' | 'onToggleSubtask' | 'activeFocusTaskId' | 'onSelectFocusTask' | 'focusSessions' | 'isFocusTimerRunning'>> = ({ 
+  tasks, 
+  calendarEvents, 
+  onToggleTask, 
+  onToggleSubtask,
+  activeFocusTaskId,
+  onSelectFocusTask,
+  focusSessions,
+  isFocusTimerRunning = false
+}) => {
     
     const agendaItems = useMemo(() => {
         const taskItems = tasks.map(t => ({ ...t, itemType: 'task' as const, sortKey: t.start_time || '23:59:59' }));
@@ -137,8 +203,14 @@ const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'calendarEvents' | 
             })
             .map(e => ({ ...e, itemType: 'event' as const, sortKey: e.start.dateTime ? e.start.dateTime.split('T')[1] : '00:00:00' }));
         
-        return [...taskItems, ...eventItems].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-    }, [tasks, calendarEvents]);
+        return [...taskItems, ...eventItems].sort((a, b) => {
+            if (isFocusTimerRunning && activeFocusTaskId) {
+                if (a.itemType === 'task' && a.id === activeFocusTaskId) return -1;
+                if (b.itemType === 'task' && b.id === activeFocusTaskId) return 1;
+            }
+            return a.sortKey.localeCompare(b.sortKey);
+        });
+    }, [tasks, calendarEvents, isFocusTimerRunning, activeFocusTaskId]);
 
     return (
       <>
@@ -150,6 +222,10 @@ const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'calendarEvents' | 
                 task={item}
                 onToggleTask={onToggleTask}
                 onToggleSubtask={onToggleSubtask}
+                activeFocusTaskId={activeFocusTaskId}
+                onSelectFocusTask={onSelectFocusTask}
+                focusSessions={focusSessions}
+                isFocusTimerRunning={isFocusTimerRunning}
               />
             ) : (
               <CalendarEventItem key={`event-${item.id}`} event={item} />
@@ -232,6 +308,10 @@ interface TodaysAgendaProps {
   onAddQuickNote: (text: string) => void;
   onDeleteQuickNote: (id: number) => void;
   onClearAllQuickNotes: () => void;
+  activeFocusTaskId?: number | null;
+  onSelectFocusTask?: (taskId: number | null) => void;
+  focusSessions?: FocusSession[];
+  isFocusTimerRunning?: boolean;
 }
 
 const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
@@ -243,7 +323,11 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
         quickNotes,
         onAddQuickNote,
         onDeleteQuickNote,
-        onClearAllQuickNotes
+        onClearAllQuickNotes,
+        activeFocusTaskId = null,
+        onSelectFocusTask,
+        focusSessions = [],
+        isFocusTimerRunning = false
     } = props;
     const [activeView, setActiveView] = useState<'agenda' | 'notes'>('agenda');
     
@@ -265,7 +349,16 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
             </div>
             <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
                  {activeView === 'agenda' ? (
-                    <AgendaView tasks={tasks} calendarEvents={calendarEvents} onToggleTask={onToggleTask} onToggleSubtask={onToggleSubtask} />
+                    <AgendaView 
+                        tasks={tasks} 
+                        calendarEvents={calendarEvents} 
+                        onToggleTask={onToggleTask} 
+                        onToggleSubtask={onToggleSubtask} 
+                        activeFocusTaskId={activeFocusTaskId}
+                        onSelectFocusTask={onSelectFocusTask}
+                        focusSessions={focusSessions}
+                        isFocusTimerRunning={isFocusTimerRunning}
+                    />
                  ) : (
                     <NotesView 
                         quickNotes={quickNotes} 

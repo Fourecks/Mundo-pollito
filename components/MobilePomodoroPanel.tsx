@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CloseIcon from './icons/CloseIcon';
+import { Todo } from '../types';
 
 type Durations = { work: number; break: number };
 
@@ -12,15 +13,25 @@ interface MobilePomodoroPanelProps {
   onToggleBackgroundTimer: () => void;
   backgroundTimerOpacity: number;
   onSetBackgroundTimerOpacity: (opacity: number) => void;
+  tasks?: Todo[];
+  activeTaskId?: number | null;
+  onSelectTask?: (taskId: number | null) => void;
+  isFocusTimerRunning?: boolean;
 }
 
 const MobilePomodoroPanel: React.FC<MobilePomodoroPanelProps> = (props) => {
   const { 
     isOpen, onClose, durations, onSaveSettings, showBackgroundTimer, 
-    onToggleBackgroundTimer, backgroundTimerOpacity, onSetBackgroundTimerOpacity
+    onToggleBackgroundTimer, backgroundTimerOpacity, onSetBackgroundTimerOpacity,
+    tasks = [], activeTaskId = null, onSelectTask, isFocusTimerRunning = false
   } = props;
   
   const [tempDurations, setTempDurations] = useState({ work: durations.work / 60, break: durations.break / 60 });
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const selectedTask = useMemo(() => {
+    return tasks.find(t => t.id === activeTaskId);
+  }, [tasks, activeTaskId]);
   
   useEffect(() => {
     if (isOpen) {
@@ -56,6 +67,84 @@ const MobilePomodoroPanel: React.FC<MobilePomodoroPanelProps> = (props) => {
         </header>
         <main className="flex-grow p-4 overflow-y-auto custom-scrollbar">
             <div className="w-full max-w-sm mx-auto space-y-4">
+                {/* Tarea de enfoque */}
+                <div className="bg-white/50 dark:bg-gray-700/30 p-3 rounded-xl border border-secondary-light/40 dark:border-gray-700/50 relative">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                      Tarea de Enfoque Activa
+                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsDropdownOpen(o => !o)}
+                        className="w-full text-sm bg-white dark:bg-gray-700 border border-secondary-light dark:border-gray-600 text-gray-800 dark:text-gray-100 rounded-lg py-2 px-3 pr-8 focus:outline-none focus:ring-2 focus:ring-primary truncate text-left cursor-pointer font-medium flex items-center justify-between"
+                      >
+                        <span className="truncate flex items-center gap-1.5">
+                          {selectedTask ? (
+                            <>
+                              <span className={`w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0 ${isFocusTimerRunning ? 'animate-pulse' : ''}`} />
+                              <span className="truncate">{selectedTask.text}</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-400 dark:text-slate-500">General (Sin tarea)</span>
+                          )}
+                        </span>
+                        <span className="text-slate-400 absolute right-2.5">
+                          <svg className={`w-4 h-4 transform transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </span>
+                      </button>
+
+                      {isDropdownOpen && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                          <div className="absolute left-0 right-0 mt-1 z-50 max-h-[180px] overflow-y-auto bg-white dark:bg-gray-850 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 animate-pop-in scrollbar-none">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectTask?.(null);
+                                setIsDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-xs font-semibold flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${!activeTaskId ? 'text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0" />
+                              <span>General (Sin tarea)</span>
+                            </button>
+                            {tasks && tasks.length > 0 ? (
+                              tasks.map((task) => {
+                                const isCurrent = activeTaskId === task.id;
+                                const isUndated = !task.due_date;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={task.id}
+                                    onClick={() => {
+                                      onSelectTask?.(task.id);
+                                      setIsDropdownOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs truncate flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${isCurrent ? 'text-primary font-bold bg-primary/5' : 'text-slate-600 dark:text-slate-300'}`}
+                                  >
+                                    <span className="truncate flex items-center gap-2 flex-1 min-w-0">
+                                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isCurrent ? 'bg-primary' : 'bg-slate-400 dark:bg-slate-500'}`} />
+                                      <span className="truncate">{task.text}</span>
+                                    </span>
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-400 flex-shrink-0">
+                                      {isUndated ? 'Sin fecha' : (task.start_time || 'Hoy')}
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <div className="px-3 py-2.5 text-[10px] text-slate-400 dark:text-slate-500 italic text-center">
+                                No hay tareas pendientes
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                </div>
+
                 <div className="flex items-center justify-between">
                     <label className="font-medium text-gray-700 dark:text-gray-200">Pomodoro</label>
                     <div className="flex items-center gap-2">
@@ -70,7 +159,7 @@ const MobilePomodoroPanel: React.FC<MobilePomodoroPanelProps> = (props) => {
                       <span className="font-medium text-gray-500 dark:text-gray-400">min</span>
                     </div>
                 </div>
-                 <div className="pt-4 border-t border-secondary-light/50 dark:border-gray-600/50 space-y-3">
+                  <div className="pt-4 border-t border-secondary-light/50 dark:border-gray-600/50 space-y-3">
                   <label htmlFor="bg-timer-toggle-mobile" className="flex items-center justify-between cursor-pointer select-none">
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Temporizador de fondo</span>
                       <div className="relative">

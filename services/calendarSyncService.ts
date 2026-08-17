@@ -96,7 +96,6 @@ export class CalendarSyncService {
     calendarId: string = 'primary'
   ): Promise<{ id: string; htmlLink?: string } | null> {
     try {
-      // Calculate start and end date/time
       const todayStr = new Date().toISOString().split('T')[0];
       const startDateStr = todo.due_date || todayStr;
       const endDateStr = todo.end_date || startDateStr;
@@ -107,7 +106,6 @@ export class CalendarSyncService {
         const startDateTime = `${startDateStr}T${todo.start_time}:00`;
         let endDateTime = `${endDateStr}T${todo.end_time || todo.start_time}:00`;
         
-        // If end_time equals start_time or missing, default to +30 minutes
         if (!todo.end_time || todo.end_time === todo.start_time) {
           const [h, m] = todo.start_time.split(':').map(Number);
           const endD = new Date(`${startDateStr}T${todo.start_time}:00`);
@@ -132,8 +130,6 @@ export class CalendarSyncService {
           },
         };
       } else {
-        // All-day event
-        // For Google Calendar, end date for all day events is exclusive (day + 1)
         const nextDay = new Date(`${endDateStr}T00:00:00`);
         nextDay.setDate(nextDay.getDate() + 1);
         const endDayStr = nextDay.toISOString().split('T')[0];
@@ -215,7 +211,7 @@ export class CalendarSyncService {
         },
       });
 
-      return res.ok || res.status === 404; // 404 means it's already gone
+      return res.ok || res.status === 404;
     } catch (error) {
       console.error('Error deleting Google Calendar event:', error);
       return false;
@@ -233,8 +229,8 @@ export class CalendarSyncService {
   ): Promise<GoogleCalendarEvent[]> {
     try {
       const now = new Date();
-      const minDate = timeMin || new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-      const maxDate = timeMax || new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+      const minDate = timeMin || new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString();
+      const maxDate = timeMax || new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString();
 
       if (window.gapi && window.gapi.client && window.gapi.client.calendar) {
         const res = await window.gapi.client.calendar.events.list({
@@ -277,6 +273,27 @@ export class CalendarSyncService {
       }));
     } catch (e) {
       console.error('Error fetching Google Calendar events:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch list of user's Google Calendars
+   */
+  static async fetchGoogleCalendars(token: string): Promise<GoogleCalendar[]> {
+    try {
+      if (window.gapi && window.gapi.client && window.gapi.client.calendar) {
+        const res = await window.gapi.client.calendar.calendarList.list();
+        return res?.result?.items || [];
+      }
+      const res = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.items || [];
+    } catch (e) {
+      console.error('Error fetching Google calendars:', e);
       return [];
     }
   }
@@ -394,8 +411,8 @@ export class CalendarSyncService {
   ): Promise<GoogleCalendarEvent[]> {
     try {
       const now = new Date();
-      const minDate = timeMin || new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-      const maxDate = timeMax || new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+      const minDate = timeMin || new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString();
+      const maxDate = timeMax || new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString();
 
       const endpoint = calendarId && calendarId !== 'primary'
         ? `${MS_GRAPH_BASE}/me/calendars/${calendarId}/calendarView?startDateTime=${encodeURIComponent(minDate)}&endDateTime=${encodeURIComponent(maxDate)}`
@@ -456,8 +473,7 @@ export class CalendarSyncService {
    */
   static async connectOutlookAccount(clientId?: string): Promise<CalendarIntegrationAccount | null> {
     return new Promise((resolve) => {
-      // In web apps, we can connect using Microsoft identity OAuth endpoint
-      const msClientId = clientId || 'c8383f94-b258-45a7-bc18-2d8869c9b5aa'; // common public client or configurable
+      const msClientId = clientId || 'c8383f94-b258-45a7-bc18-2d8869c9b5aa';
       const redirectUri = window.location.origin;
       const scopes = encodeURIComponent('openid profile email Calendars.ReadWrite offline_access');
       const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${msClientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account`;
@@ -469,12 +485,11 @@ export class CalendarSyncService {
       );
 
       if (!popup) {
-        alert('Por favor permite las ventanas emergentes para iniciar sesión con Outlook.');
+        alert('La ventana emergente fue bloqueada por el navegador. Por favor permite las ventanas emergentes para conectar Outlook.');
         resolve(null);
         return;
       }
 
-      // Check for token in popup URL or message
       const interval = setInterval(() => {
         try {
           if (popup.closed) {
@@ -493,7 +508,6 @@ export class CalendarSyncService {
             clearInterval(interval);
 
             if (token) {
-              // Fetch user profile from Microsoft Graph
               fetch(`${MS_GRAPH_BASE}/me`, {
                 headers: { Authorization: `Bearer ${token}` },
               })
@@ -537,5 +551,92 @@ export class CalendarSyncService {
         }
       }, 500);
     });
+  }
+
+  /**
+   * Connect with manual token or direct Demo Account
+   */
+  static connectWithDirectToken(token: string, email: string = 'usuario@outlook.com', name: string = 'Outlook Account'): CalendarIntegrationAccount {
+    const account: CalendarIntegrationAccount = {
+      provider: 'outlook',
+      email,
+      name,
+      token,
+      expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
+      selectedCalendarId: 'primary',
+      selectedCalendarName: 'Calendario Principal',
+      autoSyncOnCreate: true,
+      connectedAt: new Date().toISOString(),
+    };
+    CalendarSyncService.saveAccount(account);
+    CalendarSyncService.setActiveProvider('outlook');
+    return account;
+  }
+
+  // ==========================================
+  // UNIVERSAL .ICS (ICAL / APPLE CALENDAR) EXPORT
+  // ==========================================
+
+  /**
+   * Export tasks and events to standard iCal (.ics) format
+   */
+  static exportToICS(todos: Todo[], events: GoogleCalendarEvent[]): void {
+    const formatDateToICS = (dateStr: string, timeStr?: string): string => {
+      if (timeStr) {
+        const [h, m] = timeStr.split(':');
+        const [year, month, day] = dateStr.split('-');
+        return `${year}${month}${day}T${h}${m}00`;
+      }
+      const [year, month, day] = dateStr.split('-');
+      return `${year}${month}${day}`;
+    };
+
+    let icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Pollito Productivo//Calendario v2.0//ES',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-CALNAME:Pollito Productivo Calendario',
+      'X-WR-TIMEZONE:' + (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'),
+    ];
+
+    // Add todos as VEVENT
+    todos.forEach((todo) => {
+      if (!todo.due_date) return;
+      const uid = `pollito_task_${todo.id}_${Date.now()}@pollitoproductivo.app`;
+      const created = new Date(todo.created_at || Date.now()).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      const isTimed = !!todo.start_time;
+      const dtStart = formatDateToICS(todo.due_date, todo.start_time);
+      const endDate = todo.end_date || todo.due_date;
+      const dtEnd = formatDateToICS(endDate, todo.end_time || (todo.start_time ? todo.start_time : undefined));
+
+      icsContent.push('BEGIN:VEVENT');
+      icsContent.push(`UID:${uid}`);
+      icsContent.push(`DTSTAMP:${created}`);
+      if (isTimed) {
+        icsContent.push(`DTSTART:${dtStart}`);
+        icsContent.push(`DTEND:${dtEnd}`);
+      } else {
+        icsContent.push(`DTSTART;VALUE=DATE:${dtStart}`);
+        icsContent.push(`DTEND;VALUE=DATE:${dtEnd}`);
+      }
+      icsContent.push(`SUMMARY:${todo.text.replace(/,/g, '\\,')}`);
+      icsContent.push(`DESCRIPTION:${(todo.notes || '🐥 Tarea de Pollito Productivo').replace(/\n/g, '\\n')}`);
+      icsContent.push(`STATUS:${todo.completed ? 'COMPLETED' : 'CONFIRMED'}`);
+      icsContent.push('END:VEVENT');
+    });
+
+    icsContent.push('END:VCALENDAR');
+
+    const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pollito_calendario_${new Date().toISOString().split('T')[0]}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 }

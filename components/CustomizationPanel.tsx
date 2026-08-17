@@ -41,6 +41,9 @@ interface CustomizationPanelProps {
   setParticleType: (type: ParticleType) => void;
   ambientSound: { type: AmbientSoundType; volume: number };
   setAmbientSound: (sound: { type: AmbientSoundType; volume: number }) => void;
+  enableBatterySaver: boolean;
+  setEnableBatterySaver: (enabled: boolean) => void;
+  batteryStatus: any;
 }
 
 // #region Tab Content Components
@@ -115,8 +118,95 @@ const soundOptions: { type: AmbientSoundType; icon: React.FC; label: string }[] 
     { type: 'ocean', icon: WaveIcon, label: 'Mar' },
 ];
 
-const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setParticleType' | 'ambientSound' | 'setAmbientSound'>> = ({ particleType, setParticleType, ambientSound, setAmbientSound }) => (
+const BatteryIcon: React.FC<{ className?: string }> = ({ className = "h-5 w-5" }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
+        <line x1="22" x2="22" y1="11" y2="13" />
+    </svg>
+);
+
+const ZapIcon: React.FC<{ className?: string }> = ({ className = "h-5 w-5" }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+);
+
+const BatterySaverSection: React.FC<{
+    enableBatterySaver: boolean;
+    setEnableBatterySaver: (enabled: boolean) => void;
+    batteryStatus: any;
+}> = ({ enableBatterySaver, setEnableBatterySaver, batteryStatus }) => {
+    const isSavingActive = enableBatterySaver && batteryStatus.isLow;
+
+    return (
+        <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-xl shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <BatteryIcon className={`h-5 w-5 ${batteryStatus.isLow ? 'text-red-500 animate-pulse' : 'text-gray-500 dark:text-gray-400'}`} />
+                    <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm">Ahorro de Batería</h4>
+                </div>
+                {batteryStatus.supported && (
+                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                        {batteryStatus.charging && <ZapIcon className="h-3 w-3 text-amber-500" />}
+                        {Math.round(batteryStatus.level * 100)}%
+                    </span>
+                )}
+            </div>
+
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Reduce automáticamente las partículas a un 25% y desactiva los fondos de video animados cuando la batería esté por debajo del 20% para ahorrar energía.
+            </p>
+
+            <div className="flex items-center justify-between pt-2 border-t border-secondary-light/30 dark:border-gray-700/30">
+                <label htmlFor="battery-saver-toggle" className="text-xs font-semibold text-gray-600 dark:text-gray-300 cursor-pointer">
+                    Activar ahorro automático
+                </label>
+                <button
+                    id="battery-saver-toggle"
+                    onClick={() => setEnableBatterySaver(!enableBatterySaver)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                        enableBatterySaver ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
+                    }`}
+                    role="switch"
+                    aria-checked={enableBatterySaver}
+                >
+                    <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            enableBatterySaver ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                    />
+                </button>
+            </div>
+
+            {isSavingActive && (
+                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/30 rounded-lg flex items-center gap-2 animate-fade-in">
+                    <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                    <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                        Modo ahorro activo: Partículas reducidas y fondo animado desactivado.
+                    </span>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setParticleType' | 'ambientSound' | 'setAmbientSound' | 'enableBatterySaver' | 'setEnableBatterySaver' | 'batteryStatus'>> = ({ 
+    particleType, 
+    setParticleType, 
+    ambientSound, 
+    setAmbientSound,
+    enableBatterySaver,
+    setEnableBatterySaver,
+    batteryStatus
+}) => (
     <div className="space-y-4 animate-fade-in">
+        <BatterySaverSection 
+            enableBatterySaver={enableBatterySaver} 
+            setEnableBatterySaver={setEnableBatterySaver} 
+            batteryStatus={batteryStatus} 
+        />
+
         <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-xl shadow-sm">
             <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-3 text-center">Partículas</h4>
             <div className="grid grid-cols-3 gap-2">

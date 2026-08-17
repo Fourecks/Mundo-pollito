@@ -12,12 +12,15 @@ interface ModalWindowProps {
   frameless?: boolean;
   isDraggable?: boolean;
   isResizable?: boolean;
+  minWidth?: number;
+  minHeight?: number;
   windowState?: WindowState | null;
   onStateChange?: (state: WindowState) => void;
   zIndex?: number;
   onFocus?: () => void;
   noHeader?: boolean;
   allowFullscreen?: boolean;
+  overflowVisible?: boolean;
 }
 
 const ModalWindow: React.FC<ModalWindowProps> = ({ 
@@ -29,12 +32,15 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
   frameless = false, 
   isDraggable = false, 
   isResizable = false, 
+  minWidth = 280,
+  minHeight = 140,
   windowState, 
   onStateChange, 
   zIndex, 
   onFocus, 
   noHeader = false,
-  allowFullscreen = false
+  allowFullscreen = false,
+  overflowVisible = false
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -85,12 +91,14 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     } else if (interactionInfo.current.isResizing) {
       const dw = e.clientX - interactionInfo.current.startX;
       const dh = e.clientY - interactionInfo.current.startY;
+      const minW = minWidth ?? 280;
+      const minH = minHeight ?? 140;
       setSize({
-        width: Math.max(400, interactionInfo.current.startWidth + dw),
-        height: Math.max(300, interactionInfo.current.startHeight + dh),
+        width: Math.max(minW, interactionInfo.current.startWidth + dw),
+        height: Math.max(minH, interactionInfo.current.startHeight + dh),
       });
     }
-  }, []);
+  }, [minWidth, minHeight]);
 
   const handleMouseUp = useCallback(() => {
     if (interactionInfo.current.isDragging || interactionInfo.current.isResizing) {
@@ -217,8 +225,17 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
           <>
             {!noHeader && (
               <header 
-                className="flex items-center justify-between p-2 border-b border-secondary-light/30 dark:border-gray-700/50 flex-shrink-0 drag-handle animate-fade-in"
+                className="flex items-center justify-between p-2 border-b border-secondary-light/30 dark:border-gray-700/50 flex-shrink-0 drag-handle animate-fade-in select-none"
                 style={{ cursor: isDraggable && !isFullscreen ? 'move' : 'default' }}
+                onDoubleClick={() => {
+                  if (hasInteracted) {
+                    setHasInteracted(false);
+                    setPos({ x: 0, y: 0 });
+                    setSize({ width: 0, height: 0 });
+                    onStateChange?.({ pos: { x: 0, y: 0 }, size: { width: 0, height: 0 } });
+                  }
+                }}
+                title={isDraggable ? "Arrastra para mover • Doble clic para restaurar posición y tamaño inicial" : undefined}
               >
                 <h2 className="text-lg font-bold text-primary-dark dark:text-primary truncate pl-2">{title}</h2>
                 <div className="flex items-center gap-1">
@@ -230,8 +247,17 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                       title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                     >
                       {isFullscreen ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 4v5H4m5 0L3 3m11 1v5h5m-5 0l6-6M9 20v-5H4m5 0l-6 6m11-1v-5h5m-5 0l6 6" />
+                        <svg 
+                          xmlns="http://www.w3.org/2000/svg" 
+                          className="h-5 w-5" 
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor" 
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 14h6v6M20 14h-6v6M4 10h6V4M20 10h-6V4" />
                         </svg>
                       ) : (
                         <ExpandIcon />
@@ -248,7 +274,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                 </div>
               </header>
             )}
-            <main className="flex-grow flex flex-col overflow-y-auto custom-scrollbar min-h-0 relative">
+            <main className={`flex-grow flex flex-col min-h-0 relative ${overflowVisible ? 'overflow-visible' : 'overflow-y-auto custom-scrollbar'}`}>
               {children}
             </main>
           </>

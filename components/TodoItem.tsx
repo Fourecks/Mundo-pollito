@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Todo, Priority, Subtask } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Todo, Priority, Subtask, FocusSession } from '../types';
 import SubtaskIcon from './icons/SubtaskIcon';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 
@@ -11,6 +11,10 @@ interface TodoItemProps {
   onEdit: (todo: Todo) => void;
   onToggleSubtask: (taskId: number, subtaskId: number) => void;
   color?: string | null;
+  activeFocusTaskId?: number | null;
+  onSelectFocusTask?: (taskId: number | null) => void;
+  focusSessions?: FocusSession[];
+  isFocusTimerRunning?: boolean;
 }
 
 const priorityMap: { [key in Priority]: { color: string; label: string, borderColor: string } } = {
@@ -48,7 +52,19 @@ const formatDueDate = (todo: Todo): string => {
 };
 
 
-const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate, onEdit, onToggleSubtask, color }) => {
+const TodoItem: React.FC<TodoItemProps> = ({ 
+  todo, 
+  onToggle, 
+  onDelete, 
+  onUpdate, 
+  onEdit, 
+  onToggleSubtask, 
+  color,
+  activeFocusTaskId = null,
+  onSelectFocusTask,
+  focusSessions = [],
+  isFocusTimerRunning = false
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleSubtaskToggle = (subtaskId: number) => {
@@ -57,6 +73,13 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
 
   const hasSubtasks = todo.subtasks && todo.subtasks.length > 0;
   const dueDateText = formatDueDate(todo);
+  const isFocused = activeFocusTaskId === todo.id;
+
+  const taskFocusTime = useMemo(() => {
+    return focusSessions
+      .filter(s => s.task_id === todo.id)
+      .reduce((acc, curr) => acc + curr.duration, 0);
+  }, [focusSessions, todo.id]);
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 border-l-4 ${todo.completed ? 'opacity-70' : ''} ${priorityMap[todo.priority].borderColor}`}>
@@ -104,6 +127,30 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete, onUpdate,
         
         {/* Right side controls */}
         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+            {taskFocusTime > 0 && (
+                <span className="text-[10px] font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                    ⏱️ {taskFocusTime} min
+                </span>
+            )}
+            {onSelectFocusTask && !todo.completed && (
+                <button
+                    onClick={() => onSelectFocusTask(isFocused ? null : todo.id)}
+                    className={`p-1 rounded-full transition-all duration-200 ${
+                        isFocused
+                            ? isFocusTimerRunning
+                                ? 'bg-red-500 text-white shadow-sm ring-2 ring-red-300 dark:ring-red-900/60 scale-110 animate-pulse'
+                                : 'bg-sky-50 text-sky-600 dark:bg-sky-950/30 dark:text-sky-400 scale-105 ring-1 ring-sky-300/50 dark:ring-sky-800/50'
+                            : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+                    }`}
+                    title={isFocused ? (isFocusTimerRunning ? "Enfoque activo y corriendo" : "Enfoque pausado") : "Establecer como tarea de enfoque actual"}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <circle cx="12" cy="12" r="10" strokeWidth="2"/>
+                        <circle cx="12" cy="12" r="6" strokeWidth="2"/>
+                        <circle cx="12" cy="12" r="2" strokeWidth="2" fill="currentColor"/>
+                    </svg>
+                </button>
+            )}
             {dueDateText && (
                 <span className="text-xs font-medium text-primary-dark dark:text-primary bg-primary-light/50 dark:bg-primary/20 px-2 py-0.5 rounded-full whitespace-nowrap">
                     {dueDateText}

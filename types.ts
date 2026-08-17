@@ -183,6 +183,15 @@ export interface HabitRecord {
 }
 // --- End Habit Tracker Types ---
 
+export interface FocusSession {
+  id: number;
+  user_id?: string;
+  completed_at: string; // YYYY-MM-DD
+  duration: number; // in minutes
+  task_id?: number;
+  task_title?: string;
+}
+
 // --- Calendar Integration Types ---
 export type CalendarProvider = 'google' | 'outlook' | 'none';
 

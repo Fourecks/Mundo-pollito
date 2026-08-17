@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Todo, Project, Habit, HabitRecord, HabitFrequency } from '../types';
+import { Todo, Project, Habit, HabitRecord, HabitFrequency, FocusSession } from '../types';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import {
@@ -107,6 +107,7 @@ interface ProgressViewProps {
   projects: Project[];
   habits: Habit[];
   habitRecords: HabitRecord[];
+  focusSessions?: FocusSession[];
   onBack?: () => void;
 }
 
@@ -115,6 +116,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
   projects,
   habits,
   habitRecords,
+  focusSessions,
   onBack
 }) => {
   const [period, setPeriod] = useState<'week' | 'month'>('week');
@@ -236,6 +238,63 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
     return (totalCompleted / daysList.length).toFixed(1);
   }, [totalCompleted, daysList]);
 
+  // Focus sessions calculations for selected period
+  const { focusChartData, totalFocusMinutes, prevFocusMinutes, focusTrendText, totalFocusSessions, averageFocusSessionDuration, dailyFocusAverage } = useMemo(() => {
+    const sessions = focusSessions || [];
+    let periodTotal = 0;
+    let periodSessionsCount = 0;
+
+    const data = daysList.map((d) => {
+      const dateKey = d.toISOString().split('T')[0];
+      const daySessions = sessions.filter(s => s.completed_at === dateKey);
+      const minutes = daySessions.reduce((acc, s) => acc + s.duration, 0);
+      periodTotal += minutes;
+      periodSessionsCount += daySessions.length;
+
+      const dayLabel = period === 'week'
+        ? d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase()
+        : d.getDate().toString();
+
+      return {
+        dateKey,
+        label: dayLabel,
+        Minutos: minutes,
+      };
+    });
+
+    let prevTotal = 0;
+    const pStart = new Date(prevStart);
+    const pEnd = new Date(prevEnd);
+    for (let d = new Date(pStart); d <= pEnd; d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toISOString().split('T')[0];
+      const daySessions = sessions.filter(s => s.completed_at === dateKey);
+      prevTotal += daySessions.reduce((acc, s) => acc + s.duration, 0);
+    }
+
+    const diff = periodTotal - prevTotal;
+    let trend = 'vs periodo anterior';
+    if (diff > 0) {
+      trend = `+${diff} min vs anterior`;
+    } else if (diff < 0) {
+      trend = `${diff} min vs anterior`;
+    } else {
+      trend = `Igual vs anterior`;
+    }
+
+    const averageDuration = periodSessionsCount > 0 ? Math.round(periodTotal / periodSessionsCount) : 0;
+    const dailyAvg = daysList.length > 0 ? Math.round(periodTotal / daysList.length) : 0;
+
+    return {
+      focusChartData: data,
+      totalFocusMinutes: periodTotal,
+      prevFocusMinutes: prevTotal,
+      focusTrendText: trend,
+      totalFocusSessions: periodSessionsCount,
+      averageFocusSessionDuration: averageDuration,
+      dailyFocusAverage: dailyAvg,
+    };
+  }, [daysList, focusSessions, period, prevStart, prevEnd]);
+
   // Project Focus Breakdown
   const projectFocusData = useMemo(() => {
     const counts = new Map<number, { count: number; name: string; color: string }>();
@@ -346,7 +405,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
       <div className="flex-grow overflow-y-auto custom-scrollbar space-y-4">
 
         {/* Metric Cards Grid - Simple & Clean */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200 dark:border-slate-800">
             <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
               Tareas Completadas
@@ -356,6 +415,18 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
             </div>
             <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-normal">
               {growthPercentage >= 0 ? `+${growthPercentage}%` : `${growthPercentage}%`} vs periodo anterior
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200 dark:border-slate-800">
+            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+              Tiempo Enfocado
+            </div>
+            <div className="text-2xl font-semibold text-indigo-600 dark:text-indigo-400">
+              {totalFocusMinutes >= 60 ? `${Math.floor(totalFocusMinutes / 60)}h ${totalFocusMinutes % 60}m` : `${totalFocusMinutes}m`}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-normal truncate">
+              {focusTrendText}
             </div>
           </div>
 
@@ -533,6 +604,74 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
                   />
                 </BarChart>
               )}
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* SECTION 1.5: FOCUS STATISTICS PANEL */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+            <div>
+              <h3 className="font-semibold text-sm text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                Estadísticas de Enfoque (Concentración)
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Tiempo total acumulado dedicado a tareas y estudio</p>
+            </div>
+
+            {/* Quick Metrics in Header */}
+            <div className="flex items-center gap-4 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-slate-400">SESIONES</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{totalFocusSessions} comp.</span>
+              </div>
+              <div className="h-6 w-px bg-slate-200 dark:bg-slate-800" />
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-slate-400">PROMEDIO</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{averageFocusSessionDuration} min</span>
+              </div>
+              <div className="h-6 w-px bg-slate-200 dark:bg-slate-800" />
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-slate-400">DIARIO</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{dailyFocusAverage} min</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full h-60 pt-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={focusChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="indigoGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  label={{ value: 'Minutos', angle: -90, position: 'insideLeft', offset: 10, fill: '#94a3b8', fontSize: 10, fontWeight: 500 }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="Minutos"
+                  name="Minutos de Enfoque"
+                  stroke="#6366f1"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#indigoGradient)"
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
