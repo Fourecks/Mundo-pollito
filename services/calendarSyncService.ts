@@ -173,6 +173,9 @@ export class CalendarSyncService {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.error('Failed to create Google Calendar event:', err);
+        if (res.status === 403) {
+          alert('Error 403 (Permiso Denegado) en Google Calendar.\n\nPosibles causas:\n1. No has habilitado la "Google Calendar API" en tu Google Cloud Console.\n2. Al iniciar sesión, no marcaste la casilla para darle permisos de calendario a la app.');
+        }
         return null;
       }
 
@@ -289,7 +292,12 @@ export class CalendarSyncService {
       const res = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        if (res.status === 403) {
+          console.error('Error 403 fetching calendars. Make sure Google Calendar API is enabled and scopes are granted.');
+        }
+        return [];
+      }
       const data = await res.json();
       return data.items || [];
     } catch (e) {
@@ -473,7 +481,7 @@ export class CalendarSyncService {
    */
   static async connectOutlookAccount(clientId?: string): Promise<CalendarIntegrationAccount | null> {
     return new Promise((resolve) => {
-      const msClientId = clientId || 'c8383f94-b258-45a7-bc18-2d8869c9b5aa';
+      const msClientId = clientId || '425536a2-6c7e-47ef-9288-43cae78ffe31';
       const redirectUri = window.location.origin;
       const scopes = encodeURIComponent('openid profile email Calendars.ReadWrite offline_access');
       const authUrl = `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?client_id=${msClientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&prompt=select_account`;

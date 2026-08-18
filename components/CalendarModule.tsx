@@ -222,10 +222,17 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
       if (dateKey) {
         ensureDate(dateKey);
-        if (evt.provider === 'outlook') {
-          map[dateKey].outlookEvents.push(evt);
-        } else {
-          map[dateKey].googleEvents.push(evt);
+        
+        // Evitar duplicados: Si la tarea local ya tiene este gcal_event_id, no la agregamos
+        // como un evento externo porque ya se está mostrando como tarea local.
+        const isDuplicate = map[dateKey].tasks.some(t => t.gcal_event_id === evt.id);
+        
+        if (!isDuplicate) {
+          if (evt.provider === 'outlook') {
+            map[dateKey].outlookEvents.push(evt);
+          } else {
+            map[dateKey].googleEvents.push(evt);
+          }
         }
       }
     });
@@ -1761,26 +1768,6 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                   </div>
                 )}
               </div>
-              
-              {!localOutlookAccount && (
-                <div className="space-y-2 pt-2 border-t border-blue-200/50 dark:border-blue-800/40 text-xs">
-                  <div>
-                    <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Client ID de Azure (Opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={outlookClientIdInput}
-                      onChange={(e) => setOutlookClientIdInput(e.target.value)}
-                      placeholder="Deja en blanco para usar el por defecto..."
-                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                    />
-                    <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                      Si creaste tu propia app en Azure, pega el Client ID aquí. Asegúrate de configurar los tipos de cuenta como <b>"Cualquier directorio organizativo y cuentas personales (Skype, Xbox, etc.)"</b> o te dará error <i>unauthorized_client</i>.
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* INTEGRATION CARD 3: NOTION */}
