@@ -2374,6 +2374,32 @@ const App: React.FC = () => {
 
     const savedTodo = await syncableUpdate('todos', updatedTodo);
     
+    // Sync to external calendars
+    if (savedTodo.gcal_event_id && savedTodo.calendar_provider) {
+      let newCalResult: any = false;
+      if (savedTodo.calendar_provider === 'google' && gcalSettings.enabled && googleApiToken && gapiReady) {
+        const calId = gcalSettings.calendarId || 'primary';
+        newCalResult = await CalendarSyncService.updateGoogleEvent(savedTodo, googleApiToken, savedTodo.gcal_event_id, calId);
+      } else if (savedTodo.calendar_provider === 'outlook') {
+        const currentOutlook = CalendarSyncService.getAccount('outlook');
+        if (currentOutlook && currentOutlook.token) {
+          const calId = currentOutlook.selectedCalendarId || 'primary';
+          newCalResult = await CalendarSyncService.updateOutlookEvent(savedTodo, currentOutlook.token, savedTodo.gcal_event_id, calId);
+        }
+      }
+      
+      if (typeof newCalResult === 'object' && newCalResult.id) {
+         // The event was recreated, so we must save the new ID
+         savedTodo.gcal_event_id = newCalResult.id;
+         if (newCalResult.htmlLink) savedTodo.calendar_event_link = newCalResult.htmlLink;
+         await syncableUpdate('todos', savedTodo);
+         setAllTodos(current => getUpdatedTodosState(current, savedTodo));
+      } else if (newCalResult === false) {
+         // The event failed to update completely. Maybe we should unlink it? Or just leave it.
+         console.warn('Sync to calendar failed for task', savedTodo.id);
+      }
+    }
+
     // Sync to Notion if page ID exists and Notion is enabled
     try {
       const notionSet = NotionService.getSettings();
@@ -2600,6 +2626,22 @@ const App: React.FC = () => {
       }
     } catch (notionErr) {
       console.warn("Auto Notion delete error:", notionErr);
+    }
+    
+    // Sync delete to external calendars
+    if (todoToDelete?.gcal_event_id && todoToDelete?.calendar_provider) {
+      try {
+        if (todoToDelete.calendar_provider === 'google' && googleApiToken && gapiReady) {
+            await CalendarSyncService.deleteGoogleEvent(todoToDelete.gcal_event_id, googleApiToken, gcalSettings.calendarId || 'primary');
+        } else if (todoToDelete.calendar_provider === 'outlook') {
+            const currentOutlook = CalendarSyncService.getAccount('outlook');
+            if (currentOutlook && currentOutlook.token) {
+                await CalendarSyncService.deleteOutlookEvent(todoToDelete.gcal_event_id, currentOutlook.token);
+            }
+        }
+      } catch (calErr) {
+        console.warn("Auto Calendar delete error:", calErr);
+      }
     }
 
     await syncableDelete('todos', id);

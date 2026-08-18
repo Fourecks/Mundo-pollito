@@ -1039,6 +1039,8 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                                     {t.start_time}
                                   </span>
                                   <span className="truncate">{t.text}</span>
+                                  {t.calendar_provider === 'google' && <div className="w-2 h-2 ml-auto"><GoogleIcon /></div>}
+                                  {t.calendar_provider === 'outlook' && <div className="w-2 h-2 ml-auto"><OutlookIcon /></div>}
                                 </div>
                               </div>
                             ))}
@@ -1129,8 +1131,10 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                             {t.completed && <span className="text-xs">✓</span>}
                           </button>
                           <div className="truncate">
-                            <div className={`text-xs font-semibold truncate ${t.completed ? 'line-through' : ''}`}>
+                            <div className={`text-xs font-semibold truncate flex items-center gap-1 ${t.completed ? 'line-through' : ''}`}>
                               {t.text}
+                              {t.calendar_provider === 'google' && <div className="w-3 h-3 ml-1" title="Sincronizado con Google"><GoogleIcon /></div>}
+                              {t.calendar_provider === 'outlook' && <div className="w-3 h-3 ml-1" title="Sincronizado con Outlook"><OutlookIcon /></div>}
                             </div>
                             {t.start_time && (
                               <div className="text-[10px] text-gray-400 font-mono">
@@ -1202,7 +1206,11 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                           }}
                           className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-xs font-bold text-amber-900 dark:text-amber-200 shadow-sm flex items-center justify-between"
                         >
-                          <span>🐥 {t.text}</span>
+                          <span className="flex items-center gap-1">
+                            🐥 {t.text}
+                            {t.calendar_provider === 'google' && <div className="w-3 h-3 ml-1"><GoogleIcon /></div>}
+                            {t.calendar_provider === 'outlook' && <div className="w-3 h-3 ml-1"><OutlookIcon /></div>}
+                          </span>
                           <span className="text-[10px] opacity-75 font-mono">{t.start_time} - {t.end_time || '+30m'}</span>
                         </div>
                       ))}

@@ -191,6 +191,99 @@ export class CalendarSyncService {
   }
 
   /**
+   * Update event in Google Calendar
+   */
+  static async updateGoogleEvent(
+    todo: Todo,
+    token: string,
+    eventId: string,
+    calendarId: string = 'primary'
+  ): Promise<boolean | { id: string; htmlLink?: string }> {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const startDateStr = todo.due_date || todayStr;
+      const endDateStr = todo.end_date || startDateStr;
+
+      let eventResource: any;
+
+      if (todo.start_time) {
+        let startDateTime = `${startDateStr}T${todo.start_time}:00`;
+        let endDateTime = `${endDateStr}T${todo.end_time || todo.start_time}:00`;
+        if (!todo.end_time) {
+          const endD = new Date(startDateTime);
+          endD.setMinutes(endD.getMinutes() + 30);
+          const endHours = String(endD.getHours()).padStart(2, '0');
+          const endMins = String(endD.getMinutes()).padStart(2, '0');
+          endDateTime = `${startDateStr}T${endHours}:${endMins}:00`;
+        }
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        eventResource = {
+          summary: todo.text,
+          description: todo.notes || '',
+          start: { dateTime: startDateTime, timeZone },
+          end: { dateTime: endDateTime, timeZone },
+        };
+      } else {
+        const nextDayDate = new Date(`${endDateStr}T00:00:00`);
+        nextDayDate.setDate(nextDayDate.getDate() + 1);
+        const nextDayStr = nextDayDate.toISOString().split('T')[0];
+        eventResource = {
+          summary: todo.text,
+          description: todo.notes || '',
+          start: { date: startDateStr },
+          end: { date: nextDayStr },
+        };
+      }
+
+      if (window.gapi && window.gapi.client && window.gapi.client.calendar) {
+        try {
+          await window.gapi.client.calendar.events.update({
+            calendarId: calendarId || 'primary',
+            eventId: eventId,
+            resource: eventResource,
+          });
+          return true;
+        } catch (gapiErr: any) {
+          if (gapiErr?.result?.error?.code === 404 || gapiErr?.status === 404) {
+            console.warn('Event not found in Google Calendar during update, recreating it...');
+            const insertResult = await this.insertGoogleEvent(todo, token, calendarId);
+            return insertResult || false;
+          }
+          throw gapiErr;
+        }
+      }
+
+      const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId || 'primary')}/events/${encodeURIComponent(eventId)}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventResource),
+      });
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('Event not found in Google Calendar during update, recreating it...');
+          const insertResult = await this.insertGoogleEvent(todo, token, calendarId);
+          return insertResult || false;
+        }
+        console.error('Failed to update Google event:', await res.json().catch(() => ({})));
+        return false;
+      }
+      return true;
+    } catch (error: any) {
+      if (error?.result?.error?.code === 404 || error?.status === 404) {
+        console.warn('Event not found in Google Calendar during update, recreating it...');
+        const insertResult = await this.insertGoogleEvent(todo, token, calendarId);
+        return insertResult || false;
+      }
+      console.error('Error updating Google Calendar event:', error);
+      return false;
+    }
+  }
+
+  /**
    * Delete event from Google Calendar
    */
   static async deleteGoogleEvent(
@@ -200,11 +293,19 @@ export class CalendarSyncService {
   ): Promise<boolean> {
     try {
       if (window.gapi && window.gapi.client && window.gapi.client.calendar) {
-        await window.gapi.client.calendar.events.delete({
-          calendarId: calendarId || 'primary',
-          eventId: eventId,
-        });
-        return true;
+        try {
+          await window.gapi.client.calendar.events.delete({
+            calendarId: calendarId || 'primary',
+            eventId: eventId,
+          });
+          return true;
+        } catch (gapiErr: any) {
+          if (gapiErr?.result?.error?.code === 404 || gapiErr?.result?.error?.code === 410 || gapiErr?.status === 404 || gapiErr?.status === 410) {
+            console.warn('Event already deleted or not found in Google Calendar');
+            return true; // Already deleted
+          }
+          throw gapiErr;
+        }
       }
 
       const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId || 'primary')}/events/${encodeURIComponent(eventId)}`, {
@@ -324,9 +425,16 @@ export class CalendarSyncService {
       const endDateStr = todo.end_date || startDateStr;
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-      let startDateTime = `${startDateStr}T00:00:00`;
-      let endDateTime = `${endDateStr}T23:59:59`;
       let isAllDay = true;
+      let startDateTime = `${startDateStr}T00:00:00`;
+      
+      // Microsoft Graph API requires all-day events to end at midnight of the following day
+      const endDObj = new Date(`${endDateStr}T00:00:00`);
+      endDObj.setDate(endDObj.getDate() + 1);
+      const nextDayY = endDObj.getFullYear();
+      const nextDayM = String(endDObj.getMonth() + 1).padStart(2, '0');
+      const nextDayD = String(endDObj.getDate()).padStart(2, '0');
+      let endDateTime = `${nextDayY}-${nextDayM}-${nextDayD}T00:00:00`;
 
       if (todo.start_time) {
         isAllDay = false;
@@ -334,7 +442,6 @@ export class CalendarSyncService {
         if (todo.end_time && todo.end_time !== todo.start_time) {
           endDateTime = `${endDateStr}T${todo.end_time}:00`;
         } else {
-          const [h, m] = todo.start_time.split(':').map(Number);
           const endD = new Date(`${startDateStr}T${todo.start_time}:00`);
           endD.setMinutes(endD.getMinutes() + 30);
           const endHours = String(endD.getHours()).padStart(2, '0');
@@ -392,6 +499,85 @@ export class CalendarSyncService {
   }
 
   /**
+   * Update event in Outlook Calendar
+   */
+  static async updateOutlookEvent(
+    todo: Todo,
+    token: string,
+    eventId: string,
+    calendarId: string = 'primary'
+  ): Promise<boolean | { id: string; htmlLink?: string }> {
+    try {
+      const startDateStr = todo.due_date || new Date().toISOString().split('T')[0];
+      const endDateStr = todo.end_date || startDateStr;
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+      let isAllDay = true;
+      let startDateTime = `${startDateStr}T00:00:00`;
+      
+      const endDObj = new Date(`${endDateStr}T00:00:00`);
+      endDObj.setDate(endDObj.getDate() + 1);
+      const nextDayY = endDObj.getFullYear();
+      const nextDayM = String(endDObj.getMonth() + 1).padStart(2, '0');
+      const nextDayD = String(endDObj.getDate()).padStart(2, '0');
+      let endDateTime = `${nextDayY}-${nextDayM}-${nextDayD}T00:00:00`;
+
+      if (todo.start_time) {
+        isAllDay = false;
+        startDateTime = `${startDateStr}T${todo.start_time}:00`;
+        if (todo.end_time && todo.end_time !== todo.start_time) {
+          endDateTime = `${endDateStr}T${todo.end_time}:00`;
+        } else {
+          const endD = new Date(`${startDateStr}T${todo.start_time}:00`);
+          endD.setMinutes(endD.getMinutes() + 30);
+          const endHours = String(endD.getHours()).padStart(2, '0');
+          const endMins = String(endD.getMinutes()).padStart(2, '0');
+          endDateTime = `${startDateStr}T${endHours}:${endMins}:00`;
+        }
+      }
+
+      const eventResource = {
+        subject: todo.text,
+        body: {
+          contentType: 'HTML',
+          content: todo.notes || '',
+        },
+        start: { dateTime: startDateTime, timeZone },
+        end: { dateTime: endDateTime, timeZone },
+        isAllDay,
+      };
+
+      const url = calendarId === 'primary' || !calendarId
+        ? `${MS_GRAPH_BASE}/me/events/${encodeURIComponent(eventId)}`
+        : `${MS_GRAPH_BASE}/me/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`;
+
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventResource),
+      });
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('Event not found in Outlook during update, recreating it...');
+          const insertResult = await this.insertOutlookEvent(todo, token, calendarId);
+          return insertResult || false;
+        }
+        const errorData = await res.json().catch(() => ({}));
+        console.error('Failed to update Outlook event:', errorData);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Error updating Outlook event:', e);
+      return false;
+    }
+  }
+
+  /**
    * Delete event from Outlook Calendar
    */
   static async deleteOutlookEvent(eventId: string, token: string): Promise<boolean> {
@@ -402,9 +588,14 @@ export class CalendarSyncService {
           Authorization: `Bearer ${token}`,
         },
       });
-      return res.ok || res.status === 404;
-    } catch (error) {
-      console.error('Error deleting Outlook event:', error);
+
+      if (!res.ok && res.status !== 404 && res.status !== 410) {
+        console.error('Failed to delete Outlook event:', await res.json().catch(() => ({})));
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Error deleting Outlook event:', e);
       return false;
     }
   }
