@@ -498,6 +498,19 @@ export class CalendarSyncService {
             return;
           }
 
+          if (popup.location.href.includes('error=')) {
+            const hash = popup.location.hash.substring(1) || popup.location.search.substring(1);
+            const params = new URLSearchParams(hash);
+            const error = params.get('error');
+            const errorDesc = params.get('error_description');
+            console.error('Outlook auth error:', error, errorDesc);
+            popup.close();
+            clearInterval(interval);
+            alert(`Error de Outlook: ${errorDesc || error}`);
+            resolve(null);
+            return;
+          }
+
           if (popup.location.href.includes('access_token=')) {
             const hash = popup.location.hash.substring(1);
             const params = new URLSearchParams(hash);

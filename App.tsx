@@ -3276,10 +3276,10 @@ const App: React.FC = () => {
 
   const handleSyncToCalendar = useCallback(async (todo: Todo) => {
     try {
-      const provider = CalendarSyncService.getActiveProvider();
       const currentOutlook = CalendarSyncService.getAccount('outlook');
 
-      if (provider === 'google' && gcalSettings.enabled && googleApiToken && gapiReady) {
+      // Sync to Google
+      if (gcalSettings.enabled && googleApiToken && gapiReady) {
         const calId = gcalSettings.calendarId || 'primary';
         const calResult = await CalendarSyncService.insertGoogleEvent(todo, googleApiToken, calId);
         if (calResult && calResult.id) {
@@ -3291,7 +3291,10 @@ const App: React.FC = () => {
           };
           await syncableUpdate('todos', updatedTodo);
         }
-      } else if (currentOutlook && currentOutlook.token) {
+      } 
+      
+      // Sync to Outlook
+      if (currentOutlook && currentOutlook.token) {
         const calId = currentOutlook.selectedCalendarId || 'primary';
         const calResult = await CalendarSyncService.insertOutlookEvent(todo, currentOutlook.token, calId);
         if (calResult && calResult.id) {
