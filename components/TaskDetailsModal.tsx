@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Todo, Subtask, Priority, RecurrenceRule, Project } from '../types';
+import { Todo, Subtask, Priority, RecurrenceRule, Project, CalendarProvider } from '../types';
 import { NotionService } from '../services/notionService';
+import { CalendarSyncService } from '../services/calendarSyncService';
 import CloseIcon from './icons/CloseIcon';
 import PlusIcon from './icons/PlusIcon';
 import TrashIcon from './icons/TrashIcon';
@@ -18,7 +19,7 @@ interface TaskDetailsModalProps {
   onSave: (todo: Todo) => void;
   onDelete?: (id: number) => void;
   onRemoveFromCalendar?: (todoId: number) => Promise<void> | void;
-  onSyncToCalendar?: (todo: Todo) => Promise<void> | void;
+  onSyncToCalendar?: (todo: Todo, provider?: CalendarProvider) => Promise<void> | void;
   todo: Todo | null;
   projects: Project[];
 }
@@ -65,6 +66,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
   const [isRemovingCalendar, setIsRemovingCalendar] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [calendarSyncStatus, setCalendarSyncStatus] = useState<string | null>(null);
+  const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
   // Confirmation modal state
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
@@ -107,6 +110,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
       setNotes(todo.notes || '');
       setRecurrence(todo.recurrence || { frequency: 'none' });
       setCalendarSyncStatus(null);
+      setSyncNotice(null);
+      setIsAccountPickerOpen(false);
       setIsRemovingCalendar(false);
       setIsSyncingCalendar(false);
 
@@ -149,9 +154,45 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     }
   };
 
-  const handleSyncToCalendarAction = async () => {
+  const getConnectedCalendarAccounts = () => {
+    const isGoogleConnected = typeof window !== 'undefined' && (
+      !!(window as any).gapi?.client?.getToken?.() ||
+      !!CalendarSyncService.getAccount('google') ||
+      !!localStorage.getItem('pollito_google_token')
+    );
+    const googleAccount = CalendarSyncService.getAccount('google');
+    const outlookAccount = CalendarSyncService.getAccount('outlook');
+    const isOutlookConnected = !!(outlookAccount && outlookAccount.token);
+
+    return {
+      isGoogleConnected,
+      googleEmail: googleAccount?.email || 'Google Calendar',
+      isOutlookConnected,
+      outlookEmail: outlookAccount?.email || 'Outlook Calendar',
+      totalCount: (isGoogleConnected ? 1 : 0) + (isOutlookConnected ? 1 : 0)
+    };
+  };
+
+  const handleInitiateSync = () => {
+    setSyncNotice(null);
+    const accounts = getConnectedCalendarAccounts();
+
+    if (accounts.totalCount > 1) {
+      // Prompt user to select which account to sync to
+      setIsAccountPickerOpen(true);
+    } else if (accounts.isGoogleConnected) {
+      handleSyncToCalendarAction('google');
+    } else if (accounts.isOutlookConnected) {
+      handleSyncToCalendarAction('outlook');
+    } else {
+      setSyncNotice('Debes conectar tu cuenta de Google u Outlook en Calendario > Integraciones para sincronizar.');
+    }
+  };
+
+  const handleSyncToCalendarAction = async (provider?: CalendarProvider) => {
     if (!todo) return;
     setIsSyncingCalendar(true);
+    setIsAccountPickerOpen(false);
     try {
       if (onSyncToCalendar) {
         await onSyncToCalendar({
@@ -163,7 +204,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
           end_time: hasTime ? end_time : undefined,
           notes,
           priority,
-        });
+        }, provider);
       }
       setCalendarSyncStatus('synced');
     } catch (e) {
@@ -746,21 +787,41 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900/80 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {calendarSyncStatus === 'removed' 
-                      ? '✓ Evento eliminado del calendario. La tarea permanece guardada.'
-                      : 'Esta tarea no está vinculada a un evento de calendario.'}
-                  </span>
-                  {onSyncToCalendar && !isUndated && (
-                    <button
-                      type="button"
-                      onClick={handleSyncToCalendarAction}
-                      disabled={isSyncingCalendar}
-                      className="px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors flex items-center gap-1"
-                    >
-                      {isSyncingCalendar ? 'Sincronizando...' : 'Sincronizar ahora'}
-                    </button>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900/80 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {calendarSyncStatus === 'removed' 
+                        ? '✓ Evento eliminado del calendario. La tarea permanece guardada.'
+                        : 'Esta tarea no está vinculada a un evento de calendario.'}
+                    </span>
+                    {onSyncToCalendar && !isUndated && (
+                      <button
+                        type="button"
+                        onClick={handleInitiateSync}
+                        disabled={isSyncingCalendar}
+                        className="px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors flex items-center gap-1.5"
+                      >
+                        {isSyncingCalendar ? (
+                          <>
+                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            <span>Sincronizando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CalendarIcon className="w-3.5 h-3.5 text-primary" />
+                            <span>Sincronizar ahora</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {syncNotice && (
+                    <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200">
+                      {syncNotice}
+                    </div>
                   )}
                 </div>
               )}
@@ -800,6 +861,80 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
           </footer>
         </form>
       </div>
+
+      {/* Account Selection Modal */}
+      {isAccountPickerOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-700">
+              <h4 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+                <CalendarIcon className="w-4 h-4 text-primary" />
+                <span>¿A cuál cuenta sincronizar?</span>
+              </h4>
+              <button
+                onClick={() => setIsAccountPickerOpen(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Detectamos múltiples cuentas de calendario conectadas. Elige dónde crear este evento:
+            </p>
+
+            <div className="space-y-2">
+              {getConnectedCalendarAccounts().isGoogleConnected && (
+                <button
+                  type="button"
+                  onClick={() => handleSyncToCalendarAction('google')}
+                  className="w-full p-3 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-all text-left flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-5 h-5 flex-shrink-0"><GoogleIcon /></div>
+                    <div>
+                      <div className="font-bold text-xs text-sky-900 dark:text-sky-200">Google Calendar</div>
+                      <div className="text-[10px] text-sky-600 dark:text-sky-400">
+                        {getConnectedCalendarAccounts().googleEmail}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-sky-600 dark:text-sky-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                </button>
+              )}
+
+              {getConnectedCalendarAccounts().isOutlookConnected && (
+                <button
+                  type="button"
+                  onClick={() => handleSyncToCalendarAction('outlook')}
+                  className="w-full p-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all text-left flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-5 h-5 flex-shrink-0"><OutlookIcon /></div>
+                    <div>
+                      <div className="font-bold text-xs text-blue-900 dark:text-blue-200">Outlook Calendar</div>
+                      <div className="text-[10px] text-blue-600 dark:text-blue-400">
+                        {getConnectedCalendarAccounts().outlookEmail}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                </button>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsAccountPickerOpen(false)}
+                className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmationModal
         isOpen={isConfirmDeleteOpen}

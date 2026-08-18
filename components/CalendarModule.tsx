@@ -35,6 +35,7 @@ export interface CalendarModuleProps {
   onSelectDate?: (date: Date) => void;
   onEditTodo: (todo: Todo) => void;
   onToggleTodo: (id: number) => void;
+  onDeleteTodo?: (id: number) => void;
   onAddTodo?: (text: string, options?: any) => Promise<void>;
   googleApiToken?: string | null;
   googleToken?: string | null;
@@ -61,6 +62,26 @@ const formatDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const formatTimeFromISO = (iso: string): string => {
+  try {
+    const d = new Date(iso);
+    const h = d.getHours().toString().padStart(2, '0');
+    const m = d.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+  } catch {
+    return '09:00';
+  }
+};
+
+const getVirtualId = (idStr: string): number => {
+  let hash = 0;
+  for (let i = 0; i < idStr.length; i++) {
+    hash = (hash << 5) - hash + idStr.charCodeAt(i);
+    hash |= 0;
+  }
+  return -Math.abs(hash || 999999);
+};
+
 const parseDateKey = (dateKey: string): Date => {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day);
@@ -84,6 +105,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
   onSelectDate,
   onEditTodo,
   onToggleTodo,
+  onDeleteTodo,
   onAddTodo,
   googleApiToken,
   googleToken,
@@ -188,30 +210,30 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
     return list;
   }, [allTodos]);
 
-  // Map events and tasks by Date Key (YYYY-MM-DD)
+  // Map events and tasks by Date Key (YYYY-MM-DD) with FULL RECONCILIATION / DATA MERGING
   const itemsByDate = useMemo(() => {
     const map: {
       [dateKey: string]: {
         tasks: Todo[];
-        googleEvents: GoogleCalendarEvent[];
-        outlookEvents: GoogleCalendarEvent[];
       };
     } = {};
 
     const ensureDate = (k: string) => {
       if (!map[k]) {
-        map[k] = { tasks: [], googleEvents: [], outlookEvents: [] };
+        map[k] = { tasks: [] };
       }
     };
 
-    // 1. Add Pollito Tasks
+    // 1. Add all local Pollito Tasks (cloned so we can enrich them if needed)
     Object.keys(allTodos).forEach(dateKey => {
       if (dateKey === 'undated') return;
       ensureDate(dateKey);
-      map[dateKey].tasks.push(...allTodos[dateKey]);
+      map[dateKey].tasks.push(...allTodos[dateKey].map(t => ({ ...t })));
     });
 
-    // 2. Add Google and Outlook Events
+    // 2. Reconcile Google & Outlook Events:
+    // If a task with this gcal_event_id OR matching date+title already exists, merge provider details.
+    // If no matching task exists, create a local task representation with provider metadata.
     calendarEvents.forEach(evt => {
       let dateKey: string | null = null;
       if (evt.start?.date) {
@@ -222,19 +244,62 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
       if (dateKey) {
         ensureDate(dateKey);
-        
-        // Evitar duplicados: Si la tarea local ya tiene este gcal_event_id, no la agregamos
-        // como un evento externo porque ya se está mostrando como tarea local.
-        const isDuplicate = map[dateKey].tasks.some(t => t.gcal_event_id === evt.id);
-        
-        if (!isDuplicate) {
-          if (evt.provider === 'outlook') {
-            map[dateKey].outlookEvents.push(evt);
-          } else {
-            map[dateKey].googleEvents.push(evt);
+        const dayTasks = map[dateKey].tasks;
+        const normalizedSummary = (evt.summary || '').trim().toLowerCase();
+
+        // Check for existing local task by ID or by text/date
+        const existingTask = dayTasks.find(t =>
+          (t.gcal_event_id && t.gcal_event_id === evt.id) ||
+          (!t.gcal_event_id && t.text.trim().toLowerCase() === normalizedSummary)
+        );
+
+        const provider = evt.provider === 'outlook' ? 'outlook' : 'google';
+
+        if (existingTask) {
+          // Merge metadata onto the existing local task
+          existingTask.gcal_event_id = evt.id;
+          existingTask.calendar_provider = provider;
+          if (evt.htmlLink) existingTask.calendar_event_link = evt.htmlLink;
+          if (!existingTask.start_time && evt.start?.dateTime) {
+            existingTask.start_time = formatTimeFromISO(evt.start.dateTime);
           }
+          if (!existingTask.end_time && evt.end?.dateTime) {
+            existingTask.end_time = formatTimeFromISO(evt.end.dateTime);
+          }
+          if (!existingTask.notes && evt.description) {
+            existingTask.notes = evt.description;
+          }
+        } else {
+          // Synthesize a local task object so it shares the unified task UI & features
+          const startTime = evt.start?.dateTime ? formatTimeFromISO(evt.start.dateTime) : undefined;
+          const endTime = evt.end?.dateTime ? formatTimeFromISO(evt.end.dateTime) : undefined;
+          const syntheticTask: Todo = {
+            id: getVirtualId(evt.id),
+            text: evt.summary || '(Sin título)',
+            completed: false,
+            priority: 'medium',
+            due_date: dateKey,
+            start_time: startTime,
+            end_time: endTime,
+            notes: evt.description || '',
+            gcal_event_id: evt.id,
+            calendar_provider: provider,
+            calendar_event_link: evt.htmlLink,
+          };
+          dayTasks.push(syntheticTask);
         }
       }
+    });
+
+    // Sort tasks in each date: completed last, by start_time first
+    Object.keys(map).forEach(dateKey => {
+      map[dateKey].tasks.sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        if (a.start_time && b.start_time) return a.start_time.localeCompare(b.start_time);
+        if (a.start_time) return -1;
+        if (b.start_time) return 1;
+        return 0;
+      });
     });
 
     return map;
@@ -256,19 +321,8 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
       return true;
     };
 
-    const filterEvent = (e: GoogleCalendarEvent, provider: 'google' | 'outlook') => {
-      if (filterSource === 'tasks' || filterSource === 'pending' || filterSource === 'notion') return false;
-      if (filterSource === 'google' && provider !== 'google') return false;
-      if (filterSource === 'outlook' && provider !== 'outlook') return false;
-      if (query && !e.summary.toLowerCase().includes(query) && !e.description?.toLowerCase().includes(query)) {
-        return false;
-      }
-      return true;
-    };
-
     return {
       filterTask,
-      filterEvent,
     };
   }, [searchQuery, filterSource]);
 
@@ -357,6 +411,56 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
     } finally {
       setIsSubmittingNew(false);
     }
+  };
+
+  // Delete Task / Remote Calendar Event Handler
+  const handleDeleteTask = async (task: Todo) => {
+    const isRemoteOnly = task.id < 0;
+    const confirmMsg = task.calendar_provider
+      ? `¿Eliminar "${task.text}"? También se eliminará de ${task.calendar_provider === 'google' ? 'Google Calendar' : 'Outlook'}.`
+      : `¿Eliminar la tarea "${task.text}"?`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    // 1. Delete from remote calendar if linked
+    if (task.gcal_event_id) {
+      try {
+        if (task.calendar_provider === 'google' && activeGoogleToken) {
+          await CalendarSyncService.deleteGoogleEvent(
+            task.gcal_event_id,
+            activeGoogleToken,
+            gcalSettings.calendarId || 'primary'
+          );
+        } else if (task.calendar_provider === 'outlook') {
+          const currentOutlook = CalendarSyncService.getAccount('outlook');
+          if (currentOutlook?.token) {
+            await CalendarSyncService.deleteOutlookEvent(task.gcal_event_id, currentOutlook.token);
+          }
+        }
+      } catch (calErr) {
+        console.warn('Error deleting remote calendar event:', calErr);
+      }
+    }
+
+    // 2. Delete local todo if not synthetic
+    if (!isRemoteOnly && onDeleteTodo) {
+      onDeleteTodo(task.id);
+    }
+
+    // 3. Refresh calendar events
+    if (handleRefreshEvents) {
+      try {
+        await handleRefreshEvents();
+      } catch (err) {
+        console.warn('Error refreshing after delete:', err);
+      }
+    }
+
+    setSyncFeedback('Elemento eliminado correctamente');
+    setTimeout(() => setSyncFeedback(null), 3000);
+    setSelectedEventDetails(null);
   };
 
   // Trigger Refresh
@@ -806,10 +910,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
               {monthGridDays.map((cell) => {
                 const dateItems = itemsByDate[cell.dateKey] || { tasks: [], googleEvents: [], outlookEvents: [] };
                 const filteredTasks = dateItems.tasks.filter(filteredTasksAndEvents.filterTask);
-                const filteredGoogle = dateItems.googleEvents.filter(e => filteredTasksAndEvents.filterEvent(e, 'google'));
-                const filteredOutlook = dateItems.outlookEvents.filter(e => filteredTasksAndEvents.filterEvent(e, 'outlook'));
-
-                const totalItemsCount = filteredTasks.length + filteredGoogle.length + filteredOutlook.length;
+                const totalItemsCount = filteredTasks.length;
                 const maxDisplay = 3;
 
                 return (
@@ -859,7 +960,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
                     {/* Event Chips List */}
                     <div className="flex-1 space-y-1 overflow-hidden">
-                      {/* Pollito Tasks */}
+                      {/* Unified Reconciled Tasks (Local + Google + Outlook) */}
                       {filteredTasks.slice(0, maxDisplay).map((task) => (
                         <div
                           key={task.id}
@@ -867,58 +968,46 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                             e.stopPropagation();
                             setSelectedEventDetails({ type: 'task', task });
                           }}
-                          className={`text-[11px] leading-tight px-1.5 py-0.5 rounded-md flex items-center gap-1 border truncate transition-transform hover:scale-[1.02] ${
+                          className={`text-[11px] leading-tight px-1.5 py-0.5 rounded-md flex items-center justify-between gap-1 border truncate transition-transform hover:scale-[1.02] ${
                             task.completed
                               ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 line-through'
                               : task.priority === 'urgent'
                               ? 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800/50 font-medium'
                               : task.priority === 'high'
                               ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/50'
-                              : 'bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-800/50'
+                              : task.calendar_provider === 'google'
+                              ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300 border-sky-200 dark:border-sky-800/50'
+                              : task.calendar_provider === 'outlook'
+                              ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800/50'
+                              : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50'
                           }`}
                         >
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onToggleTodo(task.id);
-                            }}
-                            className={`w-2.5 h-2.5 rounded-sm border flex items-center justify-center flex-shrink-0 cursor-pointer ${
-                              task.completed ? 'bg-primary border-primary text-white' : 'border-gray-400'
-                            }`}
-                          >
-                            {task.completed && <span className="text-[7px]">✓</span>}
-                          </span>
-                          <span className="truncate">{task.text}</span>
-                        </div>
-                      ))}
+                          <div className="flex items-center gap-1 min-w-0 truncate">
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleTodo(task.id);
+                              }}
+                              className={`w-2.5 h-2.5 rounded-sm border flex items-center justify-center flex-shrink-0 cursor-pointer ${
+                                task.completed ? 'bg-primary border-primary text-white' : 'border-gray-400'
+                              }`}
+                            >
+                              {task.completed && <span className="text-[7px]">✓</span>}
+                            </span>
+                            <span className="truncate">{task.text}</span>
+                          </div>
 
-                      {/* Google Events */}
-                      {filteredGoogle.slice(0, Math.max(0, maxDisplay - filteredTasks.length)).map((gEvt) => (
-                        <div
-                          key={gEvt.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEventDetails({ type: 'google', event: gEvt });
-                          }}
-                          className="text-[11px] leading-tight px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-200 border border-sky-200 dark:border-sky-800/60 truncate hover:scale-[1.02] transition-transform font-medium"
-                        >
-                          <div className="w-2.5 h-2.5 flex-shrink-0"><GoogleIcon /></div>
-                          <span className="truncate">{gEvt.summary}</span>
-                        </div>
-                      ))}
-
-                      {/* Outlook Events */}
-                      {filteredOutlook.slice(0, Math.max(0, maxDisplay - filteredTasks.length - filteredGoogle.length)).map((oEvt) => (
-                        <div
-                          key={oEvt.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEventDetails({ type: 'outlook', event: oEvt });
-                          }}
-                          className="text-[11px] leading-tight px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800/60 truncate hover:scale-[1.02] transition-transform font-medium"
-                        >
-                          <div className="w-2.5 h-2.5 flex-shrink-0"><OutlookIcon /></div>
-                          <span className="truncate">{oEvt.summary}</span>
+                          <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+                            {task.calendar_provider === 'google' && (
+                              <div className="w-2.5 h-2.5" title="Sincronizado con Google Calendar"><GoogleIcon /></div>
+                            )}
+                            {task.calendar_provider === 'outlook' && (
+                              <div className="w-2.5 h-2.5" title="Sincronizado con Outlook"><OutlookIcon /></div>
+                            )}
+                            {task.notion_page_id && (
+                              <div className="w-2.5 h-2.5" title="Sincronizado con Notion"><NotionIcon /></div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -992,25 +1081,11 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                     {weekGridDays.map((d) => {
                       const dateItems = itemsByDate[d.dateKey] || { tasks: [], googleEvents: [], outlookEvents: [] };
                       
-                      // Match tasks that start in this hour
+                      // Match unified tasks that start in this hour
                       const hourTasks = dateItems.tasks.filter(t => {
                         if (!t.start_time) return false;
                         const [h] = t.start_time.split(':').map(Number);
                         return h === hour && filteredTasksAndEvents.filterTask(t);
-                      });
-
-                      // Match Google events that start in this hour
-                      const hourGoogle = dateItems.googleEvents.filter(e => {
-                        if (!e.start?.dateTime) return false;
-                        const dObj = new Date(e.start.dateTime);
-                        return dObj.getHours() === hour && filteredTasksAndEvents.filterEvent(e, 'google');
-                      });
-
-                      // Match Outlook events that start in this hour
-                      const hourOutlook = dateItems.outlookEvents.filter(e => {
-                        if (!e.start?.dateTime) return false;
-                        const dObj = new Date(e.start.dateTime);
-                        return dObj.getHours() === hour && filteredTasksAndEvents.filterEvent(e, 'outlook');
                       });
 
                       return (
@@ -1031,48 +1106,25 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                                 className={`p-1.5 rounded-lg border text-xs shadow-sm truncate transition-transform hover:scale-[1.02] ${
                                   t.completed
                                     ? 'bg-gray-100 text-gray-400 border-gray-300 dark:bg-gray-800 dark:text-gray-500'
+                                    : t.calendar_provider === 'google'
+                                    ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-900 dark:text-sky-200 border-sky-300 dark:border-sky-700 font-semibold'
+                                    : t.calendar_provider === 'outlook'
+                                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border-blue-300 dark:border-blue-700 font-semibold'
                                     : 'bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 font-semibold'
                                 }`}
                               >
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400">
-                                    {t.start_time}
-                                  </span>
-                                  <span className="truncate">{t.text}</span>
-                                  {t.calendar_provider === 'google' && <div className="w-2 h-2 ml-auto"><GoogleIcon /></div>}
-                                  {t.calendar_provider === 'outlook' && <div className="w-2 h-2 ml-auto"><OutlookIcon /></div>}
-                                </div>
-                              </div>
-                            ))}
-
-                            {hourGoogle.map((g) => (
-                              <div
-                                key={g.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedEventDetails({ type: 'google', event: g });
-                                }}
-                                className="p-1.5 rounded-lg border bg-sky-50 dark:bg-sky-950/60 text-sky-900 dark:text-sky-200 border-sky-300 dark:border-sky-700 text-xs shadow-sm font-semibold truncate hover:scale-[1.02]"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <div className="w-3 h-3 flex-shrink-0"><GoogleIcon /></div>
-                                  <span className="truncate">{g.summary}</span>
-                                </div>
-                              </div>
-                            ))}
-
-                            {hourOutlook.map((o) => (
-                              <div
-                                key={o.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedEventDetails({ type: 'outlook', event: o });
-                                }}
-                                className="p-1.5 rounded-lg border bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border-blue-300 dark:border-blue-700 text-xs shadow-sm font-semibold truncate hover:scale-[1.02]"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <div className="w-3 h-3 flex-shrink-0"><OutlookIcon /></div>
-                                  <span className="truncate">{o.summary}</span>
+                                <div className="flex items-center justify-between gap-1">
+                                  <div className="flex items-center gap-1 truncate">
+                                    <span className="text-[10px] font-mono opacity-75">
+                                      {t.start_time}
+                                    </span>
+                                    <span className="truncate">{t.text}</span>
+                                  </div>
+                                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                                    {t.calendar_provider === 'google' && <div className="w-2.5 h-2.5"><GoogleIcon /></div>}
+                                    {t.calendar_provider === 'outlook' && <div className="w-2.5 h-2.5"><OutlookIcon /></div>}
+                                    {t.notion_page_id && <div className="w-2.5 h-2.5"><NotionIcon /></div>}
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -1132,9 +1184,10 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                           </button>
                           <div className="truncate">
                             <div className={`text-xs font-semibold truncate flex items-center gap-1 ${t.completed ? 'line-through' : ''}`}>
-                              {t.text}
-                              {t.calendar_provider === 'google' && <div className="w-3 h-3 ml-1" title="Sincronizado con Google"><GoogleIcon /></div>}
-                              {t.calendar_provider === 'outlook' && <div className="w-3 h-3 ml-1" title="Sincronizado con Outlook"><OutlookIcon /></div>}
+                              <span>{t.text}</span>
+                              {t.calendar_provider === 'google' && <div className="w-3 h-3 flex-shrink-0" title="Sincronizado con Google"><GoogleIcon /></div>}
+                              {t.calendar_provider === 'outlook' && <div className="w-3 h-3 flex-shrink-0" title="Sincronizado con Outlook"><OutlookIcon /></div>}
+                              {t.notion_page_id && <div className="w-3 h-3 flex-shrink-0" title="Sincronizado con Notion"><NotionIcon /></div>}
                             </div>
                             {t.start_time && (
                               <div className="text-[10px] text-gray-400 font-mono">
@@ -1176,16 +1229,6 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                   return h === hour && filteredTasksAndEvents.filterTask(t);
                 });
 
-                const slotGoogle = dayItems.googleEvents.filter(g => {
-                  if (!g.start?.dateTime) return false;
-                  return new Date(g.start.dateTime).getHours() === hour && filteredTasksAndEvents.filterEvent(g, 'google');
-                });
-
-                const slotOutlook = dayItems.outlookEvents.filter(o => {
-                  if (!o.start?.dateTime) return false;
-                  return new Date(o.start.dateTime).getHours() === hour && filteredTasksAndEvents.filterEvent(o, 'outlook');
-                });
-
                 return (
                   <div
                     key={hour}
@@ -1204,46 +1247,25 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                             e.stopPropagation();
                             setSelectedEventDetails({ type: 'task', task: t });
                           }}
-                          className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-xs font-bold text-amber-900 dark:text-amber-200 shadow-sm flex items-center justify-between"
+                          className={`p-2 rounded-lg border text-xs font-bold shadow-sm flex items-center justify-between ${
+                            t.completed
+                              ? 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-800 dark:text-gray-500'
+                              : t.calendar_provider === 'google'
+                              ? 'bg-sky-50 dark:bg-sky-950/60 border-sky-200 dark:border-sky-800 text-sky-900 dark:text-sky-200'
+                              : t.calendar_provider === 'outlook'
+                              ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200'
+                              : 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+                          }`}
                         >
-                          <span className="flex items-center gap-1">
-                            🐥 {t.text}
-                            {t.calendar_provider === 'google' && <div className="w-3 h-3 ml-1"><GoogleIcon /></div>}
-                            {t.calendar_provider === 'outlook' && <div className="w-3 h-3 ml-1"><OutlookIcon /></div>}
+                          <span className="flex items-center gap-1.5 truncate">
+                            {t.calendar_provider === 'google' ? <GoogleIcon /> : t.calendar_provider === 'outlook' ? <OutlookIcon /> : t.notion_page_id ? <NotionIcon /> : <span>🐥</span>}
+                            <span className="truncate">{t.text}</span>
                           </span>
-                          <span className="text-[10px] opacity-75 font-mono">{t.start_time} - {t.end_time || '+30m'}</span>
+                          <span className="text-[10px] opacity-75 font-mono flex-shrink-0 ml-2">{t.start_time} - {t.end_time || '+30m'}</span>
                         </div>
                       ))}
 
-                      {slotGoogle.map(g => (
-                        <div
-                          key={g.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEventDetails({ type: 'google', event: g });
-                          }}
-                          className="p-2 rounded-lg bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-xs font-bold text-sky-900 dark:text-sky-200 shadow-sm flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-1.5"><GoogleIcon /> {g.summary}</span>
-                          <span className="text-[10px] text-sky-600 dark:text-sky-400">Google Calendar</span>
-                        </div>
-                      ))}
-
-                      {slotOutlook.map(o => (
-                        <div
-                          key={o.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEventDetails({ type: 'outlook', event: o });
-                          }}
-                          className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs font-bold text-blue-900 dark:text-blue-200 shadow-sm flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-1.5"><OutlookIcon /> {o.summary}</span>
-                          <span className="text-[10px] text-blue-600 dark:text-blue-400">Outlook</span>
-                        </div>
-                      ))}
-
-                      {slotTasks.length === 0 && slotGoogle.length === 0 && slotOutlook.length === 0 && (
+                      {slotTasks.length === 0 && (
                         <div className="text-[11px] text-gray-300 dark:text-gray-700 py-0.5 group-hover:text-primary transition-colors">
                           + Haz clic para programar
                         </div>
@@ -1275,7 +1297,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
             </div>
 
             <div className="max-h-72 overflow-y-auto space-y-2">
-              {(itemsByDate[dayPreviewDate]?.tasks || []).map((t) => (
+              {((itemsByDate[dayPreviewDate]?.tasks || []).filter(filteredTasksAndEvents.filterTask)).map((t) => (
                 <div
                   key={t.id}
                   onClick={() => {
@@ -1284,40 +1306,21 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                   }}
                   className="p-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 flex items-center justify-between text-xs cursor-pointer hover:border-primary"
                 >
-                  <span className="font-bold">{t.text}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getPriorityColor(t.priority)}`}>
+                  <div className="flex items-center gap-2 truncate">
+                    {t.calendar_provider === 'google' ? <GoogleIcon /> : t.calendar_provider === 'outlook' ? <OutlookIcon /> : t.notion_page_id ? <NotionIcon /> : <span>🐥</span>}
+                    <span className="font-bold truncate">{t.text}</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${getPriorityColor(t.priority)}`}>
                     {t.priority}
                   </span>
                 </div>
               ))}
 
-              {(itemsByDate[dayPreviewDate]?.googleEvents || []).map((g) => (
-                <div
-                  key={g.id}
-                  onClick={() => {
-                    setDayPreviewDate(null);
-                    setSelectedEventDetails({ type: 'google', event: g });
-                  }}
-                  className="p-2.5 rounded-xl border bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800 flex items-center gap-2 text-xs font-bold text-sky-900 dark:text-sky-200 cursor-pointer"
-                >
-                  <GoogleIcon />
-                  <span>{g.summary}</span>
+              {((itemsByDate[dayPreviewDate]?.tasks || []).filter(filteredTasksAndEvents.filterTask)).length === 0 && (
+                <div className="text-center py-6 text-gray-400 text-xs">
+                  No hay tareas ni eventos en este día.
                 </div>
-              ))}
-
-              {(itemsByDate[dayPreviewDate]?.outlookEvents || []).map((o) => (
-                <div
-                  key={o.id}
-                  onClick={() => {
-                    setDayPreviewDate(null);
-                    setSelectedEventDetails({ type: 'outlook', event: o });
-                  }}
-                  className="p-2.5 rounded-xl border bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 flex items-center gap-2 text-xs font-bold text-blue-900 dark:text-blue-200 cursor-pointer"
-                >
-                  <OutlookIcon />
-                  <span>{o.summary}</span>
-                </div>
-              ))}
+              )}
             </div>
 
             <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 flex justify-end">
@@ -1530,7 +1533,37 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
             {/* Task Details */}
             {selectedEventDetails.task && (
-              <div className="space-y-3 text-xs">
+              <div className="space-y-3.5 text-xs">
+                {/* Integration status badge */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                    {selectedEventDetails.task.calendar_provider === 'google' && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                        <GoogleIcon /> Sincronizada con Google Calendar
+                      </span>
+                    )}
+                    {selectedEventDetails.task.calendar_provider === 'outlook' && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <OutlookIcon /> Sincronizada con Outlook Calendar
+                      </span>
+                    )}
+                    {selectedEventDetails.task.notion_page_id && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700">
+                        <NotionIcon /> Sincronizada con Notion
+                      </span>
+                    )}
+                    {!selectedEventDetails.task.calendar_provider && !selectedEventDetails.task.notion_page_id && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        🐥 Tarea Local de Pollito
+                      </span>
+                    )}
+                  </div>
+
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getPriorityColor(selectedEventDetails.task.priority)}`}>
+                    {selectedEventDetails.task.priority}
+                  </span>
+                </div>
+
                 <div>
                   <span className="text-gray-400 font-bold uppercase text-[10px]">Título</span>
                   <div className="text-sm font-black text-gray-900 dark:text-white">
@@ -1555,33 +1588,58 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
                 {selectedEventDetails.task.notes && (
                   <div>
-                    <span className="text-gray-400 font-bold uppercase text-[10px]">Notas</span>
-                    <div className="p-2 bg-gray-50 dark:bg-gray-900 rounded-lg text-gray-700 dark:text-gray-300">
+                    <span className="text-gray-400 font-bold uppercase text-[10px]">Notas / Descripción</span>
+                    <div className="p-2.5 bg-gray-50 dark:bg-gray-900 rounded-xl text-gray-700 dark:text-gray-300 max-h-36 overflow-y-auto whitespace-pre-wrap">
                       {selectedEventDetails.task.notes}
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
+                {selectedEventDetails.task.calendar_event_link && (
+                  <div className="pt-1">
+                    <a
+                      href={selectedEventDetails.task.calendar_event_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
+                    >
+                      <span>Abrir evento en {selectedEventDetails.task.calendar_provider === 'google' ? 'Google Calendar' : 'Outlook'}</span>
+                      <ExternalLinkIcon />
+                    </a>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700 gap-2">
                   <button
-                    onClick={() => {
-                      onEditTodo(selectedEventDetails.task!);
-                      setSelectedEventDetails(null);
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 font-bold text-xs"
+                    onClick={() => handleDeleteTask(selectedEventDetails.task!)}
+                    className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 font-bold text-xs flex items-center gap-1 transition-colors"
+                    title="Eliminar tarea y desvincular de calendarios"
                   >
-                    Editar Tarea Completa
+                    <TrashIcon />
+                    <span>Eliminar</span>
                   </button>
 
-                  <button
-                    onClick={() => {
-                      onToggleTodo(selectedEventDetails.task!.id);
-                      setSelectedEventDetails(null);
-                    }}
-                    className="px-4 py-1.5 rounded-xl bg-primary text-white font-bold text-xs shadow"
-                  >
-                    {selectedEventDetails.task.completed ? 'Marcar Pendiente' : 'Completar Tarea'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        onEditTodo(selectedEventDetails.task!);
+                        setSelectedEventDetails(null);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 font-bold text-xs"
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        onToggleTodo(selectedEventDetails.task!.id);
+                        setSelectedEventDetails(null);
+                      }}
+                      className="px-4 py-1.5 rounded-xl bg-primary text-white font-bold text-xs shadow"
+                    >
+                      {selectedEventDetails.task.completed ? 'Marcar Pendiente' : 'Completar Tarea'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

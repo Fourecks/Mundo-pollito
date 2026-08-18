@@ -193,44 +193,84 @@ const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'calendarEvents' | 
 }) => {
     
     const agendaItems = useMemo(() => {
-        const taskItems = tasks.map(t => ({ ...t, itemType: 'task' as const, sortKey: t.start_time || '23:59:59' }));
-
         const todayKey = new Date().toISOString().split('T')[0];
-        const eventItems = calendarEvents
-            .filter(e => {
-                const eventDate = e.start.dateTime ? e.start.dateTime.split('T')[0] : e.start.date;
-                return eventDate === todayKey;
-            })
-            .map(e => ({ ...e, itemType: 'event' as const, sortKey: e.start.dateTime ? e.start.dateTime.split('T')[1] : '00:00:00' }));
-        
-        return [...taskItems, ...eventItems].sort((a, b) => {
-            if (isFocusTimerRunning && activeFocusTaskId) {
-                if (a.itemType === 'task' && a.id === activeFocusTaskId) return -1;
-                if (b.itemType === 'task' && b.id === activeFocusTaskId) return 1;
+        const linkedGcalIds = new Set<string>();
+        const taskTitlesSet = new Set<string>();
+
+        // Process tasks for today
+        const processedTasks: Todo[] = [];
+        for (const t of tasks) {
+            if (t.gcal_event_id) {
+                linkedGcalIds.add(t.gcal_event_id);
             }
-            return a.sortKey.localeCompare(b.sortKey);
+            if (t.text) {
+                taskTitlesSet.add(t.text.trim().toLowerCase());
+            }
+            processedTasks.push(t);
+        }
+
+        // Process calendar events for today that aren't already represented in tasks
+        const syntheticTasksFromEvents: Todo[] = [];
+        for (const e of calendarEvents) {
+            const eventDate = e.start.dateTime ? e.start.dateTime.split('T')[0] : e.start.date;
+            if (eventDate !== todayKey) continue;
+            if (linkedGcalIds.has(e.id)) continue;
+            if (taskTitlesSet.has((e.summary || '').trim().toLowerCase())) continue;
+
+            const startTimeStr = e.start.dateTime ? e.start.dateTime.substring(11, 16) : undefined;
+            const endTimeStr = e.end?.dateTime ? e.end.dateTime.substring(11, 16) : undefined;
+
+            // Compute deterministic virtual ID
+            let hash = 0;
+            for (let i = 0; i < e.id.length; i++) {
+                hash = (hash << 5) - hash + e.id.charCodeAt(i);
+                hash |= 0;
+            }
+            const virtualId = -(Math.abs(hash) || 999999);
+
+            syntheticTasksFromEvents.push({
+                id: virtualId,
+                text: e.summary || 'Evento de calendario',
+                completed: false,
+                due_date: todayKey,
+                start_time: startTimeStr,
+                end_time: endTimeStr,
+                notes: e.description || e.location ? `${e.location ? '📍 ' + e.location + '\n' : ''}${e.description || ''}` : undefined,
+                priority: 'media',
+                gcal_event_id: e.id,
+                calendar_provider: (e as any).provider || 'google',
+                calendar_event_link: e.htmlLink,
+            });
+        }
+
+        const allCombined = [...processedTasks, ...syntheticTasksFromEvents];
+
+        return allCombined.sort((a, b) => {
+            if (isFocusTimerRunning && activeFocusTaskId) {
+                if (a.id === activeFocusTaskId) return -1;
+                if (b.id === activeFocusTaskId) return 1;
+            }
+            const timeA = a.start_time || '23:59:59';
+            const timeB = b.start_time || '23:59:59';
+            return timeA.localeCompare(timeB);
         });
     }, [tasks, calendarEvents, isFocusTimerRunning, activeFocusTaskId]);
 
     return (
       <>
         {agendaItems.length > 0 ? (
-          agendaItems.map(item =>
-            item.itemType === 'task' ? (
-              <AgendaItem
-                key={`task-${item.id}`}
-                task={item}
-                onToggleTask={onToggleTask}
-                onToggleSubtask={onToggleSubtask}
-                activeFocusTaskId={activeFocusTaskId}
-                onSelectFocusTask={onSelectFocusTask}
-                focusSessions={focusSessions}
-                isFocusTimerRunning={isFocusTimerRunning}
-              />
-            ) : (
-              <CalendarEventItem key={`event-${item.id}`} event={item} />
-            )
-          )
+          agendaItems.map(item => (
+            <AgendaItem
+              key={`task-${item.id}`}
+              task={item}
+              onToggleTask={onToggleTask}
+              onToggleSubtask={onToggleSubtask}
+              activeFocusTaskId={activeFocusTaskId}
+              onSelectFocusTask={onSelectFocusTask}
+              focusSessions={focusSessions}
+              isFocusTimerRunning={isFocusTimerRunning}
+            />
+          ))
         ) : (
           <div className="text-center text-gray-500 dark:text-gray-400 text-xs py-4 px-2">
             <p>No tienes nada para hoy.</p>

@@ -765,6 +765,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 selectedDate={selectedDate}
                 onSelectDate={setSelectedDate}
                 onEditTodo={setTaskToEdit}
+                onDeleteTodo={handleDeleteTodo}
                 onToggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
                 onAddTodo={handleAddTodo}
                 projects={projects}
@@ -3318,14 +3319,17 @@ const App: React.FC = () => {
     }
   }, [googleApiToken, gapiReady, gcalSettings.calendarId, outlookAccount?.token]);
 
-  const handleSyncToCalendar = useCallback(async (todo: Todo) => {
+  const handleSyncToCalendar = useCallback(async (todo: Todo, targetProvider?: CalendarProvider) => {
     try {
       const currentOutlook = CalendarSyncService.getAccount('outlook');
+      const isGoogleActive = gcalSettings.enabled && !!googleApiToken && !!gapiReady;
+      const isOutlookActive = !!(currentOutlook && currentOutlook.token);
 
-      // Sync to Google
-      if (gcalSettings.enabled && googleApiToken && gapiReady) {
+      const providerToUse = targetProvider || (isGoogleActive ? 'google' : isOutlookActive ? 'outlook' : null);
+
+      if (providerToUse === 'google' && isGoogleActive) {
         const calId = gcalSettings.calendarId || 'primary';
-        const calResult = await CalendarSyncService.insertGoogleEvent(todo, googleApiToken, calId);
+        const calResult = await CalendarSyncService.insertGoogleEvent(todo, googleApiToken!, calId);
         if (calResult && calResult.id) {
           const updatedTodo = {
             ...todo,
@@ -3333,12 +3337,13 @@ const App: React.FC = () => {
             calendar_event_link: calResult.htmlLink,
             calendar_provider: 'google' as CalendarProvider,
           };
+          setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
           await syncableUpdate('todos', updatedTodo);
+          if (loadAndValidateCalendarData) {
+            await loadAndValidateCalendarData();
+          }
         }
-      } 
-      
-      // Sync to Outlook
-      if (currentOutlook && currentOutlook.token) {
+      } else if (providerToUse === 'outlook' && isOutlookActive && currentOutlook) {
         const calId = currentOutlook.selectedCalendarId || 'primary';
         const calResult = await CalendarSyncService.insertOutlookEvent(todo, currentOutlook.token, calId);
         if (calResult && calResult.id) {
@@ -3348,13 +3353,17 @@ const App: React.FC = () => {
             calendar_event_link: calResult.htmlLink,
             calendar_provider: 'outlook' as CalendarProvider,
           };
+          setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
           await syncableUpdate('todos', updatedTodo);
+          if (loadAndValidateCalendarData) {
+            await loadAndValidateCalendarData();
+          }
         }
       }
     } catch (e) {
       console.error('Error syncing event to calendar:', e);
     }
-  }, [googleApiToken, gapiReady, gcalSettings.enabled, gcalSettings.calendarId]);
+  }, [googleApiToken, gapiReady, gcalSettings.enabled, gcalSettings.calendarId, loadAndValidateCalendarData]);
 
   // --- Supabase Backgrounds Logic ---
   const loadBackgroundsFromSupabase = useCallback(async () => {
