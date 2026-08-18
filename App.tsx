@@ -2222,7 +2222,9 @@ const App: React.FC = () => {
           };
           await syncableUpdate('todos', savedTodo);
         }
-      } else if (shouldSyncOutlook && outlookAccount && outlookAccount.token) {
+      } 
+      
+      if (shouldSyncOutlook && outlookAccount && outlookAccount.token) {
         const calId = outlookAccount.selectedCalendarId || 'primary';
         const calResult = await CalendarSyncService.insertOutlookEvent(savedTodo, outlookAccount.token, calId);
         if (calResult && calResult.id) {

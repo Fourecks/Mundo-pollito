@@ -374,8 +374,9 @@ export class CalendarSyncService {
       });
 
       if (!res.ok) {
-        const error = await res.json().catch(() => ({}));
-        console.error('Failed to create Outlook event:', error);
+        const errorData = await res.json().catch(() => ({}));
+        console.error('Failed to create Outlook event:', errorData);
+        alert(`Error al crear evento en Outlook:\n${errorData?.error?.message || 'Revisa la consola para más detalles.'}`);
         return null;
       }
 
