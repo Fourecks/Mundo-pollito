@@ -1258,7 +1258,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                           }`}
                         >
                           <span className="flex items-center gap-1.5 truncate">
-                            {t.calendar_provider === 'google' ? <GoogleIcon /> : t.calendar_provider === 'outlook' ? <OutlookIcon /> : t.notion_page_id ? <NotionIcon /> : <span>🐥</span>}
+                            {t.calendar_provider === 'google' ? <GoogleIcon /> : t.calendar_provider === 'outlook' ? <OutlookIcon /> : t.notion_page_id ? <NotionIcon /> : <CalendarIcon className="w-3.5 h-3.5 text-primary" />}
                             <span className="truncate">{t.text}</span>
                           </span>
                           <span className="text-[10px] opacity-75 font-mono flex-shrink-0 ml-2">{t.start_time} - {t.end_time || '+30m'}</span>
@@ -1307,7 +1307,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                   className="p-2.5 rounded-xl border bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 flex items-center justify-between text-xs cursor-pointer hover:border-primary"
                 >
                   <div className="flex items-center gap-2 truncate">
-                    {t.calendar_provider === 'google' ? <GoogleIcon /> : t.calendar_provider === 'outlook' ? <OutlookIcon /> : t.notion_page_id ? <NotionIcon /> : <span>🐥</span>}
+                    {t.calendar_provider === 'google' ? <GoogleIcon /> : t.calendar_provider === 'outlook' ? <OutlookIcon /> : t.notion_page_id ? <NotionIcon /> : <CalendarIcon className="w-3.5 h-3.5 text-primary" />}
                     <span className="font-bold truncate">{t.text}</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${getPriorityColor(t.priority)}`}>
@@ -1440,14 +1440,13 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                   Prioridad
                 </label>
                 <select
-                  value={newPriority}
+                  value={newPriority === 'urgent' ? 'high' : newPriority}
                   onChange={(e) => setNewPriority(e.target.value as Priority)}
                   className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
                 >
                   <option value="low">Baja</option>
                   <option value="medium">Media</option>
                   <option value="high">Alta</option>
-                  <option value="urgent">Urgente 🔥</option>
                 </select>
               </div>
 
@@ -1462,10 +1461,10 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                 >
                   <option value="pollito">Solo Tareas Locales</option>
                   <option value="google" disabled={!activeGoogleToken}>
-                    🔵 Google Calendar {!activeGoogleToken ? '(No conectado)' : ''}
+                    Google Calendar {!activeGoogleToken ? '(No conectado)' : ''}
                   </option>
                   <option value="outlook" disabled={!localOutlookAccount}>
-                    🔷 Microsoft Outlook {!localOutlookAccount ? '(No conectado)' : ''}
+                    Microsoft Outlook {!localOutlookAccount ? '(No conectado)' : ''}
                   </option>
                 </select>
               </div>
@@ -1514,7 +1513,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
               <div className="flex items-center gap-2">
                 {selectedEventDetails.type === 'google' && <GoogleIcon />}
                 {selectedEventDetails.type === 'outlook' && <OutlookIcon />}
-                {selectedEventDetails.type === 'task' && <span>🐥</span>}
+                {selectedEventDetails.type === 'task' && <CalendarIcon className="w-4 h-4 text-emerald-600" />}
                 <h3 className="font-extrabold text-base text-gray-900 dark:text-white">
                   {selectedEventDetails.type === 'task'
                     ? 'Detalle de Tarea'
@@ -1554,13 +1553,13 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                     )}
                     {!selectedEventDetails.task.calendar_provider && !selectedEventDetails.task.notion_page_id && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                        🐥 Tarea Local de Pollito
+                        Tarea Local
                       </span>
                     )}
                   </div>
 
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getPriorityColor(selectedEventDetails.task.priority)}`}>
-                    {selectedEventDetails.task.priority}
+                  <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-md ${getPriorityColor(selectedEventDetails.task.priority)}`}>
+                    {selectedEventDetails.task.priority === 'low' ? 'Baja' : selectedEventDetails.task.priority === 'high' || selectedEventDetails.task.priority === 'urgent' ? 'Alta' : 'Media'}
                   </span>
                 </div>
 

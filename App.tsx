@@ -2205,11 +2205,11 @@ const App: React.FC = () => {
       console.warn("Auto Notion sync notice:", notionErr);
     }
 
-    // Automatic Calendar Sync if integration is enabled
+    // Automatic Calendar Sync ONLY when explicitly selected/requested for this task
     try {
-      const shouldSyncGoogle = options?.syncToGoogle || (gcalSettings.enabled && googleApiToken && gapiReady);
+      const shouldSyncGoogle = options?.syncToGoogle === true;
       const outlookAccount = CalendarSyncService.getAccount('outlook');
-      const shouldSyncOutlook = options?.syncToOutlook || (outlookAccount && outlookAccount.token && outlookAccount.autoSyncOnCreate);
+      const shouldSyncOutlook = options?.syncToOutlook === true;
 
       if (shouldSyncGoogle && googleApiToken && gapiReady) {
         const calId = gcalSettings.calendarId || 'primary';
@@ -2223,9 +2223,7 @@ const App: React.FC = () => {
           };
           await syncableUpdate('todos', savedTodo);
         }
-      } 
-      
-      if (shouldSyncOutlook && outlookAccount && outlookAccount.token) {
+      } else if (shouldSyncOutlook && outlookAccount && outlookAccount.token) {
         const calId = outlookAccount.selectedCalendarId || 'primary';
         const calResult = await CalendarSyncService.insertOutlookEvent(savedTodo, outlookAccount.token, calId);
         if (calResult && calResult.id) {
