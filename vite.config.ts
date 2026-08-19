@@ -18,6 +18,15 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      build: {
+        rollupOptions: {
+          input: {
+            main: path.resolve(__dirname, 'index.html'),
+            notionLogin: path.resolve(__dirname, 'notion-login.html'),
+            notionCallback: path.resolve(__dirname, 'notion-callback.html'),
+          }
+        }
       }
     };
 });

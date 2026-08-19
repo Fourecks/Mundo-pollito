@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sincronizando con Notion...</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            fredoka: ['Fredoka', 'sans-serif'],
+          },
+          colors: {
+            notion: {
+              lightBg: '#FBFBFA',
+              darkBg: '#191919',
+              lightText: '#37352F',
+              darkText: '#E3E3E2',
+              lightBorder: '#E9E9E6',
+              darkBorder: '#2F2F2F',
+              accent: '#0A85EA'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-notion-lightBg dark:bg-notion-darkBg text-notion-lightText dark:text-notion-darkText min-h-screen flex flex-col items-center justify-center p-6">
+
+  <div class="max-w-md w-full text-center space-y-6">
+    <!-- Icon/Status Loader -->
+    <div id="loader-container" class="space-y-4">
+      <div class="relative w-16 h-16 mx-auto">
+        <div class="absolute inset-0 border-4 border-notion-accent/20 rounded-full"></div>
+        <div class="absolute inset-0 border-4 border-notion-accent border-t-transparent rounded-full animate-spin"></div>
+        <div class="absolute inset-0 flex items-center justify-center text-xl">
+          🐣
+        </div>
+      </div>
+      <h2 class="text-lg font-bold font-fredoka text-slate-800 dark:text-white">
+        Intercambiando códigos de acceso...
+      </h2>
+      <p class="text-xs text-slate-500 dark:text-slate-400">
+        Estamos completando la autenticación segura con Notion de verdad.
+      </p>
+    </div>
+
+    <!-- DB Selector (Initially hidden) -->
+    <div id="db-selector-container" class="hidden text-left bg-white dark:bg-slate-900 p-5 rounded-2xl border border-notion-lightBorder dark:border-notion-darkBorder shadow-md space-y-4">
+      <div>
+        <h3 class="text-sm font-bold font-fredoka text-slate-800 dark:text-white">
+          🎉 ¡Autorizado con éxito!
+        </h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          Por favor, selecciona qué base de datos de Notion quieres usar para sincronizar tus tareas:
+        </p>
+      </div>
+
+      <div id="db-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+        <!-- Dyn list -->
+      </div>
+
+      <div id="no-dbs-alert" class="hidden p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400 text-xs">
+        ⚠️ No hemos encontrado ninguna Base de Datos compartida con esta conexión. Asegúrate de añadir la conexión en Notion pulsando los <code>...</code> de la página de la base de datos.
+      </div>
+
+      <button id="btn-confirm-db" onclick="confirmDatabaseSelection()" disabled class="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-xs dark:bg-white dark:text-slate-900">
+        Confirmar Selección de Base de Datos
+      </button>
+    </div>
+
+    <!-- Error container (Initially hidden) -->
+    <div id="error-container" class="hidden space-y-4">
+      <div class="w-12 h-12 bg-red-100 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-full flex items-center justify-center text-red-600 mx-auto text-xl">
+        ❌
+      </div>
+      <h2 class="text-base font-bold text-red-600 dark:text-red-400">
+        Fallo de Autenticación
+      </h2>
+      <p id="error-desc" class="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+        No se pudo completar el intercambio del token de Notion.
+      </p>
+      <button onclick="window.close()" class="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-1.5 px-4 rounded-xl text-xs font-semibold">
+        Cerrar ventana
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Copy parent theme
+    if (window.opener && window.opener.document.documentElement.classList.contains('dark')) {
+      document.documentElement.classList.add('dark');
+    }
+
+    // Capture OAuth code and state
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const errorParam = urlParams.get('error');
+
+    let accessToken = '';
+    let selectedDbId = '';
+    let selectedDbName = '';
+    let databasesList = [];
+
+    if (errorParam) {
+      showError(`Autorización cancelada: ${errorParam}`);
+    } else if (!code) {
+      showError('No se recibió ningún código de autorización de Notion.');
+    } else {
+      exchangeCodeForToken();
+    }
+
+    function showError(msg) {
+      document.getElementById('loader-container').classList.add('hidden');
+      document.getElementById('error-container').classList.remove('hidden');
+      document.getElementById('error-desc').innerText = msg;
+    }
+
+    async function exchangeCodeForToken() {
+      try {
+        // Retrieve client details from localStorage
+        const pendingAuth = JSON.parse(localStorage.getItem('pollito_notion_pending_auth') || '{}');
+        const { clientId, clientSecret, redirectUri } = pendingAuth;
+
+        if (!clientId || !clientSecret) {
+          throw new Error('No se encontraron los datos de la integración en la sesión actual. Por favor, inténtalo de nuevo.');
+        }
+
+        const CORS_PROXY = 'https://corsproxy.io/?';
+        const tokenUrl = CORS_PROXY + 'https://api.notion.com/v1/oauth/token';
+
+        const basicAuth = btoa(clientId + ':' + clientSecret);
+
+        const response = await fetch(tokenUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + basicAuth,
+            'Content-Type': 'application/json',
+            'Notion-Version': '2022-06-28'
+          },
+          body: JSON.stringify({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: redirectUri
+          })
+        });
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(errBody.message || errBody.error_description || 'Error ' + response.status + ' al intercambiar el código.');
+        }
+
+        const tokenData = await response.json();
+        accessToken = tokenData.access_token;
+
+        if (!accessToken) {
+          throw new Error('La API de Notion no devolvió ningún token de acceso válido.');
+        }
+
+        // If template duplication returned a database, use it directly
+        if (tokenData.duplicated_template_id) {
+          const dbId = tokenData.duplicated_template_id.replace(/-/g, '');
+          sendSuccessAndClose(accessToken, dbId, 'Base de Datos Duplicada');
+          return;
+        }
+
+        // Query for available databases
+        await searchForDatabases(accessToken);
+
+      } catch (err) {
+        console.error(err);
+        showError(err.message);
+      }
+    }
+
+    async function searchForDatabases(token) {
+      try {
+        document.getElementById('loader-container').querySelector('h2').innerText = 'Buscando tus bases de datos...';
+        
+        const CORS_PROXY = 'https://corsproxy.io/?';
+        const searchUrl = CORS_PROXY + 'https://api.notion.com/v1/search';
+
+        const response = await fetch(searchUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+            'Notion-Version': '2022-06-28'
+          },
+          body: JSON.stringify({
+            filter: {
+              property: 'object',
+              value: 'database'
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('No se pudieron buscar bases de datos. Código: ' + response.status);
+        }
+
+        const searchData = await response.json();
+        databasesList = searchData.results || [];
+
+        document.getElementById('loader-container').classList.add('hidden');
+        document.getElementById('db-selector-container').classList.remove('hidden');
+
+        const dbListDiv = document.getElementById('db-list');
+        dbListDiv.innerHTML = '';
+
+        if (databasesList.length === 0) {
+          document.getElementById('no-dbs-alert').classList.remove('hidden');
+          return;
+        }
+
+        databasesList.forEach((db, index) => {
+          const title = db.title?.map(t => t.plain_text).join('') || `Base de datos sin título (${db.id.substring(0, 8)})`;
+          const cleanId = db.id.replace(/-/g, '');
+
+          const label = document.createElement('label');
+          label.className = 'flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all';
+          label.innerHTML = `
+            <input type="radio" name="selected_db" value="${cleanId}" data-name="${title}" onclick="enableConfirmButton('${cleanId}', '${title}')" class="text-notion-accent focus:ring-notion-accent h-4 w-4">
+            <div class="flex-1">
+              <div class="text-xs font-semibold text-slate-800 dark:text-slate-100">${title}</div>
+              <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">${cleanId}</div>
+            </div>
+          `;
+          dbListDiv.appendChild(label);
+        });
+
+        // Auto-select first database if only one is found
+        if (databasesList.length === 1) {
+          const radio = dbListDiv.querySelector('input[type="radio"]');
+          if (radio) {
+            radio.checked = true;
+            enableConfirmButton(radio.value, radio.getAttribute('data-name'));
+          }
+        }
+
+      } catch (err) {
+        console.error(err);
+        showError('Fallo al recuperar las bases de datos de Notion: ' + err.message);
+      }
+    }
+
+    function enableConfirmButton(id, name) {
+      selectedDbId = id;
+      selectedDbName = name;
+      document.getElementById('btn-confirm-db').disabled = false;
+    }
+
+    function confirmDatabaseSelection() {
+      if (!accessToken || !selectedDbId) return;
+      sendSuccessAndClose(accessToken, selectedDbId, selectedDbName);
+    }
+
+    function sendSuccessAndClose(token, dbId, dbName) {
+      // Clean up temp auth session
+      localStorage.removeItem('pollito_notion_pending_auth');
+
+      const payload = {
+        type: 'NOTION_AUTH_SUCCESS',
+        token: token,
+        databaseId: dbId,
+        databaseName: dbName
+      };
+
+      if (window.opener) {
+        window.opener.postMessage(payload, '*');
+        window.close();
+      } else {
+        alert('¡Conectado de verdad! Token guardado, base de datos seleccionada: ' + dbName);
+      }
+    }
+  </script>
+</body>
+</html>
