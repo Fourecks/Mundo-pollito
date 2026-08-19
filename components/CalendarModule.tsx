@@ -180,9 +180,13 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
   const [isSyncingNotion, setIsSyncingNotion] = useState(false);
   const [notionTokenInput, setNotionTokenInput] = useState(() => notionSettings.token || '');
   const [notionDbIdInput, setNotionDbIdInput] = useState(() => notionSettings.databaseId || '');
+  const [notionDbNameInput, setNotionDbNameInput] = useState(() => notionSettings.databaseName || '');
   const [notionEnabledInput, setNotionEnabledInput] = useState(() => notionSettings.enabled || false);
   const [notionSaveMsg, setNotionSaveMsg] = useState<string | null>(null);
   const [isTestingNotion, setIsTestingNotion] = useState(false);
+  const [notionDatabases, setNotionDatabases] = useState<Array<{ id: string; title: string; icon?: string | null }>>([]);
+  const [isLoadingNotionDbs, setIsLoadingNotionDbs] = useState(false);
+  const [showNotionTokenInput, setShowNotionTokenInput] = useState(false);
 
   // Time Grid Auto-Scroll ref
   const timeGridScrollRef = useRef<HTMLDivElement>(null);
@@ -507,6 +511,49 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
   };
 
   // Connect / Sync Notion Handlers
+  const handleConnectNotionOAuth = () => {
+    const width = 600;
+    const height = 750;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      '/notion-login.html',
+      'NotionAuthPopup',
+      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
+    );
+    
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      window.location.href = '/notion-login.html';
+    }
+  };
+
+  useEffect(() => {
+    const handleNotionMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'NOTION_AUTH_SUCCESS') {
+        const { token, databaseId, databaseName } = event.data;
+        const updated: NotionSettings = {
+          enabled: true,
+          token: token || '',
+          databaseId: databaseId || '',
+          databaseName: databaseName || 'Base de datos de Notion',
+          autoSync: true,
+        };
+        NotionService.saveSettings(updated);
+        setNotionSettings(updated);
+        setNotionTokenInput(token || '');
+        setNotionDbIdInput(databaseId || '');
+        setNotionDbNameInput(databaseName || '');
+        setNotionEnabledInput(true);
+        setNotionSaveMsg(`¡Conectado exitosamente con Notion (${databaseName || 'Base de datos'})!`);
+        setTimeout(() => setNotionSaveMsg(null), 4000);
+      }
+    };
+
+    window.addEventListener('message', handleNotionMessage);
+    return () => window.removeEventListener('message', handleNotionMessage);
+  }, []);
+
   const handleNotionSyncClick = async () => {
     if (!onSyncNotion) return;
     setIsSyncingNotion(true);
@@ -527,18 +574,88 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
       ...notionSettings,
       token: notionTokenInput.trim(),
       databaseId: notionDbIdInput.trim(),
+      databaseName: notionDbNameInput.trim(),
       enabled: notionEnabledInput,
       autoSync: notionEnabledInput,
     };
     NotionService.saveSettings(updated);
     setNotionSettings(updated);
-    setNotionSaveMsg('¡Configuración guardada!');
+    setNotionSaveMsg('Configuración guardada correctamente.');
+    setTimeout(() => setNotionSaveMsg(null), 3000);
+  };
+
+  const handleFetchNotionDatabases = async () => {
+    if (!notionTokenInput.trim()) {
+      setNotionSaveMsg('Introduce tu token de integración de Notion.');
+      setTimeout(() => setNotionSaveMsg(null), 3000);
+      return;
+    }
+    setIsLoadingNotionDbs(true);
+    setNotionSaveMsg(null);
+    try {
+      const dbs = await NotionService.fetchUserDatabases(notionTokenInput.trim());
+      setNotionDatabases(dbs);
+      if (dbs.length === 0) {
+        setNotionSaveMsg('No se encontraron bases de datos compartidas con esta integración. Asegúrate de compartir la base de datos en Notion.');
+      } else {
+        setNotionSaveMsg(`Se encontraron ${dbs.length} base(s) de datos.`);
+        if (!notionDbIdInput && dbs[0]) {
+          setNotionDbIdInput(dbs[0].id);
+          setNotionDbNameInput(dbs[0].title);
+        }
+      }
+    } catch (err: any) {
+      setNotionSaveMsg(err.message || 'Error al buscar bases de datos en Notion.');
+    } finally {
+      setIsLoadingNotionDbs(false);
+      setTimeout(() => setNotionSaveMsg(null), 4000);
+    }
+  };
+
+  const handleSelectNotionDatabase = (dbId: string) => {
+    const selected = notionDatabases.find(d => d.id === dbId);
+    setNotionDbIdInput(dbId);
+    const dbName = selected ? selected.title : '';
+    setNotionDbNameInput(dbName);
+    
+    // Auto save and enable
+    const updated: NotionSettings = {
+      ...notionSettings,
+      token: notionTokenInput.trim(),
+      databaseId: dbId,
+      databaseName: dbName,
+      enabled: true,
+      autoSync: true,
+    };
+    setNotionEnabledInput(true);
+    NotionService.saveSettings(updated);
+    setNotionSettings(updated);
+    setNotionSaveMsg(`Base de datos "${dbName || 'Seleccionada'}" conectada.`);
+    setTimeout(() => setNotionSaveMsg(null), 3000);
+  };
+
+  const handleDisconnectNotion = () => {
+    const updated: NotionSettings = {
+      enabled: false,
+      token: '',
+      databaseId: '',
+      databaseName: '',
+      autoSync: false,
+    };
+    NotionService.saveSettings(updated);
+    setNotionSettings(updated);
+    setNotionTokenInput('');
+    setNotionDbIdInput('');
+    setNotionDbNameInput('');
+    setNotionEnabledInput(false);
+    setNotionDatabases([]);
+    setNotionSaveMsg('Integración con Notion desconectada.');
     setTimeout(() => setNotionSaveMsg(null), 3000);
   };
 
   const handleTestNotionConnection = async () => {
     if (!notionTokenInput.trim() || !notionDbIdInput.trim()) {
-      setNotionSaveMsg('Introduce token y database ID.');
+      setNotionSaveMsg('Introduce token y selecciona una base de datos.');
       setTimeout(() => setNotionSaveMsg(null), 3000);
       return;
     }
@@ -547,7 +664,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
     try {
       const res = await NotionService.testConnection(notionTokenInput.trim(), notionDbIdInput.trim());
       if (res.success) {
-        setNotionSaveMsg('¡Conexión exitosa con Notion!');
+        setNotionSaveMsg('Conexión con Notion verificada correctamente.');
       }
     } catch (err: any) {
       setNotionSaveMsg(err.message || 'Error al conectar');
@@ -1729,82 +1846,91 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
       {/* 7. INTEGRATIONS MANAGER MODAL */}
       {showIntegrationsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#faf8f5] dark:bg-[#18181b] rounded-2xl max-w-xl w-full p-6 shadow-xl border border-stone-200 dark:border-stone-800 space-y-4 max-h-[90vh] overflow-y-auto text-stone-800 dark:text-stone-100">
             
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+            <div className="flex items-start justify-between pb-3 border-b border-stone-200/80 dark:border-stone-800">
               <div>
-                <h3 className="font-black text-xl text-gray-900 dark:text-white">
-                  Conexión de Calendarios
+                <h3 className="font-semibold text-base text-stone-900 dark:text-white">
+                  Cuentas y Sincronización
                 </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Conecta tus cuentas para sincronizar eventos automáticamente en tiempo real.
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                  Conecta tus calendarios y servicios externos para sincronizar tareas y eventos.
                 </p>
               </div>
               <button
                 onClick={() => setShowIntegrationsModal(false)}
-                className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                className="p-1.5 rounded-lg hover:bg-stone-200/60 dark:hover:bg-stone-800 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 transition-colors"
+                aria-label="Cerrar ventana"
               >
                 <CloseIcon />
               </button>
             </div>
 
             {/* INTEGRATION CARD 1: GOOGLE CALENDAR */}
-            <div className="p-4 rounded-2xl border border-sky-200 dark:border-sky-800/60 bg-sky-50/40 dark:bg-sky-950/30 space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="bg-white dark:bg-[#202023] rounded-xl border border-stone-200/80 dark:border-stone-800/80 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white dark:bg-gray-800 shadow-sm flex items-center justify-center">
-                    <GoogleIcon />
+                  <div className="w-10 h-10 rounded-lg bg-stone-50 dark:bg-stone-800/70 border border-stone-200/60 dark:border-stone-700/60 flex items-center justify-center flex-shrink-0">
+                    <GoogleIcon size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-white">Google Calendar</h4>
-                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                      {activeGoogleToken ? '🟢 Conectado con OAuth' : '⚪ No conectado'}
-                    </span>
+                    <h4 className="font-semibold text-sm text-stone-900 dark:text-stone-100">Google Calendar</h4>
+                    <div className="mt-0.5">
+                      {activeGoogleToken ? (
+                        <span className="inline-flex items-center text-[11px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/40">
+                          Conectado
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-[11px] font-medium text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800/60 px-2 py-0.5 rounded border border-stone-200/60 dark:border-stone-700/60">
+                          No conectado
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {activeGoogleToken ? (
                   <button
                     onClick={handleGoogleAuth}
-                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100"
+                    className="px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-xs font-medium text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700/70 transition-colors"
                   >
                     Reconectar
                   </button>
                 ) : (
                   <button
                     onClick={handleGoogleAuth}
-                    className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow"
+                    className="px-3.5 py-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-medium text-xs hover:opacity-90 transition-opacity"
                   >
-                    Conectar con Google
+                    Conectar cuenta
                   </button>
                 )}
               </div>
 
               {activeGoogleToken && (
-                <div className="pt-2 border-t border-sky-200/60 dark:border-sky-800/40 space-y-2 text-xs">
+                <div className="pt-3 border-t border-stone-100 dark:border-stone-800 space-y-2.5 text-xs">
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="font-semibold text-gray-700 dark:text-gray-300">
-                      Sincronización activa (2 vías)
+                    <span className="text-stone-700 dark:text-stone-300">
+                      Sincronización activa en dos direcciones
                     </span>
                     <input
                       type="checkbox"
                       checked={gcalSettings.enabled}
                       onChange={(e) => onGCalSettingsChange({ ...gcalSettings, enabled: e.target.checked })}
-                      className="rounded text-primary focus:ring-primary h-4 w-4"
+                      className="rounded border-stone-300 text-stone-900 focus:ring-stone-900 h-4 w-4"
                     />
                   </label>
 
                   {userCalendars.length > 0 && (
-                    <div>
-                      <span className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                        Calendario Principal
+                    <div className="space-y-1">
+                      <span className="block text-stone-600 dark:text-stone-400">
+                        Calendario seleccionado
                       </span>
                       <select
                         value={gcalSettings.calendarId}
                         onChange={(e) => onGCalSettingsChange({ ...gcalSettings, calendarId: e.target.value })}
-                        className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                        className="w-full px-3 py-1.5 rounded-lg bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-400"
                       >
                         {userCalendars.map((cal) => (
                           <option key={cal.id} value={cal.id}>
@@ -1819,135 +1945,216 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
             </div>
 
             {/* INTEGRATION CARD 2: MICROSOFT OUTLOOK */}
-            <div className="p-4 rounded-2xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/40 dark:bg-blue-950/30 space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="bg-white dark:bg-[#202023] rounded-xl border border-stone-200/80 dark:border-stone-800/80 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white dark:bg-gray-800 shadow-sm flex items-center justify-center">
-                    <OutlookIcon />
+                  <div className="w-10 h-10 rounded-lg bg-stone-50 dark:bg-stone-800/70 border border-stone-200/60 dark:border-stone-700/60 flex items-center justify-center flex-shrink-0">
+                    <OutlookIcon size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-white">Microsoft Outlook Calendar</h4>
-                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                      {localOutlookAccount ? `🟢 Conectado (${localOutlookAccount.email || 'Outlook'})` : '⚪ No conectado'}
-                    </span>
+                    <h4 className="font-semibold text-sm text-stone-900 dark:text-stone-100">Microsoft Outlook</h4>
+                    <div className="mt-0.5">
+                      {localOutlookAccount ? (
+                        <span className="inline-flex items-center text-[11px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/40">
+                          Conectado {localOutlookAccount.email ? `(${localOutlookAccount.email})` : ''}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-[11px] font-medium text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800/60 px-2 py-0.5 rounded border border-stone-200/60 dark:border-stone-700/60">
+                          No conectado
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {localOutlookAccount ? (
                   <button
                     onClick={handleDisconnectOutlookClick}
-                    className="px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-xs font-bold hover:bg-red-200"
+                    className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-400 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                   >
                     Desconectar
                   </button>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleConnectOutlookClick}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow"
-                    >
-                      Conectar Outlook
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleConnectOutlookClick}
+                    className="px-3.5 py-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-medium text-xs hover:opacity-90 transition-opacity"
+                  >
+                    Conectar Outlook
+                  </button>
                 )}
               </div>
             </div>
 
             {/* INTEGRATION CARD 3: NOTION */}
-            <div className="p-4 rounded-2xl border border-purple-200 dark:border-purple-800/60 bg-purple-50/40 dark:bg-purple-950/30 space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="bg-white dark:bg-[#202023] rounded-xl border border-stone-200/80 dark:border-stone-800/80 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white dark:bg-gray-800 shadow-sm flex items-center justify-center">
-                    <NotionIcon />
+                  <div className="w-10 h-10 rounded-lg bg-stone-50 dark:bg-stone-800/70 border border-stone-200/60 dark:border-stone-700/60 flex items-center justify-center flex-shrink-0">
+                    <NotionIcon size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-white">Notion Database</h4>
-                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                      {notionSettings.enabled ? '🟢 Sincronización activa' : '⚪ Desactivado'}
-                    </span>
+                    <h4 className="font-semibold text-sm text-stone-900 dark:text-stone-100">Notion</h4>
+                    <div className="mt-0.5">
+                      {notionSettings.enabled && notionSettings.token && notionSettings.databaseId ? (
+                        <span className="inline-flex items-center text-[11px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/40">
+                          Conectado {notionDbNameInput ? `· ${notionDbNameInput}` : ''}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-[11px] font-medium text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800/60 px-2 py-0.5 rounded border border-stone-200/60 dark:border-stone-700/60">
+                          No conectado
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notionEnabledInput}
-                      onChange={(e) => setNotionEnabledInput(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                  </label>
-                </div>
-              </div>
-
-              {/* Configuration Inputs */}
-              <div className="space-y-2 pt-2 border-t border-purple-200/50 dark:border-purple-800/40 text-xs">
-                <div>
-                  <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">Notion API Token</label>
-                  <input
-                    type="password"
-                    value={notionTokenInput}
-                    onChange={(e) => setNotionTokenInput(e.target.value)}
-                    placeholder="secret_..."
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-purple-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">Database ID</label>
-                  <input
-                    type="text"
-                    value={notionDbIdInput}
-                    onChange={(e) => setNotionDbIdInput(e.target.value)}
-                    placeholder="32 caracteres de la base de datos..."
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-purple-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
-                  />
-                </div>
-
-                {notionSaveMsg && (
-                  <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 font-medium text-center">
-                    {notionSaveMsg}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveNotionSettings}
-                      className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow"
-                    >
-                      Guardar
-                    </button>
-                    <button
-                      onClick={handleTestNotionConnection}
-                      disabled={isTestingNotion}
-                      className="px-3 py-1.5 rounded-xl bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold"
-                    >
-                      {isTestingNotion ? 'Probando...' : 'Probar Conexión'}
-                    </button>
-                  </div>
-
-                  {notionSettings.enabled && (
-                    <button
-                      onClick={handleNotionSyncClick}
-                      disabled={isSyncingNotion}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow flex items-center gap-1"
-                    >
-                      {isSyncingNotion ? 'Sincronizando...' : 'Sincronizar ⚡'}
-                    </button>
+                  {notionSettings.enabled && notionSettings.token && notionSettings.databaseId ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleConnectNotionOAuth}
+                        className="px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-xs font-medium text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700/70 transition-colors"
+                      >
+                        Cambiar cuenta o base
+                      </button>
+                      <button
+                        onClick={handleDisconnectNotion}
+                        className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-400 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                      >
+                        Desconectar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleConnectNotionOAuth}
+                        className="px-3.5 py-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-medium text-xs hover:opacity-90 transition-opacity flex items-center gap-1.5"
+                      >
+                        <span>Conectar con Notion</span>
+                      </button>
+                      <button
+                        onClick={() => setShowNotionTokenInput(prev => !prev)}
+                        className="text-[11px] text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 underline px-1"
+                      >
+                        {showNotionTokenInput ? 'Ocultar' : 'Avanzado'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
+
+              {/* Connected Active Controls */}
+              {notionSettings.enabled && notionSettings.token && notionSettings.databaseId && (
+                <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-xs">
+                  <span className="text-stone-500 dark:text-stone-400">
+                    Sincronización de tareas activa
+                  </span>
+                  <button
+                    onClick={handleNotionSyncClick}
+                    disabled={isSyncingNotion}
+                    className="px-3 py-1 rounded-lg bg-emerald-700 text-white font-medium hover:bg-emerald-800 transition-colors flex items-center gap-1 text-xs"
+                  >
+                    {isSyncingNotion ? 'Sincronizando...' : 'Sincronizar ahora'}
+                  </button>
+                </div>
+              )}
+
+              {/* Notion Configuration & Database Selection (Manual / Advanced mode) */}
+              {showNotionTokenInput && (
+                <div className="pt-3 border-t border-stone-100 dark:border-stone-800 space-y-3 text-xs">
+                  <div>
+                    <label className="block text-stone-600 dark:text-stone-400 mb-1">
+                      Token de Integración (Internal Integration Token)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={notionTokenInput}
+                        onChange={(e) => setNotionTokenInput(e.target.value)}
+                        placeholder="secret_..."
+                        className="flex-1 px-3 py-1.5 rounded-lg bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-stone-400"
+                      />
+                      <button
+                        onClick={handleFetchNotionDatabases}
+                        disabled={isLoadingNotionDbs || !notionTokenInput.trim()}
+                        className="px-3 py-1.5 rounded-lg bg-stone-800 dark:bg-stone-200 text-white dark:text-stone-900 font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                      >
+                        {isLoadingNotionDbs ? 'Buscando...' : 'Buscar Bases'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Database Picker */}
+                  {notionDatabases.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="block text-stone-600 dark:text-stone-400">
+                        Selecciona tu base de datos de Notion (1 clic)
+                      </label>
+                      <select
+                        value={notionDbIdInput}
+                        onChange={(e) => handleSelectNotionDatabase(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200 font-medium focus:outline-none focus:ring-1 focus:ring-stone-400"
+                      >
+                        <option value="">-- Elige una base de datos --</option>
+                        {notionDatabases.map((db) => (
+                          <option key={db.id} value={db.id}>
+                            {db.icon ? `${db.icon} ` : ''}{db.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Manual Database ID if needed */}
+                  {notionDatabases.length === 0 && (
+                    <div>
+                      <label className="block text-stone-600 dark:text-stone-400 mb-1">
+                        ID de la Base de Datos
+                      </label>
+                      <input
+                        type="text"
+                        value={notionDbIdInput}
+                        onChange={(e) => setNotionDbIdInput(e.target.value)}
+                        placeholder="ID de 32 caracteres..."
+                        className="w-full px-3 py-1.5 rounded-lg bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-stone-400"
+                      />
+                    </div>
+                  )}
+
+                  {notionSaveMsg && (
+                    <div className="p-2 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-center font-medium">
+                      {notionSaveMsg}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveNotionSettings}
+                        className="px-3 py-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-medium hover:opacity-90 transition-opacity"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        onClick={handleTestNotionConnection}
+                        disabled={isTestingNotion}
+                        className="px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 font-medium hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
+                      >
+                        {isTestingNotion ? 'Verificando...' : 'Probar conexión'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* FOOTER */}
-            <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center text-xs">
-              <span className="text-gray-400 font-medium">Sincronización segura punto a punto</span>
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-stone-200/80 dark:border-stone-800 flex justify-end items-center">
               <button
                 onClick={() => setShowIntegrationsModal(false)}
-                className="px-5 py-2 rounded-xl bg-primary text-white font-bold shadow hover:bg-primary-dark"
+                className="px-4 py-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-medium text-xs hover:opacity-90 transition-opacity"
               >
-                Listo
+                Cerrar
               </button>
             </div>
           </div>

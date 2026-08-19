@@ -129,6 +129,50 @@ export class NotionService {
   }
 
   /**
+   * List all databases the Notion integration token has access to
+   */
+  static async fetchUserDatabases(token: string): Promise<Array<{ id: string; title: string; icon?: string | null }>> {
+    const url = `${CORS_PROXY}${NOTION_BASE_URL}/search`;
+    const headers = {
+      'Authorization': `Bearer ${token.trim()}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        filter: {
+          value: 'database',
+          property: 'object',
+        },
+        page_size: 50,
+      }),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.message || `No se pudieron obtener las bases de datos de Notion (${response.status})`);
+    }
+
+    const data = await response.json();
+    const results = data.results || [];
+
+    return results.map((db: any) => {
+      let title = 'Base de datos sin título';
+      if (db.title && Array.isArray(db.title) && db.title.length > 0) {
+        title = db.title.map((t: any) => t.plain_text).join('') || title;
+      }
+      return {
+        id: db.id,
+        title,
+        icon: db.icon?.emoji || null,
+      };
+    });
+  }
+
+  /**
    * Fetch pages from the Notion database
    */
   static async fetchDatabasePages(): Promise<NotionPageItem[]> {
