@@ -339,26 +339,26 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
 
   return (
     <div className="fixed inset-0 z-[60000] flex items-center justify-center p-3 sm:p-4 animate-fade-in">
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-0 bg-gray-800/50 backdrop-blur-xs" onClick={onClose} />
 
       <div 
-        className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex flex-col z-[60001] overflow-hidden max-h-[92vh]"
+        className="relative w-full max-w-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-secondary-light/50 dark:border-gray-700 rounded-2xl shadow-xl flex flex-col z-[60001] overflow-hidden max-h-[92vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <header className="flex-shrink-0 px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 rounded-t-2xl">
+        <header className="flex-shrink-0 px-5 py-3.5 border-b border-secondary-light/50 dark:border-gray-700 flex items-center justify-between bg-white/50 dark:bg-gray-800/50 rounded-t-2xl">
           <div>
-            <h3 className="font-semibold text-base text-slate-900 dark:text-slate-100">
+            <h3 className="font-semibold text-base text-gray-800 dark:text-gray-100">
               Editar Tarea
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-gray-400 dark:text-gray-400">
               Modifica los detalles de tu tarea
             </p>
           </div>
           <button 
             type="button" 
             onClick={onClose} 
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-secondary-light/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <CloseIcon />
           </button>
@@ -370,7 +370,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             
             {/* Task Name */}
             <div className="space-y-1">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50">
                 Nombre de la Tarea
               </label>
               <input 
@@ -379,32 +379,32 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 value={text || ''} 
                 onChange={(e) => setText(e.target.value)} 
                 placeholder="Ej. Comprar víveres, Enviar informe..." 
-                className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100 placeholder:text-slate-400 transition-all"
+                className="w-full bg-white/50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-slate-300 dark:border-gray-600 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100 placeholder:text-gray-400 transition-all"
               />
             </div>
 
             {/* Subtasks */}
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50">
                 Sub-tareas
               </label>
               {subtasks.length > 0 && (
                 <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
                   {subtasks.map(subtask => (
-                    <div key={subtask.id} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 p-2 rounded-lg border border-slate-200 dark:border-slate-800 group">
+                    <div key={subtask.id} className="flex items-center gap-2 bg-white/50 dark:bg-gray-700/60 p-2 rounded-lg border border-secondary-light/50 dark:border-gray-700 group">
                       <input 
                         type="checkbox" 
                         checked={subtask.completed} 
                         onChange={() => handleToggleSubtask(subtask.id)}
-                        className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0 cursor-pointer"
+                        className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0 cursor-pointer"
                       />
-                      <span className={`flex-1 text-xs ${subtask.completed ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>
+                      <span className={`flex-1 text-xs ${subtask.completed ? 'line-through text-gray-400 dark:text-gray-400' : 'text-gray-700 dark:text-secondary-light/50'}`}>
                         {subtask.text}
                       </span>
                       <button 
                         type="button" 
                         onClick={() => handleDeleteSubtask(subtask.id)} 
-                        className="text-slate-400 hover:text-red-500 p-1 rounded transition-colors"
+                        className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors"
                       >
                         <TrashIcon className="h-3.5 w-3.5" />
                       </button>
@@ -419,12 +419,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   onChange={e => setNewSubtaskText(e.target.value)} 
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
                   placeholder="Añadir nueva sub-tarea..." 
-                  className="flex-1 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100 placeholder:text-slate-400"
+                  className="flex-1 bg-white/50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-slate-300 dark:border-gray-600 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100 placeholder:text-gray-400"
                 />
                 <button 
                   type="button" 
                   onClick={handleAddSubtask} 
-                  className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                  className="px-3 py-1.5 bg-secondary-light/50 dark:bg-gray-600 hover:bg-slate-300 dark:hover:bg-gray-500 text-gray-700 dark:text-secondary-light/50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
                 >
                   <PlusIcon className="w-3.5 h-3.5" />
                   Añadir
@@ -432,18 +432,18 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
               </div>
             </div>
 
-            <hr className="border-slate-100 dark:border-slate-800" />
+            <hr className="border-gray-100 dark:border-gray-700" />
 
             {/* Project & Priority */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50 mb-1">
                   Proyecto
                 </label>
                 <select 
                   value={projectId === null ? '' : projectId} 
                   onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)} 
-                  className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                  className="w-full bg-white/50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-slate-300 dark:border-gray-600 rounded-lg py-2 px-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
                 >
                   <option value="">Sin proyecto</option>
                   {projects.map(p => (
@@ -453,10 +453,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50 mb-1">
                   Prioridad
                 </label>
-                <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg border border-secondary-light/50 dark:border-gray-600">
                   {(['low', 'medium', 'high'] as Priority[]).map(p => {
                     const labels: Record<Priority, string> = { low: 'Baja', medium: 'Media', high: 'Alta' };
                     const isSelected = priority === p;
@@ -468,7 +468,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         className={`flex-1 py-1 text-xs font-semibold rounded-md transition-colors ${
                           isSelected
                             ? p === 'high' ? 'bg-red-600 text-white' : p === 'medium' ? 'bg-amber-500 text-white' : 'bg-blue-600 text-white'
-                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100'
                         }`}
                       >
                         {labels[p]}
@@ -480,32 +480,32 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Date Section */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+            <div className="p-3 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                  <CalendarIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-gray-400" />
                   Fecha
                 </span>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">Sin fecha</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-400">Sin fecha</span>
                   <input 
                     type="checkbox" 
                     checked={isUndated} 
                     onChange={e => handleToggleUndated(e.target.checked)} 
-                    className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0"
+                    className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0"
                   />
                 </label>
               </div>
 
               {!isUndated && (
-                <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 animate-fade-in">
+                <div className="space-y-2 pt-2 border-t border-secondary-light/50/60 dark:border-gray-600/60 animate-fade-in">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Rango de fechas (Fin)</span>
+                    <span className="text-[11px] text-gray-400 dark:text-gray-400">Rango de fechas (Fin)</span>
                     <input 
                       type="checkbox" 
                       checked={hasEndDate} 
                       onChange={e => setHasEndDate(e.target.checked)} 
-                      className="w-3.5 h-3.5 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0"
+                      className="w-3.5 h-3.5 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -513,15 +513,15 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                       type="date" 
                       value={due_date || ''} 
                       onChange={e => setDueDate(e.target.value)} 
-                      className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                      className="flex-1 bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
                     />
-                    {hasEndDate && <span className="text-xs text-slate-400 font-medium">a</span>}
+                    {hasEndDate && <span className="text-xs text-gray-400 font-medium">a</span>}
                     {hasEndDate && (
                       <input 
                         type="date" 
                         value={end_date || ''} 
                         onChange={e => setEndDate(e.target.value)} 
-                        className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                        className="flex-1 bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
                       />
                     )}
                   </div>
@@ -530,10 +530,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Time Section */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="p-3 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                  <ClockIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
+                  <ClockIcon className="w-3.5 h-3.5 text-gray-400" />
                   Añadir Hora
                 </span>
                 <input 
@@ -541,28 +541,28 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   checked={hasTime} 
                   onChange={e => handleToggleTime(e.target.checked)} 
                   disabled={isUndated}
-                  className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0 disabled:opacity-40"
+                  className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0 disabled:opacity-40"
                 />
               </div>
 
               {hasTime && !isUndated && (
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 animate-fade-in">
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-secondary-light/50/60 dark:border-gray-600/60 animate-fade-in">
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Inicio</label>
+                    <label className="block text-[11px] font-medium text-gray-400 dark:text-gray-400 mb-1">Inicio</label>
                     <input 
                       type="time" 
                       value={start_time || ''} 
                       onChange={e => setStartTime(e.target.value)} 
-                      className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                      className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Fin (opcional)</label>
+                    <label className="block text-[11px] font-medium text-gray-400 dark:text-gray-400 mb-1">Fin (opcional)</label>
                     <input 
                       type="time" 
                       value={end_time || ''} 
                       onChange={e => setEndTime(e.target.value)} 
-                      className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                      className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
                     />
                   </div>
                 </div>
@@ -570,10 +570,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Reminder Section */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="p-3 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                  <BellIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
+                  <BellIcon className="w-3.5 h-3.5 text-gray-400" />
                   Recordatorio
                 </span>
                 <input 
@@ -581,16 +581,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   checked={hasReminder} 
                   onChange={e => handleToggleReminder(e.target.checked)} 
                   disabled={isUndated}
-                  className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0 disabled:opacity-40"
+                  className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0 disabled:opacity-40"
                 />
               </div>
 
               {hasReminder && !isUndated && (
-                <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 animate-fade-in">
+                <div className="space-y-2 pt-2 border-t border-secondary-light/50/60 dark:border-gray-600/60 animate-fade-in">
                   <select 
                     value={reminderType || '0'} 
                     onChange={e => setReminderType(e.target.value)} 
-                    className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                    className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
                   >
                     <option value="0">En el momento de la tarea</option>
                     <option value="10">10 minutos antes</option>
@@ -606,13 +606,13 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         type="date" 
                         value={customReminderDate || ''} 
                         onChange={e => setCustomReminderDate(e.target.value)} 
-                        className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        className="bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800"
                       />
                       <input 
                         type="time" 
                         value={customReminderTime || ''} 
                         onChange={e => setCustomReminderTime(e.target.value)} 
-                        className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        className="bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800"
                       />
                     </div>
                   )}
@@ -621,10 +621,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Recurrence Section */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="p-3 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                  <RefreshIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
+                  <RefreshIcon className="w-3.5 h-3.5 text-gray-400" />
                   Repetir tarea
                 </span>
                 <input 
@@ -632,16 +632,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   checked={hasRecurrence} 
                   onChange={e => handleToggleRecurrence(e.target.checked)} 
                   disabled={isUndated}
-                  className="w-4 h-4 rounded text-slate-900 border-slate-300 dark:border-slate-600 focus:ring-0 disabled:opacity-40"
+                  className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0 disabled:opacity-40"
                 />
               </div>
 
               {hasRecurrence && !isUndated && (
-                <div className="space-y-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 animate-fade-in">
+                <div className="space-y-2.5 pt-2 border-t border-secondary-light/50/60 dark:border-gray-600/60 animate-fade-in">
                   <select 
                     value={recurrence?.frequency || 'none'} 
                     onChange={e => setRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
-                    className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100"
+                    className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
                   >
                     <option value="none">Nunca</option>
                     <option value="daily">Diariamente</option>
@@ -650,7 +650,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   </select>
 
                   {recurrence.frequency === 'custom' && (
-                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600">
+                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-gray-600 rounded-lg border border-secondary-light/50 dark:border-gray-500">
                       {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map((dayLabel, index) => {
                         const isSelected = recurrence.customDays?.includes(index);
                         return (
@@ -659,7 +659,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                             type="button" 
                             onClick={() => handleCustomDayToggle(index)} 
                             className={`flex-1 py-1 text-xs font-semibold rounded-md transition-colors ${
-                              isSelected ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                              isSelected ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800' : 'text-gray-500 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-500'
                             }`}
                           >
                             {dayLabel}
@@ -670,12 +670,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   )}
 
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Finaliza repetición (opcional)</label>
+                    <label className="block text-[11px] font-medium text-gray-400 dark:text-gray-400 mb-1">Finaliza repetición (opcional)</label>
                     <input 
                       type="date" 
                       value={recurrence?.ends_on || ''} 
                       onChange={e => setRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
-                      className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-1.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800"
                     />
                   </div>
                 </div>
@@ -685,7 +685,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             {/* Notes */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50">
                   Notas
                 </label>
                 {todo?.notion_page_id && (
@@ -703,7 +703,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         href={todo.notion_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline flex items-center gap-0.5"
+                        className="text-[10px] text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-secondary-light/50 hover:underline flex items-center gap-0.5"
                       >
                         Abrir Notion ↗
                       </a>
@@ -716,14 +716,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 onChange={e => setNotes(e.target.value)} 
                 placeholder="Añade notas o detalles adicionales..." 
                 rows={3} 
-                className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-100 placeholder:text-slate-400 transition-all resize-none"
+                className="w-full bg-white/50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-slate-300 dark:border-gray-600 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100 placeholder:text-gray-400 transition-all resize-none"
               />
             </div>
 
             {/* Calendar Integration Section */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+            <div className="p-3.5 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
                   <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
                   Sincronización de Calendario
                 </span>
@@ -733,15 +733,15 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                     Sincronizado
                   </span>
                 ) : (
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-gray-400">
                     {calendarSyncStatus === 'removed' ? 'Desvinculado' : 'No sincronizado'}
                   </span>
                 )}
               </div>
 
               {(todo.gcal_event_id || todo.calendar_provider) && calendarSyncStatus !== 'removed' ? (
-                <div className="bg-white dark:bg-slate-900/80 p-3 rounded-lg border border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
-                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                <div className="bg-white dark:bg-gray-800/80 p-3 rounded-lg border border-secondary-light/50/80 dark:border-gray-600/80 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-slate-300">
                     <div className="flex items-center gap-2">
                       {todo.calendar_provider === 'outlook' ? (
                         <OutlookIcon className="w-4 h-4" />
@@ -764,8 +764,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
+                    <p className="text-[11px] text-gray-400 dark:text-gray-400">
                       Puedes eliminar el evento del calendario sin borrar la tarea de la app.
                     </p>
                     <button
@@ -788,8 +788,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900/80 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center justify-between p-2.5 bg-white dark:bg-gray-800/80 rounded-lg border border-secondary-light/50/80 dark:border-gray-600/80">
+                    <span className="text-[11px] text-gray-400 dark:text-gray-400">
                       {calendarSyncStatus === 'removed' 
                         ? '✓ Evento eliminado del calendario. La tarea permanece guardada.'
                         : 'Esta tarea no está vinculada a un evento de calendario.'}
@@ -799,7 +799,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         type="button"
                         onClick={handleInitiateSync}
                         disabled={isSyncingCalendar}
-                        className="px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors flex items-center gap-1.5"
+                        className="px-2.5 py-1 text-[11px] font-medium text-gray-600 dark:text-secondary-light/50 bg-gray-100 dark:bg-gray-700 hover:bg-secondary-light/50 dark:hover:bg-gray-600 rounded-md transition-colors flex items-center gap-1.5"
                       >
                         {isSyncingCalendar ? (
                           <>
@@ -830,7 +830,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
           </main>
 
           {/* Modal Footer */}
-          <footer className="flex-shrink-0 px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between gap-2 rounded-b-2xl">
+          <footer className="flex-shrink-0 px-5 py-3 border-t border-secondary-light/50 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 flex items-center justify-between gap-2 rounded-b-2xl">
             {todo && onDelete ? (
               <button
                 type="button"
@@ -846,14 +846,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
               <button 
                 type="button" 
                 onClick={onClose} 
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-slate-300 hover:bg-secondary-light/50 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 Cancelar
               </button>
               <button 
                 type="submit" 
                 disabled={!text.trim()} 
-                className="px-5 py-2 text-xs font-semibold bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white rounded-lg transition-colors disabled:opacity-40"
+                className="px-5 py-2 text-xs font-semibold bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 hover:bg-gray-700 dark:hover:bg-white rounded-lg transition-colors disabled:opacity-40"
               >
                 Guardar Cambios
               </button>

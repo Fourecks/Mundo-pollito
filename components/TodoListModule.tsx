@@ -46,6 +46,7 @@ interface TodoListModuleProps {
     onSelectFocusTask?: (taskId: number | null) => void;
     focusSessions?: FocusSession[];
     isFocusTimerRunning?: boolean;
+    progressEmoji?: string;
 }
 
 const formatDateKey = (date: Date): string => {
@@ -223,11 +224,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                     />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                    {emoji ? (
-                        <span className="text-3xl sm:text-4xl drop-shadow-sm">{emoji}</span>
-                    ) : (
-                        <ChickenIcon className="w-10 h-10 sm:w-12 sm:h-12 text-secondary-dark drop-shadow-sm" />
-                    )}
+                    <span className="text-3xl sm:text-4xl drop-shadow-sm">{emoji || props.progressEmoji || '🚀'}</span>
                 </div>
             </div>
         );
@@ -355,7 +352,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                         <div className="flex justify-between items-center"><div className="flex items-center gap-1 sm:gap-2"><button onClick={() => setIsCalendarPanelVisible(!isCalendarPanelVisible)} className="hidden md:flex p-2 items-center justify-center rounded-full hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-primary-dark transition-colors" aria-label={isCalendarPanelVisible ? 'Ocultar calendario' : 'Mostrar calendario'}><ChevronLeftIcon className={`h-5 w-5 transition-transform duration-300 ${!isCalendarPanelVisible ? 'rotate-180' : ''}`}/></button><div className="flex items-center"><button onClick={handlePrevDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día anterior"><ChevronLeftIcon /></button><h2 className="text-lg sm:text-xl font-bold text-primary-dark dark:text-primary text-center w-40 sm:w-auto flex-shrink-0">{formattedDate}</h2><button onClick={handleNextDay} className="p-2 rounded-full text-gray-500 hover:bg-secondary-lighter/70 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors" aria-label="Día siguiente"><ChevronRightIcon /></button></div></div><button onClick={() => setCalendarVisible(true)} className="md:hidden flex items-center gap-2 bg-white/70 dark:bg-gray-700/70 backdrop-blur-sm p-2 rounded-full shadow-sm text-primary dark:text-primary-dark hover:bg-primary-light/50 dark:hover:bg-primary/20 transition-colors" aria-label="Abrir calendario"><CalendarIcon /></button></div>
                                     )}
                                     <p className="text-gray-500 dark:text-gray-300 text-sm mt-1 text-center md:text-left">{filteredTodos.length > 0 ? `${completedCount} de ${filteredTodos.length} tareas completadas.` : '¡Añade una tarea para empezar!'}</p>
-                                    <ProgressBar completed={completedCount} total={filteredTodos.length} />
+                                    <ProgressBar completed={completedCount} total={filteredTodos.length} emoji={props.progressEmoji} />
                                     <div className="flex items-center justify-between mt-4 mb-2 gap-2">
                                         <div className="flex items-center gap-2">
                                             <div className="relative flex items-center px-2 py-1 rounded-lg bg-black/5 dark:bg-black/20">

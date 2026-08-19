@@ -1,33 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Background, ParticleType, AmbientSoundType, ThemeColors } from '../types';
-import CloseIcon from './icons/CloseIcon';
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
+import { Background, ParticleType, AmbientSoundType, ThemeColors, SupabaseUser } from '../types';
 
-// Icons
-import UploadIcon from './icons/UploadIcon';
-import TrashIcon from './icons/TrashIcon';
-import StarIcon from './icons/StarIcon';
-import VideoIcon from './icons/VideoIcon';
-import ImageIcon from './icons/ImageIcon';
-import SnowIcon from './icons/SnowIcon';
-import RainIcon from './icons/RainIcon';
-import StarsIcon from './icons/StarsIcon';
-import BubblesIcon from './icons/BubblesIcon';
-import SparksIcon from './icons/SparksIcon';
-import ParticlesOffIcon from './icons/ParticlesOffIcon';
-import ForestIcon from './icons/ForestIcon';
-import CoffeeIcon from './icons/CoffeeIcon';
-import WaveIcon from './icons/WaveIcon';
-import SoundOffIcon from './icons/SoundOffIcon';
-import VolumeIcon from './icons/VolumeIcon';
-import ChickenIcon from './ChickenIcon';
+import { 
+  User, X, Upload, Trash2, Star, Image as ImageIconLucide, 
+  Video as VideoIconLucide, Volume2, CloudOff, Snowflake, 
+  CloudRain, Stars, Circle, Zap, TreePine, Coffee, Waves, 
+  VolumeX, LogOut, Palette, Sparkles, Smile, Battery, 
+  ChevronRight 
+} from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 
-// Prop Interfaces
 interface CustomizationPanelProps {
   isOpen: boolean;
   onClose: () => void;
   isMobile?: boolean;
   colors: ThemeColors;
+  progressEmoji?: string;
+  onProgressEmojiChange?: (emoji: string) => void;
   onThemeColorChange: (colorName: keyof ThemeColors, value: string) => void;
   onReset: () => void;
   activeBackground: Background | null;
@@ -44,339 +35,383 @@ interface CustomizationPanelProps {
   enableBatterySaver: boolean;
   setEnableBatterySaver: (enabled: boolean) => void;
   batteryStatus: any;
+  currentUser?: SupabaseUser;
+  onLogout?: () => void;
 }
 
-// #region Tab Content Components
-
-const ColorsTab: React.FC<Pick<CustomizationPanelProps, 'colors' | 'onThemeColorChange' | 'onReset'>> = ({ colors, onThemeColorChange, onReset }) => (
-    <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-xl shadow-sm space-y-4 animate-fade-in">
-        <div>
-            <label htmlFor="primary-color" className="text-sm font-semibold text-gray-600 dark:text-gray-300">Color Primario</label>
-            <div className="flex items-center gap-3 mt-1">
-                <div className="relative w-10 h-10 flex-shrink-0">
-                    <input
-                        type="color"
-                        id="primary-color"
-                        value={colors?.primary || '#ff80bf'}
-                        onChange={(e) => onThemeColorChange('primary', e.target.value)}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors?.primary || '#ff80bf' }}></div>
-                </div>
-                <input
-                    type="text"
-                    value={colors?.primary || '#ff80bf'}
-                    onChange={(e) => onThemeColorChange('primary', e.target.value)}
-                    className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-dark dark:focus:ring-primary-dark text-sm"
-                />
-            </div>
-        </div>
-        <div>
-            <label htmlFor="secondary-color" className="text-sm font-semibold text-gray-600 dark:text-gray-300">Color Secundario</label>
-            <div className="flex items-center gap-3 mt-1">
-                <div className="relative w-10 h-10 flex-shrink-0">
-                    <input
-                        type="color"
-                        id="secondary-color"
-                        value={colors?.secondary || '#ffdfba'}
-                        onChange={(e) => onThemeColorChange('secondary', e.target.value)}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <div className="w-full h-full rounded-lg border-2 border-white/50 dark:border-black/50" style={{ backgroundColor: colors?.secondary || '#ffdfba' }}></div>
-                </div>
-                <input
-                    type="text"
-                    value={colors?.secondary || '#ffdfba'}
-                    onChange={(e) => onThemeColorChange('secondary', e.target.value)}
-                    className="flex-grow bg-white/60 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border-2 border-secondary-light/50 dark:border-gray-600 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-dark dark:focus:ring-primary-dark text-sm"
-                />
-            </div>
-        </div>
-        <button
-            onClick={onReset}
-            className="w-full mt-2 text-center text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:underline font-semibold transition-colors"
-        >
-            Restaurar colores
-        </button>
-    </div>
-);
-
-const particleOptions: { type: ParticleType; icon: React.FC; label: string }[] = [
-    { type: 'none', icon: ParticlesOffIcon, label: 'Ninguna' },
-    { type: 'snow', icon: SnowIcon, label: 'Nieve' },
-    { type: 'rain', icon: RainIcon, label: 'Lluvia' },
-    { type: 'stars', icon: StarsIcon, label: 'Estrellas' },
-    { type: 'bubbles', icon: BubblesIcon, label: 'Burbujas' },
-    { type: 'sparks', icon: SparksIcon, label: 'Chispas' },
-];
-
-const soundOptions: { type: AmbientSoundType; icon: React.FC; label: string }[] = [
-    { type: 'none', icon: SoundOffIcon, label: 'Silencio' },
-    { type: 'rain', icon: RainIcon, label: 'Lluvia' },
-    { type: 'forest', icon: ForestIcon, label: 'Bosque' },
-    { type: 'coffee_shop', icon: CoffeeIcon, label: 'Cafetería' },
-    { type: 'ocean', icon: WaveIcon, label: 'Mar' },
-];
-
-const BatteryIcon: React.FC<{ className?: string }> = ({ className = "h-5 w-5" }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
-        <line x1="22" x2="22" y1="11" y2="13" />
-    </svg>
-);
-
-const ZapIcon: React.FC<{ className?: string }> = ({ className = "h-5 w-5" }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-);
-
-const BatterySaverSection: React.FC<{
-    enableBatterySaver: boolean;
-    setEnableBatterySaver: (enabled: boolean) => void;
-    batteryStatus: any;
-}> = ({ enableBatterySaver, setEnableBatterySaver, batteryStatus }) => {
-    const isSavingActive = enableBatterySaver && batteryStatus.isLow;
-
-    return (
-        <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-xl shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <BatteryIcon className={`h-5 w-5 ${batteryStatus.isLow ? 'text-red-500 animate-pulse' : 'text-gray-500 dark:text-gray-400'}`} />
-                    <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm">Ahorro de Batería</h4>
-                </div>
-                {batteryStatus.supported && (
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                        {batteryStatus.charging && <ZapIcon className="h-3 w-3 text-amber-500" />}
-                        {Math.round(batteryStatus.level * 100)}%
-                    </span>
-                )}
-            </div>
-
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                Reduce automáticamente las partículas a un 25% y desactiva los fondos de video animados cuando la batería esté por debajo del 20% para ahorrar energía.
-            </p>
-
-            <div className="flex items-center justify-between pt-2 border-t border-secondary-light/30 dark:border-gray-700/30">
-                <label htmlFor="battery-saver-toggle" className="text-xs font-semibold text-gray-600 dark:text-gray-300 cursor-pointer">
-                    Activar ahorro automático
-                </label>
-                <button
-                    id="battery-saver-toggle"
-                    onClick={() => setEnableBatterySaver(!enableBatterySaver)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                        enableBatterySaver ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
-                    }`}
-                    role="switch"
-                    aria-checked={enableBatterySaver}
-                >
-                    <span
-                        aria-hidden="true"
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            enableBatterySaver ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                    />
-                </button>
-            </div>
-
-            {isSavingActive && (
-                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/30 rounded-lg flex items-center gap-2 animate-fade-in">
-                    <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
-                    <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
-                        Modo ahorro activo: Partículas reducidas y fondo animado desactivado.
-                    </span>
-                </div>
-            )}
-        </div>
-    );
-};
-
-const AmbienceTab: React.FC<Pick<CustomizationPanelProps, 'particleType' | 'setParticleType' | 'ambientSound' | 'setAmbientSound' | 'enableBatterySaver' | 'setEnableBatterySaver' | 'batteryStatus'>> = ({ 
-    particleType, 
-    setParticleType, 
-    ambientSound, 
-    setAmbientSound,
-    enableBatterySaver,
-    setEnableBatterySaver,
-    batteryStatus
-}) => (
-    <div className="space-y-4 animate-fade-in">
-        <BatterySaverSection 
-            enableBatterySaver={enableBatterySaver} 
-            setEnableBatterySaver={setEnableBatterySaver} 
-            batteryStatus={batteryStatus} 
-        />
-
-        <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-xl shadow-sm">
-            <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-3 text-center">Partículas</h4>
-            <div className="grid grid-cols-3 gap-2">
-                {particleOptions.map(opt => (
-                    <button key={opt.type} onClick={() => setParticleType(opt.type)} className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors text-xs font-semibold ${particleType === opt.type ? 'bg-primary-light/50 dark:bg-primary/20 text-primary-dark dark:text-primary' : 'text-gray-600 dark:text-gray-300 hover:bg-secondary-lighter dark:hover:bg-gray-700'}`} title={opt.label}>
-                        <opt.icon />
-                        <span className="mt-1">{opt.label}</span>
-                    </button>
-                ))}
-            </div>
-        </div>
-        <div className="bg-white/70 dark:bg-gray-800/70 p-4 rounded-xl shadow-sm">
-            <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm mb-3 text-center">Sonidos de Ambiente</h4>
-            <div className="grid grid-cols-3 gap-2">
-                {soundOptions.map(opt => (
-                    <button key={opt.type} onClick={() => setAmbientSound({ ...ambientSound, type: opt.type })} className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors text-xs font-semibold ${ambientSound.type === opt.type ? 'bg-primary-light/50 dark:bg-primary/20 text-primary-dark dark:text-primary' : 'text-gray-600 dark:text-gray-300 hover:bg-secondary-lighter dark:hover:bg-gray-700'}`} title={opt.label}>
-                        <opt.icon />
-                        <span className="mt-1">{opt.label}</span>
-                    </button>
-                ))}
-            </div>
-            <div className={`mt-4 pt-3 border-t border-secondary-light/50 dark:border-gray-700/50 transition-opacity ${ambientSound.type === 'none' ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="flex items-center gap-2">
-                    <VolumeIcon />
-                    <input type="range" min="0" max="1" step="0.05" value={ambientSound?.volume ?? 0.5} onChange={(e) => setAmbientSound({ ...ambientSound, volume: parseFloat(e.target.value) })} className="w-full h-2 bg-secondary-light/80 dark:bg-gray-600/80 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary" />
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
-const BackgroundsTab: React.FC<Pick<CustomizationPanelProps, 'activeBackground' | 'userBackgrounds' | 'onSelectBackground' | 'onAddBackground' | 'onDeleteBackground' | 'onToggleFavorite' | 'backgroundsLoading'>> = (props) => {
-    const { activeBackground, userBackgrounds, onSelectBackground, onAddBackground, onDeleteBackground, onToggleFavorite, backgroundsLoading } = props;
-    const [view, setView] = useState<'all' | 'favorites'>('all');
-    const [bgToDelete, setBgToDelete] = useState<Background | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) onAddBackground(file);
-        if (event.target) event.target.value = '';
-    };
-
-    const confirmDelete = () => {
-        if (bgToDelete) {
-            onDeleteBackground(bgToDelete.id);
-            setBgToDelete(null);
-        }
-    };
-    
-    const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.is_favorite) : userBackgrounds;
-
-    return (
-        <div className="flex flex-col h-full animate-fade-in">
-            <div className="p-2 border-b border-secondary-light/50 dark:border-gray-700/50 flex-shrink-0">
-                <div className="bg-black/5 dark:bg-black/20 rounded-full p-1 flex items-center gap-1">
-                    <button onClick={() => setView('all')} className={`w-full py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-colors ${view === 'all' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Todos</button>
-                    <button onClick={() => setView('favorites')} className={`w-full py-1.5 text-xs sm:text-sm font-semibold rounded-full transition-colors ${view === 'favorites' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Favoritos</button>
-                </div>
-            </div>
-            <div className="flex-grow overflow-y-auto custom-scrollbar p-4">
-                {backgroundsLoading ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                        <ChickenIcon className="w-12 h-12 text-primary animate-pulse" />
-                        <p className="font-semibold text-gray-600 dark:text-gray-300 mt-3">Cargando fondos...</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                        {view === 'all' && (
-                            <>
-                                <button onClick={() => fileInputRef.current?.click()} className="aspect-video bg-white/60 dark:bg-gray-700/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col items-center justify-center text-center p-4 text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary border-2 border-dashed border-secondary-light dark:border-gray-600">
-                                    <UploadIcon />
-                                    <span className="text-xs font-semibold mt-2">Subir nuevo</span>
-                                </button>
-                                <button onClick={() => onSelectBackground(null)} className={`aspect-video bg-white/60 dark:bg-gray-700/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col items-center justify-center text-center p-4 text-gray-500 dark:text-gray-400 ${!activeBackground ? 'ring-2 ring-primary' : ''}`}>
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900"></div>
-                                    <span className="text-xs font-semibold mt-2">Original</span>
-                                </button>
-                            </>
-                        )}
-                        {filteredBackgrounds.map(bg => (
-                            <div key={bg.id} className="group relative">
-                                <button onClick={() => onSelectBackground(bg)} className={`w-full aspect-video rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 block ${activeBackground?.id === bg.id ? 'ring-2 ring-primary' : ''}`}>
-                                    {bg.type === 'video' ? (<video src={bg.url} className="w-full h-full object-cover" />) : (<div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${bg.url})` }} />)}
-                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {bg.type === 'video' ? <VideoIcon /> : <ImageIcon />}
-                                    </div>
-                                </button>
-                                <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => onToggleFavorite(bg.id)} className="p-1.5 rounded-full bg-black/30 text-white hover:bg-yellow-500 backdrop-blur-sm" title={bg.is_favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}>
-                                        <StarIcon filled={!!bg.is_favorite} className="h-4 w-4" />
-                                    </button>
-                                    <button onClick={() => setBgToDelete(bg)} className="p-1.5 rounded-full bg-black/30 text-white hover:bg-red-500 backdrop-blur-sm" title="Eliminar fondo">
-                                        <TrashIcon className="h-4 w-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                        {filteredBackgrounds.length === 0 && view === 'favorites' && (
-                            <div className="text-center text-gray-500 dark:text-gray-400 py-10 col-span-2">
-                                <p className="font-medium">No tienes fondos favoritos.</p>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-            <ConfirmationModal isOpen={!!bgToDelete} onClose={() => setBgToDelete(null)} onConfirm={confirmDelete} title="Eliminar Fondo" message={`¿Seguro que quieres eliminar "${bgToDelete?.name}"?`} confirmText="Eliminar" cancelText="Cancelar" />
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden"/>
-        </div>
-    );
-};
-
-// #endregion
-
-// Main Panel Component
 const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
-    const { isOpen, onClose, isMobile } = props;
-    const [activeTab, setActiveTab] = useState<'colores' | 'fondos' | 'ambiente'>('colores');
+  const { 
+    isOpen, onClose, isMobile, currentUser, onLogout,
+    colors, onThemeColorChange, onReset,
+    progressEmoji, onProgressEmojiChange,
+    activeBackground, userBackgrounds, onSelectBackground, onAddBackground, onDeleteBackground, onToggleFavorite, backgroundsLoading,
+    particleType, setParticleType, ambientSound, setAmbientSound, enableBatterySaver, setEnableBatterySaver,
+    batteryStatus
+  } = props;
+  
+  const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'backgrounds' | 'ambience' | 'emoji'>('account');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [view, setView] = useState<'all' | 'favorites'>('all');
+  const [bgToDelete, setBgToDelete] = useState<string | null>(null);
 
-    const tabs = [
-        { id: 'colores', label: 'Colores' },
-        { id: 'fondos', label: 'Fondos' },
-        { id: 'ambiente', label: 'Ambiente' },
-    ];
-    
-    if (!isOpen) return null;
+  const tabs = [
+    { id: 'account', label: 'Cuenta', icon: User },
+    { id: 'colors', label: 'Apariencia', icon: Palette },
+    { id: 'backgrounds', label: 'Fondos', icon: ImageIconLucide },
+    { id: 'ambience', label: 'Efectos', icon: Sparkles },
+    { id: 'emoji', label: 'Emoji', icon: Smile },
+  ] as const;
 
-    const panelContent = (
-        <div className="flex flex-col h-full">
-            <header className="flex items-center justify-between p-4 border-b border-secondary-light/50 dark:border-gray-700/50 flex-shrink-0">
-                <h2 className="text-xl font-bold text-primary-dark dark:text-primary">Personalización</h2>
-                <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-primary-light/50 dark:hover:bg-gray-700 hover:text-primary-dark transition-colors"><CloseIcon /></button>
-            </header>
-            
-            <div className="border-b border-secondary-light/50 dark:border-gray-700/50 flex-shrink-0">
-                <div className="flex items-center gap-2 p-2">
-                    {tabs.map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`w-full py-2 text-sm font-semibold rounded-full transition-colors ${activeTab === tab.id ? 'bg-white dark:bg-gray-700 shadow text-primary-dark dark:text-primary text-on-transparent' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}>
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
+  const particleOptions = [
+    { type: 'none', icon: CloudOff, label: 'Ninguno' },
+    { type: 'snow', icon: Snowflake, label: 'Nieve' },
+    { type: 'rain', icon: CloudRain, label: 'Lluvia' },
+    { type: 'stars', icon: Stars, label: 'Estrellas' },
+    { type: 'bubbles', icon: Circle, label: 'Burbujas' },
+    { type: 'sparks', icon: Zap, label: 'Chispas' },
+  ] as const;
 
-            <div className="flex-grow overflow-y-auto custom-scrollbar p-4">
-                {activeTab === 'colores' && <ColorsTab {...props} />}
-                {activeTab === 'fondos' && <BackgroundsTab {...props} />}
-                {activeTab === 'ambiente' && <AmbienceTab {...props} />}
-            </div>
-        </div>
-    );
+  const soundOptions = [
+    { type: 'none', icon: VolumeX, label: 'Ninguno' },
+    { type: 'rain', icon: CloudRain, label: 'Lluvia' },
+    { type: 'forest', icon: TreePine, label: 'Bosque' },
+    { type: 'coffee', icon: Coffee, label: 'Cafetería' },
+    { type: 'waves', icon: Waves, label: 'Olas' },
+  ] as const;
 
-    if (isMobile) {
+  const avatarUrl = currentUser?.user_metadata?.avatar_url;
+  const fullName = currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Usuario';
+  const email = currentUser?.email || '';
+
+  if (!isOpen) return null;
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'account':
         return (
-            <div className="fixed inset-0 bg-secondary-lighter dark:bg-gray-800 z-[60000] animate-deploy">
-                {panelContent}
+          <div className="flex flex-col h-full animate-in fade-in duration-200">
+            {/* Header Profile */}
+            <div className="flex items-center gap-5 pb-8 border-b border-gray-100 dark:border-gray-800">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Perfil" className="w-16 h-16 rounded-full object-cover shadow-sm border border-gray-100 dark:border-gray-800" />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center shadow-sm border border-gray-100 dark:border-gray-800">
+                  <User className="w-7 h-7 text-gray-400" strokeWidth={1.5} />
+                </div>
+              )}
+              <div className="flex flex-col items-start justify-center">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white leading-snug">{fullName}</h2>
+                <p className="text-[14px] text-gray-500 dark:text-gray-400">{email}</p>
+              </div>
             </div>
-        );
-    }
 
-    return (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[60000]" onClick={onClose}>
-            <div
-                className="fixed top-0 right-0 h-full w-full max-w-sm bg-secondary-lighter/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-2xl flex flex-col transition-transform duration-300 transform animate-slide-in"
-                onClick={e => e.stopPropagation()}
-            >
-                {panelContent}
+            {/* List */}
+            <div className="pt-2">
+              <div className="flex justify-between items-center py-5 border-b border-gray-100 dark:border-gray-800">
+                <span className="text-[15px] font-medium text-gray-700 dark:text-gray-200">Nombre</span>
+                <span className="text-[15px] text-gray-500 dark:text-gray-400">{fullName}</span>
+              </div>
+              <div className="flex justify-between items-center py-5 border-b border-gray-100 dark:border-gray-800">
+                <span className="text-[15px] font-medium text-gray-700 dark:text-gray-200">Cuenta de email</span>
+                <span className="text-[15px] text-gray-500 dark:text-gray-400">{email}</span>
+              </div>
+              
+              <div className="pt-8">
+                <button 
+                  onClick={onLogout}
+                  className="w-[140px] py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[14px] flex justify-center items-center"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
             </div>
+          </div>
+        );
+
+      case 'colors':
+        return (
+          <div className="flex flex-col h-full animate-in fade-in duration-200">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">Apariencia</h3>
+            <div className="space-y-0">
+              {Object.entries(colors).map(([colorName, colorValue]) => (
+                <div key={colorName} className="flex justify-between items-center py-5 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                  <span className="text-[15px] font-medium text-gray-700 dark:text-gray-200 capitalize">
+                    {colorName.replace('-', ' ')}
+                  </span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-[14px] text-gray-500 uppercase tracking-wide">{colorValue}</span>
+                    <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700 cursor-pointer shadow-sm">
+                      <input
+                        type="color"
+                        value={colorValue}
+                        onChange={(e) => onThemeColorChange(colorName as keyof ThemeColors, e.target.value)}
+                        className="absolute inset-[-10px] w-12 h-12 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="pt-8">
+                <button onClick={onReset} className="w-[200px] py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors text-[14px]">
+                  Restaurar colores
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'backgrounds':
+        const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.is_favorite) : userBackgrounds;
+        return (
+          <div className="flex flex-col h-full animate-in fade-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Fondos de pantalla</h3>
+              <button onClick={() => fileInputRef.current?.click()} disabled={backgroundsLoading || userBackgrounds.length >= 10} className="w-[120px] py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[13px] flex items-center justify-center gap-2 disabled:opacity-50">
+                <Upload size={14} /> Subir Fondo
+              </button>
+              <input type="file" ref={fileInputRef} onChange={(e) => { if (e.target.files?.[0]) { onAddBackground(e.target.files[0]); e.target.value = ''; } }} accept="image/*,video/mp4,video/webm" className="hidden" />
+            </div>
+
+            <div className="flex gap-6 mb-6 border-b border-gray-100 dark:border-gray-800 pb-2">
+              <button onClick={() => setView('all')} className={`text-[14px] font-medium transition-colors ${view === 'all' ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white pb-2 -mb-[9px]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Todos</button>
+              <button onClick={() => setView('favorites')} className={`text-[14px] font-medium transition-colors ${view === 'favorites' ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white pb-2 -mb-[9px]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Favoritos</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar -mx-1 px-1 pb-4">
+              {backgroundsLoading && userBackgrounds.length === 0 ? (
+                <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+              ) : filteredBackgrounds.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 text-[15px]">No hay fondos {view === 'favorites' && 'favoritos'}.</div>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredBackgrounds.map(bg => (
+                    <div key={bg.id} className="relative group aspect-video rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800/50 cursor-pointer border border-gray-100 dark:border-gray-800" onClick={() => onSelectBackground(activeBackground?.id === bg.id ? null : bg)}>
+                      {activeBackground?.id === bg.id && <div className="absolute inset-0 border-2 border-blue-500 rounded-xl z-20 pointer-events-none" />}
+                      
+                      {bg.type === 'video' ? (
+                        <video src={bg.url} className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={bg.url} alt={bg.name} className="w-full h-full object-cover" loading="lazy" />
+                      )}
+                      
+                      <div className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/90 dark:bg-black/60 backdrop-blur-md text-gray-800 dark:text-white z-10 shadow-sm">
+                        {bg.type === 'video' ? <VideoIconLucide size={12} strokeWidth={2.5}/> : <ImageIconLucide size={12} strokeWidth={2.5}/>}
+                      </div>
+
+                      <div className={`absolute inset-0 bg-black/20 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 z-10 ${activeBackground?.id === bg.id ? 'opacity-0 hover:opacity-100' : ''}`}>
+                        <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(bg.id); }} className={`p-2.5 rounded-full backdrop-blur-md transition-all shadow-sm ${bg.is_favorite ? 'bg-yellow-400 text-white' : 'bg-white/90 text-gray-700 hover:bg-white'}`}>
+                          <Star size={16} className={bg.is_favorite ? 'fill-current' : ''} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setBgToDelete(bg.id); }} className="p-2.5 rounded-full bg-red-500 text-white hover:bg-red-600 backdrop-blur-md transition-all shadow-sm">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <ConfirmationModal isOpen={!!bgToDelete} onClose={() => setBgToDelete(null)} onConfirm={() => { if (bgToDelete) { onDeleteBackground(bgToDelete); setBgToDelete(null); } }} title="Eliminar Fondo" message="¿Estás seguro de que quieres eliminar este fondo?" confirmText="Eliminar" cancelText="Cancelar" isDestructive={true} />
+          </div>
+        );
+
+      case 'ambience':
+        return (
+          <div className="flex flex-col h-full animate-in fade-in duration-200">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">Efectos visuales y sonido</h3>
+            
+            <div className="space-y-8 pb-8 flex-1 overflow-y-auto custom-scrollbar">
+              <div>
+                <span className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 mb-4">Efectos de pantalla</span>
+                <div className="grid grid-cols-3 gap-3">
+                  {particleOptions.map(opt => (
+                    <button
+                      key={opt.type}
+                      onClick={() => setParticleType(opt.type)}
+                      className={`py-3 px-2 rounded-xl text-[14px] font-medium transition-all flex flex-col items-center gap-2 border ${
+                        particleType === opt.type 
+                          ? 'bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' 
+                          : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200 dark:bg-[#1a1b1e] dark:border-gray-800 dark:text-gray-400 dark:hover:border-gray-700'
+                      }`}
+                    >
+                      <opt.icon className="w-5 h-5" strokeWidth={particleType === opt.type ? 2.5 : 1.5} />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <span className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 mb-4">Sonido de fondo</span>
+                <div className="grid grid-cols-3 gap-3">
+                  {soundOptions.map(opt => (
+                    <button
+                      key={opt.type}
+                      onClick={() => setAmbientSound({ ...ambientSound, type: opt.type as AmbientSoundType })}
+                      className={`py-3 px-2 rounded-xl text-[14px] font-medium transition-all flex flex-col items-center gap-2 border ${
+                        ambientSound.type === opt.type 
+                          ? 'bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' 
+                          : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200 dark:bg-[#1a1b1e] dark:border-gray-800 dark:text-gray-400 dark:hover:border-gray-700'
+                      }`}
+                    >
+                      <opt.icon className="w-5 h-5" strokeWidth={ambientSound.type === opt.type ? 2.5 : 1.5} />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {ambientSound.type !== 'none' && (
+                  <div className="mt-5 flex items-center gap-4 bg-gray-50 dark:bg-gray-800/30 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <Volume2 size={18} className="text-gray-500 dark:text-gray-400" />
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={ambientSound.volume}
+                      onChange={(e) => setAmbientSound({ ...ambientSound, volume: parseFloat(e.target.value) })}
+                      className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center py-4 border-t border-gray-100 dark:border-gray-800">
+                <div className="flex flex-col">
+                  <span className="text-[15px] font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                    <Battery size={16} className={batteryStatus?.isLow ? 'text-red-500' : 'text-gray-400'}/>
+                    Ahorro de energía
+                  </span>
+                  <span className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Detener animaciones con batería baja</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={enableBatterySaver} onChange={(e) => setEnableBatterySaver(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 border border-transparent dark:border-gray-600 dark:peer-checked:border-blue-500"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'emoji':
+        return (
+          <div className="flex flex-col h-full pb-4 animate-in fade-in duration-200">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">Emoji de progreso</h3>
+            
+            <div className="flex items-center justify-center py-6 mb-6 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-800">
+              <span className="text-6xl leading-none filter drop-shadow-sm">{progressEmoji || '🐥'}</span>
+            </div>
+            
+            <div className="flex-1 min-h-[350px] overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1b1e]">
+              <EmojiPicker 
+                width="100%"
+                height="100%"
+                onEmojiClick={(emojiData) => onProgressEmojiChange?.(emojiData.emoji)}
+                theme={document.documentElement.classList.contains('dark') ? EmojiTheme.DARK : EmojiTheme.LIGHT}
+                searchPlaceHolder="Buscar emoji..."
+                previewConfig={{ showPreview: false }}
+                skinTonesDisabled
+              />
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const panelContent = (
+    <div className="flex flex-col md:flex-row h-full w-full bg-white dark:bg-[#1a1b1e] overflow-hidden">
+      
+      {/* Mobile Header (Close button only) */}
+      {isMobile && (
+        <div className="flex justify-end p-4 shrink-0 drag-handle cursor-move">
+          <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+            <X size={20} strokeWidth={2.5} />
+          </button>
         </div>
+      )}
+
+      {/* Sidebar Navigation */}
+      <div className="w-full md:w-[240px] shrink-0 border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800 flex flex-col bg-gray-50/50 dark:bg-[#151618]">
+        
+        {/* Desktop Drag Handle & Title */}
+        {!isMobile && (
+          <div className="p-6 pb-2 drag-handle cursor-move flex items-center justify-between">
+            <h2 className="text-[16px] font-semibold text-gray-900 dark:text-white tracking-wide">Ajustes</h2>
+            <button onClick={onClose} className="p-1.5 -mr-1.5 text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors rounded-full">
+              <X size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
+
+        {/* Tabs List */}
+        <div className="flex md:flex-col p-4 md:p-4 gap-1.5 overflow-x-auto custom-scrollbar md:overflow-visible">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all text-[14px] whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-white dark:bg-[#1a1b1e] text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-gray-800'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 border border-transparent'
+              }`}
+            >
+              <tab.icon size={18} strokeWidth={activeTab === tab.id ? 2.5 : 2} className={activeTab === tab.id ? 'text-blue-500' : 'opacity-70'} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar relative bg-white dark:bg-[#1a1b1e]">
+        {renderContent()}
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-[70000] flex flex-col justify-end pointer-events-auto">
+        <motion.div 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" 
+          onClick={onClose} 
+        />
+        <motion.div 
+          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+          className="relative w-full h-[90vh] bg-white dark:bg-[#1a1b1e] rounded-t-3xl overflow-hidden shadow-2xl flex flex-col"
+        >
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full z-10" />
+          {panelContent}
+        </motion.div>
+      </div>
     );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70000] flex items-center justify-center p-4 pointer-events-none">
+      <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-gray-900/30 backdrop-blur-[2px] pointer-events-auto" 
+        onClick={onClose} 
+      />
+      <motion.div
+        drag
+        dragHandle=".drag-handle"
+        dragMomentum={false}
+        initial={{ scale: 0.96, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 10 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+        className="w-full max-w-[840px] h-[640px] max-h-[85vh] relative pointer-events-auto shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)] rounded-[20px] overflow-hidden bg-white dark:bg-[#1a1b1e] border border-gray-100 dark:border-gray-800"
+      >
+        {panelContent}
+      </motion.div>
+    </div>
+  );
 };
 
 export default CustomizationPanel;

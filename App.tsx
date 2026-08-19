@@ -666,6 +666,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       </header>
 
       <CustomizationPanel
+        currentUser={currentUser}
+        onLogout={onLogout}
+        progressEmoji={uiSettings?.progressEmoji}
+        onProgressEmojiChange={(emoji) => setUiSettings((s: any) => ({ ...s, progressEmoji: emoji }))}
         isOpen={isCustomizationPanelOpen}
         onClose={() => setIsCustomizationPanelOpen(false)}
         colors={themeColors}
@@ -726,7 +730,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         <main className={`${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {openWindows.includes('todo') && (
             <ModalWindow isOpen={true} onClose={() => toggleWindow('todo')} title="Lista de Tareas" isDraggable isResizable zIndex={focusedWindow === 'todo' ? 50 : 40} onFocus={() => bringToFront('todo')} className="w-full max-w-3xl h-[80vh]" windowState={windowStates.todo} onStateChange={s => setWindowStates(ws => ({...ws, todo: s}))} allowFullscreen>
-              <TodoListModule 
+              <TodoListModule progressEmoji={uiSettings?.progressEmoji} 
                 allTodos={allTodos} 
                 addTodo={handleAddTodo} 
                 toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
@@ -1119,8 +1123,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'tasks':
                 return (
                     <div className="flex flex-col h-full">
-                        <TodoListModule 
-                            isMobile={true} 
+                        <TodoListModule progressEmoji={uiSettings?.progressEmoji} 
+                            currentUser={currentUser}
+              onLogout={onLogout}
+              isMobile={true} 
                             allTodos={allTodos} 
                             addTodo={handleAddTodo} 
                             toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
@@ -1299,6 +1305,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             <CustomizationPanel
               isOpen={isCustomizationPanelOpen}
               onClose={() => setIsCustomizationPanelOpen(false)}
+              currentUser={currentUser}
+              onLogout={onLogout}
+              progressEmoji={uiSettings?.progressEmoji}
+              onProgressEmojiChange={(emoji) => setUiSettings((s: any) => ({ ...s, progressEmoji: emoji }))}
               isMobile={true}
               colors={themeColors}
               onThemeColorChange={onThemeColorChange}
@@ -1647,22 +1657,32 @@ const App: React.FC = () => {
   // --- Auth & Data Loading ---
   useEffect(() => {
     const checkUser = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if(session) setUser(session.user);
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if(session?.user) {
+            setUser(session.user);
+          } else {
+            setUser(null);
+          }
+        } catch (e) {
+          console.error("Auth check failed:", e);
+        }
         setAuthLoading(false);
     };
     checkUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-        setUser(session?.user ?? null);
-        if(!session) { // If logged out
-            setDataLoaded(false);
-            setUiSettings(null);
-            // Reset all state
-            setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
-            setProjects([]); setHabits([]); setHabitRecords([]);
-            setUserBackgrounds([]);
-            setGoogleApiToken(null);
+        if (session?.user) {
+          setUser(session.user);
+        } else {
+          setUser(null);
+          setDataLoaded(false);
+          setUiSettings(null);
+          // Reset all state
+          setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
+          setProjects([]); setHabits([]); setHabitRecords([]);
+          setUserBackgrounds([]);
+          setGoogleApiToken(null);
         }
     });
 
@@ -1680,14 +1700,28 @@ const App: React.FC = () => {
     if (user) {
       localStorage.removeItem(getUserKey('google_api_token'));
     }
+    localStorage.removeItem('pollito_legacy_user');
+
     // Also clear the token from the gapi client instance.
     if (window.gapi && window.gapi.client) {
         window.gapi.client.setToken(null);
     }
 
+    // Reset local state
+    setUser(null);
+    setDataLoaded(false);
+    setUiSettings(null);
+    setAllTodos({}); setFolders([]); setPlaylists([]); setQuickNotes([]); setNotes([]);
+    setProjects([]); setHabits([]); setHabitRecords([]);
+    setUserBackgrounds([]);
+
     // Supabase logout
-    const { error } = await supabase.auth.signOut();
-    if (error) console.error('Error logging out:', error.message);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error('Error logging out:', error.message);
+    } catch (e) {
+      console.warn('Sign out error:', e);
+    }
   }, [googleApiToken, user, getUserKey]);
   
   const loadData = useCallback(async (networkMode: 'fetch' | 'cache-only' = 'fetch') => {
@@ -1758,6 +1792,38 @@ const App: React.FC = () => {
     });
     setHabits(parsedCachedHabits);
     
+    // Load local UI settings from localStorage or defaults
+    const savedUiSettings = localStorage.getItem(getUserKey('ui_settings'));
+    let localSettings = {
+      themeColors: DEFAULT_COLORS,
+      activeBackgroundId: null,
+      particleType: 'none' as ParticleType,
+      ambientSound: { type: 'none' as AmbientSoundType, volume: 0.5 },
+      dailyEncouragementLocalHour: null,
+      dailySummaryHour: null,
+      enableBatterySaver: false,
+      progressEmoji: '🐥'
+    };
+    if (savedUiSettings) {
+      try {
+        localSettings = { ...localSettings, ...JSON.parse(savedUiSettings) };
+      } catch (e) {
+        console.warn('Failed to parse ui_settings:', e);
+      }
+    }
+    setUiSettings(localSettings);
+
+    try {
+        const [storedBrowser, storedActiveTrack, storedSpotifyTrack] = await Promise.all([
+            get<{key: string, value: BrowserSession}>('settings', getUserKey('browserSession')),
+            get<{key: string, value: Playlist}>('settings', getUserKey('activeTrack')),
+            get<{key: string, value: Playlist}>('settings', getUserKey('activeSpotifyTrack')),
+        ]);
+        if (storedBrowser) setBrowserSession(storedBrowser.value);
+        if(storedActiveTrack) setActiveTrack(storedActiveTrack.value);
+        if(storedSpotifyTrack) setActiveSpotifyTrack(storedSpotifyTrack.value);
+    } catch(e) { console.error("Error parsing settings from IndexedDB:", e); }
+
     setDataLoaded(true);
 
     if (networkMode === 'fetch' && navigator.onLine) {
@@ -1979,25 +2045,34 @@ const App: React.FC = () => {
   // --- Settings Persistence ---
   useEffect(() => {
     if (user && dataLoaded) {
-      if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-      settingsSaveTimeout.current = window.setTimeout(async () => {
-        const { durations, showBackgroundTimer, backgroundTimerOpacity, autoMinimizeWindows } = pomodoroState;
-        const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity, autoMinimizeWindows };
-        if(isOnline) await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
-      }, 1500);
+      if(isOnline) {
+        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+        settingsSaveTimeout.current = window.setTimeout(async () => {
+          const { durations, showBackgroundTimer, backgroundTimerOpacity, autoMinimizeWindows } = pomodoroState;
+          const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity, autoMinimizeWindows };
+          await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
+        }, 1500);
+      }
     }
     return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
   }, [pomodoroState, user, dataLoaded, isOnline]);
   
   useEffect(() => {
-    if (user && dataLoaded && uiSettings) {
-      if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
-      settingsSaveTimeout.current = window.setTimeout(async () => {
-        if(isOnline) await supabase.from('profiles').update({ ui_settings: uiSettings }).eq('id', user.id);
-      }, 1000);
+    if (user && uiSettings) {
+      try {
+        localStorage.setItem(getUserKey('ui_settings'), JSON.stringify(uiSettings));
+      } catch (e) {
+        console.warn('Failed to save ui_settings to localStorage:', e);
+      }
+      if (dataLoaded && isOnline) {
+        if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
+        settingsSaveTimeout.current = window.setTimeout(async () => {
+          await supabase.from('profiles').update({ ui_settings: uiSettings }).eq('id', user.id);
+        }, 1000);
+      }
     }
     return () => { if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current); };
-  }, [uiSettings, user, dataLoaded, isOnline]);
+  }, [uiSettings, user, dataLoaded, isOnline, getUserKey]);
 
   // --- Robust Pomodoro State Persistence ---
   const pomodoroInitialized = useRef(false);
@@ -3368,13 +3443,24 @@ const App: React.FC = () => {
     if (!user) return;
     setBackgroundsAreLoading(true);
     try {
+        const isUserUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id);
+        if (!isUserUuid || user.id === '00000000-0000-0000-0000-000000000001') {
+            const cached = localStorage.getItem(`pollito_cached_backgrounds_${user.id}`);
+            if (cached) {
+                setUserBackgrounds(JSON.parse(cached));
+            } else {
+                setUserBackgrounds([]);
+            }
+            return;
+        }
+
         const { data: backgroundMeta, error } = await supabase
             .from('user_backgrounds')
             .select('*')
             .eq('user_id', user.id);
         if (error) throw error;
         
-        const backgrounds: Background[] = backgroundMeta.map(meta => {
+        const backgrounds: Background[] = (backgroundMeta || []).map(meta => {
             const { data: { publicUrl } } = supabase.storage.from('fondos').getPublicUrl(meta.path);
             return { ...meta, url: publicUrl };
         });
@@ -3701,7 +3787,7 @@ const App: React.FC = () => {
   }
   
   if (!user) {
-    return <Login onLogin={() => {}} />;
+    return <Login />;
   }
   
   const appProps: AppComponentProps = {
