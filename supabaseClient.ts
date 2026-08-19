@@ -25,5 +25,12 @@ if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('YOUR_SUPABASE_URL'
 }
 
 
-// Crea y exporta el cliente de Supabase.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Crea y exporta el cliente de Supabase con flujo PKCE y persistencia de sesión.
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+  },
+});

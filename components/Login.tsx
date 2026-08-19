@@ -13,40 +13,6 @@ const Login: React.FC = () => {
     const [isSignUp, setIsSignUp] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
 
-    useEffect(() => {
-        // Inicializar Google Identity Services (GSI) si está disponible
-        if (typeof window !== 'undefined' && window.google?.accounts?.id && config.GOOGLE_CLIENT_ID) {
-            try {
-                window.google.accounts.id.initialize({
-                    client_id: config.GOOGLE_CLIENT_ID,
-                    callback: async (response: any) => {
-                        if (response.credential) {
-                            setGoogleLoading(true);
-                            setError(null);
-                            try {
-                                const { error: signInError } = await supabase.auth.signInWithIdToken({
-                                    provider: 'google',
-                                    token: response.credential,
-                                });
-                                if (signInError) {
-                                    setError(signInError.message || 'Error al iniciar sesión con Google.');
-                                }
-                            } catch (err: any) {
-                                setError(err?.message || 'Error al procesar el inicio de sesión.');
-                            } finally {
-                                setGoogleLoading(false);
-                            }
-                        }
-                    },
-                    auto_select: false,
-                    cancel_on_tap_outside: true,
-                });
-            } catch (e) {
-                console.warn('GSI Init:', e);
-            }
-        }
-    }, []);
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -100,22 +66,6 @@ const Login: React.FC = () => {
         setGoogleLoading(true);
 
         try {
-            if (window.google?.accounts?.id && config.GOOGLE_CLIENT_ID) {
-                window.google.accounts.id.prompt((notification: any) => {
-                    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                        performSupabaseOAuth();
-                    }
-                });
-            } else {
-                await performSupabaseOAuth();
-            }
-        } catch (err: any) {
-            await performSupabaseOAuth();
-        }
-    };
-
-    const performSupabaseOAuth = async () => {
-        try {
             const { error: oauthError } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -128,10 +78,10 @@ const Login: React.FC = () => {
             });
             if (oauthError) {
                 setError(oauthError.message || 'Error al conectar con Google.');
+                setGoogleLoading(false);
             }
         } catch (err: any) {
             setError('No fue posible completar la autenticación con Google.');
-        } finally {
             setGoogleLoading(false);
         }
     };
