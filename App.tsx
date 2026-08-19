@@ -53,6 +53,7 @@ import ChevronLeftIcon from './components/icons/ChevronLeftIcon';
 import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
 import { NotionService } from './services/notionService';
+import { Settings } from 'lucide-react';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -620,48 +621,49 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 Sin conexión
             </div>
         )}
-        <div className={`transition-opacity duration-300 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <button onClick={onLogout} className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-100 hover:text-red-500 p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110" aria-label="Cerrar sesión">
+        <div className={`transition-opacity duration-300 flex flex-col items-end gap-3 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <button onClick={onLogout} className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-100 hover:text-red-500 p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110" aria-label="Cerrar sesión" title="Cerrar sesión">
             <LogoutIcon />
+          </button>
+          <button
+            onClick={() => setIsCustomizationPanelOpen(true)}
+            className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-300 hover:text-primary p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110"
+            aria-label="Configuración"
+            title="Configuración"
+          >
+            <Settings className="h-6 w-6" />
           </button>
         </div>
         <FocusModeButton isFocusMode={isFocusMode} onToggle={() => setIsFocusMode(!isFocusMode)} />
         <div className={`transition-opacity duration-300 flex flex-col items-end gap-3 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
-          <button
-              onClick={() => setIsCustomizationPanelOpen(true)}
-              className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-700 dark:text-gray-300 hover:text-primary p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110"
-              aria-label="Personalización"
-            >
-              <PaletteIcon />
-            </button>
 
-            <button
-                onClick={() => setIsNotificationsPanelOpen(true)}
-                className={`relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
-                    isPermissionBlocked
-                    ? 'text-red-400 cursor-not-allowed'
-                    : isSubscribed
-                    ? 'text-primary'
-                    : 'text-gray-700 dark:text-gray-300 hover:text-primary'
-                }`}
-                aria-label={isSubscribed ? 'Gestionar notificaciones' : 'Activar notificaciones'}
-                title={
-                    isPermissionBlocked
-                    ? 'Notificaciones bloqueadas por el navegador'
-                    : 'Gestionar notificaciones'
-                }
-                disabled={isPermissionBlocked}
-            >
-                <BellIcon className="h-6 w-6" />
-                {isPermissionBlocked && (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                        </svg>
-                    </div>
-                )}
-            </button>
+          <button
+              onClick={() => setIsNotificationsPanelOpen(true)}
+              className={`relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
+                  isPermissionBlocked
+                  ? 'text-red-400 cursor-not-allowed'
+                  : isSubscribed
+                  ? 'text-primary'
+                  : 'text-gray-700 dark:text-gray-300 hover:text-primary'
+              }`}
+              aria-label={isSubscribed ? 'Gestionar notificaciones' : 'Activar notificaciones'}
+              title={
+                  isPermissionBlocked
+                  ? 'Notificaciones bloqueadas por el navegador'
+                  : 'Gestionar notificaciones'
+              }
+              disabled={isPermissionBlocked}
+          >
+              <BellIcon className="h-6 w-6" />
+              {isPermissionBlocked && (
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                  </div>
+              )}
+          </button>
         </div>
       </header>
 
@@ -677,7 +679,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         onReset={onResetThemeColors}
         activeBackground={activeBackground}
         userBackgrounds={userBackgrounds}
-        onSelectBackground={(bg) => setUiSettings((s: any) => ({ ...s, activeBackgroundId: bg?.id || null }))}
+        onSelectBackground={(bg) => {
+          setUiSettings((s: any) => ({ ...s, activeBackgroundId: bg?.id || null }));
+          try {
+            if (bg) {
+              localStorage.setItem(`pollito_selected_bg_${currentUser?.id || 'guest'}`, JSON.stringify(bg));
+            } else {
+              localStorage.removeItem(`pollito_selected_bg_${currentUser?.id || 'guest'}`);
+            }
+          } catch (e) {}
+        }}
         onAddBackground={handleAddBackground}
         onDeleteBackground={handleDeleteBackground}
         onToggleFavorite={handleToggleFavoriteBackground}
@@ -1226,15 +1237,18 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden">
                                 <div className="divide-y divide-black/5 dark:divide-white/10">
 
+                                    <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <Settings className="w-5 h-5 text-primary" />
+                                            <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Configuración</h3>
+                                        </div>
+                                        <ChevronRightIcon />
+                                    </button>
+
                                     <div className="p-4 flex justify-between items-center">
                                         <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Tema</h3>
                                         <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
                                     </div>
-
-                                    <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Personalización</h3>
-                                        <ChevronRightIcon />
-                                    </button>
 
                                     <button onClick={() => setIsQuickCaptureSetupOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
                                         <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Captura Rápida</h3>
@@ -1315,7 +1329,16 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               onReset={onResetThemeColors}
               activeBackground={activeBackground}
               userBackgrounds={userBackgrounds}
-              onSelectBackground={(bg) => setUiSettings((s: any) => ({ ...s, activeBackgroundId: bg?.id || null }))}
+              onSelectBackground={(bg) => {
+                setUiSettings((s: any) => ({ ...s, activeBackgroundId: bg?.id || null }));
+                try {
+                  if (bg) {
+                    localStorage.setItem(`pollito_selected_bg_${currentUser?.id || 'guest'}`, JSON.stringify(bg));
+                  } else {
+                    localStorage.removeItem(`pollito_selected_bg_${currentUser?.id || 'guest'}`);
+                  }
+                } catch (e) {}
+              }}
               onAddBackground={handleAddBackground}
               onDeleteBackground={handleDeleteBackground}
               onToggleFavorite={handleToggleFavoriteBackground}
@@ -1401,8 +1424,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
 
 const DEFAULT_COLORS: ThemeColors = {
-  primary: '#F472B6', // pink-400
-  secondary: '#FBBF24', // amber-400
+  primary: '#38BDF8', // Celeste (Sky-400)
+  secondary: '#2563EB', // Azul (Blue-600)
 };
 
 // --- Color Manipulation Helpers ---
@@ -1439,6 +1462,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [uiSettings, setUiSettings] = useState<any>(null);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   const batteryStatus = useBatteryStatus();
   const isPowerSavingActive = !!(uiSettings?.enableBatterySaver && batteryStatus.isLow);
@@ -3514,11 +3538,28 @@ const App: React.FC = () => {
   }, [user, isOnline, loadBackgroundsFromSupabase]);
   
   const activeBackground = useMemo(() => {
-    if (!uiSettings?.activeBackgroundId || userBackgrounds.length === 0) {
-        return null;
+    if (!uiSettings?.activeBackgroundId) {
+      return null;
     }
-    return userBackgrounds.find(bg => bg.id === uiSettings.activeBackgroundId) || null;
-  }, [uiSettings?.activeBackgroundId, userBackgrounds]);
+    const bgFromList = userBackgrounds.find(bg => bg.id === uiSettings.activeBackgroundId);
+    if (bgFromList) {
+      try {
+        localStorage.setItem(`pollito_selected_bg_${user?.id || 'guest'}`, JSON.stringify(bgFromList));
+      } catch (e) {}
+      return bgFromList;
+    }
+    // Check cached active background in case userBackgrounds is loading
+    try {
+      const cached = localStorage.getItem(`pollito_selected_bg_${user?.id || 'guest'}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.id === uiSettings.activeBackgroundId) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return null;
+  }, [uiSettings?.activeBackgroundId, userBackgrounds, user?.id]);
 
   useEffect(() => {
     if (activeBackground) {
@@ -3796,7 +3837,7 @@ const App: React.FC = () => {
   }
   
   const appProps: AppComponentProps = {
-    isOnline, isSyncing, currentUser: user, onLogout: handleLogout, 
+    isOnline, isSyncing, currentUser: user, onLogout: () => setIsLogoutConfirmOpen(true), 
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
     allTodos, folders: foldersWithNotes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, 
@@ -3926,6 +3967,18 @@ const App: React.FC = () => {
         title="Eliminar Tarea"
         message={singleTaskToDelete ? `¿Seguro que deseas eliminar la tarea "${singleTaskToDelete.text}"?` : ''}
         confirmText="Eliminar"
+        cancelText="Cancelar"
+      />
+      <ConfirmationModal
+        isOpen={isLogoutConfirmOpen}
+        onClose={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={() => {
+          setIsLogoutConfirmOpen(false);
+          handleLogout();
+        }}
+        title="Cerrar sesión"
+        message="¿Estás seguro de que deseas cerrar sesión en Pollito Productivo?"
+        confirmText="Cerrar sesión"
         cancelText="Cancelar"
       />
       <HabitEditorPanel 

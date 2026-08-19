@@ -53,6 +53,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<'all' | 'favorites'>('all');
   const [bgToDelete, setBgToDelete] = useState<string | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const tabs = [
     { id: 'account', label: 'Cuenta', icon: User },
@@ -118,8 +119,8 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               
               <div className="pt-8">
                 <button 
-                  onClick={onLogout}
-                  className="w-[140px] py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[14px] flex justify-center items-center"
+                  onClick={() => setShowLogoutConfirm(true)}
+                  className="w-[140px] py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[14px] flex justify-center items-center shadow-sm"
                 >
                   Cerrar sesión
                 </button>
@@ -465,6 +466,19 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
       >
         {panelContent}
       </motion.div>
+
+      <ConfirmationModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          if (onLogout) onLogout();
+        }}
+        title="Cerrar sesión"
+        message="¿Estás seguro de que deseas cerrar sesión?"
+        confirmText="Cerrar sesión"
+        cancelText="Cancelar"
+      />
     </div>
   );
 };
