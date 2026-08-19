@@ -2,7 +2,6 @@ import { Todo } from '../types';
 
 const NOTION_SETTINGS_KEY = 'pollito_notion_settings';
 const NOTION_BASE_URL = 'https://api.notion.com/v1';
-const CORS_PROXY = 'https://corsproxy.io/?';
 
 export interface NotionSettings {
   enabled: boolean;
@@ -26,6 +25,33 @@ export interface NotionPageItem {
 }
 
 export class NotionService {
+
+  /**
+   * Helper to execute Notion requests trying multiple proxy routes
+   */
+  private static async executeWithProxyFallback(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const fullTargetUrl = `${NOTION_BASE_URL}${endpoint}`;
+    const proxyGenerators = [
+      (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+      (u: string) => `https://corsproxy.io/?${u}`,
+      (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+      (u: string) => u,
+    ];
+
+    let lastError: any = null;
+    for (const makeUrl of proxyGenerators) {
+      try {
+        const proxyUrl = makeUrl(fullTargetUrl);
+        const res = await fetch(proxyUrl, options);
+        if (res.ok || res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) {
+          return res;
+        }
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError || new Error('No se pudo establecer conexión con Notion a través de los servidores intermediarios.');
+  }
 
   /**
    * Get saved Notion integration settings
@@ -70,7 +96,6 @@ export class NotionService {
       throw new Error('Notion token is missing. Please configure Notion integration.');
     }
 
-    const url = `${CORS_PROXY}${NOTION_BASE_URL}${endpoint}`;
     const headers = {
       'Authorization': `Bearer ${settings.token}`,
       'Notion-Version': '2022-06-28',
@@ -78,7 +103,7 @@ export class NotionService {
       ...options.headers,
     };
 
-    const response = await fetch(url, {
+    const response = await this.executeWithProxyFallback(endpoint, {
       ...options,
       headers,
     });
@@ -96,14 +121,13 @@ export class NotionService {
    * Test connection and retrieve database properties to verify integration
    */
   static async testConnection(token: string, databaseId: string): Promise<{ success: boolean; properties: string[]; titleProp: string }> {
-    const url = `${CORS_PROXY}${NOTION_BASE_URL}/databases/${databaseId}`;
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Notion-Version': '2022-06-28',
       'Content-Type': 'application/json',
     };
 
-    const response = await fetch(url, { headers });
+    const response = await this.executeWithProxyFallback(`/databases/${databaseId}`, { headers });
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.message || `No se pudo conectar a la base de datos de Notion (${response.status})`);
@@ -132,14 +156,13 @@ export class NotionService {
    * List all databases the Notion integration token has access to
    */
   static async fetchUserDatabases(token: string): Promise<Array<{ id: string; title: string; icon?: string | null }>> {
-    const url = `${CORS_PROXY}${NOTION_BASE_URL}/search`;
     const headers = {
       'Authorization': `Bearer ${token.trim()}`,
       'Notion-Version': '2022-06-28',
       'Content-Type': 'application/json',
     };
 
-    const response = await fetch(url, {
+    const response = await this.executeWithProxyFallback('/search', {
       method: 'POST',
       headers,
       body: JSON.stringify({
