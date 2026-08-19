@@ -3,7 +3,6 @@ import { Todo, Priority, Project, GoogleCalendarEvent, FocusSession } from '../t
 import ProgressBar from './ProgressBar';
 import TodoInput from './TodoInput';
 import TodoItem from './TodoItem';
-import ChickenIcon from './ChickenIcon';
 import SortIcon from './icons/SortIcon';
 import Calendar from './Calendar';
 import CalendarIcon from './icons/CalendarIcon';
@@ -342,8 +341,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                             <Calendar selectedDate={selectedDate} setDate={setSelectedDate} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} calendarEvents={calendarEvents} />
                         </div>
                         <div className="flex-grow relative flex flex-col overflow-hidden">
-                            <div className="absolute -top-10 -left-10 opacity-10 dark:opacity-20 transform rotate-12 -z-10"><ChickenIcon className="w-40 h-40 text-secondary"/></div>
-                            <div className="absolute -bottom-12 -right-12 opacity-10 dark:opacity-20 transform -rotate-12 -z-10"><ChickenIcon className="w-48 h-48 text-primary"/></div>
                             <div className={`flex-shrink-0 ${isMobile ? 'sticky top-0 bg-secondary-lighter/80 dark:bg-gray-800/80 backdrop-blur-md z-20 border-b border-secondary-light/50 dark:border-gray-700/50' : ''}`}>
                                 <div className="p-3 md:p-4">
                                     {isMobile ? (

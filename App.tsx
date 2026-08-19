@@ -1802,11 +1802,14 @@ const App: React.FC = () => {
       dailyEncouragementLocalHour: null,
       dailySummaryHour: null,
       enableBatterySaver: false,
-      progressEmoji: '🐥'
+      progressEmoji: '🚀'
     };
     if (savedUiSettings) {
       try {
         localSettings = { ...localSettings, ...JSON.parse(savedUiSettings) };
+        if (!localSettings.progressEmoji) {
+          localSettings.progressEmoji = '🚀';
+        }
       } catch (e) {
         console.warn('Failed to parse ui_settings:', e);
       }
@@ -1941,6 +1944,7 @@ const App: React.FC = () => {
               dailyEncouragementLocalHour: settings.dailyEncouragementLocalHour ?? null,
               dailySummaryHour: settings.dailySummaryHour ?? null,
               enableBatterySaver: settings.enableBatterySaver ?? false,
+              progressEmoji: settings.progressEmoji || '🚀',
           });
 
           // Check and update user's timezone offset for notifications
@@ -1964,6 +1968,7 @@ const App: React.FC = () => {
               dailyEncouragementLocalHour: null,
               dailySummaryHour: null,
               enableBatterySaver: false,
+              progressEmoji: '🚀',
             });
       }
       setIsSyncing(false);

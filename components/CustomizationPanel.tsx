@@ -293,15 +293,70 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
         );
 
       case 'emoji':
+        const currentEmoji = progressEmoji || '🚀';
+        const presetEmojis = ['🚀', '🐥', '🔥', '⭐', '🎯', '⚡', '🏆', '✨', '💡', '🌱', '🐱', '🥑'];
+
         return (
           <div className="flex flex-col h-full pb-4 animate-in fade-in duration-200">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">Emoji de progreso</h3>
-            
-            <div className="flex items-center justify-center py-6 mb-6 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-800">
-              <span className="text-6xl leading-none filter drop-shadow-sm">{progressEmoji || '🐥'}</span>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Emoji de progreso</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Personaliza el emoji que se muestra en tus listas y barras de progreso.</p>
+              </div>
+              {currentEmoji !== '🚀' && (
+                <button
+                  onClick={() => onProgressEmojiChange?.('🚀')}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900/30 font-medium"
+                >
+                  Restablecer a 🚀
+                </button>
+              )}
             </div>
             
-            <div className="flex-1 min-h-[350px] overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1b1e]">
+            {/* Active Emoji Preview Card */}
+            <div className="flex items-center gap-4 p-4 mb-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+              <div className="w-16 h-16 rounded-xl bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-center shrink-0">
+                <span className="text-4xl leading-none filter drop-shadow-sm">{currentEmoji}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Seleccionado: {currentEmoji}</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                    Activo
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Este emoji acompaña tu avance en tareas y metas.</p>
+              </div>
+            </div>
+
+            {/* Quick Select Presets */}
+            <div className="mb-4">
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-2">Frecuentes / Rápidos</span>
+              <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
+                {presetEmojis.map((emoji) => {
+                  const isSelected = currentEmoji === emoji;
+                  return (
+                    <button
+                      key={emoji}
+                      onClick={() => onProgressEmojiChange?.(emoji)}
+                      className={`h-11 rounded-xl flex items-center justify-center text-xl transition-all relative ${
+                        isSelected
+                          ? 'bg-blue-50 dark:bg-blue-950/50 ring-2 ring-blue-500 border border-blue-200 dark:border-blue-700 scale-105 shadow-sm'
+                          : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800'
+                      }`}
+                    >
+                      <span>{emoji}</span>
+                      {isSelected && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full ring-2 ring-white dark:ring-gray-900" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Full Emoji Picker */}
+            <div className="flex-1 min-h-[300px] overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1b1e]">
               <EmojiPicker 
                 width="100%"
                 height="100%"
