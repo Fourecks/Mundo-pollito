@@ -83,12 +83,12 @@ export interface Folder {
 
 export interface Background {
   id: string; // uuid from DB table
-  user_id: string;
+  user_id?: string;
   name: string; // original filename
-  path: string; // path in supabase storage
+  path?: string; // path in supabase storage
   url: string;
-  type: 'video' | 'image';
-  is_favorite: boolean;
+  type: 'video' | 'image' | 'youtube';
+  is_favorite?: boolean;
 }
 
 export interface QuickNote {

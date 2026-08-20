@@ -2002,7 +2002,7 @@ const App: React.FC = () => {
           }
 
       } else {
-            setUiSettings({
+            setUiSettings(prev => prev || {
               themeColors: DEFAULT_COLORS,
               activeBackgroundId: null,
               particleType: 'none',
@@ -3758,11 +3758,10 @@ const App: React.FC = () => {
   useEffect(() => {
       const videoEl = videoRef.current;
       const audioEl = ambientAudioRef.current;
-      const activeBg = userBackgrounds.find(bg => bg.id === uiSettings?.activeBackgroundId);
       
       if (videoEl) {
-          const isVideoActive = activeBg?.type === 'video' && !isPowerSavingActive;
-          const newSrc = isVideoActive ? activeBg.url : '';
+          const isVideoActive = (activeBackground?.type === 'video' || (activeBackground?.url && (activeBackground.url.endsWith('.mp4') || activeBackground.url.endsWith('.webm')))) && !isPowerSavingActive;
+          const newSrc = isVideoActive ? (activeBackground?.url || '') : '';
           
           if (videoEl.src !== newSrc) {
               videoEl.src = newSrc;
@@ -3775,8 +3774,14 @@ const App: React.FC = () => {
       }
 
       if (audioEl) {
-          const soundMap: Record<AmbientSoundType, string | null> = {
-              'none': null, 'rain': rainSoundSrc, 'forest': forestSoundSrc, 'coffee_shop': coffeeShopSrc, 'ocean': oceanSoundSrc,
+          const soundMap: Record<string, string | null> = {
+              'none': null, 
+              'rain': rainSoundSrc, 
+              'forest': forestSoundSrc, 
+              'coffee_shop': coffeeShopSrc, 
+              'coffee': coffeeShopSrc, 
+              'ocean': oceanSoundSrc, 
+              'waves': oceanSoundSrc,
           };
           const soundType = uiSettings?.ambientSound?.type || 'none';
           const newSrc = soundMap[soundType];
@@ -3784,16 +3789,19 @@ const App: React.FC = () => {
           audioEl.loop = true;
           audioEl.volume = uiSettings?.ambientSound?.volume ?? 0.5;
 
-          if (audioEl.src !== (newSrc || '')) {
-              audioEl.src = newSrc || '';
-               if (newSrc) {
+          if (newSrc) {
+              if (audioEl.src !== newSrc) {
+                  audioEl.src = newSrc;
                   handleMediaPlay(audioEl);
-              } else {
-                  audioEl.pause();
+              } else if (audioEl.paused) {
+                  handleMediaPlay(audioEl);
               }
+          } else {
+              audioEl.pause();
+              audioEl.src = '';
           }
       }
-  }, [uiSettings?.activeBackgroundId, uiSettings?.ambientSound, userBackgrounds, handleMediaPlay, isPowerSavingActive]);
+  }, [activeBackground, uiSettings?.ambientSound, handleMediaPlay, isPowerSavingActive]);
 
 
   // --- OneSignal / Notifications ---
@@ -3930,12 +3938,35 @@ const App: React.FC = () => {
       <div 
           className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-20 transition-opacity duration-500"
           style={{ 
-              backgroundImage: `url(${activeBackground?.type === 'image' ? activeBackground.url : ''})`,
-              opacity: activeBackground?.type === 'image' ? 1 : 0
+              backgroundImage: `url(${(activeBackground?.type === 'image' || (!activeBackground?.type && activeBackground?.url && !activeBackground.url.includes('youtube.com') && !activeBackground.url.endsWith('.mp4'))) ? activeBackground.url : ''})`,
+              opacity: (activeBackground?.type === 'image' || (!activeBackground?.type && activeBackground?.url && !activeBackground.url.includes('youtube.com') && !activeBackground.url.endsWith('.mp4'))) ? 1 : 0
           }}
       />
 
-      {/* Video background (persistent in DOM, overlays default) */}
+      {/* YouTube Video Background */}
+      {(() => {
+        const url = activeBackground?.url || '';
+        const isYt = activeBackground?.type === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be');
+        if (isYt && !isPowerSavingActive) {
+          const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+          if (match && match[1]) {
+            const ytEmbedUrl = `https://www.youtube-nocookie.com/embed/${match[1]}?autoplay=1&mute=1&controls=0&loop=1&playlist=${match[1]}&playsinline=1&enablejsapi=1&iv_load_policy=3&disablekb=1&modestbranding=1`;
+            return (
+              <div className="absolute inset-0 -z-20 overflow-hidden pointer-events-none transition-opacity duration-500">
+                <iframe
+                  src={ytEmbedUrl}
+                  title="Fondo Animado YouTube"
+                  className="w-[130%] h-[130%] -translate-x-[15%] -translate-y-[15%] object-cover pointer-events-none border-0"
+                  allow="autoplay; encrypted-media"
+                />
+              </div>
+            );
+          }
+        }
+        return null;
+      })()}
+
+      {/* MP4/WebM Video background (persistent in DOM, overlays default) */}
       <video 
           ref={videoRef} 
           loop 
@@ -3943,8 +3974,8 @@ const App: React.FC = () => {
           playsInline 
           className="absolute top-0 left-0 w-full h-full object-cover -z-20 transition-opacity duration-500"
           style={{ 
-              opacity: (activeBackground?.type === 'video' && !isPowerSavingActive) ? 1 : 0,
-              pointerEvents: (activeBackground?.type === 'video' && !isPowerSavingActive) ? 'auto' : 'none'
+              opacity: ((activeBackground?.type === 'video' || (activeBackground?.url && (activeBackground.url.endsWith('.mp4') || activeBackground.url.endsWith('.webm')))) && !isPowerSavingActive) ? 1 : 0,
+              pointerEvents: 'none'
           }}
       />
       

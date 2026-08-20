@@ -78,8 +78,8 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
     { type: 'none', icon: VolumeX, label: 'Ninguno' },
     { type: 'rain', icon: CloudRain, label: 'Lluvia' },
     { type: 'forest', icon: TreePine, label: 'Bosque' },
-    { type: 'coffee', icon: Coffee, label: 'Cafetería' },
-    { type: 'waves', icon: Waves, label: 'Olas' },
+    { type: 'coffee_shop', icon: Coffee, label: 'Cafetería' },
+    { type: 'ocean', icon: Waves, label: 'Olas del Mar' },
   ] as const;
 
   const avatarUrl = currentUser?.user_metadata?.avatar_url;
