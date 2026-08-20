@@ -3950,13 +3950,14 @@ const App: React.FC = () => {
         if (isYt && !isPowerSavingActive) {
           const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
           if (match && match[1]) {
-            const ytEmbedUrl = `https://www.youtube-nocookie.com/embed/${match[1]}?autoplay=1&mute=1&controls=0&loop=1&playlist=${match[1]}&playsinline=1&enablejsapi=1&iv_load_policy=3&disablekb=1&modestbranding=1`;
+            const videoId = match[1];
+            const ytEmbedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&disablekb=1&fs=0&autohide=1&loop=1&playlist=${videoId}&playsinline=1&enablejsapi=1`;
             return (
-              <div className="absolute inset-0 -z-20 overflow-hidden pointer-events-none transition-opacity duration-500">
+              <div className="absolute inset-0 -z-20 overflow-hidden pointer-events-none transition-opacity duration-500 bg-black">
                 <iframe
                   src={ytEmbedUrl}
                   title="Fondo Animado YouTube"
-                  className="w-[130%] h-[130%] -translate-x-[15%] -translate-y-[15%] object-cover pointer-events-none border-0"
+                  className="absolute w-[250%] h-[250%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none border-0 aspect-video object-cover"
                   allow="autoplay; encrypted-media"
                 />
               </div>
