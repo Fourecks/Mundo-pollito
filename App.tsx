@@ -298,7 +298,7 @@ interface AppComponentProps {
   handleUpdateNote: (note: Note) => Promise<void>;
   handleDeleteNote: (noteId: number, folderId: number) => Promise<void>;
   handleAddProject: (name: string, emoji: string | null, color: string | null) => Promise<Project | null>;
-  handleUpdateProject: (projectId: number, name: string, emoji: string | null, color: string | null, kanban_columns?: string[]) => Promise<void>;
+  handleUpdateProject: (projectId: number, updates: Partial<Project>) => Promise<void>;
   handleDeleteProject: (projectId: number) => Promise<void>;
   handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
   handleArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
@@ -403,7 +403,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 
   const handleSaveProject = async (name: string, emoji: string | null, color: string | null) => {
     if (projectToEdit) {
-      await handleUpdateProject(projectToEdit.id, name, emoji, color);
+      await handleUpdateProject(projectToEdit.id, { name, emoji, color });
     } else {
       await handleAddProject(name, emoji, color);
     }
@@ -769,7 +769,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 setSelectedDate={setSelectedDate} 
                 focusMode={isFocusMode}
                 onAddProject={handleAddProject}
-                onUpdateProject={handleUpdateProject}
+                onUpdateProject={(id, name, emoji, color) => handleUpdateProject(id, { name, emoji, color })}
                 onDeleteProject={handleDeleteProject}
                 onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
                 handleArchiveProject={handleArchiveProject}
@@ -886,15 +886,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                           return p || null;
                       }}
                       onUpdateProject={async (id, updates) => {
-                          if (updates.name !== undefined || updates.emoji !== undefined || updates.color !== undefined) {
-                              const existing = projects.find(p => p.id === id);
-                              await handleUpdateProject(
-                                  id,
-                                  updates.name !== undefined ? updates.name : (existing?.name || ''),
-                                  updates.emoji !== undefined ? updates.emoji : (existing?.emoji || null),
-                                  updates.color !== undefined ? updates.color : (existing?.color || null)
-                              );
-                          }
+                          await handleUpdateProject(id, updates);
                       }}
                       onDeleteProject={handleDeleteProject}
                       onArchiveProject={async (id, isArchived) => {
@@ -1007,7 +999,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
     const handleSaveProject = async (name: string, emoji: string | null, color: string | null) => {
         if (projectToEdit) {
-            await handleUpdateProject(projectToEdit.id, name, emoji, color);
+            await handleUpdateProject(projectToEdit.id, { name, emoji, color });
         } else {
             await handleAddProject(name, emoji, color);
         }
@@ -1214,7 +1206,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onClearPastTodos={onClearPastTodos}
                             projects={projects}
                             onAddProject={handleAddProject}
-                            onUpdateProject={handleUpdateProject}
+                            onUpdateProject={(id, name, emoji, color) => handleUpdateProject(id, { name, emoji, color })}
                             onDeleteProject={handleDeleteProject}
                             onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
                             handleArchiveProject={handleArchiveProject}
@@ -1245,15 +1237,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 return p || null;
                             }}
                             onUpdateProject={async (id, updates) => {
-                                if (updates.name !== undefined || updates.emoji !== undefined || updates.color !== undefined) {
-                                    const existing = projects.find(p => p.id === id);
-                                    await handleUpdateProject(
-                                        id,
-                                        updates.name !== undefined ? updates.name : (existing?.name || ''),
-                                        updates.emoji !== undefined ? updates.emoji : (existing?.emoji || null),
-                                        updates.color !== undefined ? updates.color : (existing?.color || null)
-                                    );
-                                }
+                                await handleUpdateProject(id, updates);
                             }}
                             onDeleteProject={handleDeleteProject}
                             onArchiveProject={async (id, isArchived) => {
@@ -2993,16 +2977,10 @@ const App: React.FC = () => {
       return savedProject;
   }, [user]);
 
-  const handleUpdateProject = async (projectId: number, name: string, emoji: string | null, color: string | null, kanban_columns?: string[]) => {
+  const handleUpdateProject = async (projectId: number, updates: Partial<Project>) => {
       const projectToUpdate = projects.find(p => p.id === projectId);
       if(!projectToUpdate) return;
-      const updatedProject = { 
-        ...projectToUpdate, 
-        name, 
-        emoji, 
-        color, 
-        kanban_columns: kanban_columns !== undefined ? kanban_columns : projectToUpdate.kanban_columns 
-      };
+      const updatedProject = { ...projectToUpdate, ...updates };
       setProjects(p => p.map(project => project.id === projectId ? updatedProject : project));
       
       const savedProject = await syncableUpdate('projects', updatedProject);

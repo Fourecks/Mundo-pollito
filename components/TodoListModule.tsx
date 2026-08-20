@@ -15,7 +15,6 @@ import DotsVerticalIcon from './icons/DotsVerticalIcon';
 import ConfirmationModal from './ConfirmationModal';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import ConfirmationModalWithOptions from './ConfirmationModalWithOptions';
-import ProjectKanbanView from './ProjectKanbanView';
 
 interface TodoListModuleProps {
     allTodos: { [key: string]: Todo[] };
@@ -328,11 +327,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const emptyState = getEmptyStateMessage();
 
     return (
-        <div ref={containerRef} className="w-full bg-transparent flex flex-col h-full">
-            <div className="flex-shrink-0 border-b border-secondary-light/30 dark:border-gray-700/50 flex items-center p-1 bg-black/5 dark:bg-black/20">
-                <button onClick={() => setActiveTab('tasks')} className={`w-1/2 py-1 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'tasks' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Tareas</button>
-                <button onClick={() => setActiveTab('projects')} className={`w-1/2 py-1 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'projects' ? 'bg-white dark:bg-gray-600 shadow text-primary-dark dark:text-gray-100 text-on-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-black/20'}`}>Proyectos</button>
-            </div>
 
             <div className="flex-grow overflow-hidden">
                 {activeTab === 'tasks' && (
@@ -410,12 +404,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                     </div>
                 )}
                 
-                {activeTab === 'projects' && (
-                    <div className="h-full overflow-hidden bg-secondary-lighter/30 dark:bg-gray-900/30">
-                        {renderProjectsView()}
-                    </div>
-                )}
-            </div>
             
             <ConfirmationModalWithOptions
                 isOpen={!!projectToDelete}

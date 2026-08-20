@@ -1,1294 +1,540 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Project, Todo, Priority, Sprint, Milestone, ProjectDoc, ProjectInboxItem, ProjectActivity, ProjectMember, TaskComment, TaskAttachment } from '../types';
-import { 
-  FolderKanban, 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  Layers, 
-  FileText, 
-  Paperclip, 
-  Inbox, 
-  Activity, 
-  Users, 
-  Target, 
-  Zap, 
-  BarChart3, 
-  Play, 
-  CheckSquare, 
-  ChevronRight, 
-  MoreVertical, 
-  Edit3, 
-  Trash2, 
-  Archive, 
-  Copy, 
-  Lock, 
-  ArrowRight, 
-  Sparkles, 
-  ExternalLink,
-  Flag,
-  UserCheck,
-  TrendingUp,
-  Tag,
-  Bold,
-  Italic,
-  List,
-  Heading1,
-  Heading2,
-  Code,
-  Quote,
-  X,
-  Check
-} from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectInboxItem, ProjectActivity } from '../types';
+import { Plus, LayoutDashboard, Settings, MoreVertical, Archive, Trash2, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, Search, Filter, AlertCircle, CheckCircle2, Circle, Clock, ChevronDown, AlignLeft, Edit2 } from 'lucide-react';
+import { format, parseISO, isPast, isFuture, isToday } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface ProjectsWorkspaceProps {
-  projects: Project[];
-  allTodos: Todo[];
-  activeProjectId?: number | null;
-  onSelectProject: (projectId: number) => void;
-  onAddProject: (name: string, emoji: string | null, color: string | null, templateType?: string) => Promise<Project | null>;
-  onUpdateProject: (projectId: number, updates: Partial<Project>) => Promise<void>;
-  onDeleteProject: (projectId: number) => Promise<void>;
-  onArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
-  addTodo: (text: string, options?: { projectId?: number | null; isUndated?: boolean; kanbanColumn?: string; sprintId?: string }) => Promise<void>;
-  updateTodo: (todo: Todo) => void;
-  deleteTodo: (id: number) => void;
-  onEditTodo: (todo: Todo) => void;
-  onOpenProjectEditor?: (project: Project) => void;
+    projects: Project[];
+    allTodos: Todo[];
+    activeProjectId: number | null;
+    onSelectProject: (id: number | null) => void;
+    onAddProject: (name: string, emoji: string | null, color: string | null) => Promise<Project | null>;
+    onUpdateProject: (id: number, updates: Partial<Project>) => Promise<void>;
+    onDeleteProject: (id: number) => Promise<void>;
+    onArchiveProject: (id: number, isArchived: boolean) => Promise<void>;
+    addTodo: (text: string, options?: any) => Promise<void>;
+    updateTodo: (id: number, updates: Partial<Todo>) => void;
+    deleteTodo: (id: number) => void;
+    onEditTodo?: (todo: Todo) => void;
+    onOpenProjectEditor?: (project: Project) => void;
 }
 
-export const PROJECT_TEMPLATES = [
-  {
-    id: 'software',
-    name: 'Software Development',
-    icon: '💻',
-    description: 'Backlog, Development, Code Review, Testing, Done. Incluye plantillas iniciales de Requisitos y Arquitectura.',
-    columns: ['Backlog', 'Development', 'Code Review', 'Testing', 'Done'],
-    initialDocs: [
-      { title: 'Requisitos del Sistema', category: 'Requirements', content: '# Requisitos del Sistema\n\nDefinición de alcance, características principales y arquitectura técnica.' },
-      { title: 'Notas de Arquitectura', category: 'Architecture', content: '# Arquitectura del Proyecto\n\nDiagramas de flujo, base de datos y endpoints de API.' }
-    ]
-  },
-  {
-    id: 'university',
-    name: 'University Project',
-    icon: '🎓',
-    description: 'Research, Pending, Doing, Review, Delivered. Ideal para trabajos académicos e investigación.',
-    columns: ['Research', 'Pending', 'Doing', 'Review', 'Delivered'],
-    initialDocs: [
-      { title: 'Borrador de Investigación', category: 'Research', content: '# Investigación y Fuentes\n\nRegistro de bibliografía, referencias y resúmenes.' }
-    ]
-  },
-  {
-    id: 'business',
-    name: 'Business Launch',
-    icon: '🚀',
-    description: 'Idea, Planning, Development, Launch, Growth. Para lanzamientos de startups y negocios.',
-    columns: ['Idea', 'Planning', 'Development', 'Launch', 'Growth'],
-    initialDocs: [
-      { title: 'Plan de Negocio & MVP', category: 'Specifications', content: '# Propuesta de Valor\n\nDefinición del cliente objetivo y estrategia de mercado.' }
-    ]
-  },
-  {
-    id: 'blank',
-    name: 'Proyecto Personalizado',
-    icon: '⚡',
-    description: 'Proyecto desde cero con columnas estándar.',
-    columns: ['Por hacer', 'En progreso', 'Completado'],
-    initialDocs: []
-  }
-];
+// Sub-components will be rendered within the main component for simplicity in this monolithic file,
+// but structured cleanly.
 
 export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
-  projects,
-  allTodos,
-  activeProjectId,
-  onSelectProject,
-  onAddProject,
-  onUpdateProject,
-  onDeleteProject,
-  onArchiveProject,
-  addTodo,
-  updateTodo,
-  deleteTodo,
-  onEditTodo,
-  onOpenProjectEditor
+    projects,
+    allTodos,
+    activeProjectId,
+    onSelectProject,
+    onAddProject,
+    onUpdateProject,
+    onDeleteProject,
+    onArchiveProject,
+    addTodo,
+    updateTodo,
+    deleteTodo,
+    onEditTodo,
+    onOpenProjectEditor
 }) => {
-  // Current active project selection
-  const currentProject = useMemo(() => {
-    if (activeProjectId) {
-      return projects.find(p => p.id === activeProjectId) || projects[0] || null;
-    }
-    return projects[0] || null;
-  }, [projects, activeProjectId]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'inbox' | 'activity'>('overview');
+    
+    const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId) || null, [projects, activeProjectId]);
+    const projectTodos = useMemo(() => activeProject ? allTodos.filter(t => t.project_id === activeProject.id) : [], [allTodos, activeProject]);
 
-  // Tab State
-  type TabType = 'overview' | 'board' | 'sprints' | 'timeline' | 'milestones' | 'docs' | 'files' | 'inbox' | 'activity' | 'team';
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+    // -- RENDERS --
 
-  // Search & Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showArchived, setShowArchived] = useState(false);
-
-  // Modals state
-  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectEmoji, setNewProjectEmoji] = useState('🚀');
-  const [newProjectTemplate, setNewProjectTemplate] = useState('software');
-
-  // Sprint Modal
-  const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false);
-  const [sprintName, setSprintName] = useState('');
-  const [sprintGoal, setSprintGoal] = useState('');
-  const [sprintStartDate, setSprintStartDate] = useState('');
-  const [sprintEndDate, setSprintEndDate] = useState('');
-
-  // Finish Sprint Modal
-  const [isFinishSprintOpen, setIsFinishSprintOpen] = useState(false);
-  const [sprintToFinish, setSprintToFinish] = useState<Sprint | null>(null);
-
-  // Milestone Modal
-  const [isCreateMilestoneOpen, setIsCreateMilestoneOpen] = useState(false);
-  const [milestoneName, setMilestoneName] = useState('');
-  const [milestoneDate, setMilestoneDate] = useState('');
-  const [milestoneDesc, setMilestoneDesc] = useState('');
-
-  // Doc Editor State
-  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
-  const [activeDoc, setActiveDoc] = useState<ProjectDoc | null>(null);
-  const [docTitle, setDocTitle] = useState('');
-  const [docCategory, setDocCategory] = useState<ProjectDoc['category']>('Specifications');
-  const [docContent, setDocContent] = useState('');
-
-  // Inbox quick capture
-  const [inboxText, setInboxText] = useState('');
-
-  // Project Todos derived
-  const projectTodos = useMemo(() => {
-    if (!currentProject) return [];
-    return allTodos.filter(t => t.project_id === currentProject.id);
-  }, [allTodos, currentProject]);
-
-  // Project Metrics
-  const metrics = useMemo(() => {
-    const total = projectTodos.length;
-    const completed = projectTodos.filter(t => t.completed).length;
-    const pending = total - completed;
-    const todayStr = new Date().toISOString().split('T')[0];
-    const overdue = projectTodos.filter(t => !t.completed && t.due_date && t.due_date < todayStr).length;
-    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-    // Blocked tasks
-    const blockedTasks = projectTodos.filter(t => {
-      if (!t.dependencies || t.dependencies.length === 0) return false;
-      // Check if any dependency is incomplete
-      return t.dependencies.some(depId => {
-        const depTask = allTodos.find(item => item.id === depId);
-        return depTask && !depTask.completed;
-      });
-    });
-
-    return { total, completed, pending, overdue, progress, blockedTasks };
-  }, [projectTodos, allTodos]);
-
-  // Active Sprint
-  const activeSprint = useMemo(() => {
-    return currentProject?.sprints?.find(s => s.status === 'active') || null;
-  }, [currentProject]);
-
-  // Helper to log project activity
-  const logActivity = async (action: string, details?: string) => {
-    if (!currentProject) return;
-    const newAct: ProjectActivity = {
-      id: crypto.randomUUID(),
-      project_id: currentProject.id,
-      author: currentProject.lead || 'Usuario',
-      action,
-      details,
-      created_at: new Date().toISOString()
-    };
-    const updatedActs = [newAct, ...(currentProject.activities || [])];
-    await onUpdateProject(currentProject.id, { activities: updatedActs });
-  };
-
-  // Create New Project Handler
-  const handleCreateProjectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProjectName.trim()) return;
-
-    const template = PROJECT_TEMPLATES.find(t => t.id === newProjectTemplate) || PROJECT_TEMPLATES[0];
-    const created = await onAddProject(newProjectName.trim(), newProjectEmoji, '#0284c7', template.id);
-
-    if (created) {
-      // Add initial docs if template has them
-      const initialDocs: ProjectDoc[] = template.initialDocs.map(d => ({
-        id: crypto.randomUUID(),
-        project_id: created.id,
-        title: d.title,
-        content: d.content,
-        category: d.category as any,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
-
-      await onUpdateProject(created.id, {
-        kanban_columns: template.columns,
-        status: 'active',
-        priority: 'medium',
-        docs: initialDocs,
-        sprints: [],
-        milestones: [],
-        inbox: [],
-        activities: [{
-          id: crypto.randomUUID(),
-          project_id: created.id,
-          author: 'Usuario',
-          action: 'Proyecto creado',
-          details: `Plantilla: ${template.name}`,
-          created_at: new Date().toISOString()
-        }]
-      });
-
-      onSelectProject(created.id);
-    }
-
-    setNewProjectName('');
-    setIsNewProjectModalOpen(false);
-  };
-
-  // Create Sprint
-  const handleCreateSprint = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentProject || !sprintName.trim()) return;
-
-    const newSprint: Sprint = {
-      id: crypto.randomUUID(),
-      project_id: currentProject.id,
-      name: sprintName.trim(),
-      goal: sprintGoal.trim(),
-      start_date: sprintStartDate || new Date().toISOString().split('T')[0],
-      end_date: sprintEndDate || new Date(Date.now() + 14*86400000).toISOString().split('T')[0],
-      status: currentProject.sprints?.some(s => s.status === 'active') ? 'planning' : 'active',
-      created_at: new Date().toISOString()
-    };
-
-    const updatedSprints = [...(currentProject.sprints || []), newSprint];
-    await onUpdateProject(currentProject.id, { sprints: updatedSprints });
-    await logActivity(`Sprint creado: ${newSprint.name}`, newSprint.goal);
-
-    setSprintName('');
-    setSprintGoal('');
-    setIsCreateSprintOpen(false);
-  };
-
-  // Finish Sprint
-  const handleFinishSprintAction = async () => {
-    if (!currentProject || !sprintToFinish) return;
-
-    const updatedSprints = (currentProject.sprints || []).map(s => {
-      if (s.id === sprintToFinish.id) {
-        return { ...s, status: 'completed' as const };
-      }
-      return s;
-    });
-
-    await onUpdateProject(currentProject.id, { sprints: updatedSprints });
-    await logActivity(`Sprint finalizado: ${sprintToFinish.name}`);
-    setIsFinishSprintOpen(false);
-    setSprintToFinish(null);
-  };
-
-  // Create Milestone
-  const handleCreateMilestone = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentProject || !milestoneName.trim()) return;
-
-    const newM: Milestone = {
-      id: crypto.randomUUID(),
-      project_id: currentProject.id,
-      name: milestoneName.trim(),
-      target_date: milestoneDate || new Date().toISOString().split('T')[0],
-      status: 'pending',
-      description: milestoneDesc.trim()
-    };
-
-    const updatedM = [...(currentProject.milestones || []), newM];
-    await onUpdateProject(currentProject.id, { milestones: updatedM });
-    await logActivity(`Hito creado: ${newM.name}`);
-
-    setMilestoneName('');
-    setMilestoneDesc('');
-    setIsCreateMilestoneOpen(false);
-  };
-
-  // Save Doc
-  const handleSaveDoc = async () => {
-    if (!currentProject || !docTitle.trim()) return;
-
-    let updatedDocs = [...(currentProject.docs || [])];
-    if (activeDoc) {
-      updatedDocs = updatedDocs.map(d => d.id === activeDoc.id ? {
-        ...d,
-        title: docTitle.trim(),
-        category: docCategory,
-        content: docContent,
-        updated_at: new Date().toISOString()
-      } : d);
-    } else {
-      updatedDocs.push({
-        id: crypto.randomUUID(),
-        project_id: currentProject.id,
-        title: docTitle.trim(),
-        category: docCategory,
-        content: docContent,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    }
-
-    await onUpdateProject(currentProject.id, { docs: updatedDocs });
-    await logActivity(activeDoc ? `Documento actualizado: ${docTitle}` : `Documento creado: ${docTitle}`);
-    setIsDocModalOpen(false);
-    setActiveDoc(null);
-    setDocTitle('');
-    setDocContent('');
-  };
-
-  // Add Inbox Item
-  const handleAddInboxItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentProject || !inboxText.trim()) return;
-
-    const newItem: ProjectInboxItem = {
-      id: crypto.randomUUID(),
-      project_id: currentProject.id,
-      text: inboxText.trim(),
-      type: 'idea',
-      created_at: new Date().toISOString()
-    };
-
-    const updatedInbox = [newItem, ...(currentProject.inbox || [])];
-    await onUpdateProject(currentProject.id, { inbox: updatedInbox });
-    setInboxText('');
-  };
-
-  // Convert Inbox Item to Task
-  const handleConvertInboxToTask = async (item: ProjectInboxItem) => {
-    if (!currentProject) return;
-    await addTodo(item.text, { projectId: currentProject.id });
-    const updatedInbox = (currentProject.inbox || []).filter(i => i.id !== item.id);
-    await onUpdateProject(currentProject.id, { inbox: updatedInbox });
-    await logActivity(`Elemento de Inbox convertido a Tarea: "${item.text}"`);
-  };
-
-  if (projects.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-stone-50 dark:bg-stone-900 text-stone-800 dark:text-stone-200">
-        <div className="w-16 h-16 rounded-2xl bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-4 shadow-sm">
-          <FolderKanban className="w-8 h-8" />
+    const renderEmptyState = (title: string, description: string, action?: React.ReactNode) => (
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700/50">
+            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                <AlertCircle className="w-6 h-6 text-gray-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">{title}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-sm">{description}</p>
+            {action}
         </div>
-        <h2 className="text-xl font-bold mb-2">Comienza tu primer Proyecto</h2>
-        <p className="text-sm text-stone-500 max-w-md mb-6">
-          Organiza tus metas, sprints, documentación y tareas en un espacio de trabajo unificado.
-        </p>
-        <button
-          onClick={() => setIsNewProjectModalOpen(true)}
-          className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-medium text-sm transition-all shadow-md flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" /> Crear Proyecto
-        </button>
-
-        {/* New Project Modal */}
-        {isNewProjectModalOpen && renderNewProjectModal()}
-      </div>
     );
-  }
 
-  return (
-    <div className="flex flex-col h-full bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 overflow-hidden">
-      {/* Top Header Bar */}
-      <header className="px-5 py-3 border-b border-stone-200 dark:border-stone-800 bg-white/80 dark:bg-stone-900/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3">
-          {/* Project Switcher Selector */}
-          <div className="relative group">
-            <select
-              value={currentProject?.id}
-              onChange={(e) => onSelectProject(Number(e.target.value))}
-              className="appearance-none bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl pl-3 pr-8 py-1.5 text-sm font-semibold text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
-            >
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.emoji || '📁'} {p.name}
-                </option>
-              ))}
-            </select>
-            <ChevronRight className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 rotate-90 pointer-events-none" />
-          </div>
-
-          <button
-            onClick={() => setIsNewProjectModalOpen(true)}
-            className="p-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300 transition-colors"
-            title="Crear nuevo proyecto"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-
-          {/* Quick Status Pill */}
-          {currentProject?.status && (
-            <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/50 uppercase tracking-wider text-[10px]">
-              {currentProject.status}
-            </span>
-          )}
-        </div>
-
-        {/* Project Actions */}
-        <div className="flex items-center gap-2">
-          {currentProject && onOpenProjectEditor && (
-            <button
-              onClick={() => onOpenProjectEditor(currentProject)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5" /> Editar
-            </button>
-          )}
-
-          <button
-            onClick={() => currentProject && onArchiveProject(currentProject.id, !currentProject.is_archived)}
-            className="p-1.5 rounded-lg border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500 transition-colors"
-            title={currentProject?.is_archived ? "Desarchivar" : "Archivar proyecto"}
-          >
-            <Archive className="w-4 h-4" />
-          </button>
-        </div>
-      </header>
-
-      {/* Project Navigation Tabs */}
-      <nav className="px-5 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex items-center gap-1 overflow-x-auto custom-scrollbar shrink-0">
-        {[
-          { id: 'overview', label: 'Overview', icon: Layers },
-          { id: 'board', label: 'Tablero Kanban', icon: FolderKanban },
-          { id: 'sprints', label: 'Sprints & Backlog', icon: Zap },
-          { id: 'timeline', label: 'Timeline', icon: Calendar },
-          { id: 'milestones', label: 'Milestones', icon: Flag },
-          { id: 'docs', label: 'Docs', icon: FileText },
-          { id: 'files', label: 'Archivos', icon: Paperclip },
-          { id: 'inbox', label: 'Inbox', icon: Inbox },
-          { id: 'activity', label: 'Actividad', icon: Activity },
-          { id: 'team', label: 'Equipo', icon: Users },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as TabType)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${
-                isActive
-                  ? 'border-sky-600 text-sky-600 dark:text-sky-400 font-semibold'
-                  : 'border-transparent text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Workspace Body Content */}
-      <main className="flex-grow overflow-y-auto custom-scrollbar p-6">
-        {activeTab === 'overview' && renderOverviewTab()}
-        {activeTab === 'board' && renderBoardTab()}
-        {activeTab === 'sprints' && renderSprintsTab()}
-        {activeTab === 'timeline' && renderTimelineTab()}
-        {activeTab === 'milestones' && renderMilestonesTab()}
-        {activeTab === 'docs' && renderDocsTab()}
-        {activeTab === 'files' && renderFilesTab()}
-        {activeTab === 'inbox' && renderInboxTab()}
-        {activeTab === 'activity' && renderActivityTab()}
-        {activeTab === 'team' && renderTeamTab()}
-      </main>
-
-      {/* Modals */}
-      {isNewProjectModalOpen && renderNewProjectModal()}
-      {isCreateSprintOpen && renderCreateSprintModal()}
-      {isFinishSprintOpen && renderFinishSprintModal()}
-      {isCreateMilestoneOpen && renderCreateMilestoneModal()}
-      {isDocModalOpen && renderDocEditorModal()}
-    </div>
-  );
-
-  // --- SUB-RENDERERS FOR TABS ---
-
-  function renderOverviewTab() {
-    if (!currentProject) return null;
-    return (
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Project Header Overview */}
-        <div className="p-6 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 shadow-sm space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-4xl p-2 rounded-2xl bg-stone-100 dark:bg-stone-800">
-                {currentProject.emoji || '🚀'}
-              </span>
-              <div>
-                <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">
-                  {currentProject.name}
-                </h1>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  {currentProject.description || 'Sin descripción asignada.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs px-3 py-1 rounded-full font-medium bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
-                {currentProject.priority?.toUpperCase() || 'PRIORIDAD MEDIA'}
-              </span>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-semibold text-stone-600 dark:text-stone-400">
-              <span>Progreso General</span>
-              <span>{metrics.progress}% ({metrics.completed} / {metrics.total} tareas)</span>
-            </div>
-            <div className="w-full h-2.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
-              <div
-                className="h-full bg-sky-600 rounded-full transition-all duration-500"
-                style={{ width: `${metrics.progress}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-stone-500 font-medium">Completadas</p>
-              <p className="text-xl font-bold text-stone-900 dark:text-stone-100">{metrics.completed}</p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-stone-500 font-medium">Pendientes</p>
-              <p className="text-xl font-bold text-stone-900 dark:text-stone-100">{metrics.pending}</p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-              <AlertCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-stone-500 font-medium">Atrasadas</p>
-              <p className="text-xl font-bold text-stone-900 dark:text-stone-100">{metrics.overdue}</p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-              <Zap className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-stone-500 font-medium">Sprint Activo</p>
-              <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate">
-                {activeSprint ? activeSprint.name : 'Sin Sprint Activo'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Blocked Tasks Alert */}
-        {metrics.blockedTasks.length > 0 && (
-          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-3">
-            <Lock className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-            <div className="flex-grow text-xs">
-              <h4 className="font-bold text-rose-800 dark:text-rose-300">
-                {metrics.blockedTasks.length} {metrics.blockedTasks.length === 1 ? 'Tarea Bloqueada' : 'Tareas Bloqueadas'} por Dependencias
-              </h4>
-              <p className="text-rose-700 dark:text-rose-400 mt-1">
-                {metrics.blockedTasks.map(t => t.text).join(', ')}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Sprints & Recent Activity Overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Active Sprint Summary */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <Zap className="w-4 h-4 text-sky-600" /> Sprint Actual
-              </h3>
-              <button
-                onClick={() => setActiveTab('sprints')}
-                className="text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium"
-              >
-                Ver todos
-              </button>
-            </div>
-
-            {activeSprint ? (
-              <div className="p-4 rounded-xl bg-stone-50 dark:bg-stone-800/50 space-y-2 border border-stone-200/60 dark:border-stone-700/60">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold">{activeSprint.name}</h4>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-semibold">
-                    Activo
-                  </span>
-                </div>
-                <p className="text-xs text-stone-500">{activeSprint.goal || 'Sin meta definida'}</p>
-                <div className="flex items-center justify-between text-xs text-stone-400 pt-2 border-t border-stone-200/60 dark:border-stone-700/60">
-                  <span>Fechas: {activeSprint.start_date} al {activeSprint.end_date}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="p-6 text-center text-xs text-stone-400 bg-stone-50 dark:bg-stone-800/30 rounded-xl">
-                No hay sprint activo. Inicia uno en la pestaña de Sprints.
-              </div>
-            )}
-          </div>
-
-          {/* Recent Activity */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 space-y-3">
-            <h3 className="text-sm font-bold flex items-center gap-2">
-              <Activity className="w-4 h-4 text-sky-600" /> Actividad Reciente
-            </h3>
-            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-              {(currentProject.activities || []).slice(0, 5).map(act => (
-                <div key={act.id} className="text-xs p-2.5 rounded-lg bg-stone-50 dark:bg-stone-800/40 border border-stone-100 dark:border-stone-800 flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-stone-800 dark:text-stone-200">{act.action}</span>
-                    {act.details && <p className="text-[11px] text-stone-500">{act.details}</p>}
-                  </div>
-                  <span className="text-[10px] text-stone-400 shrink-0">
-                    {new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              ))}
-              {(!currentProject.activities || currentProject.activities.length === 0) && (
-                <p className="text-xs text-stone-400 text-center py-4">Sin actividad registrada.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderBoardTab() {
-    if (!currentProject) return null;
-    const columns = currentProject.kanban_columns && currentProject.kanban_columns.length > 0
-      ? currentProject.kanban_columns
-      : ['Por hacer', 'En progreso', 'Completado'];
-
-    return (
-      <div className="h-full flex flex-col space-y-4">
-        {/* Board Search & Filter Bar */}
-        <div className="flex items-center justify-between gap-3 shrink-0">
-          <div className="relative flex-grow max-w-sm">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar tareas en el tablero..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
-        </div>
-
-        {/* Board Columns Grid */}
-        <div className="flex-grow flex gap-4 overflow-x-auto custom-scrollbar pb-4">
-          {columns.map(col => {
-            const colTasks = projectTodos.filter(t => {
-              const matchesSearch = searchQuery ? t.text.toLowerCase().includes(searchQuery.toLowerCase()) : true;
-              const taskCol = t.kanban_column || (t.completed ? columns[columns.length - 1] : columns[0]);
-              return matchesSearch && taskCol === col;
-            });
-
-            return (
-              <div key={col} className="w-72 shrink-0 flex flex-col bg-stone-100/70 dark:bg-stone-900/50 rounded-2xl p-3 border border-stone-200/60 dark:border-stone-800/60">
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <h3 className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider flex items-center gap-1.5">
-                    {col}
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-400">
-                      {colTasks.length}
-                    </span>
-                  </h3>
-                </div>
-
-                {/* Tasks Container */}
-                <div className="flex-grow space-y-2 overflow-y-auto custom-scrollbar pr-1">
-                  {colTasks.map(task => (
-                    <div
-                      key={task.id}
-                      onClick={() => onEditTodo(task)}
-                      className="p-3 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 shadow-sm hover:border-sky-500/50 transition-all cursor-pointer space-y-2 group"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className={`text-xs font-medium ${task.completed ? 'line-through text-stone-400' : 'text-stone-800 dark:text-stone-100'}`}>
-                          {task.text}
-                        </span>
-                        {task.priority && (
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                            task.priority === 'high' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
-                            task.priority === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
-                            'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400'
-                          }`}>
-                            {task.priority}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Card Badges */}
-                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-stone-400 pt-1">
-                        {task.due_date && (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800">
-                            <Calendar className="w-3 h-3" /> {task.due_date}
-                          </span>
-                        )}
-                        {task.story_points && (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-semibold">
-                            {task.story_points} SP
-                          </span>
-                        )}
-                        {task.subtasks && task.subtasks.length > 0 && (
-                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-100 dark:bg-stone-800">
-                            <CheckSquare className="w-3 h-3" />
-                            {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {colTasks.length === 0 && (
-                    <div className="text-center py-6 text-xs text-stone-400 border border-dashed border-stone-200 dark:border-stone-800 rounded-xl">
-                      Sin tareas
-                    </div>
-                  )}
-                </div>
-
-                {/* Quick Add Button */}
-                <button
-                  onClick={() => addTodo('Nueva Tarea', { projectId: currentProject.id, kanbanColumn: col })}
-                  className="mt-3 w-full py-2 text-xs font-medium text-stone-600 dark:text-stone-400 hover:bg-stone-200/60 dark:hover:bg-stone-800 rounded-xl border border-dashed border-stone-300 dark:border-stone-700 transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Agregar Tarea
+    const renderSidebar = () => (
+        <div className="w-64 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-gray-50 dark:bg-[#111] h-full flex-shrink-0">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider">Proyectos</h2>
+                <button onClick={() => onAddProject('Nuevo Proyecto', null, null)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+                    <Plus className="w-4 h-4" />
                 </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  function renderSprintsTab() {
-    if (!currentProject) return null;
-    const backlogTasks = projectTodos.filter(t => !t.sprint_id);
-
-    return (
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold">Gestión de Sprints & Backlog</h2>
-            <p className="text-xs text-stone-500">Planifica entregas iterativas estilo Scrum.</p>
-          </div>
-          <button
-            onClick={() => setIsCreateSprintOpen(true)}
-            className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs shadow-sm flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Crear Sprint
-          </button>
-        </div>
-
-        {/* Sprints Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(currentProject.sprints || []).map(sprint => {
-            const sprintTasks = projectTodos.filter(t => t.sprint_id === sprint.id);
-            const totalSP = sprintTasks.reduce((acc, t) => acc + (t.story_points || 0), 0);
-            const completedSP = sprintTasks.filter(t => t.completed).reduce((acc, t) => acc + (t.story_points || 0), 0);
-
-            return (
-              <div key={sprint.id} className="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-sm">{sprint.name}</h3>
-                    <p className="text-xs text-stone-500">{sprint.goal || 'Sin meta'}</p>
-                  </div>
-                  <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                    sprint.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
-                    sprint.status === 'completed' ? 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400' :
-                    'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                  }`}>
-                    {sprint.status}
-                  </span>
+            </div>
+            <div className="p-2">
+                <div className="relative">
+                    <Search className="w-4 h-4 absolute left-2.5 top-2 text-gray-400" />
+                    <input 
+                        type="text" 
+                        placeholder="Buscar proyecto..." 
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md pl-8 pr-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                    />
                 </div>
-
-                <div className="flex items-center justify-between text-xs text-stone-500">
-                  <span>Fechas: {sprint.start_date} - {sprint.end_date}</span>
-                  <span className="font-semibold text-sky-600">{completedSP} / {totalSP} SP</span>
-                </div>
-
-                {sprint.status === 'active' && (
-                  <button
-                    onClick={() => {
-                      setSprintToFinish(sprint);
-                      setIsFinishSprintOpen(true);
-                    }}
-                    className="w-full py-1.5 text-xs rounded-lg border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 font-medium"
-                  >
-                    Finalizar Sprint
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Backlog Section */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 space-y-3">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <Layers className="w-4 h-4 text-sky-600" /> Backlog del Proyecto ({backlogTasks.length})
-          </h3>
-
-          <div className="space-y-2">
-            {backlogTasks.map(task => (
-              <div key={task.id} className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/40 border border-stone-100 dark:border-stone-800 flex items-center justify-between gap-3 text-xs">
-                <span className="font-medium text-stone-800 dark:text-stone-200">{task.text}</span>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-[10px]">
-                    {task.story_points || 0} SP
-                  </span>
-                  <button
-                    onClick={() => onEditTodo(task)}
-                    className="p-1 hover:bg-stone-200 dark:hover:bg-stone-700 rounded"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-            {backlogTasks.length === 0 && (
-              <p className="text-xs text-stone-400 text-center py-4">No hay tareas en el backlog.</p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderTimelineTab() {
-    return (
-      <div className="max-w-6xl mx-auto space-y-4">
-        <h2 className="text-lg font-bold">Roadmap & Timeline</h2>
-        <div className="p-6 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 space-y-4">
-          {projectTodos.map(task => (
-            <div key={task.id} className="space-y-1">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span>{task.text}</span>
-                <span className="text-stone-400">{task.due_date || 'Sin fecha'}</span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${task.completed ? 'bg-emerald-500' : 'bg-sky-500'}`}
-                  style={{ width: task.completed ? '100%' : '40%' }}
-                />
-              </div>
             </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  function renderMilestonesTab() {
-    if (!currentProject) return null;
-
-    return (
-      <div className="max-w-6xl mx-auto space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">Hitos (Milestones)</h2>
-          <button
-            onClick={() => setIsCreateMilestoneOpen(true)}
-            className="px-4 py-2 rounded-xl bg-sky-600 text-white font-medium text-xs flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Crear Hito
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(currentProject.milestones || []).map(m => (
-            <div key={m.id} className="p-4 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-sm">{m.name}</h3>
-                <span className="text-xs text-stone-400">{m.target_date}</span>
-              </div>
-              <p className="text-xs text-stone-500">{m.description || 'Sin descripción'}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  function renderDocsTab() {
-    if (!currentProject) return null;
-
-    return (
-      <div className="max-w-6xl mx-auto space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">Documentos del Proyecto</h2>
-          <button
-            onClick={() => {
-              setActiveDoc(null);
-              setDocTitle('');
-              setDocContent('');
-              setIsDocModalOpen(true);
-            }}
-            className="px-4 py-2 rounded-xl bg-sky-600 text-white font-medium text-xs flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Nuevo Documento
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {(currentProject.docs || []).map(doc => (
-            <div
-              key={doc.id}
-              onClick={() => {
-                setActiveDoc(doc);
-                setDocTitle(doc.title);
-                setDocCategory(doc.category || 'Specifications');
-                setDocContent(doc.content);
-                setIsDocModalOpen(true);
-              }}
-              className="p-4 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 hover:border-sky-500 cursor-pointer transition-all space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] px-2 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-semibold">
-                  {doc.category || 'General'}
-                </span>
-                <span className="text-[10px] text-stone-400">
-                  {new Date(doc.updated_at).toLocaleDateString()}
-                </span>
-              </div>
-              <h3 className="font-bold text-sm text-stone-900 dark:text-stone-100">{doc.title}</h3>
-              <p className="text-xs text-stone-500 line-clamp-3">{doc.content}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  function renderFilesTab() {
-    return (
-      <div className="max-w-6xl mx-auto space-y-4">
-        <h2 className="text-lg font-bold">Archivos y Recursos</h2>
-        <div className="p-8 text-center text-xs text-stone-400 bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 rounded-2xl">
-          Todos los archivos adjuntos en tareas y documentos se centralizan aquí.
-        </div>
-      </div>
-    );
-  }
-
-  function renderInboxTab() {
-    if (!currentProject) return null;
-
-    return (
-      <div className="max-w-4xl mx-auto space-y-4">
-        <h2 className="text-lg font-bold">Project Inbox (Captura Rápida)</h2>
-        <form onSubmit={handleAddInboxItem} className="flex gap-2">
-          <input
-            type="text"
-            value={inboxText}
-            onChange={(e) => setInboxText(e.target.value)}
-            placeholder="Captura una idea, nota rápida o tarea sin clasificar..."
-            className="flex-grow px-4 py-2 text-xs rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 focus:outline-none"
-          />
-          <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-xl text-xs font-medium">
-            Guardar
-          </button>
-        </form>
-
-        <div className="space-y-2">
-          {(currentProject.inbox || []).map(item => (
-            <div key={item.id} className="p-3.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 flex items-center justify-between text-xs">
-              <span>{item.text}</span>
-              <button
-                onClick={() => handleConvertInboxToTask(item)}
-                className="px-3 py-1 rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-semibold"
-              >
-                Convertir a Tarea
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  function renderActivityTab() {
-    if (!currentProject) return null;
-
-    return (
-      <div className="max-w-4xl mx-auto space-y-4">
-        <h2 className="text-lg font-bold">Historial de Actividad</h2>
-        <div className="space-y-2">
-          {(currentProject.activities || []).map(act => (
-            <div key={act.id} className="p-3 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 flex items-center justify-between text-xs">
-              <div>
-                <p className="font-semibold">{act.action}</p>
-                {act.details && <p className="text-stone-500">{act.details}</p>}
-              </div>
-              <span className="text-[10px] text-stone-400">{new Date(act.created_at).toLocaleString()}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  function renderTeamTab() {
-    return (
-      <div className="max-w-4xl mx-auto space-y-4">
-        <h2 className="text-lg font-bold">Equipo y Colaboración</h2>
-        <div className="p-6 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 text-xs text-stone-500">
-          Diseñado para colaboración futura. Asigna responsables y roles en cada tarea y proyecto.
-        </div>
-      </div>
-    );
-  }
-
-  // --- MODAL DIALOGS ---
-
-  function renderNewProjectModal() {
-    return (
-      <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-stone-900 rounded-2xl max-w-md w-full p-6 space-y-4 border border-stone-200 dark:border-stone-800 shadow-2xl">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-base">Crear Nuevo Proyecto</h3>
-            <button onClick={() => setIsNewProjectModalOpen(false)} className="text-stone-400 hover:text-stone-600">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <form onSubmit={handleCreateProjectSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs font-medium text-stone-600 dark:text-stone-400 block mb-1">Nombre</label>
-              <input
-                type="text"
-                required
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                placeholder="Ej. FourCode Store"
-                className="w-full px-3 py-2 text-xs rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-stone-600 dark:text-stone-400 block mb-1">Plantilla de Proyecto</label>
-              <div className="grid grid-cols-2 gap-2">
-                {PROJECT_TEMPLATES.map(t => (
-                  <button
-                    type="button"
-                    key={t.id}
-                    onClick={() => setNewProjectTemplate(t.id)}
-                    className={`p-3 rounded-xl border text-left text-xs transition-all ${
-                      newProjectTemplate === t.id
-                        ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200'
-                        : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800'
-                    }`}
-                  >
-                    <div className="text-lg mb-1">{t.icon}</div>
-                    <div className="font-bold">{t.name}</div>
-                  </button>
+            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+                {projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) && !p.is_archived).map(project => (
+                    <button
+                        key={project.id}
+                        onClick={() => onSelectProject(project.id)}
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${activeProjectId === project.id ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50'}`}
+                    >
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color || '#9CA3AF' }} />
+                        <span className="truncate flex-1">{project.name}</span>
+                    </button>
                 ))}
-              </div>
             </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsNewProjectModalOpen(false)}
-                className="px-4 py-2 text-xs font-medium text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-xs font-medium bg-sky-600 text-white rounded-xl hover:bg-sky-700"
-              >
-                Crear Proyecto
-              </button>
-            </div>
-          </form>
         </div>
-      </div>
     );
-  }
 
-  function renderCreateSprintModal() {
+    const renderProjectHeader = () => {
+        if (!activeProject) return null;
+        return (
+            <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black px-6 py-4 flex flex-col gap-4">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <div className="flex items-center gap-3 mb-1">
+                            {activeProject.emoji && <span className="text-2xl">{activeProject.emoji}</span>}
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{activeProject.name}</h1>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded border ${
+                                activeProject.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
+                                activeProject.status === 'on_hold' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800' :
+                                'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
+                            }`}>
+                                {activeProject.status === 'completed' ? 'Completado' : activeProject.status === 'on_hold' ? 'En Pausa' : 'Activo'}
+                            </span>
+                        </div>
+                        {activeProject.description && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-3xl">{activeProject.description}</p>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+                            <Settings className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-2 px-2 scrollbar-hide">
+                    {[
+                        { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
+                        { id: 'kanban', label: 'Tablero', icon: AlignLeft },
+                        { id: 'sprints', label: 'Sprints', icon: Target },
+                        { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
+                        { id: 'docs', label: 'Documentación', icon: FileText },
+                        { id: 'inbox', label: 'Bandeja', icon: Inbox },
+                        { id: 'activity', label: 'Actividad', icon: Activity },
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
+                                activeTab === tab.id 
+                                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white' 
+                                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            <tab.icon className="w-4 h-4" />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderOverview = () => {
+        if (!activeProject) return null;
+        
+        const completedTasks = projectTodos.filter(t => t.completed).length;
+        const totalTasks = projectTodos.length;
+        const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+
+        return (
+            <div className="p-6 max-w-5xl mx-auto space-y-6 w-full">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex flex-col">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Progreso</span>
+                        <div className="flex items-end gap-2 mb-2">
+                            <span className="text-3xl font-bold text-gray-900 dark:text-white">{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 mt-auto">
+                            <div className="bg-primary h-1.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex flex-col">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Tareas</span>
+                        <span className="text-3xl font-bold text-gray-900 dark:text-white">{completedTasks} <span className="text-lg text-gray-400">/ {totalTasks}</span></span>
+                    </div>
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex flex-col">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Fecha Límite</span>
+                        <span className="text-lg font-medium text-gray-900 dark:text-white mt-auto">
+                            {activeProject.target_date ? format(parseISO(activeProject.target_date), 'd MMM, yyyy', { locale: es }) : 'No definida'}
+                        </span>
+                    </div>
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex flex-col">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Prioridad</span>
+                        <span className="text-lg font-medium text-gray-900 dark:text-white capitalize mt-auto">
+                            {activeProject.priority === 'high' ? 'Alta' : activeProject.priority === 'low' ? 'Baja' : 'Media'}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white dark:bg-[#111] rounded-lg border border-gray-200 dark:border-gray-800">
+                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Tareas Recientes</h3>
+                        </div>
+                        <div className="p-0">
+                            {projectTodos.slice(0, 5).map(todo => (
+                                <div key={todo.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800/50 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors cursor-pointer" onClick={() => onEditTodo && onEditTodo(todo)}>
+                                    <div onClick={(e) => { e.stopPropagation(); updateTodo(todo.id, { completed: !todo.completed }); }} className="cursor-pointer">
+                                        {todo.completed ? <CheckCircle2 className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-gray-400" />}
+                                    </div>
+                                    <span className={`text-sm flex-1 ${todo.completed ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-200'}`}>{todo.text}</span>
+                                </div>
+                            ))}
+                            {projectTodos.length === 0 && (
+                                <div className="p-4 text-center text-sm text-gray-500">No hay tareas en este proyecto.</div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-[#111] rounded-lg border border-gray-200 dark:border-gray-800">
+                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Actividad Reciente</h3>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            {(activeProject.activities || []).slice(0, 5).map(act => (
+                                <div key={act.id} className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                                        <Activity className="w-4 h-4 text-gray-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-900 dark:text-gray-100"><span className="font-medium">{act.author}</span> {act.action}</p>
+                                        <span className="text-xs text-gray-500">{format(parseISO(act.created_at), 'dd MMM, HH:mm', { locale: es })}</span>
+                                    </div>
+                                </div>
+                            ))}
+                            {(!activeProject.activities || activeProject.activities.length === 0) && (
+                                <div className="text-center text-sm text-gray-500">No hay actividad registrada.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderKanban = () => {
+        if (!activeProject) return null;
+        const columns = activeProject.kanban_columns || ['To Do', 'In Progress', 'Done'];
+        
+        return (
+            <div className="h-full flex overflow-x-auto p-6 gap-6 bg-gray-50/50 dark:bg-[#0a0a0a]">
+                {columns.map(col => {
+                    const colTasks = projectTodos.filter(t => (t.kanban_column || 'To Do') === col);
+                    return (
+                        <div key={col} className="flex-shrink-0 w-80 flex flex-col bg-gray-100 dark:bg-[#161616] rounded-lg border border-gray-200 dark:border-gray-800 h-full max-h-full">
+                            <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{col}</h3>
+                                <span className="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs px-2 py-0.5 rounded-full font-medium">{colTasks.length}</span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                                {colTasks.map(todo => (
+                                    <div key={todo.id} onClick={() => onEditTodo && onEditTodo(todo)} className="bg-white dark:bg-[#222] p-3 rounded shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
+                                        <p className={`text-sm ${todo.completed ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'}`}>{todo.text}</p>
+                                        {todo.date && (
+                                            <div className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                                <CalendarIcon className="w-3 h-3" />
+                                                {format(parseISO(todo.date), 'MMM d', { locale: es })}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                <button onClick={() => {
+                                    const text = prompt('Nueva tarea para ' + col);
+                                    if(text) addTodo(text, { projectId: activeProject.id, kanban_column: col });
+                                }} className="w-full py-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 flex items-center justify-center gap-2 hover:bg-gray-200/50 dark:hover:bg-gray-800 rounded transition-colors">
+                                    <Plus className="w-4 h-4" /> Añadir Tarea
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    const renderSprints = () => {
+        if (!activeProject) return null;
+        const sprints = activeProject.sprints || [];
+
+        return (
+            <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Gestión de Sprints</h2>
+                    <button onClick={() => {
+                        const name = prompt('Nombre del Sprint');
+                        if (name) {
+                            const newSprint: Sprint = {
+                                id: crypto.randomUUID(),
+                                project_id: activeProject.id,
+                                name,
+                                start_date: new Date().toISOString(),
+                                end_date: new Date(Date.now() + 14 * 86400000).toISOString(),
+                                status: 'planning',
+                                created_at: new Date().toISOString()
+                            };
+                            onUpdateProject(activeProject.id, { sprints: [...sprints, newSprint] });
+                        }
+                    }} className="px-3 py-1.5 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-dark transition-colors flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Sprint
+                    </button>
+                </div>
+
+                {sprints.length === 0 ? renderEmptyState('No hay sprints', 'Organiza el trabajo en iteraciones de tiempo fijo.') : (
+                    <div className="space-y-4">
+                        {sprints.map(sprint => (
+                            <div key={sprint.id} className="bg-white dark:bg-[#111] rounded-lg border border-gray-200 dark:border-gray-800 p-5 flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{sprint.name}</h3>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                                            sprint.status === 'active' ? 'bg-primary/10 text-primary border-primary/20' : 
+                                            sprint.status === 'completed' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400' : 
+                                            'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400'
+                                        }`}>
+                                            {sprint.status === 'active' ? 'Activo' : sprint.status === 'completed' ? 'Completado' : 'Planificación'}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm text-gray-500 flex items-center gap-2">
+                                        <CalendarIcon className="w-4 h-4" />
+                                        {format(parseISO(sprint.start_date), 'd MMM', { locale: es })} - {format(parseISO(sprint.end_date), 'd MMM', { locale: es })}
+                                    </div>
+                                </div>
+                                {sprint.goal && <p className="text-sm text-gray-600 dark:text-gray-300">{sprint.goal}</p>}
+                                <div className="pt-3 border-t border-gray-100 dark:border-gray-800 mt-2 flex justify-between items-center">
+                                    <span className="text-xs text-gray-500">0 tareas completadas</span>
+                                    <button className="text-sm text-primary hover:underline font-medium">Ver Tablero</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderRoadmap = () => {
+        if (!activeProject) return null;
+        const milestones = activeProject.milestones || [];
+
+        return (
+            <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Hoja de Ruta</h2>
+                    <button onClick={() => {
+                        const title = prompt('Título del Hito (Milestone)');
+                        if (title) {
+                            const newMs: Milestone = {
+                                id: crypto.randomUUID(),
+                                project_id: activeProject.id,
+                                title,
+                                date: new Date().toISOString(),
+                                status: 'pending',
+                                created_at: new Date().toISOString()
+                            };
+                            onUpdateProject(activeProject.id, { milestones: [...milestones, newMs] });
+                        }
+                    }} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Hito
+                    </button>
+                </div>
+
+                {milestones.length === 0 ? renderEmptyState('No hay hitos', 'Define los puntos clave del proyecto en la hoja de ruta.') : (
+                    <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-800 space-y-8 py-4">
+                        {milestones.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(ms => (
+                            <div key={ms.id} className="relative">
+                                <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-4 border-white dark:border-black ${ms.status === 'completed' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-700'}`} />
+                                <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{ms.title}</h3>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{format(parseISO(ms.date), 'MMMM yyyy', { locale: es })}</span>
+                                    </div>
+                                    {ms.description && <p className="text-sm text-gray-600 dark:text-gray-300">{ms.description}</p>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderDocs = () => {
+        if (!activeProject) return null;
+        const docs = activeProject.docs || [];
+
+        return (
+            <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Documentación</h2>
+                    <button onClick={() => {
+                        const title = prompt('Título del documento');
+                        if (title) {
+                            const newDoc: ProjectDoc = {
+                                id: crypto.randomUUID(),
+                                project_id: activeProject.id,
+                                title,
+                                content: '',
+                                category: 'Other',
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            };
+                            onUpdateProject(activeProject.id, { docs: [...docs, newDoc] });
+                        }
+                    }} className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Documento
+                    </button>
+                </div>
+
+                {docs.length === 0 ? renderEmptyState('No hay documentos', 'Crea notas, especificaciones o requerimientos.') : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {docs.map(doc => (
+                            <div key={doc.id} className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm cursor-pointer hover:border-primary/50 transition-colors flex flex-col h-32">
+                                <div className="flex items-start justify-between mb-2">
+                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-1">{doc.title}</h3>
+                                    <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{doc.category}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-auto">{doc.content || 'Sin contenido...'}</p>
+                                <span className="text-[10px] text-gray-400 mt-2">{format(parseISO(doc.updated_at), 'dd MMM yyyy', { locale: es })}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderInbox = () => {
+        if (!activeProject) return null;
+        const inbox = activeProject.inbox || [];
+
+        return (
+            <div className="p-6 max-w-3xl mx-auto w-full h-full overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Bandeja de Entrada</h2>
+                </div>
+                
+                <div className="mb-6 flex gap-2">
+                    <input 
+                        type="text" 
+                        placeholder="Escribe una idea, enlace o nota rápida..." 
+                        className="flex-1 bg-white dark:bg-[#111] border border-gray-300 dark:border-gray-700 rounded-md px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                const newItem: ProjectInboxItem = {
+                                    id: crypto.randomUUID(),
+                                    project_id: activeProject.id,
+                                    text: e.currentTarget.value.trim(),
+                                    type: 'note',
+                                    created_at: new Date().toISOString()
+                                };
+                                onUpdateProject(activeProject.id, { inbox: [newItem, ...inbox] });
+                                e.currentTarget.value = '';
+                            }
+                        }}
+                    />
+                </div>
+
+                {inbox.length === 0 ? renderEmptyState('Bandeja vacía', 'Captura ideas rápidas antes de organizarlas.') : (
+                    <div className="space-y-3">
+                        {inbox.map(item => (
+                            <div key={item.id} className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm flex items-start justify-between group">
+                                <div>
+                                    <p className="text-sm text-gray-800 dark:text-gray-200">{item.text}</p>
+                                    <span className="text-xs text-gray-400 mt-1 block">{format(parseISO(item.created_at), 'dd MMM, HH:mm', { locale: es })}</span>
+                                </div>
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                                    <button className="text-xs text-primary hover:underline font-medium">Convertir a Tarea</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderActivity = () => {
+        if (!activeProject) return null;
+        const activities = activeProject.activities || [];
+
+        return (
+            <div className="p-6 max-w-3xl mx-auto w-full h-full overflow-y-auto">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Registro de Actividad</h2>
+                
+                {activities.length === 0 ? renderEmptyState('Sin actividad', 'Las acciones importantes se registrarán aquí.') : (
+                    <div className="relative pl-4 border-l border-gray-200 dark:border-gray-800 space-y-6">
+                        {activities.map(act => (
+                            <div key={act.id} className="relative">
+                                <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-gray-700 border-2 border-white dark:border-black mt-1.5" />
+                                <div>
+                                    <p className="text-sm text-gray-800 dark:text-gray-200">
+                                        <span className="font-semibold text-gray-900 dark:text-white">{act.author}</span> {act.action}
+                                    </p>
+                                    {act.details && <p className="text-sm text-gray-500 mt-1">{act.details}</p>}
+                                    <span className="text-xs text-gray-400 mt-1 block">{format(parseISO(act.created_at), 'd MMM yyyy, HH:mm', { locale: es })}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+
     return (
-      <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-stone-900 rounded-2xl max-w-md w-full p-6 space-y-4 border border-stone-200 dark:border-stone-800">
-          <h3 className="font-bold text-base">Crear Sprint</h3>
-          <form onSubmit={handleCreateSprint} className="space-y-3 text-xs">
-            <div>
-              <label className="block mb-1 font-medium">Nombre del Sprint</label>
-              <input
-                type="text"
-                required
-                value={sprintName}
-                onChange={(e) => setSprintName(e.target.value)}
-                placeholder="Ej. Sprint 01 - Autenticación"
-                className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700"
-              />
+        <div className="flex h-full w-full bg-white dark:bg-black overflow-hidden font-sans">
+            {renderSidebar()}
+            
+            <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                {activeProject ? (
+                    <>
+                        {renderProjectHeader()}
+                        <div className="flex-1 overflow-hidden bg-gray-50/30 dark:bg-[#050505]">
+                            {activeTab === 'overview' && renderOverview()}
+                            {activeTab === 'kanban' && renderKanban()}
+                            {activeTab === 'sprints' && renderSprints()}
+                            {activeTab === 'roadmap' && renderRoadmap()}
+                            {activeTab === 'docs' && renderDocs()}
+                            {activeTab === 'inbox' && renderInbox()}
+                            {activeTab === 'activity' && renderActivity()}
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex-1 flex items-center justify-center bg-gray-50/50 dark:bg-black">
+                        <div className="text-center max-w-sm">
+                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-gray-200 dark:border-gray-700">
+                                <LayoutDashboard className="w-8 h-8 text-gray-400" />
+                            </div>
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Selecciona un Proyecto</h2>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Elige un proyecto del panel lateral o crea uno nuevo para empezar a gestionar tu trabajo.</p>
+                            <button onClick={() => onAddProject('Nuevo Proyecto', null, null)} className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors shadow-sm">
+                                Crear Proyecto
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
-            <div>
-              <label className="block mb-1 font-medium">Meta (Sprint Goal)</label>
-              <input
-                type="text"
-                value={sprintGoal}
-                onChange={(e) => setSprintGoal(e.target.value)}
-                placeholder="Ej. Dejar listo el login y registro de usuarios"
-                className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setIsCreateSprintOpen(false)} className="px-4 py-2 text-stone-500">
-                Cancelar
-              </button>
-              <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-xl">
-                Crear Sprint
-              </button>
-            </div>
-          </form>
         </div>
-      </div>
     );
-  }
-
-  function renderFinishSprintModal() {
-    return (
-      <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-stone-900 rounded-2xl max-w-md w-full p-6 space-y-4 border border-stone-200 dark:border-stone-800">
-          <h3 className="font-bold text-base">Finalizar Sprint</h3>
-          <p className="text-xs text-stone-500">
-            ¿Deseas completar este sprint? Las tareas incompletas se mantendrán disponibles para el siguiente sprint o backlog.
-          </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={() => setIsFinishSprintOpen(false)} className="px-4 py-2 text-xs text-stone-500">
-              Cancelar
-            </button>
-            <button onClick={handleFinishSprintAction} className="px-4 py-2 text-xs bg-emerald-600 text-white rounded-xl font-medium">
-              Confirmar y Finalizar
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderCreateMilestoneModal() {
-    return (
-      <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-stone-900 rounded-2xl max-w-md w-full p-6 space-y-4 border border-stone-200 dark:border-stone-800">
-          <h3 className="font-bold text-base">Crear Hito (Milestone)</h3>
-          <form onSubmit={handleCreateMilestone} className="space-y-3 text-xs">
-            <div>
-              <label className="block mb-1 font-medium">Nombre</label>
-              <input
-                type="text"
-                required
-                value={milestoneName}
-                onChange={(e) => setMilestoneName(e.target.value)}
-                placeholder="Ej. MVP Launch"
-                className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700"
-              />
-            </div>
-            <div>
-              <label className="block mb-1 font-medium">Fecha Objetivo</label>
-              <input
-                type="date"
-                value={milestoneDate}
-                onChange={(e) => setMilestoneDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setIsCreateMilestoneOpen(false)} className="px-4 py-2 text-stone-500">
-                Cancelar
-              </button>
-              <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-xl">
-                Guardar Hito
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  function renderDocEditorModal() {
-    return (
-      <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-stone-900 rounded-2xl max-w-2xl w-full p-6 space-y-4 border border-stone-200 dark:border-stone-800">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-base">{activeDoc ? 'Editar Documento' : 'Nuevo Documento'}</h3>
-            <button onClick={() => setIsDocModalOpen(false)} className="text-stone-400">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="space-y-3 text-xs">
-            <input
-              type="text"
-              value={docTitle}
-              onChange={(e) => setDocTitle(e.target.value)}
-              placeholder="Título del documento..."
-              className="w-full px-3 py-2 text-sm font-bold rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700"
-            />
-
-            <textarea
-              value={docContent}
-              onChange={(e) => setDocContent(e.target.value)}
-              rows={10}
-              placeholder="Escribe el contenido del documento aquí..."
-              className="w-full p-3 rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 focus:outline-none"
-            />
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setIsDocModalOpen(false)} className="px-4 py-2 text-stone-500">
-                Cancelar
-              </button>
-              <button onClick={handleSaveDoc} className="px-4 py-2 bg-sky-600 text-white rounded-xl font-medium">
-                Guardar Documento
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 };
 
 export default ProjectsWorkspace;

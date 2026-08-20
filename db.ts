@@ -55,7 +55,7 @@ export const initDB = (username: string): Promise<IDBDatabase> => {
 
 
 // --- Generic DB Helpers ---
-const CLIENT_ONLY_FIELDS = ['subtasks', 'notes', 'todos', 'kanban_column', 'kanban_columns', 'notion_page_id', 'notion_url'];
+const CLIENT_ONLY_FIELDS = ['subtasks', 'notes', 'todos', 'kanban_column', 'notion_page_id', 'notion_url'];
 
 const sanitizeForSupabase = (tableName: string, data: any) => {
     const copy = { ...data };
