@@ -256,7 +256,7 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
   const currentColor = color || PROJECT_COLORS[0].hex;
 
   return (
-    <div className="fixed inset-0 z-[60000] flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[90000] flex items-center justify-center p-3 sm:p-4 animate-fade-in">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-md transition-opacity"
@@ -265,7 +265,7 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
 
       {/* Modal Dialog */}
       <div
-        className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-3xl shadow-2xl flex flex-col z-[60001] overflow-hidden border border-gray-200/80 dark:border-gray-800 animate-scale-up max-h-[92vh] text-gray-900 dark:text-gray-100"
+        className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-3xl shadow-2xl flex flex-col z-[90001] overflow-hidden border border-gray-200/80 dark:border-gray-800 animate-scale-up max-h-[92vh] text-gray-900 dark:text-gray-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Section */}
@@ -311,53 +311,6 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
           onSubmit={handleSave}
           className="flex-grow p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-6"
         >
-          {/* Live Preview Card */}
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100/60 dark:from-gray-800/60 dark:to-gray-800/30 p-4 rounded-2xl border border-gray-200/60 dark:border-gray-700/50 shadow-inner">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                <span
-                  className="w-2 h-2 rounded-full inline-block"
-                  style={{ backgroundColor: currentColor }}
-                />
-                Vista previa en tiempo real
-              </span>
-              <span className="text-[10px] bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 font-semibold px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-800">
-                Tarjeta de Proyecto
-              </span>
-            </div>
-
-            {/* Simulated Project Card */}
-            <div
-              className="bg-white dark:bg-gray-900 p-4 rounded-2xl border shadow-sm flex items-center gap-3.5 transition-all duration-300"
-              style={{ borderColor: `${currentColor}40` }}
-            >
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-xs transition-transform duration-300 transform group-hover:scale-105"
-                style={{
-                  backgroundColor: `${currentColor}15`,
-                  border: `1.5px solid ${currentColor}30`,
-                }}
-              >
-                {emoji || '📁'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-base text-gray-900 dark:text-white truncate">
-                  {name.trim() || 'Nombre del proyecto...'}
-                </h4>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <div className="flex-1 bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{ width: '35%', backgroundColor: currentColor }}
-                    />
-                  </div>
-                  <span className="text-[11px] text-gray-500 dark:text-gray-400 font-semibold shrink-0">
-                    0/0 Tareas
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Project Name Field */}
           <div>

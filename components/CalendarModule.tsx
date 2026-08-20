@@ -1398,7 +1398,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
       {/* 4. DAY PREVIEW POPOVER MODAL (For +N More) */}
       {dayPreviewDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
+        <div className="fixed inset-0 z-[90000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
@@ -1476,7 +1476,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
       {/* 5. CREATE TASK / EVENT MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-[90000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
           <form
             onSubmit={handleCreateSubmit}
             className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4"
@@ -1642,7 +1642,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
       {/* 6. EVENT DETAILS MODAL */}
       {selectedEventDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-[90000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
               <div className="flex items-center gap-2">
@@ -1846,7 +1846,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
       {/* 7. INTEGRATIONS MANAGER MODAL */}
       {showIntegrationsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-[90000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
           <div className="bg-[#faf8f5] dark:bg-[#18181b] rounded-2xl max-w-xl w-full p-6 shadow-xl border border-stone-200 dark:border-stone-800 space-y-4 max-h-[90vh] overflow-y-auto text-stone-800 dark:text-stone-100">
             
             {/* Header */}

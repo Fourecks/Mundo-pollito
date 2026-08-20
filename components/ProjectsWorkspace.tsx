@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectInboxItem, ProjectActivity } from '../types';
-import { Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight } from 'lucide-react';
+import { format, parseISO, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface ProjectsWorkspaceProps {
@@ -23,7 +23,7 @@ interface ProjectsWorkspaceProps {
 const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[90000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                 <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0">
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h2>
@@ -57,6 +57,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // Inline Kanabn Add State
     const [addingToColumn, setAddingToColumn] = useState<string | null>(null);
     const [newTaskText, setNewTaskText] = useState('');
+
+    // Kanban Drag & Drop State
+    const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+    const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
     // Modal States
     const [sprintModal, setSprintModal] = useState<{ isOpen: boolean, sprint: Sprint | null }>({ isOpen: false, sprint: null });
@@ -246,35 +250,255 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
+
+    const handleDragStart = (e: React.DragEvent, taskId: number) => {
+        setDraggedTaskId(taskId);
+        e.dataTransfer.setData('taskId', taskId.toString());
+        e.dataTransfer.setData('text/plain', taskId.toString());
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragEnd = () => {
+        setDraggedTaskId(null);
+        setDragOverColumn(null);
+    };
+
+    const handleDragOver = (e: React.DragEvent, col: string) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverColumn !== col) {
+            setDragOverColumn(col);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent, col: string) => {
+        const related = e.relatedTarget as Node | null;
+        if (!e.currentTarget.contains(related)) {
+            if (dragOverColumn === col) {
+                setDragOverColumn(null);
+            }
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent, targetCol: string) => {
+        e.preventDefault();
+        const taskIdStr = e.dataTransfer.getData('taskId') || e.dataTransfer.getData('text/plain');
+        const taskId = taskIdStr ? parseInt(taskIdStr, 10) : draggedTaskId;
+        
+        setDraggedTaskId(null);
+        setDragOverColumn(null);
+
+        if (!taskId || isNaN(taskId)) return;
+
+        const todo = allTodos.find(t => t.id === taskId);
+        if (!todo) return;
+
+        // Check if moving into or out of a finished column
+        const isTargetDone = /done|complet|finaliz|termin/i.test(targetCol);
+        const isCurrentDone = /done|complet|finaliz|termin/i.test(todo.kanban_column || '');
+        
+        let newCompleted = todo.completed;
+        if (isTargetDone) {
+            newCompleted = true;
+        } else if (isCurrentDone && !isTargetDone) {
+            newCompleted = false;
+        }
+
+        updateTodo(taskId, {
+            kanban_column: targetCol,
+            completed: newCompleted,
+            project_id: activeProject?.id || todo.project_id
+        });
+    };
+
+    const getColumnColor = (col: string, index: number) => {
+        const lower = col.toLowerCase();
+        if (/done|complet|finaliz|termin/i.test(lower)) return { dot: 'bg-emerald-500', headerBg: 'bg-emerald-50/50 dark:bg-emerald-950/20' };
+        if (/in progress|en progreso|en curso|haciendo|doing/i.test(lower)) return { dot: 'bg-blue-500', headerBg: 'bg-blue-50/50 dark:bg-blue-950/20' };
+        if (/review|revis|test|qa/i.test(lower)) return { dot: 'bg-purple-500', headerBg: 'bg-purple-50/50 dark:bg-purple-950/20' };
+        if (/to do|por hacer|pendiente|backlog|idea/i.test(lower)) return { dot: 'bg-amber-500', headerBg: 'bg-amber-50/50 dark:bg-amber-950/20' };
+        const palette = ['bg-indigo-500', 'bg-cyan-500', 'bg-rose-500', 'bg-teal-500'];
+        return { dot: palette[index % palette.length], headerBg: 'bg-gray-50 dark:bg-[#151515]' };
+    };
+
     const renderKanban = () => {
         if (!activeProject) return null;
         const columns = activeProject.kanban_columns || ['To Do', 'In Progress', 'Done'];
         
         return (
             <div className="h-full flex overflow-x-auto p-6 gap-6 bg-gray-50/50 dark:bg-[#050505]">
-                {columns.map(col => {
+                {columns.map((col, colIndex) => {
                     const colTasks = projectTodos.filter(t => (t.kanban_column || 'To Do') === col);
+                    const isDragOver = dragOverColumn === col && draggedTaskId !== null;
+                    const colStyle = getColumnColor(col, colIndex);
+                    
                     return (
-                        <div key={col} className="flex-shrink-0 w-80 flex flex-col bg-gray-100 dark:bg-[#111] rounded-lg border border-gray-200 dark:border-gray-800 h-full max-h-full overflow-hidden">
-                            <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-100 dark:bg-[#111]">
-                                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{col}</h3>
-                                <span className="bg-white dark:bg-black text-gray-600 dark:text-gray-400 text-xs px-2 py-0.5 rounded-full font-medium border border-gray-200 dark:border-gray-800">{colTasks.length}</span>
+                        <div 
+                            key={col} 
+                            className={`flex-shrink-0 w-80 flex flex-col bg-gray-100/90 dark:bg-[#111] rounded-xl border transition-all duration-200 h-full max-h-full overflow-hidden shadow-sm ${
+                                isDragOver 
+                                    ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-50/20 dark:bg-blue-950/20 shadow-md' 
+                                    : 'border-gray-200 dark:border-gray-800/80 hover:border-gray-300 dark:hover:border-gray-700'
+                            }`}
+                            onDragOver={(e) => handleDragOver(e, col)}
+                            onDragLeave={(e) => handleDragLeave(e, col)}
+                            onDrop={(e) => handleDrop(e, col)}
+                        >
+                            {/* Column Header */}
+                            <div className="p-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-white/70 dark:bg-[#141414] backdrop-blur-sm">
+                                <div className="flex items-center gap-2">
+                                    <span className={`w-2.5 h-2.5 rounded-full ${colStyle.dot}`} />
+                                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 tracking-tight">{col}</h3>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="bg-gray-100 dark:bg-black text-gray-600 dark:text-gray-400 text-xs px-2 py-0.5 rounded-full font-semibold border border-gray-200 dark:border-gray-800">
+                                        {colTasks.length}
+                                    </span>
+                                    <button 
+                                        onClick={() => setAddingToColumn(col)}
+                                        title={`Añadir tarea a ${col}`}
+                                        className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-hide">
-                                {colTasks.map(todo => (
-                                    <div key={todo.id} onClick={() => onEditTodo && onEditTodo(todo)} className="bg-white dark:bg-[#1c1c1c] p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700/60 cursor-pointer hover:border-gray-300 dark:hover:border-gray-600 transition-colors group">
-                                        <div className="flex justify-between items-start gap-2">
-                                            <p className={`text-sm ${todo.completed ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'}`}>{todo.text}</p>
-                                        </div>
-                                        {todo.date && (
-                                            <div className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                                <CalendarIcon className="w-3 h-3" />
-                                                {format(parseISO(todo.date), 'MMM d', { locale: es })}
+
+                            {/* Column Body & Cards */}
+                            <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-hide">
+                                {colTasks.map(todo => {
+                                    const isBeingDragged = draggedTaskId === todo.id;
+                                    const hasSubtasks = todo.subtasks && todo.subtasks.length > 0;
+                                    const completedSubtasks = hasSubtasks ? todo.subtasks!.filter(s => s.completed).length : 0;
+                                    const totalSubtasks = hasSubtasks ? todo.subtasks!.length : 0;
+                                    const isOverdue = todo.due_date && !todo.completed && isPast(parseISO(todo.due_date)) && !isToday(parseISO(todo.due_date));
+
+                                    return (
+                                        <div 
+                                            key={todo.id} 
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, todo.id)}
+                                            onDragEnd={handleDragEnd}
+                                            onClick={() => onEditTodo && onEditTodo(todo)}
+                                            className={`bg-white dark:bg-[#191919] p-3 rounded-lg border transition-all duration-150 group cursor-grab active:cursor-grabbing relative select-none ${
+                                                isBeingDragged
+                                                    ? 'opacity-30 border-dashed border-blue-500 scale-[0.98] ring-2 ring-blue-500/30'
+                                                    : 'border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-gray-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-start gap-2">
+                                                {/* Drag Handle & Quick Checkbox */}
+                                                <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                                                    <GripVertical className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500 cursor-grab" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            updateTodo(todo.id, { completed: !todo.completed });
+                                                        }}
+                                                        className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${
+                                                            todo.completed
+                                                                ? 'bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-black'
+                                                                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 text-transparent'
+                                                        }`}
+                                                    >
+                                                        {todo.completed && <Check className="w-3 h-3" />}
+                                                    </button>
+                                                </div>
+
+                                                {/* Text Content */}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-sm leading-snug break-words ${todo.completed ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100 font-medium'}`}>
+                                                        {todo.text}
+                                                    </p>
+                                                </div>
+
+                                                {/* Hover Action Menu */}
+                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (confirm('¿Eliminar tarea?')) {
+                                                                deleteTodo(todo.id);
+                                                            }
+                                                        }}
+                                                        title="Eliminar tarea"
+                                                        className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
                                             </div>
-                                        )}
+
+                                            {/* Badges & Meta Row */}
+                                            <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-gray-100 dark:border-gray-800/80">
+                                                {/* Priority Badge */}
+                                                {todo.priority && todo.priority !== 'none' && (
+                                                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                                                        todo.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800/60' :
+                                                        todo.priority === 'medium' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60' :
+                                                        'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/60'
+                                                    }`}>
+                                                        {todo.priority === 'high' ? 'Alta' : todo.priority === 'medium' ? 'Media' : 'Baja'}
+                                                    </span>
+                                                )}
+
+                                                {/* Story Points */}
+                                                {todo.story_points != null && (
+                                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 flex items-center gap-0.5">
+                                                        {todo.story_points} SP
+                                                    </span>
+                                                )}
+
+                                                {/* Subtasks Count */}
+                                                {hasSubtasks && (
+                                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700/60 flex items-center gap-1">
+                                                        <CheckSquare className="w-2.5 h-2.5" />
+                                                        {completedSubtasks}/{totalSubtasks}
+                                                    </span>
+                                                )}
+
+                                                {/* Due Date */}
+                                                {todo.due_date && (
+                                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex items-center gap-1 border ${
+                                                        isOverdue
+                                                            ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800/60'
+                                                            : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400 dark:border-gray-700/50'
+                                                    }`}>
+                                                        <CalendarIcon className="w-2.5 h-2.5" />
+                                                        {format(parseISO(todo.due_date), 'd MMM', { locale: es })}
+                                                    </span>
+                                                )}
+
+                                                {/* Assignee */}
+                                                {todo.assignee && (
+                                                    <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 ml-auto truncate max-w-[80px]">
+                                                        {todo.assignee}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* Active Drop Indicator Preview */}
+                                {isDragOver && (
+                                    <div className="border-2 border-dashed border-blue-400 dark:border-blue-500 rounded-lg p-3 text-center bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-xs font-medium flex items-center justify-center gap-1.5 animate-pulse">
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                        Mover tarea aquí
                                     </div>
-                                ))}
-                                
+                                )}
+
+                                {/* Empty State when no tasks and not dragging */}
+                                {colTasks.length === 0 && !isDragOver && (
+                                    <div className="text-center py-8 px-3 border border-dashed border-gray-200 dark:border-gray-800 rounded-lg text-gray-400 dark:text-gray-500 text-xs flex flex-col items-center justify-center gap-1">
+                                        <p>No hay tareas en esta columna</p>
+                                        <p className="text-[11px] text-gray-400">Arrastra una tarea aquí</p>
+                                    </div>
+                                )}
+
+                                {/* Quick Add Task Form */}
                                 {addingToColumn === col ? (
                                     <form onSubmit={(e) => {
                                         e.preventDefault();
@@ -283,23 +507,37 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         }
                                         setAddingToColumn(null);
                                         setNewTaskText('');
-                                    }} className="bg-white dark:bg-[#1c1c1c] p-2 rounded-lg border border-primary/50 shadow-sm">
+                                    }} className="bg-white dark:bg-[#1c1c1c] p-2.5 rounded-lg border border-blue-500/80 shadow-md">
                                         <input 
                                             autoFocus 
                                             type="text" 
                                             value={newTaskText} 
                                             onChange={e => setNewTaskText(e.target.value)} 
                                             placeholder="Nombre de la tarea..."
-                                            className="w-full text-sm bg-transparent border-none focus:ring-0 p-1 text-gray-900 dark:text-white"
+                                            className="w-full text-sm bg-transparent border-none focus:ring-0 p-1 text-gray-900 dark:text-white placeholder-gray-400"
                                         />
-                                        <div className="flex justify-end gap-2 mt-2">
-                                            <button type="button" onClick={() => { setAddingToColumn(null); setNewTaskText(''); }} className="px-2 py-1 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white">Cancelar</button>
-                                            <button type="submit" className="px-3 py-1 text-xs bg-primary text-white rounded font-medium">Añadir</button>
+                                        <div className="flex justify-end gap-2 mt-2 pt-1 border-t border-gray-100 dark:border-gray-800">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => { setAddingToColumn(null); setNewTaskText(''); }} 
+                                                className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button 
+                                                type="submit" 
+                                                className="px-3 py-1 text-xs bg-gray-900 dark:bg-white text-white dark:text-black rounded-md font-medium hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors shadow-sm"
+                                            >
+                                                Añadir
+                                            </button>
                                         </div>
                                     </form>
                                 ) : (
-                                    <button onClick={() => setAddingToColumn(col)} className="w-full py-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 flex items-center justify-center gap-2 hover:bg-gray-200/50 dark:hover:bg-gray-800 rounded-lg transition-colors border border-dashed border-gray-300 dark:border-gray-700">
-                                        <Plus className="w-4 h-4" /> Añadir Tarea
+                                    <button 
+                                        onClick={() => setAddingToColumn(col)} 
+                                        className="w-full py-2 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 flex items-center justify-center gap-1.5 hover:bg-gray-200/60 dark:hover:bg-gray-800/80 rounded-lg transition-colors border border-dashed border-gray-300 dark:border-gray-700/80"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" /> Añadir Tarea
                                     </button>
                                 )}
                             </div>

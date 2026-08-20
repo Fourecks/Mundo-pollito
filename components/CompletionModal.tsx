@@ -11,7 +11,7 @@ const CompletionModal: React.FC<CompletionModalProps> = ({ isOpen, onClose, quot
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-[50000] p-4"
+      className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center z-[90000] p-4"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

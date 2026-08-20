@@ -474,7 +474,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-[70000] flex flex-col justify-end pointer-events-auto">
+      <div className="fixed inset-0 z-[90000] flex flex-col justify-end pointer-events-auto">
         <motion.div 
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" 
@@ -493,7 +493,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[70000] flex items-center justify-center p-4 pointer-events-none">
+    <div className="fixed inset-0 z-[90000] flex items-center justify-center p-4 pointer-events-none">
       <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 bg-gray-900/30 backdrop-blur-[2px] pointer-events-auto" 

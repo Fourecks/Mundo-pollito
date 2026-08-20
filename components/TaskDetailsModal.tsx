@@ -338,11 +338,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
   if (!isOpen || !todo) return null;
 
   return (
-    <div className="fixed inset-0 z-[60000] flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[90000] flex items-center justify-center p-3 sm:p-4 animate-fade-in">
       <div className="fixed inset-0 bg-gray-800/50 backdrop-blur-xs" onClick={onClose} />
 
       <div 
-        className="relative w-full max-w-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-secondary-light/50 dark:border-gray-700 rounded-2xl shadow-xl flex flex-col z-[60001] overflow-hidden max-h-[92vh]"
+        className="relative w-full max-w-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-secondary-light/50 dark:border-gray-700 rounded-2xl shadow-xl flex flex-col z-[90001] overflow-hidden max-h-[92vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -864,7 +864,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
 
       {/* Account Selection Modal */}
       {isAccountPickerOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-[90010] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-700">
               <h4 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">

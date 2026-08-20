@@ -52,11 +52,11 @@ const MobilePomodoroPanel: React.FC<MobilePomodoroPanelProps> = (props) => {
   return (
     <>
       <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60000] animate-fade-in" 
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90000] animate-fade-in" 
         onClick={onClose}
       ></div>
       <div 
-        className="fixed bottom-0 left-0 right-0 max-h-[90vh] bg-secondary-lighter dark:bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col z-[60001] animate-slide-up"
+        className="fixed bottom-0 left-0 right-0 max-h-[90vh] bg-secondary-lighter dark:bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col z-[90001] animate-slide-up"
         onClick={e => e.stopPropagation()}
       >
         <header className="flex-shrink-0 p-3 text-center relative border-b border-secondary-light/50 dark:border-gray-700/50 flex items-center justify-center">

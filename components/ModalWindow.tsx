@@ -197,7 +197,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
       className={`fixed inset-0 ${isFullscreen ? 'p-0' : 'p-1 sm:p-4'} ${(!hasInteracted && !isFullscreen) ? 'flex items-center justify-center' : ''} pointer-events-none`}
       aria-modal="true"
       role="dialog"
-      style={{ zIndex: isFullscreen ? 80000 : zIndex }}
+      style={{ zIndex: zIndex ?? 50 }}
     >
       <div
         ref={modalRef}

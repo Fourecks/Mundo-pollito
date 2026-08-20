@@ -97,8 +97,8 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
     if (isMobile) {
         return (
             <>
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60000] animate-fade-in" onClick={onClose}></div>
-                <div className="fixed bottom-0 left-0 right-0 max-h-[90vh] bg-secondary-lighter dark:bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col z-[60001] animate-slide-up" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90000] animate-fade-in" onClick={onClose}></div>
+                <div className="fixed bottom-0 left-0 right-0 max-h-[90vh] bg-secondary-lighter dark:bg-gray-800 rounded-t-2xl shadow-2xl flex flex-col z-[90001] animate-slide-up" onClick={e => e.stopPropagation()}>
                     {panelContent}
                 </div>
             </>
@@ -106,7 +106,7 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
     }
     
      return (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[60000]" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[90000]" onClick={onClose}>
             <div
                 className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-auto w-full max-w-sm bg-secondary-lighter dark:bg-gray-800/90 backdrop-blur-xl shadow-2xl rounded-2xl flex flex-col transition-transform duration-300 transform animate-pop-in"
                 onClick={e => e.stopPropagation()}
