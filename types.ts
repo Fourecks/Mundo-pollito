@@ -147,6 +147,20 @@ export interface ThemeColors {
   secondary: string;
 }
 
+export interface UiSettings {
+  themeColors: ThemeColors;
+  activeBackgroundId: string | null;
+  activeBackgroundUrl?: string | null;
+  activeBackgroundType?: 'image' | 'video';
+  activeBackgroundName?: string | null;
+  particleType: ParticleType;
+  ambientSound: { type: AmbientSoundType; volume: number };
+  dailyEncouragementLocalHour: number | null;
+  dailySummaryHour: number | null;
+  enableBatterySaver: boolean;
+  progressEmoji?: string;
+}
+
 export interface SupabaseUser {
   id: string;
   email?: string;

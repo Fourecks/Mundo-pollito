@@ -11,6 +11,7 @@ import {
   ChevronRight 
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
+import { UnsplashGallery } from './UnsplashGallery';
 
 interface CustomizationPanelProps {
   isOpen: boolean;
@@ -51,6 +52,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
   
   const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'backgrounds' | 'ambience' | 'emoji'>('account');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bgSubTab, setBgSubTab] = useState<'unsplash' | 'custom'>('unsplash');
   const [view, setView] = useState<'all' | 'favorites'>('all');
   const [bgToDelete, setBgToDelete] = useState<string | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -165,53 +167,97 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
         const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.is_favorite) : userBackgrounds;
         return (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
-            <div className="flex justify-between items-center mb-6">
+            {/* Header with Sub-tabs */}
+            <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Fondos de pantalla</h3>
-              <button onClick={() => fileInputRef.current?.click()} disabled={backgroundsLoading || userBackgrounds.length >= 10} className="w-[120px] py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[13px] flex items-center justify-center gap-2 disabled:opacity-50">
-                <Upload size={14} /> Subir Fondo
-              </button>
+              {bgSubTab === 'custom' && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={backgroundsLoading || userBackgrounds.length >= 10}
+                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[13px] flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
+                >
+                  <Upload size={14} /> Subir Fondo
+                </button>
+              )}
               <input type="file" ref={fileInputRef} onChange={(e) => { if (e.target.files?.[0]) { onAddBackground(e.target.files[0]); e.target.value = ''; } }} accept="image/*,video/mp4,video/webm" className="hidden" />
             </div>
 
-            <div className="flex gap-6 mb-6 border-b border-gray-100 dark:border-gray-800 pb-2">
-              <button onClick={() => setView('all')} className={`text-[14px] font-medium transition-colors ${view === 'all' ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white pb-2 -mb-[9px]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Todos</button>
-              <button onClick={() => setView('favorites')} className={`text-[14px] font-medium transition-colors ${view === 'favorites' ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white pb-2 -mb-[9px]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Favoritos</button>
+            {/* Sub-tab Switcher (Unsplash vs Custom) */}
+            <div className="flex gap-2 mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+              <button
+                onClick={() => setBgSubTab('unsplash')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  bgSubTab === 'unsplash'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                <span>Unsplash (Galería)</span>
+              </button>
+              <button
+                onClick={() => setBgSubTab('custom')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  bgSubTab === 'custom'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                }`}
+              >
+                <ImageIconLucide className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Mis Fondos ({userBackgrounds.length})</span>
+              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar -mx-1 px-1 pb-4">
-              {backgroundsLoading && userBackgrounds.length === 0 ? (
-                <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
-              ) : filteredBackgrounds.length === 0 ? (
-                <div className="text-center py-12 text-gray-400 text-[15px]">No hay fondos {view === 'favorites' && 'favoritos'}.</div>
-              ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredBackgrounds.map(bg => (
-                    <div key={bg.id} className="relative group aspect-video rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800/50 cursor-pointer border border-gray-100 dark:border-gray-800" onClick={() => onSelectBackground(activeBackground?.id === bg.id ? null : bg)}>
-                      {activeBackground?.id === bg.id && <div className="absolute inset-0 border-2 border-blue-500 rounded-xl z-20 pointer-events-none" />}
-                      
-                      {bg.type === 'video' ? (
-                        <video src={bg.url} className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={bg.url} alt={bg.name} className="w-full h-full object-cover" loading="lazy" />
-                      )}
-                      
-                      <div className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/90 dark:bg-black/60 backdrop-blur-md text-gray-800 dark:text-white z-10 shadow-sm">
-                        {bg.type === 'video' ? <VideoIconLucide size={12} strokeWidth={2.5}/> : <ImageIconLucide size={12} strokeWidth={2.5}/>}
-                      </div>
-
-                      <div className={`absolute inset-0 bg-black/20 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 z-10 ${activeBackground?.id === bg.id ? 'opacity-0 hover:opacity-100' : ''}`}>
-                        <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(bg.id); }} className={`p-2.5 rounded-full backdrop-blur-md transition-all shadow-sm ${bg.is_favorite ? 'bg-yellow-400 text-white' : 'bg-white/90 text-gray-700 hover:bg-white'}`}>
-                          <Star size={16} className={bg.is_favorite ? 'fill-current' : ''} />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); setBgToDelete(bg.id); }} className="p-2.5 rounded-full bg-red-500 text-white hover:bg-red-600 backdrop-blur-md transition-all shadow-sm">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+            {bgSubTab === 'unsplash' ? (
+              <div className="flex-1 overflow-hidden">
+                <UnsplashGallery
+                  activeBackground={activeBackground}
+                  onSelectBackground={onSelectBackground}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="flex gap-6 mb-4 border-b border-gray-100 dark:border-gray-800 pb-2">
+                  <button onClick={() => setView('all')} className={`text-[14px] font-medium transition-colors ${view === 'all' ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white pb-2 -mb-[9px]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Todos</button>
+                  <button onClick={() => setView('favorites')} className={`text-[14px] font-medium transition-colors ${view === 'favorites' ? 'text-gray-900 dark:text-white border-b-2 border-gray-900 dark:border-white pb-2 -mb-[9px]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>Favoritos</button>
                 </div>
-              )}
-            </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar -mx-1 px-1 pb-4">
+                  {backgroundsLoading && userBackgrounds.length === 0 ? (
+                    <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+                  ) : filteredBackgrounds.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 text-[15px]">No hay fondos {view === 'favorites' && 'favoritos'}.</div>
+                  ) : (
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredBackgrounds.map(bg => (
+                        <div key={bg.id} className="relative group aspect-video rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800/50 cursor-pointer border border-gray-100 dark:border-gray-800" onClick={() => onSelectBackground(activeBackground?.id === bg.id ? null : bg)}>
+                          {activeBackground?.id === bg.id && <div className="absolute inset-0 border-2 border-blue-500 rounded-xl z-20 pointer-events-none" />}
+                          
+                          {bg.type === 'video' ? (
+                            <video src={bg.url} className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={bg.url} alt={bg.name} className="w-full h-full object-cover" loading="lazy" />
+                          )}
+                          
+                          <div className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/90 dark:bg-black/60 backdrop-blur-md text-gray-800 dark:text-white z-10 shadow-sm">
+                            {bg.type === 'video' ? <VideoIconLucide size={12} strokeWidth={2.5}/> : <ImageIconLucide size={12} strokeWidth={2.5}/>}
+                          </div>
+
+                          <div className={`absolute inset-0 bg-black/20 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 z-10 ${activeBackground?.id === bg.id ? 'opacity-0 hover:opacity-100' : ''}`}>
+                            <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(bg.id); }} className={`p-2.5 rounded-full backdrop-blur-md transition-all shadow-sm ${bg.is_favorite ? 'bg-yellow-400 text-white' : 'bg-white/90 text-gray-700 hover:bg-white'}`}>
+                              <Star size={16} className={bg.is_favorite ? 'fill-current' : ''} />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setBgToDelete(bg.id); }} className="p-2.5 rounded-full bg-red-500 text-white hover:bg-red-600 backdrop-blur-md transition-all shadow-sm">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <ConfirmationModal isOpen={!!bgToDelete} onClose={() => setBgToDelete(null)} onConfirm={() => { if (bgToDelete) { onDeleteBackground(bgToDelete); setBgToDelete(null); } }} title="Eliminar Fondo" message="¿Estás seguro de que quieres eliminar este fondo?" confirmText="Eliminar" cancelText="Cancelar" isDestructive={true} />
           </div>
         );
@@ -302,37 +348,38 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Emoji de progreso</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Personaliza el emoji que se muestra en tus listas y barras de progreso.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Elige el icono que acompaña tu avance en listas y metas.</p>
               </div>
               {currentEmoji !== '🚀' && (
                 <button
                   onClick={() => onProgressEmojiChange?.('🚀')}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900/30 font-medium"
+                  className="text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 font-medium"
                 >
-                  Restablecer a 🚀
+                  Restablecer
                 </button>
               )}
             </div>
             
-            {/* Active Emoji Preview Card */}
-            <div className="flex items-center gap-4 p-4 mb-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
-              <div className="w-16 h-16 rounded-xl bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-center shrink-0">
-                <span className="text-4xl leading-none filter drop-shadow-sm">{currentEmoji}</span>
+            {/* Live Progress Bar Preview */}
+            <div className="p-4 mb-5 rounded-xl bg-gray-50/80 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between text-xs font-medium text-gray-500 dark:text-gray-400 mb-2.5">
+                <span>Vista previa de avance</span>
+                <span className="font-semibold text-gray-700 dark:text-gray-300">75%</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Seleccionado: {currentEmoji}</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                    Activo
-                  </span>
+              <div className="relative h-3 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: '75%' }} />
+                <div 
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-300"
+                  style={{ left: '75%' }}
+                >
+                  <span className="text-xl leading-none select-none drop-shadow-sm">{currentEmoji}</span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Este emoji acompaña tu avance en tareas y metas.</p>
               </div>
             </div>
 
             {/* Quick Select Presets */}
             <div className="mb-4">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-2">Frecuentes / Rápidos</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-2">Sugeridos</span>
               <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
                 {presetEmojis.map((emoji) => {
                   const isSelected = currentEmoji === emoji;
@@ -340,16 +387,13 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
                     <button
                       key={emoji}
                       onClick={() => onProgressEmojiChange?.(emoji)}
-                      className={`h-11 rounded-xl flex items-center justify-center text-xl transition-all relative ${
+                      className={`h-10 rounded-lg flex items-center justify-center text-lg transition-all ${
                         isSelected
-                          ? 'bg-blue-50 dark:bg-blue-950/50 ring-2 ring-blue-500 border border-blue-200 dark:border-blue-700 scale-105 shadow-sm'
-                          : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800'
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/80 border border-transparent font-bold'
+                          : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800/60'
                       }`}
                     >
                       <span>{emoji}</span>
-                      {isSelected && (
-                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full ring-2 ring-white dark:ring-gray-900" />
-                      )}
                     </button>
                   );
                 })}
@@ -357,7 +401,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
             </div>
             
             {/* Full Emoji Picker */}
-            <div className="flex-1 min-h-[300px] overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1b1e]">
+            <div className="flex-1 min-h-[300px] overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1b1e]">
               <EmojiPicker 
                 width="100%"
                 height="100%"

@@ -680,7 +680,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         activeBackground={activeBackground}
         userBackgrounds={userBackgrounds}
         onSelectBackground={(bg) => {
-          setUiSettings((s: any) => ({ ...s, activeBackgroundId: bg?.id || null }));
+          setUiSettings((s: any) => ({
+            ...s,
+            activeBackgroundId: bg?.id || null,
+            activeBackgroundUrl: bg?.url || null,
+            activeBackgroundType: bg?.type || 'image',
+            activeBackgroundName: bg?.name || null
+          }));
           try {
             if (bg) {
               localStorage.setItem(`pollito_selected_bg_${currentUser?.id || 'guest'}`, JSON.stringify(bg));
@@ -1330,7 +1336,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               activeBackground={activeBackground}
               userBackgrounds={userBackgrounds}
               onSelectBackground={(bg) => {
-                setUiSettings((s: any) => ({ ...s, activeBackgroundId: bg?.id || null }));
+                setUiSettings((s: any) => ({
+                  ...s,
+                  activeBackgroundId: bg?.id || null,
+                  activeBackgroundUrl: bg?.url || null,
+                  activeBackgroundType: bg?.type || 'image',
+                  activeBackgroundName: bg?.name || null
+                }));
                 try {
                   if (bg) {
                     localStorage.setItem(`pollito_selected_bg_${currentUser?.id || 'guest'}`, JSON.stringify(bg));
@@ -1821,6 +1833,9 @@ const App: React.FC = () => {
     let localSettings = {
       themeColors: DEFAULT_COLORS,
       activeBackgroundId: null,
+      activeBackgroundUrl: null,
+      activeBackgroundType: 'image' as 'image' | 'video',
+      activeBackgroundName: null,
       particleType: 'none' as ParticleType,
       ambientSound: { type: 'none' as AmbientSoundType, volume: 0.5 },
       dailyEncouragementLocalHour: null,
@@ -1960,16 +1975,19 @@ const App: React.FC = () => {
           }
           
           const settings = (profileData.ui_settings || {}) as any;
-          setUiSettings({
-              themeColors: settings.themeColors || DEFAULT_COLORS,
-              activeBackgroundId: settings.activeBackgroundId || null,
-              particleType: settings.particleType || 'none',
-              ambientSound: settings.ambientSound || { type: 'none', volume: 0.5 },
-              dailyEncouragementLocalHour: settings.dailyEncouragementLocalHour ?? null,
-              dailySummaryHour: settings.dailySummaryHour ?? null,
-              enableBatterySaver: settings.enableBatterySaver ?? false,
-              progressEmoji: settings.progressEmoji || '🚀',
-          });
+          setUiSettings(prev => ({
+              themeColors: settings.themeColors || prev?.themeColors || DEFAULT_COLORS,
+              activeBackgroundId: settings.activeBackgroundId ?? prev?.activeBackgroundId ?? null,
+              activeBackgroundUrl: settings.activeBackgroundUrl ?? prev?.activeBackgroundUrl ?? null,
+              activeBackgroundType: settings.activeBackgroundType ?? prev?.activeBackgroundType ?? 'image',
+              activeBackgroundName: settings.activeBackgroundName ?? prev?.activeBackgroundName ?? null,
+              particleType: settings.particleType || prev?.particleType || 'none',
+              ambientSound: settings.ambientSound || prev?.ambientSound || { type: 'none', volume: 0.5 },
+              dailyEncouragementLocalHour: settings.dailyEncouragementLocalHour ?? prev?.dailyEncouragementLocalHour ?? null,
+              dailySummaryHour: settings.dailySummaryHour ?? prev?.dailySummaryHour ?? null,
+              enableBatterySaver: settings.enableBatterySaver ?? prev?.enableBatterySaver ?? false,
+              progressEmoji: settings.progressEmoji || prev?.progressEmoji || '🚀',
+          }));
 
           // Check and update user's timezone offset for notifications
           const currentUserTimezoneOffset = new Date().getTimezoneOffset();
@@ -2087,13 +2105,13 @@ const App: React.FC = () => {
   }, [pomodoroState, user, dataLoaded, isOnline]);
   
   useEffect(() => {
-    if (user && uiSettings) {
+    if (uiSettings) {
       try {
         localStorage.setItem(getUserKey('ui_settings'), JSON.stringify(uiSettings));
       } catch (e) {
         console.warn('Failed to save ui_settings to localStorage:', e);
       }
-      if (dataLoaded && isOnline) {
+      if (user && dataLoaded && isOnline) {
         if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
         settingsSaveTimeout.current = window.setTimeout(async () => {
           await supabase.from('profiles').update({ ui_settings: uiSettings }).eq('id', user.id);
@@ -3538,28 +3556,65 @@ const App: React.FC = () => {
   }, [user, isOnline, loadBackgroundsFromSupabase]);
   
   const activeBackground = useMemo(() => {
+    // 1. Direct URL check from uiSettings (Unsplash or custom URL)
+    if (uiSettings?.activeBackgroundUrl) {
+      const bgObj: Background = {
+        id: uiSettings.activeBackgroundId || 'unsplash_bg',
+        user_id: user?.id || 'guest',
+        name: uiSettings.activeBackgroundName || 'Fondo',
+        path: '',
+        url: uiSettings.activeBackgroundUrl,
+        type: (uiSettings.activeBackgroundType || 'image') as 'image' | 'video',
+        is_favorite: false
+      };
+      try {
+        localStorage.setItem(`pollito_selected_bg_${user?.id || 'guest'}`, JSON.stringify(bgObj));
+      } catch (e) {}
+      return bgObj;
+    }
+
     if (!uiSettings?.activeBackgroundId) {
+      // Check cached background fallback
+      try {
+        const cached = localStorage.getItem(`pollito_selected_bg_${user?.id || 'guest'}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.url) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
       return null;
     }
-    const bgFromList = userBackgrounds.find(bg => bg.id === uiSettings.activeBackgroundId);
+
+    // 2. Search in user's custom backgrounds array
+    const bgFromList = userBackgrounds.find(bg => String(bg.id) === String(uiSettings.activeBackgroundId));
     if (bgFromList) {
       try {
         localStorage.setItem(`pollito_selected_bg_${user?.id || 'guest'}`, JSON.stringify(bgFromList));
       } catch (e) {}
       return bgFromList;
     }
-    // Check cached active background in case userBackgrounds is loading
+
+    // 3. Fallback to cached active background
     try {
       const cached = localStorage.getItem(`pollito_selected_bg_${user?.id || 'guest'}`);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed && parsed.id === uiSettings.activeBackgroundId) {
+        if (parsed && (String(parsed.id) === String(uiSettings.activeBackgroundId) || parsed.url)) {
           return parsed;
         }
       }
     } catch (e) {}
     return null;
-  }, [uiSettings?.activeBackgroundId, userBackgrounds, user?.id]);
+  }, [
+    uiSettings?.activeBackgroundId,
+    uiSettings?.activeBackgroundUrl,
+    uiSettings?.activeBackgroundName,
+    uiSettings?.activeBackgroundType,
+    userBackgrounds,
+    user?.id
+  ]);
 
   useEffect(() => {
     if (activeBackground) {

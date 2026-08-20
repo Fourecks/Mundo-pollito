@@ -32,8 +32,9 @@ export class NotionService {
   private static async executeWithProxyFallback(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const fullTargetUrl = `${NOTION_BASE_URL}${endpoint}`;
     const proxyGenerators = [
+      (u: string) => `https://proxy.cors.sh/${u}`,
+      (u: string) => `https://cors.eu.org/${u}`,
       (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-      (u: string) => `https://corsproxy.io/?${u}`,
       (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
       (u: string) => u,
     ];
