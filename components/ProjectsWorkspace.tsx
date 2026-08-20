@@ -69,7 +69,23 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [activeSprintId, setActiveSprintId] = useState<string | null>(null);
     const [activeMilestoneId, setActiveMilestoneId] = useState<string | null>(null);
     
-    const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId) || null, [projects, activeProjectId]);
+    // Auto fallback to first active project if none selected
+    const activeProject = useMemo(() => {
+        if (activeProjectId) {
+            const found = projects.find(p => p.id === activeProjectId);
+            if (found) return found;
+        }
+        const activeList = projects.filter(p => !p.is_archived);
+        return activeList.length > 0 ? activeList[0] : (projects.length > 0 ? projects[0] : null);
+    }, [projects, activeProjectId]);
+
+    // Keep activeProjectId in sync if it was null
+    React.useEffect(() => {
+        if (!activeProjectId && activeProject) {
+            onSelectProject(activeProject.id);
+        }
+    }, [activeProjectId, activeProject, onSelectProject]);
+
     const projectTodos = useMemo(() => activeProject ? allTodos.filter(t => t.project_id === activeProject.id) : [], [allTodos, activeProject]);
 
     const renderEmptyState = (title: string, description: string, action?: React.ReactNode) => (
@@ -326,9 +342,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const handleDragStart = (e: React.DragEvent, taskId: number) => {
         setDraggedTaskId(taskId);
-        e.dataTransfer.setData('taskId', taskId.toString());
-        e.dataTransfer.setData('text/plain', taskId.toString());
-        e.dataTransfer.effectAllowed = 'move';
+        try {
+            e.dataTransfer.setData('taskId', taskId.toString());
+            e.dataTransfer.setData('text/plain', taskId.toString());
+            e.dataTransfer.effectAllowed = 'move';
+        } catch {
+            // fallback
+        }
     };
 
     const handleDragEnd = () => {
@@ -338,6 +358,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const handleDragOver = (e: React.DragEvent, col: string) => {
         e.preventDefault();
+        e.stopPropagation();
         e.dataTransfer.dropEffect = 'move';
         if (dragOverColumn !== col) {
             setDragOverColumn(col);
@@ -355,13 +376,23 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const handleDrop = (e: React.DragEvent, targetCol: string) => {
         e.preventDefault();
-        const taskIdStr = e.dataTransfer.getData('taskId') || e.dataTransfer.getData('text/plain');
-        const taskId = taskIdStr ? parseInt(taskIdStr, 10) : draggedTaskId;
+        e.stopPropagation();
+        
+        let taskId: number | null = draggedTaskId;
+        try {
+            const taskIdStr = e.dataTransfer.getData('taskId') || e.dataTransfer.getData('text/plain');
+            if (taskIdStr) {
+                const parsed = parseInt(taskIdStr, 10);
+                if (!isNaN(parsed)) taskId = parsed;
+            }
+        } catch {
+            // fallback to state
+        }
         
         setDraggedTaskId(null);
         setDragOverColumn(null);
 
-        if (!taskId || isNaN(taskId)) return;
+        if (!taskId) return;
 
         const todo = allTodos.find(t => t.id === taskId);
         if (!todo) return;
@@ -452,6 +483,17 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, todo.id)}
                                             onDragEnd={handleDragEnd}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                e.dataTransfer.dropEffect = 'move';
+                                                if (dragOverColumn !== col) setDragOverColumn(col);
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleDrop(e, col);
+                                            }}
                                             onClick={() => onEditTodo && onEditTodo(todo)}
                                             className={`bg-white dark:bg-[#191919] p-3 rounded-lg border transition-all duration-150 group cursor-grab active:cursor-grabbing relative select-none ${
                                                 isBeingDragged
