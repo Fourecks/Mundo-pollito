@@ -7,7 +7,21 @@ export interface WindowState {
 
 export type Priority = 'low' | 'medium' | 'high';
 
-export type WindowType = 'todo' | 'calendar' | 'notes' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso';
+export type WindowType = 'todo' | 'calendar' | 'notes' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso' | 'projects';
+
+export interface TaskComment {
+  id: string;
+  author: string;
+  text: string;
+  created_at: string;
+}
+
+export interface TaskAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: 'doc' | 'image' | 'pdf' | 'link' | 'file';
+}
 
 export interface Subtask {
   id: number;
@@ -49,18 +63,95 @@ export interface Todo {
   kanban_column?: string | null;
   notion_page_id?: string | null;
   notion_url?: string | null;
+  // Enhanced Project Task Attributes
+  story_points?: number | null;
+  sprint_id?: string | null;
+  milestone_id?: string | null;
+  tags?: string[];
+  dependencies?: number[]; // IDs of tasks this task is blocked by
+  comments?: TaskComment[];
+  attachments?: TaskAttachment[];
+  assignee?: string | null;
+}
+
+export interface ProjectMember {
+  id: string;
+  name: string;
+  avatar?: string;
+  role: 'owner' | 'lead' | 'member';
+}
+
+export interface Sprint {
+  id: string;
+  project_id: number;
+  name: string;
+  goal?: string;
+  start_date: string;
+  end_date: string;
+  status: 'planning' | 'active' | 'completed';
+  created_at: string;
+}
+
+export interface Milestone {
+  id: string;
+  project_id: number;
+  name: string;
+  target_date: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  description?: string;
+}
+
+export interface ProjectDoc {
+  id: string;
+  project_id: number;
+  title: string;
+  content: string;
+  category?: 'Requirements' | 'Meeting Notes' | 'Architecture' | 'Ideas' | 'Research' | 'Decisions' | 'Specifications' | 'Other';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectInboxItem {
+  id: string;
+  project_id: number;
+  text: string;
+  type?: 'idea' | 'task' | 'note' | 'link';
+  created_at: string;
+}
+
+export interface ProjectActivity {
+  id: string;
+  project_id: number;
+  author: string;
+  action: string;
+  details?: string;
+  created_at: string;
 }
 
 export interface Project {
   id: number;
   user_id: string;
   name: string;
+  description?: string | null;
   created_at: string;
   todos?: Todo[]; // Populated on the client
   emoji?: string | null;
   is_archived?: boolean;
   color?: string | null;
   kanban_columns?: string[];
+  status?: 'planning' | 'active' | 'on_hold' | 'completed' | 'archived';
+  priority?: 'low' | 'medium' | 'high';
+  start_date?: string | null;
+  target_date?: string | null;
+  lead?: string | null;
+  members?: ProjectMember[];
+  goal_id?: number | null;
+  template_type?: string | null;
+  sprints?: Sprint[];
+  milestones?: Milestone[];
+  docs?: ProjectDoc[];
+  inbox?: ProjectInboxItem[];
+  activities?: ProjectActivity[];
 }
 
 export interface Note {

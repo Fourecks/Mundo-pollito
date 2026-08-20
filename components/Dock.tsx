@@ -7,15 +7,21 @@ import ClockIcon from './icons/ClockIcon';
 import ChickenIcon from './ChickenIcon';
 import { WindowType } from '../types';
 import CheckBadgeIcon from './icons/CheckBadgeIcon';
-import ChartBarIcon from './icons/ChartBarIcon';
+import BriefcaseIcon from './icons/BriefcaseIcon';
+import { FolderKanban } from 'lucide-react';
 
 interface DockProps {
   onButtonClick: (window: WindowType) => void;
   openWindows: WindowType[];
 }
 
+const ProjectsIcon: React.FC = () => (
+  <FolderKanban className="w-5 h-5" />
+);
+
 const dockItems: { id: WindowType; label: string; icon: React.FC }[] = [
   { id: 'todo', label: 'Tareas', icon: ListIcon },
+  { id: 'projects', label: 'Proyectos', icon: ProjectsIcon },
   { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
   { id: 'habits', label: 'Hábitos', icon: CheckBadgeIcon },
   { id: 'pomodoro', label: 'Pomodoro', icon: ClockIcon },

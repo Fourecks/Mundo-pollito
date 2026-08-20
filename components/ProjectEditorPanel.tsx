@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import {
   FolderPlus,
   FolderEdit,
   X,
   Check,
-  Smile,
-  Ban,
   Search,
   Palette,
   CheckCircle2,
@@ -193,7 +190,6 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
   const [color, setColor] = useState<string | null>(PROJECT_COLORS[0].hex);
   const [activeCategory, setActiveCategory] = useState<string>('popular');
   const [emojiSearch, setEmojiSearch] = useState<string>('');
-  const [showFullPicker, setShowFullPicker] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -206,7 +202,6 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
         setEmoji('🎯');
         setColor(PROJECT_COLORS[0].hex);
       }
-      setShowFullPicker(false);
       setEmojiSearch('');
       setActiveCategory('popular');
     }
@@ -394,130 +389,83 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
                 <span>Icono / Emoji</span>
-                {emoji && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300">
-                    {emoji} Seleccionado
-                  </span>
-                )}
               </label>
-
-              <div className="flex items-center gap-2">
-                {emoji && (
-                  <button
-                    type="button"
-                    onClick={() => setEmoji(null)}
-                    className="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <Ban size={12} />
-                    <span>Sin emoji</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setShowFullPicker(!showFullPicker)}
-                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-                >
-                  <Smile size={13} />
-                  <span>
-                    {showFullPicker ? 'Ver atajos' : 'Catálogo completo'}
-                  </span>
-                </button>
-              </div>
             </div>
 
-            {showFullPicker ? (
-              <div className="border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm">
-                <EmojiPicker
-                  onEmojiClick={(data) => setEmoji(data.emoji)}
-                  theme={
-                    document.documentElement.classList.contains('dark')
-                      ? EmojiTheme.DARK
-                      : EmojiTheme.LIGHT
-                  }
-                  width="100%"
-                  height={280}
-                  lazyLoadEmojis={true}
-                  searchPlaceHolder="Buscar emoji en el catálogo..."
-                  previewConfig={{ showPreview: false }}
+            <div className="bg-gray-50/80 dark:bg-gray-800/40 p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800 space-y-3">
+              {/* Search Bar inside Emoji Selector */}
+              <div className="relative">
+                <Search
+                  size={15}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 />
+                <input
+                  type="text"
+                  value={emojiSearch}
+                  onChange={(e) => setEmojiSearch(e.target.value)}
+                  placeholder="Buscar emoji (ej: meta, casa, trabajo, dinero)..."
+                  className="w-full bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700/80 rounded-xl pl-9 pr-8 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400 shadow-2xs"
+                />
+                {emojiSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setEmojiSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
-            ) : (
-              <div className="bg-gray-50/80 dark:bg-gray-800/40 p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800 space-y-3">
-                {/* Search Bar inside Emoji Selector */}
-                <div className="relative">
-                  <Search
-                    size={15}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                  <input
-                    type="text"
-                    value={emojiSearch}
-                    onChange={(e) => setEmojiSearch(e.target.value)}
-                    placeholder="Buscar emoji (ej: meta, casa, trabajo, dinero)..."
-                    className="w-full bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700/80 rounded-xl pl-9 pr-8 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400 shadow-2xs"
-                  />
-                  {emojiSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setEmojiSearch('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
 
-                {/* Category Tabs (Hidden during search) */}
-                {!emojiSearch && (
-                  <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
-                    {EMOJI_CATEGORIES.map((cat) => (
+              {/* Category Tabs (Hidden during search) */}
+              {!emojiSearch && (
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
+                  {EMOJI_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setActiveCategory(cat.id)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+                        activeCategory === cat.id
+                          ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs font-bold border border-gray-200/80 dark:border-gray-600'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <span>{cat.icon}</span>
+                      <span>{cat.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Emoji Grid */}
+              <div className="grid grid-cols-7 sm:grid-cols-8 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar p-0.5">
+                {filteredEmojis.length > 0 ? (
+                  filteredEmojis.map((item) => {
+                    const isSelected = emoji === item.char;
+                    return (
                       <button
-                        key={cat.id}
+                        key={item.char}
                         type="button"
-                        onClick={() => setActiveCategory(cat.id)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
-                          activeCategory === cat.id
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs font-bold border border-gray-200/80 dark:border-gray-600'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-white/60 dark:hover:bg-gray-800'
+                        onClick={() => setEmoji(item.char)}
+                        title={item.name}
+                        className={`w-9 h-9 text-xl rounded-xl flex items-center justify-center transition-all transform ${
+                          isSelected
+                            ? 'bg-white dark:bg-gray-700 ring-2 ring-blue-500 shadow-md scale-110 z-10'
+                            : 'hover:bg-white dark:hover:bg-gray-700/60 hover:scale-105 text-gray-700 dark:text-gray-200'
                         }`}
                       >
-                        <span>{cat.icon}</span>
-                        <span>{cat.label}</span>
+                        {item.char}
                       </button>
-                    ))}
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full py-6 text-center text-xs text-gray-400">
+                    No se encontraron emojis para "{emojiSearch}"
                   </div>
                 )}
-
-                {/* Emoji Grid */}
-                <div className="grid grid-cols-7 sm:grid-cols-8 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar p-0.5">
-                  {filteredEmojis.length > 0 ? (
-                    filteredEmojis.map((item) => {
-                      const isSelected = emoji === item.char;
-                      return (
-                        <button
-                          key={item.char}
-                          type="button"
-                          onClick={() => setEmoji(item.char)}
-                          title={item.name}
-                          className={`w-9 h-9 text-xl rounded-xl flex items-center justify-center transition-all transform ${
-                            isSelected
-                              ? 'bg-white dark:bg-gray-700 ring-2 ring-blue-500 shadow-md scale-110 z-10'
-                              : 'hover:bg-white dark:hover:bg-gray-700/60 hover:scale-105 text-gray-700 dark:text-gray-200'
-                          }`}
-                        >
-                          {item.char}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="col-span-full py-6 text-center text-xs text-gray-400">
-                      No se encontraron emojis para "{emojiSearch}"
-                    </div>
-                  )}
-                </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Color Selector Section */}

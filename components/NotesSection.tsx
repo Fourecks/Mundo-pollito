@@ -81,9 +81,33 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   const [showFolders, setShowFolders] = useState(true);
   const [showNotesList, setShowNotesList] = useState(true);
 
-  // Textarea ref for inserting text tools
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Textarea / Editor ref for inserting text tools
+  const editorRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Convert legacy markdown or plain text to HTML for visual editor
+  const markdownToHtml = (str: string): string => {
+    if (!str) return '';
+    if (/<(b|i|u|del|strong|em|h1|h2|h3|p|div|ul|ol|li|blockquote|pre|hr|br)\b[^>]*>/i.test(str)) {
+      return str;
+    }
+    let html = str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    html = html.replace(/\*(.*?)\*/g, '<i>$1</i>');
+    html = html.replace(/~~(.*?)~~/g, '<del>$1</del>');
+    html = html.replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
+    html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  };
 
   // Set default selected folder
   useEffect(() => {
@@ -112,11 +136,18 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     if (selectedNote) {
       activeNoteIdRef.current = selectedNote.id;
       setActiveNoteTitle(selectedNote.title || '');
-      setActiveNoteContent(selectedNote.content || '');
+      const htmlContent = markdownToHtml(selectedNote.content || '');
+      setActiveNoteContent(htmlContent);
+      if (editorRef.current && editorRef.current.innerHTML !== htmlContent) {
+        editorRef.current.innerHTML = htmlContent;
+      }
     } else {
       activeNoteIdRef.current = null;
       setActiveNoteTitle('');
       setActiveNoteContent('');
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
+      }
     }
   }, [selectedNote?.id]);
 
@@ -141,12 +172,15 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     }, 600);
   };
 
-  const handleContentChange = (newContent: string) => {
-    setActiveNoteContent(newContent);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveCurrentNote(activeNoteTitle, newContent);
-    }, 600);
+  const handleEditorInput = () => {
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      setActiveNoteContent(html);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        saveCurrentNote(activeNoteTitle, html);
+      }, 600);
+    }
   };
 
   const handleBlurSave = () => {
@@ -154,47 +188,23 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     saveCurrentNote(activeNoteTitle, activeNoteContent);
   };
 
-  // Formatting tools helper
-  const insertFormat = (prefix: string, suffix: string = '', defaultPlaceholder: string = '') => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const currentVal = textarea.value;
-    const selected = currentVal.substring(start, end) || defaultPlaceholder;
-    const replacement = `${prefix}${selected}${suffix}`;
-    const updated = currentVal.substring(0, start) + replacement + currentVal.substring(end);
-
-    handleContentChange(updated);
-
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
-    }, 10);
-  };
-
-  const insertLinePrefix = (prefix: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const currentVal = textarea.value;
-    const lineStart = currentVal.lastIndexOf('\n', start - 1) + 1;
-    const updated = currentVal.substring(0, lineStart) + prefix + currentVal.substring(lineStart);
-
-    handleContentChange(updated);
-
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, start + prefix.length);
-    }, 10);
+  // Apply visual rich text formatting command
+  const applyRichCommand = (command: string, value: string = '') => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand(command, false, value);
+    handleEditorInput();
   };
 
   // Copy note content
   const handleCopyNote = () => {
     if (!activeNoteContent && !activeNoteTitle) return;
-    const fullText = `${activeNoteTitle}\n\n${activeNoteContent}`;
+    const plainContent = activeNoteContent
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>|<\/div>|<\/h[1-6]>|<\/li>/gi, '\n')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ');
+    const fullText = `${activeNoteTitle}\n\n${plainContent}`.trim();
     navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -682,7 +692,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     </h4>
                   </div>
                   <p className="text-[11px] text-stone-400 dark:text-stone-500 truncate mt-1">
-                    {note.content || 'Sin contenido'}
+                    {note.content ? note.content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ') : 'Sin contenido'}
                   </p>
                 </button>
 
@@ -784,52 +794,52 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
             {/* Rich Formatting Toolbar */}
             <div className="px-4 py-1.5 border-b border-stone-200/60 dark:border-stone-800/80 flex items-center gap-1 overflow-x-auto custom-scrollbar bg-stone-50/30 dark:bg-stone-900/30 text-stone-600 dark:text-stone-300">
-              <button onClick={() => insertFormat('**', '**', 'negrita')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Negrita (**texto**)">
+              <button onClick={() => applyRichCommand('bold')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Negrita">
                 <Bold className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertFormat('*', '*', 'cursiva')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Cursiva (*texto*)">
+              <button onClick={() => applyRichCommand('italic')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Cursiva">
                 <Italic className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertFormat('<u>', '</u>', 'subrayado')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Subrayado">
+              <button onClick={() => applyRichCommand('underline')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Subrayado">
                 <UnderlineIcon className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertFormat('~~', '~~', 'tachado')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Tachado (~~texto~~)">
+              <button onClick={() => applyRichCommand('strikeThrough')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Tachado">
                 <Strikethrough className="w-3.5 h-3.5" />
               </button>
 
               <div className="w-[1px] h-4 bg-stone-200 dark:bg-stone-700 mx-1" />
 
-              <button onClick={() => insertLinePrefix('# ')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Encabezado 1 (#)">
+              <button onClick={() => applyRichCommand('formatBlock', '<h1>')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Encabezado 1">
                 <Heading1 className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertLinePrefix('## ')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Encabezado 2 (##)">
+              <button onClick={() => applyRichCommand('formatBlock', '<h2>')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Encabezado 2">
                 <Heading2 className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertLinePrefix('### ')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Encabezado 3 (###)">
+              <button onClick={() => applyRichCommand('formatBlock', '<h3>')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Encabezado 3">
                 <Heading3 className="w-3.5 h-3.5" />
               </button>
 
               <div className="w-[1px] h-4 bg-stone-200 dark:bg-stone-700 mx-1" />
 
-              <button onClick={() => insertLinePrefix('- ')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Lista con viñetas (-)">
+              <button onClick={() => applyRichCommand('insertUnorderedList')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Lista con viñetas">
                 <List className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertLinePrefix('1. ')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Lista numerada (1.)">
+              <button onClick={() => applyRichCommand('insertOrderedList')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Lista numerada">
                 <ListOrdered className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertLinePrefix('- [ ] ')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Lista de tareas (- [ ])">
+              <button onClick={() => applyRichCommand('insertUnorderedList')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Lista de tareas">
                 <CheckSquare className="w-3.5 h-3.5" />
               </button>
 
               <div className="w-[1px] h-4 bg-stone-200 dark:bg-stone-700 mx-1" />
 
-              <button onClick={() => insertLinePrefix('> ')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Cita (> )">
+              <button onClick={() => applyRichCommand('formatBlock', '<blockquote>')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Cita">
                 <Quote className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertFormat('```\n', '\n```', 'código')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Bloque de código (```)">
+              <button onClick={() => applyRichCommand('formatBlock', '<pre>')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Bloque de código">
                 <Code className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => insertLinePrefix('---\n')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Línea divisoria (---)">
+              <button onClick={() => applyRichCommand('insertHorizontalRule')} className="p-1.5 rounded hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors" title="Línea divisoria">
                 <Minus className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -844,13 +854,14 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                 placeholder="Título de la nota..."
                 className="text-2xl font-bold text-stone-900 dark:text-stone-100 bg-transparent focus:outline-none mb-4 placeholder:text-stone-300 dark:placeholder:text-stone-600"
               />
-              <textarea
-                ref={textareaRef}
-                value={activeNoteContent}
-                onChange={(e) => handleContentChange(e.target.value)}
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleEditorInput}
                 onBlur={handleBlurSave}
-                placeholder="Comienza a escribir tu nota aquí..."
-                className="flex-grow w-full bg-transparent focus:outline-none resize-none text-sm text-stone-800 dark:text-stone-200 leading-relaxed custom-scrollbar placeholder:text-stone-400 min-h-[300px]"
+                data-placeholder="Comienza a escribir tu nota aquí..."
+                className="note-editor-content flex-grow w-full bg-transparent focus:outline-none text-sm text-stone-800 dark:text-stone-200 leading-relaxed custom-scrollbar min-h-[300px] outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-stone-400 dark:empty:before:text-stone-600 empty:before:pointer-events-none"
               />
             </div>
           </>

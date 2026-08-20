@@ -49,6 +49,7 @@ import ProjectEditorPanel from './components/ProjectEditorPanel';
 import HabitTracker from './components/HabitTracker';
 import HabitEditorPanel from './components/HabitEditorPanel';
 import ProgressView from './components/ProgressView';
+import { ProjectsWorkspace } from './components/ProjectsWorkspace';
 import ChevronLeftIcon from './components/icons/ChevronLeftIcon';
 import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
@@ -431,6 +432,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   };
   
   // Memoized values derived from props
+  const flatAllTodos = useMemo(() => {
+    const list: Todo[] = [];
+    Object.keys(allTodos).forEach(key => {
+      if (Array.isArray(allTodos[key])) {
+        list.push(...allTodos[key]);
+      }
+    });
+    return list;
+  }, [allTodos]);
   const datesWithTasks = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0)), [allTodos]);
   const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
   const todayKey = formatDateKey(new Date());
@@ -864,6 +874,42 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                   <Browser session={browserSession} setSession={setBrowserSession} currentUser={currentUser} />
               </ModalWindow>
           )}
+          {openWindows.includes('projects') && (
+              <ModalWindow isOpen onClose={() => toggleWindow('projects')} title="Espacio de Proyectos" isDraggable isResizable zIndex={focusedWindow === 'projects' ? 50 : 40} onFocus={() => bringToFront('projects')} className="w-full max-w-6xl h-[88vh]" windowState={windowStates.projects} onStateChange={s => setWindowStates(ws => ({...ws, projects: s}))} allowFullscreen>
+                  <ProjectsWorkspace
+                      projects={projects}
+                      allTodos={flatAllTodos}
+                      activeProjectId={viewingProjectId}
+                      onSelectProject={(id) => setViewingProjectId(id)}
+                      onAddProject={async (name, emoji, color) => {
+                          const p = await handleAddProject(name, emoji, color);
+                          return p || null;
+                      }}
+                      onUpdateProject={async (id, updates) => {
+                          if (updates.name !== undefined || updates.emoji !== undefined || updates.color !== undefined) {
+                              const existing = projects.find(p => p.id === id);
+                              await handleUpdateProject(
+                                  id,
+                                  updates.name !== undefined ? updates.name : (existing?.name || ''),
+                                  updates.emoji !== undefined ? updates.emoji : (existing?.emoji || null),
+                                  updates.color !== undefined ? updates.color : (existing?.color || null)
+                              );
+                          }
+                      }}
+                      onDeleteProject={handleDeleteProject}
+                      onArchiveProject={async (id, isArchived) => {
+                          await handleArchiveProject(id, isArchived);
+                      }}
+                      addTodo={async (text, options) => {
+                          await handleAddTodo(text, options);
+                      }}
+                      updateTodo={handleUpdateTodo}
+                      deleteTodo={handleDeleteTodo}
+                      onEditTodo={setTaskToEdit}
+                      onOpenProjectEditor={handleOpenProjectEditor}
+                  />
+              </ModalWindow>
+          )}
         </main>
       
       <div className={`transition-opacity duration-500 ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -968,6 +1014,16 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         setIsProjectEditorOpen(false);
         setProjectToEdit(null);
     };
+
+    const flatAllTodos = useMemo(() => {
+        const list: Todo[] = [];
+        Object.keys(allTodos).forEach(key => {
+            if (Array.isArray(allTodos[key])) {
+                list.push(...allTodos[key]);
+            }
+        });
+        return list;
+    }, [allTodos]);
 
     const datesWithTasks = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0)), [allTodos]);
     const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
@@ -1174,6 +1230,43 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                          <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
                             <PlusIcon />
                         </button>
+                    </div>
+                );
+            case 'projects':
+                return (
+                    <div className="h-full">
+                        <ProjectsWorkspace
+                            projects={projects}
+                            allTodos={flatAllTodos}
+                            activeProjectId={viewingProjectId}
+                            onSelectProject={(id) => setViewingProjectId(id)}
+                            onAddProject={async (name, emoji, color) => {
+                                const p = await handleAddProject(name, emoji, color);
+                                return p || null;
+                            }}
+                            onUpdateProject={async (id, updates) => {
+                                if (updates.name !== undefined || updates.emoji !== undefined || updates.color !== undefined) {
+                                    const existing = projects.find(p => p.id === id);
+                                    await handleUpdateProject(
+                                        id,
+                                        updates.name !== undefined ? updates.name : (existing?.name || ''),
+                                        updates.emoji !== undefined ? updates.emoji : (existing?.emoji || null),
+                                        updates.color !== undefined ? updates.color : (existing?.color || null)
+                                    );
+                                }
+                            }}
+                            onDeleteProject={handleDeleteProject}
+                            onArchiveProject={async (id, isArchived) => {
+                                await handleArchiveProject(id, isArchived);
+                            }}
+                            addTodo={async (text, options) => {
+                                await handleAddTodo(text, options);
+                            }}
+                            updateTodo={handleUpdateTodo}
+                            deleteTodo={handleDeleteTodo}
+                            onEditTodo={setTaskToEdit}
+                            onOpenProjectEditor={handleOpenProjectEditor}
+                        />
                     </div>
                 );
             case 'calendar':
