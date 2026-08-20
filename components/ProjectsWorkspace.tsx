@@ -114,27 +114,76 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const renderProjectHeader = () => {
         if (!activeProject) return null;
+        
+        const getStatusBadge = () => {
+            switch (activeProject.status) {
+                case 'completed':
+                    return { label: 'Completado', style: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60' };
+                case 'on_hold':
+                    return { label: 'En Pausa', style: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60' };
+                case 'planning':
+                    return { label: 'Planificación', style: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800/60' };
+                case 'archived':
+                    return { label: 'Archivado', style: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700' };
+                case 'active':
+                default:
+                    return { label: 'Activo', style: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60' };
+            }
+        };
+
+        const statusBadge = getStatusBadge();
+
         return (
-            <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black px-6 py-4 flex flex-col gap-4 shrink-0">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            {activeProject.emoji && <span className="text-2xl">{activeProject.emoji}</span>}
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{activeProject.name}</h1>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded border ${
-                                activeProject.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
-                                activeProject.status === 'on_hold' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800' :
-                                'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
-                            }`}>
-                                {activeProject.status === 'completed' ? 'Completado' : activeProject.status === 'on_hold' ? 'En Pausa' : 'Activo'}
+            <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black px-6 py-4 flex flex-col gap-3 shrink-0">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2.5 mb-1.5">
+                            {activeProject.emoji && <span className="text-2xl select-none">{activeProject.emoji}</span>}
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white truncate">{activeProject.name}</h1>
+                            
+                            {/* Status badge */}
+                            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${statusBadge.style}`}>
+                                {statusBadge.label}
                             </span>
+
+                            {/* Priority badge */}
+                            {activeProject.priority && (
+                                <span className={`px-2 py-0.5 text-xs font-medium rounded border ${
+                                    activeProject.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60' :
+                                    activeProject.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-800/60' :
+                                    'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60'
+                                }`}>
+                                    Prioridad {activeProject.priority === 'high' ? 'Alta' : activeProject.priority === 'low' ? 'Baja' : 'Media'}
+                                </span>
+                            )}
+
+                            {/* Target date badge */}
+                            {activeProject.target_date && (
+                                <span className="text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800/80 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700/60 flex items-center gap-1 font-medium">
+                                    <CalendarIcon className="w-3 h-3 text-gray-400" />
+                                    Límite: {format(parseISO(activeProject.target_date), 'd MMM yyyy', { locale: es })}
+                                </span>
+                            )}
+
+                            {/* Lead badge */}
+                            {activeProject.lead && (
+                                <span className="text-xs text-gray-600 dark:text-gray-300 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 px-2 py-0.5 rounded font-medium">
+                                    Resp: {activeProject.lead}
+                                </span>
+                            )}
                         </div>
+
                         {activeProject.description && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-3xl">{activeProject.description}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-3xl line-clamp-2 mt-0.5 leading-relaxed">{activeProject.description}</p>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} className="px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors flex items-center gap-2 font-medium">
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button 
+                            onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} 
+                            className="px-3.5 py-1.5 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm hover:border-gray-300 dark:hover:border-gray-600"
+                            title="Editar propiedades, fechas, estado y prioridad del proyecto"
+                        >
                             <Settings className="w-4 h-4" /> Configuración
                         </button>
                     </div>
@@ -155,7 +204,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             onClick={() => setActiveTab(tab.id as any)}
                             className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                                 activeTab === tab.id 
-                                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white' 
+                                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-semibold' 
                                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
                             }`}
                         >
@@ -177,30 +226,54 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         return (
             <div className="p-6 max-w-5xl mx-auto space-y-6 w-full pb-20">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Progreso</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col shadow-sm">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Progreso General</span>
                         <div className="flex items-end gap-2 mb-2">
                             <span className="text-3xl font-bold text-gray-900 dark:text-white">{progress}%</span>
                         </div>
-                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 mt-auto">
-                            <div className="bg-primary h-1.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 mt-auto overflow-hidden">
+                            <div className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
                         </div>
                     </div>
-                    <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Tareas</span>
-                        <span className="text-3xl font-bold text-gray-900 dark:text-white">{completedTasks} <span className="text-lg text-gray-400">/ {totalTasks}</span></span>
+
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col shadow-sm">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Tareas Completadas</span>
+                        <span className="text-3xl font-bold text-gray-900 dark:text-white">{completedTasks} <span className="text-base font-normal text-gray-400">/ {totalTasks}</span></span>
+                        <span className="text-xs text-gray-400 mt-auto pt-1">{totalTasks - completedTasks} tareas pendientes</span>
                     </div>
-                    <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Fecha Límite</span>
-                        <span className="text-lg font-medium text-gray-900 dark:text-white mt-auto">
-                            {activeProject.target_date ? format(parseISO(activeProject.target_date), 'd MMM, yyyy', { locale: es }) : 'No definida'}
+
+                    <div 
+                        onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)}
+                        className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col shadow-sm cursor-pointer hover:border-gray-400 dark:hover:border-gray-600 transition-all group"
+                        title="Haz clic para cambiar la fecha límite o fecha de inicio"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha Límite</span>
+                            <Edit2 className="w-3 h-3 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                        </div>
+                        <span className="text-lg font-bold text-gray-900 dark:text-white mt-auto">
+                            {activeProject.target_date ? format(parseISO(activeProject.target_date), 'd MMM, yyyy', { locale: es }) : 'Sin fecha límite'}
+                        </span>
+                        <span className="text-xs text-blue-600 dark:text-blue-400 group-hover:underline mt-1 font-medium">
+                            {activeProject.start_date ? `Desde ${format(parseISO(activeProject.start_date), 'd MMM', { locale: es })}` : 'Configurar fechas →'}
                         </span>
                     </div>
-                    <div className="bg-white dark:bg-[#111] p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex flex-col">
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Prioridad</span>
-                        <span className="text-lg font-medium text-gray-900 dark:text-white capitalize mt-auto">
+
+                    <div 
+                        onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)}
+                        className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col shadow-sm cursor-pointer hover:border-gray-400 dark:hover:border-gray-600 transition-all group"
+                        title="Haz clic para cambiar prioridad o estado"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Prioridad / Estado</span>
+                            <Edit2 className="w-3 h-3 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                        </div>
+                        <span className="text-lg font-bold text-gray-900 dark:text-white capitalize mt-auto">
                             {activeProject.priority === 'high' ? 'Alta' : activeProject.priority === 'low' ? 'Baja' : 'Media'}
+                        </span>
+                        <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 mt-1 capitalize">
+                            Estado: {activeProject.status || 'Activo'}
                         </span>
                     </div>
                 </div>

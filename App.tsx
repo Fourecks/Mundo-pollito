@@ -45,7 +45,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import QuickCaptureSetupModal from './components/QuickCaptureSetupModal';
 import MotivationalToast from './components/MotivationalToast';
 import NotificationsPanel from './components/NotificationsPanel';
-import ProjectEditorPanel from './components/ProjectEditorPanel';
+import ProjectEditorPanel, { ProjectFormData } from './components/ProjectEditorPanel';
 import HabitTracker from './components/HabitTracker';
 import HabitEditorPanel from './components/HabitEditorPanel';
 import ProgressView from './components/ProgressView';
@@ -297,7 +297,7 @@ interface AppComponentProps {
   handleAddNote: (folderId: number) => Promise<Note | null>;
   handleUpdateNote: (note: Note) => Promise<void>;
   handleDeleteNote: (noteId: number, folderId: number) => Promise<void>;
-  handleAddProject: (name: string, emoji: string | null, color: string | null) => Promise<Project | null>;
+  handleAddProject: (name: string, emoji: string | null, color: string | null, extraData?: Partial<Project>) => Promise<Project | null>;
   handleUpdateProject: (projectId: number, updates: Partial<Project>) => Promise<void>;
   handleDeleteProject: (projectId: number) => Promise<void>;
   handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
@@ -403,11 +403,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     setIsProjectEditorOpen(true);
   };
 
-  const handleSaveProject = async (name: string, emoji: string | null, color: string | null) => {
+  const handleSaveProject = async (data: ProjectFormData) => {
     if (projectToEdit) {
-      await handleUpdateProject(projectToEdit.id, { name, emoji, color });
+      await handleUpdateProject(projectToEdit.id, data);
     } else {
-      await handleAddProject(name, emoji, color);
+      await handleAddProject(data.name, data.emoji, data.color, data);
     }
     setIsProjectEditorOpen(false);
     setProjectToEdit(null);
@@ -1018,11 +1018,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         }
     };
 
-    const handleSaveProject = async (name: string, emoji: string | null, color: string | null) => {
+    const handleSaveProject = async (data: ProjectFormData) => {
         if (projectToEdit) {
-            await handleUpdateProject(projectToEdit.id, { name, emoji, color });
+            await handleUpdateProject(projectToEdit.id, data);
         } else {
-            await handleAddProject(name, emoji, color);
+            await handleAddProject(data.name, data.emoji, data.color, data);
         }
         setIsProjectEditorOpen(false);
         setProjectToEdit(null);
@@ -3002,10 +3002,29 @@ const App: React.FC = () => {
     await syncableDelete('notes', noteId);
   };
   
-  const handleAddProject = useCallback(async (name: string, emoji: string | null, color: string | null): Promise<Project | null> => {
+  const handleAddProject = useCallback(async (
+      name: string, 
+      emoji: string | null, 
+      color: string | null, 
+      extraData?: Partial<Project>
+  ): Promise<Project | null> => {
       if (!user) return null;
       const tempId = -Date.now();
-      const newProject: Project = { id: tempId, name, user_id: user.id, created_at: new Date().toISOString(), emoji, color };
+      const newProject: Project = { 
+        id: tempId, 
+        name, 
+        user_id: user.id, 
+        created_at: new Date().toISOString(), 
+        emoji, 
+        color,
+        status: extraData?.status || 'active',
+        priority: extraData?.priority || 'medium',
+        description: extraData?.description || null,
+        start_date: extraData?.start_date || null,
+        target_date: extraData?.target_date || null,
+        lead: extraData?.lead || null,
+        ...extraData
+      };
       
       setProjects(p => [...p, newProject]);
       

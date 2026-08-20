@@ -281,7 +281,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                         {menuOpenFor === project.id && (
                                             <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl z-20 animate-pop-in origin-top-right p-1" onClick={e => e.stopPropagation()}>
                                                 <button onClick={(e) => { e.stopPropagation(); if(onOpenProjectEditor) onOpenProjectEditor(project); setMenuOpenFor(null); }} className="w-full text-left px-3 py-1.5 text-sm rounded-md text-gray-700 dark:text-gray-200 hover:bg-secondary-lighter dark:hover:bg-gray-700 font-medium">
-                                                    Renombrar
+                                                    Editar Configuración
                                                 </button>
                                                 {showArchived ? (
                                                     <>
