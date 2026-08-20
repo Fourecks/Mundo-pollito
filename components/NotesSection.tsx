@@ -7,7 +7,6 @@ import {
   FilePlus, 
   Trash2, 
   Edit3, 
-  Sparkles, 
   ChevronLeft, 
   MoreVertical, 
   Bold, 
@@ -33,7 +32,6 @@ import {
   Search,
   X
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import ConfirmationModal from './ConfirmationModal';
 
 interface NotesSectionProps {
@@ -60,7 +58,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // Active Note State
@@ -192,32 +189,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       textarea.focus();
       textarea.setSelectionRange(start + prefix.length, start + prefix.length);
     }, 10);
-  };
-
-  // Magic Note with Gemini
-  const handleMagicNote = async () => {
-    if (!activeNoteContent || isAiLoading) return;
-    setIsAiLoading(true);
-    try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Analiza las siguientes notas y genera un resumen claro con 3 puntos clave accionables:\n\n"${activeNoteContent}"`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-      const resultText = response.text || '';
-
-      const updated = `${activeNoteContent}\n\n---\n✨ **Resumen Inteligente:**\n${resultText}`;
-      handleContentChange(updated);
-    } catch (error) {
-      console.error("Gemini AI Error in Notes:", error);
-      const updated = `${activeNoteContent}\n\n✨ No se pudo generar el resumen inteligente.`;
-      handleContentChange(updated);
-    } finally {
-      setIsAiLoading(false);
-    }
   };
 
   // Copy note content
@@ -489,14 +460,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
             </button>
             <div className="flex items-center gap-1">
               <button
-                onClick={handleMagicNote}
-                disabled={isAiLoading || !activeNoteContent}
-                className="p-1.5 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded-lg disabled:opacity-40"
-                title="Resumen Mágico"
-              >
-                <Sparkles className={`w-4 h-4 ${isAiLoading ? 'animate-spin' : ''}`} />
-              </button>
-              <button
                 onClick={handleCopyNote}
                 className="p-1.5 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg"
                 title="Copiar"
@@ -751,14 +714,28 @@ const NotesSection: React.FC<NotesSectionProps> = ({
             <div className="p-2.5 px-4 border-b border-stone-200/70 dark:border-stone-800 flex items-center justify-between gap-2 bg-stone-50/40 dark:bg-stone-900/60">
               <div className="flex items-center gap-2">
                 {(!showFolders || !showNotesList) && (
-                  <button
-                    onClick={() => { setShowFolders(true); setShowNotesList(true); }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200 dark:border-sky-800 transition-colors"
-                    title="Mostrar paneles laterales"
-                  >
-                    <PanelLeftOpen className="w-3.5 h-3.5" />
-                    <span>Mostrar paneles</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {!showFolders && (
+                      <button
+                        onClick={() => setShowFolders(true)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200 dark:border-sky-800 transition-colors"
+                        title="Ver carpetas"
+                      >
+                        <FolderIconLucide className="w-3.5 h-3.5" />
+                        <span>Carpetas</span>
+                      </button>
+                    )}
+                    {!showNotesList && (
+                      <button
+                        onClick={() => setShowNotesList(true)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200 dark:border-sky-800 transition-colors"
+                        title="Ver lista de notas"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Notas</span>
+                      </button>
+                    )}
+                  </div>
                 )}
                 <div className="text-[11px] font-medium text-stone-400 dark:text-stone-500">
                   {selectedFolder?.name} / <span className="text-stone-600 dark:text-stone-300 font-semibold">{activeNoteTitle || 'Sin título'}</span>
@@ -769,16 +746,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                 <span className="text-[10px] text-stone-400 dark:text-stone-500 hidden sm:inline mr-2">
                   {wordCount} palabras · {charCount} car.
                 </span>
-
-                <button
-                  onClick={handleMagicNote}
-                  disabled={isAiLoading || !activeNoteContent}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-300/40 dark:border-amber-700/40 disabled:opacity-40 transition-colors"
-                  title="Resumen inteligente con IA"
-                >
-                  <Sparkles className={`w-3.5 h-3.5 ${isAiLoading ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">IA Resumen</span>
-                </button>
 
                 <button
                   onClick={handleCopyNote}
@@ -904,6 +871,29 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                 <FilePlus className="w-4 h-4" />
                 Crear nota
               </button>
+            )}
+
+            {(!showFolders || !showNotesList) && (
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-3 border-t border-stone-200/60 dark:border-stone-800/60">
+                {!showFolders && (
+                  <button
+                    onClick={() => setShowFolders(true)}
+                    className="px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-semibold text-xs transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    <FolderIconLucide className="w-4 h-4 text-sky-500" />
+                    Ver Carpetas
+                  </button>
+                )}
+                {!showNotesList && (
+                  <button
+                    onClick={() => setShowNotesList(true)}
+                    className="px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-semibold text-xs transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    <FileText className="w-4 h-4 text-sky-500" />
+                    Ver Notas
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

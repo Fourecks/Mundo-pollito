@@ -150,10 +150,12 @@ const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
 
                     <button
                       onClick={triggerFileUpload}
-                      className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+                      disabled={userBackgrounds.length >= 3}
+                      title={userBackgrounds.length >= 3 ? 'Límite alcanzado (máximo 3 fondos)' : 'Subir fondo'}
+                      className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <UploadIcon />
-                      <span>Subir</span>
+                      <span>{userBackgrounds.length >= 3 ? 'Límite 3/3' : 'Subir'}</span>
                     </button>
                   </div>
 

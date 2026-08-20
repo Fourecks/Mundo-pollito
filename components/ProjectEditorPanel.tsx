@@ -6,13 +6,10 @@ import {
   X,
   Check,
   Smile,
-  Sparkles,
   Ban,
   Search,
   Palette,
-  Tag,
   CheckCircle2,
-  Zap,
 } from 'lucide-react';
 import { Project } from '../types';
 
@@ -185,15 +182,6 @@ const EMOJI_CATEGORIES: EmojiCategory[] = [
   },
 ];
 
-const QUICK_PROJECT_SUGGESTIONS = [
-  { name: 'Trabajo & Clientes', emoji: '💼', color: '#3b82f6' },
-  { name: 'Estudio & Cursos', emoji: '📚', color: '#8b5cf6' },
-  { name: 'Metas Personales', emoji: '🎯', color: '#10b981' },
-  { name: 'Hogar & Finanzas', emoji: '🏠', color: '#f59e0b' },
-  { name: 'Desarrollo Web', emoji: '💻', color: '#06b6d4' },
-  { name: 'Salud & Gym', emoji: '🏋️', color: '#ef4444' },
-];
-
 const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
   isOpen,
   onClose,
@@ -240,12 +228,6 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
     if (name.trim()) {
       onSave(name.trim(), emoji, color);
     }
-  };
-
-  const applyQuickSuggestion = (sug: typeof QUICK_PROJECT_SUGGESTIONS[0]) => {
-    setName(sug.name);
-    setEmoji(sug.emoji);
-    setColor(sug.color);
   };
 
   // Filter emojis based on search or category
@@ -405,29 +387,6 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
               }}
               autoFocus
             />
-
-            {/* Quick Suggestions Chips (only when empty or typing new project) */}
-            {!projectToEdit && (
-              <div className="mt-2.5">
-                <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500 block mb-1.5 flex items-center gap-1">
-                  <Zap size={12} className="text-amber-500" />
-                  Sugerencias rápidas:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_PROJECT_SUGGESTIONS.map((sug) => (
-                    <button
-                      key={sug.name}
-                      type="button"
-                      onClick={() => applyQuickSuggestion(sug)}
-                      className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700/80 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                    >
-                      <span>{sug.emoji}</span>
-                      <span>{sug.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Emoji Selector Section */}

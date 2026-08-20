@@ -3630,8 +3630,8 @@ const App: React.FC = () => {
 
   const handleAddBackground = async (file: File) => {
     if (!user) return;
-    if (userBackgrounds.length >= 10) {
-      alert("Has alcanzado el límite de 10 fondos. Por favor, elimina uno para subir otro nuevo.");
+    if (userBackgrounds.length >= 3) {
+      alert("Has alcanzado el límite de 3 fondos propios. Por favor, elimina uno para subir otro nuevo.");
       return;
     }
     if (file.size > 15 * 1024 * 1024) { // 15MB limit

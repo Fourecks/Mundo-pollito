@@ -173,10 +173,11 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               {bgSubTab === 'custom' && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={backgroundsLoading || userBackgrounds.length >= 10}
+                  disabled={backgroundsLoading || userBackgrounds.length >= 3}
+                  title={userBackgrounds.length >= 3 ? 'Límite alcanzado (máximo 3 fondos)' : 'Subir nuevo fondo'}
                   className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[13px] flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
                 >
-                  <Upload size={14} /> Subir Fondo
+                  <Upload size={14} /> {userBackgrounds.length >= 3 ? 'Límite 3/3' : 'Subir Fondo'}
                 </button>
               )}
               <input type="file" ref={fileInputRef} onChange={(e) => { if (e.target.files?.[0]) { onAddBackground(e.target.files[0]); e.target.value = ''; } }} accept="image/*,video/mp4,video/webm" className="hidden" />
