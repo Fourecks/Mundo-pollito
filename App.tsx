@@ -2344,6 +2344,7 @@ const App: React.FC = () => {
   // --- Data Handlers (Now with Offline Support & Auto Calendar Sync) ---
   const handleAddTodo = useCallback(async (text: string, options?: {
     projectId?: number | null;
+    project_id?: number | null;
     isUndated?: boolean;
     dueDate?: string | null;
     startTime?: string;
@@ -2352,10 +2353,13 @@ const App: React.FC = () => {
     notes?: string;
     syncToGoogle?: boolean;
     syncToOutlook?: boolean;
+    sprint_id?: string | null;
+    milestone_id?: string | null;
+    story_points?: number | null;
   }) => {
     if (!user) return;
 
-    const projectId = options?.projectId || null;
+    const projectId = options?.projectId || options?.project_id || null;
     const isUndated = options?.isUndated || false;
 
     const targetDueDate = options?.dueDate !== undefined ? options.dueDate : (isUndated ? null : formatDateKey(selectedDate));
@@ -2375,6 +2379,9 @@ const App: React.FC = () => {
         created_at: new Date().toISOString(), 
         subtasks: [],
         project_id: projectId,
+        sprint_id: options?.sprint_id,
+        milestone_id: options?.milestone_id,
+        story_points: options?.story_points,
     };
     
     // Optimistic UI update
