@@ -419,8 +419,40 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   useEffect(() => {
     const storedWindows = localStorage.getItem(getUserKey('windowStates'));
     const storedOpenWindows = localStorage.getItem(getUserKey('openWindows'));
-    if (storedWindows) setWindowStates(JSON.parse(storedWindows));
-    if (storedOpenWindows) setOpenWindows(JSON.parse(storedOpenWindows));
+    if (storedWindows) {
+      try {
+        const parsed = JSON.parse(storedWindows);
+        if (parsed && typeof parsed === 'object') {
+          const cleaned: { [key in WindowType]?: WindowState } = {};
+          (Object.keys(parsed) as WindowType[]).forEach((k) => {
+            const item = parsed[k];
+            if (
+              item &&
+              item.size &&
+              typeof item.size.width === 'number' &&
+              typeof item.size.height === 'number' &&
+              item.size.width >= 200 &&
+              item.size.height >= 120 &&
+              item.pos &&
+              typeof item.pos.x === 'number' &&
+              typeof item.pos.y === 'number'
+            ) {
+              cleaned[k] = item;
+            }
+          });
+          setWindowStates(cleaned);
+        }
+      } catch (e) {
+        console.error('Error parsing stored window states:', e);
+      }
+    }
+    if (storedOpenWindows) {
+      try {
+        setOpenWindows(JSON.parse(storedOpenWindows));
+      } catch (e) {
+        console.error('Error parsing stored open windows:', e);
+      }
+    }
   }, [getUserKey]);
 
   useEffect(() => { localStorage.setItem(getUserKey('windowStates'), JSON.stringify(windowStates)); }, [windowStates, getUserKey]);
