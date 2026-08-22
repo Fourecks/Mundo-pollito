@@ -150,8 +150,8 @@
       }
 
       @keyframes slide-in-from-bottom {
-        from { transform: translateY(100%) !important; }
-        to { transform: translateY(0) !important; }
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
       }
       .animate-slide-up {
         animation: slide-in-from-bottom 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
@@ -260,55 +260,6 @@
       html.dark .note-editor-content pre { background-color: rgba(255, 255, 255, 0.08); }
       .note-editor-content hr { border: none; border-top: 1px solid #cbd5e1; margin: 1rem 0; }
       html.dark .note-editor-content hr { border-top-color: #475569; }
-      /* Fullscreen auto-hide logic for Dock and Sidebars */
-      
-      body[data-fullscreen-window="true"] .app-dock-container,
-      body.focus-mode-active .app-dock-container {
-          transform: translateY(100%) !important;
-          z-index: 70000 !important;
-      }
-      body[data-fullscreen-window="true"] .app-left-sidebar-container,
-      body.focus-mode-active .app-left-sidebar-container {
-          transform: translateX(-120%) !important;
-          z-index: 70000 !important;
-      }
-      body[data-fullscreen-window="true"] .app-right-header-container,
-      body.focus-mode-active .app-right-header-container {
-          transform: translateX(120%) !important;
-          z-index: 70000 !important;
-      }
-
-      
-      body[data-fullscreen-window="true"] .app-dock-trigger-area:hover ~ .app-dock-container,
-      body[data-fullscreen-window="true"] .app-dock-container:hover,
-      body.focus-mode-active .app-dock-trigger-area:hover ~ .app-dock-container,
-      body.focus-mode-active .app-dock-container:hover {
-          transform: translateY(0) !important;
-          opacity: 1 !important;
-          pointer-events: auto !important;
-      }
-      body[data-fullscreen-window="true"] .app-left-sidebar-trigger-area:hover ~ .app-left-sidebar-container,
-      body[data-fullscreen-window="true"] .app-left-sidebar-container:hover,
-      body.focus-mode-active .app-left-sidebar-trigger-area:hover ~ .app-left-sidebar-container,
-      body.focus-mode-active .app-left-sidebar-container:hover {
-          transform: translateX(0) !important;
-          opacity: 1 !important;
-          pointer-events: auto !important;
-      }
-      body[data-fullscreen-window="true"] .app-right-header-trigger-area:hover ~ .app-right-header-container,
-      body[data-fullscreen-window="true"] .app-right-header-container:hover,
-      body.focus-mode-active .app-right-header-trigger-area:hover ~ .app-right-header-container,
-      body.focus-mode-active .app-right-header-container:hover {
-          transform: translateX(0) !important;
-          opacity: 1 !important;
-          pointer-events: auto !important;
-      }
-
-      
-      
-      
-      
-
     </style>
   <script type="importmap">
 {

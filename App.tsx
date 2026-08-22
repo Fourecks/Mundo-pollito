@@ -399,6 +399,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionQuote, setCompletionQuote] = useState('');
   const [isFocusMode, setIsFocusMode] = useState(false);
+
+  useEffect(() => {
+    if (isFocusMode) {
+      document.body.classList.add('focus-mode-active');
+    } else {
+      document.body.classList.remove('focus-mode-active');
+    }
+  }, [isFocusMode]);
+
   const [openWindows, setOpenWindows] = useState<WindowType[]>([]);
   const windowStatesRef = useRef<{ [key in WindowType]?: WindowState }>({});
   const focusedWindowRef = useRef<WindowType | null>(null);

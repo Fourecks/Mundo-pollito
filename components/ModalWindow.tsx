@@ -435,7 +435,19 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
         `}
       >
         {frameless ? (
-          children
+          <>
+            {isDraggable && (
+              <div 
+                className="absolute top-0 left-0 right-8 h-8 cursor-move z-[9999] touch-none flex items-start justify-center pt-1"
+                onMouseDown={(e) => startInteraction(e, 'drag')}
+                onTouchStart={(e) => startInteraction(e, 'drag')}
+                title="Arrastrar ventana"
+              >
+                <div className="w-12 h-1.5 bg-white/30 rounded-full backdrop-blur-sm pointer-events-none" />
+              </div>
+            )}
+            {children}
+          </>
         ) : (
           <>
             {!noHeader && (

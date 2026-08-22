@@ -543,11 +543,10 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
                         </span>
                     </div>
                     {dailyGoal && !isEditingGoal && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
                             {isGoalCompleted && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-300/60 dark:border-emerald-700/60">
-                                    <Sparkles className="w-2.5 h-2.5" />
-                                    ¡Logrado!
+                                <span className="text-[10px] font-medium text-gray-400 mr-2">
+                                    Completado
                                 </span>
                             )}
                             <button 
@@ -556,7 +555,7 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
                                 onClick={handleStartEdit}
                                 title="Editar meta principal"
                                 aria-label="Editar meta principal"
-                                className="p-1 text-gray-500 hover:text-amber-600 dark:text-gray-400 dark:hover:text-amber-400 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                                className="p-1 text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded transition-colors"
                             >
                                 <Pencil className="w-3 h-3" />
                             </button>
@@ -566,7 +565,7 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
                                 onClick={handleClearGoal}
                                 title="Eliminar o cambiar meta principal"
                                 aria-label="Eliminar meta principal"
-                                className="p-1 text-gray-500 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                                className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
                             >
                                 <Trash2 className="w-3 h-3" />
                             </button>
@@ -576,23 +575,23 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
 
                 {/* Body: Text Input or Prominent Display */}
                 {isEditingGoal || !dailyGoal ? (
-                    <form onSubmit={handleSaveGoal} className="mt-2">
+                    <form onSubmit={handleSaveGoal} className="mt-1">
                         <div className="flex items-center gap-1.5">
                             <input 
                                 id="main-daily-goal-input"
                                 type="text" 
                                 value={goalInput} 
                                 onChange={(e) => setGoalInput(e.target.value)} 
-                                placeholder="🎯 ¿Cuál es tu meta principal hoy?"
+                                placeholder="Escribe tu objetivo para hoy..."
                                 autoFocus={isEditingGoal && !!dailyGoal}
-                                className="flex-grow min-w-0 bg-white/90 dark:bg-gray-700/90 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 border border-amber-300/80 dark:border-amber-600/60 rounded-lg py-1.5 px-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 dark:focus:ring-amber-400 transition-all text-xs font-medium"
+                                className="flex-grow min-w-0 bg-transparent text-gray-800 dark:text-gray-100 placeholder-gray-400 border-b border-gray-200 dark:border-gray-700 py-1 px-1 focus:outline-none focus:border-gray-800 dark:focus:border-gray-300 transition-colors text-sm font-medium"
                             />
                             <button 
                                 id="save-daily-goal-button"
                                 type="submit" 
                                 disabled={!goalInput.trim()}
                                 aria-label="Guardar meta principal"
-                                className="bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white p-2 rounded-lg transition-all flex-shrink-0 disabled:opacity-40 shadow-xs flex items-center justify-center cursor-pointer"
+                                className="bg-gray-800 hover:bg-black dark:bg-gray-200 dark:hover:bg-white text-white dark:text-black p-1.5 rounded transition-all disabled:opacity-30 cursor-pointer flex-shrink-0"
                             >
                                 <Check className="w-3.5 h-3.5" />
                             </button>
@@ -602,7 +601,7 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
                                     type="button"
                                     onClick={handleCancelEdit}
                                     aria-label="Cancelar edición"
-                                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-all flex-shrink-0 cursor-pointer"
+                                    className="text-gray-400 hover:text-gray-600 p-1.5 rounded transition-all flex-shrink-0 cursor-pointer"
                                 >
                                     <X className="w-3.5 h-3.5" />
                                 </button>
@@ -612,22 +611,22 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
                 ) : (
                     <div 
                         id="main-daily-goal-display"
-                        className="mt-2 flex items-start gap-2 cursor-pointer group"
+                        className="mt-1 flex items-start gap-2.5 cursor-pointer group py-1"
                         onClick={handleToggleCompleted}
                     >
                         <div className="flex-shrink-0 mt-0.5">
-                            <div className={`w-4 h-4 rounded-md border-2 transition-all flex items-center justify-center ${
+                            <div className={`w-3.5 h-3.5 rounded border transition-all flex items-center justify-center ${
                                 isGoalCompleted 
-                                  ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                  : 'bg-white dark:bg-gray-700 border-amber-400 dark:border-amber-500 group-hover:border-emerald-500'
+                                  ? 'bg-gray-800 border-gray-800 dark:bg-gray-200 dark:border-gray-200 text-white dark:text-black' 
+                                  : 'bg-transparent border-gray-300 dark:border-gray-600 group-hover:border-gray-500'
                             }`}>
-                                {isGoalCompleted && <Check className="w-3 h-3 stroke-[3]" />}
+                                {isGoalCompleted && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                             </div>
                         </div>
-                        <p className={`text-xs font-semibold break-words leading-relaxed flex-grow select-none transition-all ${
+                        <p className={`text-sm font-medium break-words leading-tight flex-grow select-none transition-all ${
                             isGoalCompleted 
-                              ? 'line-through text-emerald-800 dark:text-emerald-300' 
-                              : 'text-gray-800 dark:text-gray-100 group-hover:text-amber-700 dark:group-hover:text-amber-300'
+                              ? 'line-through text-gray-400' 
+                              : 'text-gray-800 dark:text-gray-100 group-hover:text-black dark:group-hover:text-white'
                         }`}>
                             {dailyGoal}
                         </p>
