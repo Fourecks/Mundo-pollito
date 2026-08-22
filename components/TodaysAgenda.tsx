@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Todo, Subtask, QuickNote, GoogleCalendarEvent, FocusSession } from '../types';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import ClockIcon from './icons/ClockIcon';
 import PlusIcon from './icons/PlusIcon';
 import XIcon from './icons/XIcon';
 import CalendarIcon from './icons/CalendarIcon';
+import { Target, Pencil, Check, Trash2, X, Sparkles } from 'lucide-react';
 
 const formatTime = (timeStr: string) => {
     if (!timeStr) return '';
@@ -339,7 +340,7 @@ const NotesView: React.FC<Pick<TodaysAgendaProps, 'quickNotes' | 'onAddQuickNote
     );
 };
 
-interface TodaysAgendaProps {
+export interface TodaysAgendaProps {
   tasks: Todo[];
   calendarEvents: GoogleCalendarEvent[];
   onToggleTask: (taskId: number) => void;
@@ -352,6 +353,9 @@ interface TodaysAgendaProps {
   onSelectFocusTask?: (taskId: number | null) => void;
   focusSessions?: FocusSession[];
   isFocusTimerRunning?: boolean;
+  mainDailyGoal?: { text: string; completed: boolean } | string;
+  onSetMainDailyGoal?: (goal: string) => void;
+  onUpdateMainDailyGoal?: (goal: { text: string; completed: boolean } | null) => void;
 }
 
 const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
@@ -367,20 +371,281 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
         activeFocusTaskId = null,
         onSelectFocusTask,
         focusSessions = [],
-        isFocusTimerRunning = false
+        isFocusTimerRunning = false,
+        mainDailyGoal: propMainGoal,
+        onSetMainDailyGoal: propOnSetMainGoal,
+        onUpdateMainDailyGoal: propOnUpdateMainGoal
     } = props;
     const [activeView, setActiveView] = useState<'agenda' | 'notes'>('agenda');
+
+    // Date-scoped Main Daily Goal state with local persistence and cross-component sync
+    const todayKey = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
+    const storageGoalKey = `pollito_main_daily_goal_${todayKey}`;
+    const storageCompletedKey = `pollito_main_daily_goal_completed_${todayKey}`;
+
+    const [dailyGoal, setDailyGoal] = useState<string>(() => {
+      if (propMainGoal !== undefined) {
+        if (typeof propMainGoal === 'object' && propMainGoal !== null) {
+          return propMainGoal.text || '';
+        }
+        return propMainGoal || '';
+      }
+      try {
+        return localStorage.getItem(storageGoalKey) || '';
+      } catch {
+        return '';
+      }
+    });
+
+    const [isGoalCompleted, setIsGoalCompleted] = useState<boolean>(() => {
+      if (propMainGoal !== undefined && typeof propMainGoal === 'object' && propMainGoal !== null) {
+        return !!propMainGoal.completed;
+      }
+      try {
+        return localStorage.getItem(storageCompletedKey) === 'true';
+      } catch {
+        return false;
+      }
+    });
+
+    const [isEditingGoal, setIsEditingGoal] = useState<boolean>(() => !dailyGoal);
+    const [goalInput, setGoalInput] = useState<string>(dailyGoal);
+
+    // Synchronize with external prop if provided
+    useEffect(() => {
+      if (propMainGoal !== undefined) {
+        const text = typeof propMainGoal === 'object' && propMainGoal !== null ? propMainGoal.text || '' : propMainGoal || '';
+        const completed = typeof propMainGoal === 'object' && propMainGoal !== null ? !!propMainGoal.completed : false;
+        
+        setDailyGoal(text);
+        setGoalInput(text);
+        setIsGoalCompleted(completed);
+        if (text) {
+          setIsEditingGoal(false);
+        }
+      }
+    }, [propMainGoal]);
+
+    // Listen for cross-view updates (e.g. between mobile & desktop views)
+    useEffect(() => {
+      const handleStorageUpdate = () => {
+        try {
+          const savedGoal = localStorage.getItem(storageGoalKey) || '';
+          const savedCompleted = localStorage.getItem(storageCompletedKey) === 'true';
+          setDailyGoal(savedGoal);
+          setIsGoalCompleted(savedCompleted);
+          if (savedGoal && !isEditingGoal) {
+            setGoalInput(savedGoal);
+          }
+        } catch {}
+      };
+
+      window.addEventListener('storage', handleStorageUpdate);
+      window.addEventListener('main-daily-goal-changed', handleStorageUpdate);
+      return () => {
+        window.removeEventListener('storage', handleStorageUpdate);
+        window.removeEventListener('main-daily-goal-changed', handleStorageUpdate);
+      };
+    }, [storageGoalKey, storageCompletedKey, isEditingGoal]);
+
+    const notifyChange = () => {
+      window.dispatchEvent(new Event('main-daily-goal-changed'));
+    };
+
+    const handleSaveGoal = (e: React.FormEvent) => {
+      e.preventDefault();
+      const trimmed = goalInput.trim();
+      if (!trimmed) return;
+
+      setDailyGoal(trimmed);
+      setIsEditingGoal(false);
+      try {
+        localStorage.setItem(storageGoalKey, trimmed);
+      } catch {}
+      
+      if (propOnSetMainGoal) {
+        propOnSetMainGoal(trimmed);
+      }
+      if (propOnUpdateMainGoal) {
+        propOnUpdateMainGoal({ text: trimmed, completed: isGoalCompleted });
+      }
+      notifyChange();
+    };
+
+    const handleToggleCompleted = () => {
+      const nextCompleted = !isGoalCompleted;
+      setIsGoalCompleted(nextCompleted);
+      try {
+        localStorage.setItem(storageCompletedKey, String(nextCompleted));
+      } catch {}
+
+      if (propOnUpdateMainGoal && dailyGoal) {
+        propOnUpdateMainGoal({ text: dailyGoal, completed: nextCompleted });
+      }
+      notifyChange();
+    };
+
+    const handleClearGoal = () => {
+      setDailyGoal('');
+      setGoalInput('');
+      setIsGoalCompleted(false);
+      setIsEditingGoal(true);
+      try {
+        localStorage.removeItem(storageGoalKey);
+        localStorage.removeItem(storageCompletedKey);
+      } catch {}
+      if (propOnSetMainGoal) {
+        propOnSetMainGoal('');
+      }
+      if (propOnUpdateMainGoal) {
+        propOnUpdateMainGoal(null);
+      }
+      notifyChange();
+    };
+
+    const handleStartEdit = () => {
+      setGoalInput(dailyGoal);
+      setIsEditingGoal(true);
+    };
+
+    const handleCancelEdit = () => {
+      setGoalInput(dailyGoal);
+      setIsEditingGoal(false);
+    };
     
     return (
-        <div className="w-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg p-2">
+        <div id="todays-agenda-card" className="w-full bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl shadow-lg p-2.5 transition-all duration-200">
+             {/* Prominently Displayed Main Daily Goal Section */}
+             <div 
+               id="main-daily-goal-container"
+               className={`rounded-xl p-2.5 mb-2.5 border transition-all duration-300 shadow-sm ${
+                 isGoalCompleted
+                   ? 'bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-emerald-950/40 border-emerald-300/70 dark:border-emerald-700/60'
+                   : 'bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 dark:from-amber-950/40 dark:via-rose-950/30 dark:to-amber-950/40 border-amber-300/80 dark:border-amber-700/60'
+               }`}
+             >
+                {/* Header with Badge & Status */}
+                <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                        <span className={`p-1 rounded-md flex items-center justify-center ${
+                          isGoalCompleted 
+                            ? 'bg-emerald-500 text-white dark:bg-emerald-600 shadow-xs' 
+                            : 'bg-amber-500 text-white dark:bg-amber-600 shadow-xs'
+                        }`}>
+                            <Target className="w-3.5 h-3.5" />
+                        </span>
+                        <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                          isGoalCompleted 
+                            ? 'text-emerald-700 dark:text-emerald-300' 
+                            : 'text-amber-800 dark:text-amber-300'
+                        }`}>
+                            Meta Principal del Día
+                        </span>
+                    </div>
+                    {dailyGoal && !isEditingGoal && (
+                        <div className="flex items-center gap-1">
+                            {isGoalCompleted && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-300/60 dark:border-emerald-700/60">
+                                    <Sparkles className="w-2.5 h-2.5" />
+                                    ¡Logrado!
+                                </span>
+                            )}
+                            <button 
+                                id="edit-daily-goal-button"
+                                type="button"
+                                onClick={handleStartEdit}
+                                title="Editar meta principal"
+                                aria-label="Editar meta principal"
+                                className="p-1 text-gray-500 hover:text-amber-600 dark:text-gray-400 dark:hover:text-amber-400 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                            >
+                                <Pencil className="w-3 h-3" />
+                            </button>
+                            <button 
+                                id="delete-daily-goal-button"
+                                type="button"
+                                onClick={handleClearGoal}
+                                title="Eliminar o cambiar meta principal"
+                                aria-label="Eliminar meta principal"
+                                className="p-1 text-gray-500 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Body: Text Input or Prominent Display */}
+                {isEditingGoal || !dailyGoal ? (
+                    <form onSubmit={handleSaveGoal} className="mt-2">
+                        <div className="flex items-center gap-1.5">
+                            <input 
+                                id="main-daily-goal-input"
+                                type="text" 
+                                value={goalInput} 
+                                onChange={(e) => setGoalInput(e.target.value)} 
+                                placeholder="🎯 ¿Cuál es tu meta principal hoy?"
+                                autoFocus={isEditingGoal && !!dailyGoal}
+                                className="flex-grow min-w-0 bg-white/90 dark:bg-gray-700/90 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 border border-amber-300/80 dark:border-amber-600/60 rounded-lg py-1.5 px-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 dark:focus:ring-amber-400 transition-all text-xs font-medium"
+                            />
+                            <button 
+                                id="save-daily-goal-button"
+                                type="submit" 
+                                disabled={!goalInput.trim()}
+                                aria-label="Guardar meta principal"
+                                className="bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white p-2 rounded-lg transition-all flex-shrink-0 disabled:opacity-40 shadow-xs flex items-center justify-center cursor-pointer"
+                            >
+                                <Check className="w-3.5 h-3.5" />
+                            </button>
+                            {dailyGoal && (
+                                <button 
+                                    id="cancel-edit-daily-goal-button"
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    aria-label="Cancelar edición"
+                                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-all flex-shrink-0 cursor-pointer"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    </form>
+                ) : (
+                    <div 
+                        id="main-daily-goal-display"
+                        className="mt-2 flex items-start gap-2 cursor-pointer group"
+                        onClick={handleToggleCompleted}
+                    >
+                        <div className="flex-shrink-0 mt-0.5">
+                            <div className={`w-4 h-4 rounded-md border-2 transition-all flex items-center justify-center ${
+                                isGoalCompleted 
+                                  ? 'bg-emerald-500 border-emerald-500 text-white' 
+                                  : 'bg-white dark:bg-gray-700 border-amber-400 dark:border-amber-500 group-hover:border-emerald-500'
+                            }`}>
+                                {isGoalCompleted && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                        </div>
+                        <p className={`text-xs font-semibold break-words leading-relaxed flex-grow select-none transition-all ${
+                            isGoalCompleted 
+                              ? 'line-through text-emerald-800 dark:text-emerald-300' 
+                              : 'text-gray-800 dark:text-gray-100 group-hover:text-amber-700 dark:group-hover:text-amber-300'
+                        }`}>
+                            {dailyGoal}
+                        </p>
+                    </div>
+                )}
+             </div>
+
+             {/* View Navigation Tabs */}
              <div className="flex border-b border-yellow-200/50 dark:border-gray-700/50 mb-2">
                 <button 
+                    id="tab-agenda-button"
                     onClick={() => setActiveView('agenda')} 
                     className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'agenda' ? 'text-gray-800 dark:text-gray-100 bg-white/80 dark:bg-gray-600/80 text-on-transparent' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >
                     Agenda
                 </button>
                 <button 
+                    id="tab-notes-button"
                     onClick={() => setActiveView('notes')} 
                     className={`flex-1 text-center font-semibold py-1.5 text-sm transition-colors rounded-t-lg ${activeView === 'notes' ? 'text-gray-800 dark:text-gray-100 bg-white/80 dark:bg-gray-600/80 text-on-transparent' : 'text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >

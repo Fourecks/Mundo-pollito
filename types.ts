@@ -250,6 +250,7 @@ export interface UiSettings {
   dailySummaryHour: number | null;
   enableBatterySaver: boolean;
   progressEmoji?: string;
+  dailyGoals?: { [dateKey: string]: { text: string; completed: boolean } };
 }
 
 export interface SupabaseUser {

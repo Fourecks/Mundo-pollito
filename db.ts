@@ -55,14 +55,65 @@ export const initDB = (username: string): Promise<IDBDatabase> => {
 
 
 // --- Generic DB Helpers ---
-const CLIENT_ONLY_FIELDS = ['subtasks', 'notes', 'todos', 'kanban_column', 'notion_page_id', 'notion_url'];
+// Exact whitelist of columns present in Supabase remote tables
+const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
+    todos: new Set([
+        'id', 'user_id', 'created_at', 'text', 'completed', 'priority', 'due_date', 
+        'end_date', 'start_time', 'end_time', 'notes', 'project_id', 'gcal_event_id', 
+        'recurrence', 'reminder_offset', 'reminder_at', 'notification_sent'
+    ]),
+    subtasks: new Set([
+        'id', 'todo_id', 'created_at', 'text', 'completed'
+    ]),
+    projects: new Set([
+        'id', 'user_id', 'created_at', 'name', 'description', 'emoji', 'color', 
+        'is_archived', 'status', 'priority', 'start_date', 'target_date', 'lead', 
+        'kanban_columns', 'sprints', 'milestones', 'docs', 'inbox', 'activities', 
+        'members', 'template_type', 'goal_id'
+    ]),
+    folders: new Set([
+        'id', 'user_id', 'created_at', 'name'
+    ]),
+    notes: new Set([
+        'id', 'user_id', 'folder_id', 'created_at', 'updated_at', 'title', 'content'
+    ]),
+    playlists: new Set([
+        'id', 'user_id', 'created_at', 'name', 'type', 'source_id', 'platform', 
+        'is_favorite', 'thumbnail_url'
+    ]),
+    quick_notes: new Set([
+        'id', 'user_id', 'created_at', 'text'
+    ]),
+    habits: new Set([
+        'id', 'user_id', 'created_at', 'name', 'emoji', 'frequency'
+    ]),
+    habit_records: new Set([
+        'id', 'user_id', 'habit_id', 'created_at', 'completed_at'
+    ]),
+    profiles: new Set([
+        'id', 'pomodoro_settings', 'gcal_settings', 'ui_settings', 'timezone_offset'
+    ]),
+    user_backgrounds: new Set([
+        'id', 'user_id', 'name', 'path', 'type', 'is_favorite', 'created_at'
+    ]),
+};
 
 const sanitizeForSupabase = (tableName: string, data: any) => {
-    const copy = { ...data };
-    CLIENT_ONLY_FIELDS.forEach(field => {
-        delete copy[field];
-    });
-    return copy;
+    const allowed = TABLE_ALLOWED_COLUMNS[tableName];
+    if (!allowed) {
+        const copy = { ...data };
+        delete copy.subtasks;
+        delete copy.todos;
+        delete copy.notes;
+        return copy;
+    }
+    const clean: any = {};
+    for (const key of Object.keys(data)) {
+        if (allowed.has(key) && data[key] !== undefined) {
+            clean[key] = data[key];
+        }
+    }
+    return clean;
 };
 
 const getStore = (storeName: string, mode: IDBTransactionMode) => {

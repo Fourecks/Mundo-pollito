@@ -819,6 +819,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             onSelectFocusTask={handleSelectFocusTask}
             focusSessions={focusSessions}
             isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
+            mainDailyGoal={todayMainGoal}
+            onUpdateMainDailyGoal={(goal) => handleUpdateMainDailyGoal(todayGoalKey, goal)}
           />
       </div>
       
@@ -1249,6 +1251,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 onSelectFocusTask={handleSelectFocusTask}
                                 focusSessions={focusSessions}
                                 isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
+                                mainDailyGoal={todayMainGoal}
+                                onUpdateMainDailyGoal={(goal) => handleUpdateMainDailyGoal(todayGoalKey, goal)}
                             />
                         </div>
                     </>
@@ -1705,6 +1709,26 @@ const App: React.FC = () => {
   const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
 
+  // Main Daily Goal synced via ui_settings in Supabase
+  const todayGoalKey = new Date().toLocaleDateString('en-CA');
+  const todayMainGoal = uiSettings?.dailyGoals?.[todayGoalKey];
+
+  const handleUpdateMainDailyGoal = (dateKey: string, goal: { text: string; completed: boolean } | null) => {
+    setUiSettings((prev: any) => {
+      const prevGoals = prev?.dailyGoals || {};
+      const updatedGoals = { ...prevGoals };
+      if (!goal || !goal.text) {
+        delete updatedGoals[dateKey];
+      } else {
+        updatedGoals[dateKey] = goal;
+      }
+      return {
+        ...(prev || {}),
+        dailyGoals: updatedGoals
+      };
+    });
+  };
+
 
   // OneSignal Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -2132,6 +2156,7 @@ const App: React.FC = () => {
               dailySummaryHour: settings.dailySummaryHour ?? prev?.dailySummaryHour ?? null,
               enableBatterySaver: settings.enableBatterySaver ?? prev?.enableBatterySaver ?? false,
               progressEmoji: settings.progressEmoji || prev?.progressEmoji || '🚀',
+              dailyGoals: settings.dailyGoals || prev?.dailyGoals || {},
           }));
 
           // Check and update user's timezone offset for notifications
