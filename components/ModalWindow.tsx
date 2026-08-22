@@ -44,29 +44,29 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
-  const [hasInteracted, setHasInteracted] = useState(false);
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-  const [size, setSize] = useState({ width: 0, height: 0 });
+  // Position and size state
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeInteraction, setActiveInteraction] = useState<'drag' | 'resize' | null>(null);
 
-  const lastPos = useRef(pos);
-  useEffect(() => { lastPos.current = pos; }, [pos]);
-  const lastSize = useRef(size);
-  useEffect(() => { lastSize.current = size; }, [size]);
+  // Real-time tracking refs to avoid stale closure issues during mouse events
+  const posRef = useRef(pos);
+  useEffect(() => { posRef.current = pos; }, [pos]);
+  const sizeRef = useRef(size);
+  useEffect(() => { sizeRef.current = size; }, [size]);
 
-  const interactionInfo = useRef({
-    isDragging: false,
-    isResizing: false,
+  const interactionRef = useRef({
+    type: null as 'drag' | 'resize' | null,
     startX: 0,
     startY: 0,
-    startWidth: 0,
-    startHeight: 0,
-    modalX: 0,
-    modalY: 0,
+    originX: 0,
+    originY: 0,
+    originWidth: 0,
+    originHeight: 0,
   });
 
-  // Sync with incoming windowState prop if valid
+  // Sync state with incoming props
   useEffect(() => {
     if (isOpen) {
       if (
@@ -74,79 +74,83 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
         windowState?.size && 
         typeof windowState.size.width === 'number' && 
         typeof windowState.size.height === 'number' &&
-        windowState.size.width >= (minWidth || 200) && 
-        windowState.size.height >= (minHeight || 120)
+        windowState.size.width >= 150 && 
+        windowState.size.height >= 100
       ) {
-        // Clamp saved positions so window is visible
-        const safeX = Math.max(-windowState.size.width + 100, Math.min(window.innerWidth - 100, windowState.pos.x));
-        const safeY = Math.max(0, Math.min(window.innerHeight - 60, windowState.pos.y));
+        // Clamp saved coordinates safely
+        const safeWidth = Math.min(window.innerWidth - 40, Math.max(minWidth, windowState.size.width));
+        const safeHeight = Math.min(window.innerHeight - 40, Math.max(minHeight, windowState.size.height));
+        const safeX = Math.max(10, Math.min(window.innerWidth - safeWidth - 10, windowState.pos.x));
+        const safeY = Math.max(10, Math.min(window.innerHeight - safeHeight - 10, windowState.pos.y));
+        
         setPos({ x: safeX, y: safeY });
-        setSize(windowState.size);
-        setHasInteracted(true);
-      } else if (!hasInteracted) {
-        setHasInteracted(false);
-        setPos({ x: 0, y: 0 });
-        setSize({ width: 0, height: 0 });
+        setSize({ width: safeWidth, height: safeHeight });
       }
     }
   }, [isOpen, windowState, minWidth, minHeight]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (interactionInfo.current.isDragging) {
-      const dx = e.clientX - interactionInfo.current.startX;
-      const dy = e.clientY - interactionInfo.current.startY;
-      
-      const rawX = interactionInfo.current.modalX + dx;
-      const rawY = interactionInfo.current.modalY + dy;
-      
-      const currentW = lastSize.current.width > 0 ? lastSize.current.width : 400;
-      // Clamp bounds so window header cannot be dragged out of viewport
-      const clampedX = Math.max(-currentW + 80, Math.min(window.innerWidth - 80, rawX));
-      const clampedY = Math.max(0, Math.min(window.innerHeight - 48, rawY));
+    const { type, startX, startY, originX, originY, originWidth, originHeight } = interactionRef.current;
+    if (!type) return;
 
-      const newPos = { x: clampedX, y: clampedY };
+    if (type === 'drag') {
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      const currentWidth = sizeRef.current?.width || originWidth || 500;
+      const currentHeight = sizeRef.current?.height || originHeight || 400;
+
+      // Keep window within reachable bounds of the viewport
+      const minVisibleHeaderX = 80;
+      const newX = Math.max(-currentWidth + minVisibleHeaderX, Math.min(window.innerWidth - minVisibleHeaderX, originX + deltaX));
+      const newY = Math.max(0, Math.min(window.innerHeight - 50, originY + deltaY));
+
+      const newPos = { x: Math.round(newX), y: Math.round(newY) };
       setPos(newPos);
-      lastPos.current = newPos;
-    } else if (interactionInfo.current.isResizing) {
-      const dw = e.clientX - interactionInfo.current.startX;
-      const dh = e.clientY - interactionInfo.current.startY;
-      const minW = minWidth ?? 320;
-      const minH = minHeight ?? 200;
-      
-      const newWidth = Math.max(minW, Math.min(window.innerWidth - 20, interactionInfo.current.startWidth + dw));
-      const newHeight = Math.max(minH, Math.min(window.innerHeight - 20, interactionInfo.current.startHeight + dh));
-      
-      const newSize = { width: newWidth, height: newHeight };
+      posRef.current = newPos;
+    } else if (type === 'resize') {
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      const minW = Math.max(200, minWidth || 320);
+      const minH = Math.max(120, minHeight || 200);
+
+      const maxW = Math.max(minW, window.innerWidth - (posRef.current?.x ?? 0) - 10);
+      const maxH = Math.max(minH, window.innerHeight - (posRef.current?.y ?? 0) - 10);
+
+      const newW = Math.round(Math.min(maxW, Math.max(minW, originWidth + deltaX)));
+      const newH = Math.round(Math.min(maxH, Math.max(minH, originHeight + deltaY)));
+
+      const newSize = { width: newW, height: newH };
       setSize(newSize);
-      lastSize.current = newSize;
+      sizeRef.current = newSize;
     }
   }, [minWidth, minHeight]);
 
   const handleMouseUp = useCallback(() => {
-    const wasDragging = interactionInfo.current.isDragging;
-    const wasResizing = interactionInfo.current.isResizing;
-
-    interactionInfo.current.isDragging = false;
-    interactionInfo.current.isResizing = false;
+    const activeType = interactionRef.current.type;
+    interactionRef.current.type = null;
     setActiveInteraction(null);
 
     window.removeEventListener('mousemove', handleMouseMove);
     window.removeEventListener('mouseup', handleMouseUp);
 
-    if (wasDragging || wasResizing) {
-      if (lastSize.current.width >= (minWidth || 200) && lastSize.current.height >= (minHeight || 120)) {
-        onStateChange?.({ pos: lastPos.current, size: lastSize.current });
-      }
+    // Persist final position & size if modified
+    if (activeType && posRef.current && sizeRef.current) {
+      onStateChange?.({
+        pos: posRef.current,
+        size: sizeRef.current,
+      });
     }
-  }, [handleMouseMove, onStateChange, minWidth, minHeight]);
-  
+  }, [handleMouseMove, onStateChange]);
+
   const handleInteractionStart = useCallback((e: React.MouseEvent<HTMLElement>, type: 'drag' | 'resize') => {
     onFocus?.();
     e.stopPropagation();
 
-    // Prevent dragging if user is clicking on interactive elements inside header
     if (type === 'drag') {
       const target = e.target as HTMLElement;
+      // Do not initiate drag when clicking buttons, inputs or elements with no-drag class
       if (target.closest('button, input, select, textarea, a, .no-drag')) {
         return;
       }
@@ -155,49 +159,36 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     if (!modalRef.current) return;
     const rect = modalRef.current.getBoundingClientRect();
 
-    let currentPos = pos;
-    let currentSize = size;
-    
-    // First interaction snapshot
-    if (!hasInteracted || currentSize.width <= 0 || currentSize.height <= 0) {
-      currentPos = { x: Math.round(rect.left), y: Math.round(rect.top) };
-      currentSize = { width: Math.round(rect.width), height: Math.round(rect.height) };
-      setPos(currentPos);
-      setSize(currentSize);
-      lastPos.current = currentPos;
-      lastSize.current = currentSize;
-      setHasInteracted(true);
-    }
+    // Use current bounding rect if pos/size were not explicitly set yet
+    const currentX = posRef.current?.x ?? Math.round(rect.left);
+    const currentY = posRef.current?.y ?? Math.round(rect.top);
+    const currentW = sizeRef.current?.width ?? Math.round(rect.width);
+    const currentH = sizeRef.current?.height ?? Math.round(rect.height);
 
-    if (type === 'drag') {
-      interactionInfo.current = {
-        isDragging: true,
-        isResizing: false,
-        startX: e.clientX,
-        startY: e.clientY,
-        startWidth: currentSize.width || Math.round(rect.width),
-        startHeight: currentSize.height || Math.round(rect.height),
-        modalX: currentPos.x || Math.round(rect.left),
-        modalY: currentPos.y || Math.round(rect.top),
-      };
-    } else {
-      interactionInfo.current = {
-        isResizing: true,
-        isDragging: false,
-        startX: e.clientX,
-        startY: e.clientY,
-        startWidth: currentSize.width || Math.round(rect.width),
-        startHeight: currentSize.height || Math.round(rect.height),
-        modalX: currentPos.x || Math.round(rect.left),
-        modalY: currentPos.y || Math.round(rect.top),
-      };
-    }
+    // Immediately snap state to fixed coordinates so transition from center to absolute is seamless
+    const currentPos = { x: currentX, y: currentY };
+    const currentSize = { width: currentW, height: currentH };
+    setPos(currentPos);
+    setSize(currentSize);
+    posRef.current = currentPos;
+    sizeRef.current = currentSize;
+
+    interactionRef.current = {
+      type,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: currentX,
+      originY: currentY,
+      originWidth: currentW,
+      originHeight: currentH,
+    };
 
     setActiveInteraction(type);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [pos, size, hasInteracted, onFocus, handleMouseMove, handleMouseUp]);
+  }, [onFocus, handleMouseMove, handleMouseUp]);
 
+  // Clean up global listeners on unmount
   useEffect(() => {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
@@ -207,20 +198,20 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
 
   if (!isOpen) return null;
 
-  // Fullscreen View
+  // Fullscreen Mode
   if (isFullscreen) {
     return (
       <div
         ref={modalRef}
         onClick={onFocus}
-        className="fixed inset-0 z-[50000] flex flex-col bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 overflow-hidden select-auto animate-fade-in pointer-events-auto shadow-none"
+        className="fixed inset-0 flex flex-col bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 overflow-hidden select-auto animate-fade-in pointer-events-auto"
         role="dialog"
         aria-modal="true"
-        style={{ zIndex: 50000 }}
+        style={{ zIndex: 60000 }}
       >
         {!noHeader && (
           <header 
-            className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/90 dark:bg-gray-900/90 backdrop-blur-md shrink-0 select-none"
+            className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md shrink-0 select-none"
             onDoubleClick={() => setIsFullscreen(false)}
             title="Doble clic para restaurar ventana"
           >
@@ -272,11 +263,11 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     );
   }
 
-  // Windowed View (Free Moving or Centered Initial)
+  // Resizer Handle
   const Resizer = () => (
     <div
       onMouseDown={(e) => handleInteractionStart(e, 'resize')}
-      className="absolute bottom-1 right-1 w-6 h-6 cursor-nwse-resize z-30 flex items-end justify-end p-1 select-none text-gray-400/70 hover:text-primary transition-colors"
+      className="absolute bottom-1 right-1 w-6 h-6 cursor-nwse-resize z-40 flex items-end justify-end p-1 select-none text-gray-400 hover:text-primary transition-colors touch-none"
       title="Arrastra para redimensionar"
     >
       <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -287,121 +278,179 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     </div>
   );
 
-  const windowInner = (
-    <div
-      ref={modalRef}
-      onMouseDown={(e) => {
-        onFocus?.();
-        if (isDraggable) {
-          const target = e.target as HTMLElement;
-          if (target.closest('.drag-handle') && !target.closest('button, input, select, textarea, a, .no-drag')) {
-            handleInteractionStart(e, 'drag');
-          }
-        }
-      }}
-      style={hasInteracted ? {
-        position: 'fixed',
-        left: `${pos.x}px`,
-        top: `${pos.y}px`,
-        width: `${size.width}px`,
-        height: `${size.height}px`,
-        margin: 0,
-        zIndex: zIndex ?? 50,
-      } : undefined}
-      className={`
-        ${!frameless ? 'bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden' : 'relative flex flex-col'}
-        ${!hasInteracted ? (className || 'w-full max-w-3xl h-[80vh]') : ''}
-        ${!hasInteracted ? 'animate-deploy' : ''}
-        relative pointer-events-auto
-      `}
-      onClick={(e) => {
-        e.stopPropagation();
-        onFocus?.();
-      }}
-    >
-      {frameless ? (
-        children
-      ) : (
-        <>
-          {!noHeader && (
-            <header 
-              onMouseDown={isDraggable ? (e) => handleInteractionStart(e, 'drag') : undefined}
-              className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-200/70 dark:border-gray-700/70 bg-gray-50/70 dark:bg-gray-900/50 backdrop-blur-md shrink-0 select-none drag-handle ${isDraggable ? 'cursor-move' : 'cursor-default'}`}
-              onDoubleClick={() => {
-                if (allowFullscreen) {
-                  setIsFullscreen(true);
-                } else if (hasInteracted) {
-                  // Double-click resets custom placement to center
-                  setHasInteracted(false);
-                  setPos({ x: 0, y: 0 });
-                  setSize({ width: 0, height: 0 });
-                  onStateChange?.({ pos: { x: 0, y: 0 }, size: { width: 0, height: 0 } });
-                }
-              }}
-              title={isDraggable ? (allowFullscreen ? "Arrastra para mover libremente • Doble clic para pantalla completa" : "Arrastra para mover libremente • Doble clic para centrar") : undefined}
-            >
-              <div className="flex items-center gap-2 min-w-0 pointer-events-none">
-                <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">{title}</h2>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {allowFullscreen && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsFullscreen(true);
-                    }}
-                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                    title="Pantalla completa"
-                    aria-label="Pantalla completa"
-                  >
-                    <ExpandIcon className="h-4 w-4" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                  }}
-                  className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
-                  title="Cerrar ventana"
-                  aria-label="Cerrar ventana"
-                >
-                  <CloseIcon />
-                </button>
-              </div>
-            </header>
-          )}
-          <main className={`flex-1 min-h-0 w-full flex flex-col relative ${overflowVisible ? 'overflow-visible' : 'overflow-y-auto custom-scrollbar'}`}>
-            {children}
-          </main>
-        </>
-      )}
-      {isResizable && <Resizer />}
-    </div>
-  );
+  const hasCustomTransform = pos !== null && size !== null;
 
   return (
     <>
-      {/* Invisible overlay during active drag/resize so iframes or canvas don't swallow mouse events */}
+      {/* Invisible overlay during drag/resize to prevent losing pointer events over iframes/inputs */}
       {activeInteraction && (
         <div 
-          className="fixed inset-0 z-[999999] select-none pointer-events-auto"
-          style={{ cursor: activeInteraction === 'resize' ? 'nwse-resize' : 'move' }}
+          className="fixed inset-0 select-none pointer-events-auto"
+          style={{ 
+            zIndex: 999999, 
+            cursor: activeInteraction === 'resize' ? 'nwse-resize' : 'move',
+            userSelect: 'none'
+          }}
         />
       )}
 
-      {hasInteracted ? (
-        windowInner
-      ) : (
+      {/* When not interacted, render in centered layout overlay with pointer-events-none on backdrop */}
+      {!hasCustomTransform ? (
         <div
-          className="fixed inset-0 p-2 sm:p-4 flex items-center justify-center pointer-events-none"
+          className="fixed inset-0 p-3 sm:p-5 flex items-center justify-center pointer-events-none"
           aria-modal="true"
           role="dialog"
           style={{ zIndex: zIndex ?? 50 }}
         >
-          {windowInner}
+          <div
+            ref={modalRef}
+            onClick={(e) => {
+              e.stopPropagation();
+              onFocus?.();
+            }}
+            onMouseDown={() => onFocus?.()}
+            className={`
+              ${!frameless ? 'bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden' : 'relative flex flex-col'}
+              ${className || 'w-full max-w-3xl h-[80vh]'}
+              animate-deploy relative pointer-events-auto
+            `}
+          >
+            {frameless ? (
+              children
+            ) : (
+              <>
+                {!noHeader && (
+                  <header 
+                    onMouseDown={isDraggable ? (e) => handleInteractionStart(e, 'drag') : undefined}
+                    className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-200/70 dark:border-gray-700/70 bg-gray-50/80 dark:bg-gray-900/60 backdrop-blur-md shrink-0 select-none ${isDraggable ? 'cursor-move' : 'cursor-default'}`}
+                    onDoubleClick={() => {
+                      if (allowFullscreen) setIsFullscreen(true);
+                    }}
+                    title={isDraggable ? (allowFullscreen ? "Arrastra para mover libremente • Doble clic para maximizar" : "Arrastra para mover libremente") : undefined}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 pointer-events-none">
+                      <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">{title}</h2>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {allowFullscreen && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsFullscreen(true);
+                          }}
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                          title="Pantalla completa"
+                          aria-label="Pantalla completa"
+                        >
+                          <ExpandIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClose();
+                        }}
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                        title="Cerrar ventana"
+                        aria-label="Cerrar ventana"
+                      >
+                        <CloseIcon />
+                      </button>
+                    </div>
+                  </header>
+                )}
+                <main className={`flex-1 min-h-0 w-full flex flex-col relative ${overflowVisible ? 'overflow-visible' : 'overflow-y-auto custom-scrollbar'}`}>
+                  {children}
+                </main>
+              </>
+            )}
+            {isResizable && <Resizer />}
+          </div>
+        </div>
+      ) : (
+        /* Free floating mode with exact coordinates */
+        <div
+          ref={modalRef}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFocus?.();
+          }}
+          onMouseDown={() => onFocus?.()}
+          style={{
+            position: 'fixed',
+            left: `${pos.x}px`,
+            top: `${pos.y}px`,
+            width: `${size.width}px`,
+            height: `${size.height}px`,
+            margin: 0,
+            zIndex: zIndex ?? 50,
+          }}
+          className={`
+            ${!frameless ? 'bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden' : 'relative flex flex-col'}
+            relative pointer-events-auto
+          `}
+        >
+          {frameless ? (
+            children
+          ) : (
+            <>
+              {!noHeader && (
+                <header 
+                  onMouseDown={isDraggable ? (e) => handleInteractionStart(e, 'drag') : undefined}
+                  className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-200/70 dark:border-gray-700/70 bg-gray-50/80 dark:bg-gray-900/60 backdrop-blur-md shrink-0 select-none ${isDraggable ? 'cursor-move' : 'cursor-default'}`}
+                  onDoubleClick={() => {
+                    if (allowFullscreen) {
+                      setIsFullscreen(true);
+                    } else {
+                      // Reset to center
+                      setPos(null);
+                      setSize(null);
+                      onStateChange?.({ pos: { x: 0, y: 0 }, size: { width: 0, height: 0 } });
+                    }
+                  }}
+                  title={isDraggable ? (allowFullscreen ? "Arrastra para mover libremente • Doble clic para maximizar" : "Arrastra para mover libremente • Doble clic para centrar") : undefined}
+                >
+                  <div className="flex items-center gap-2 min-w-0 pointer-events-none">
+                    <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">{title}</h2>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {allowFullscreen && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsFullscreen(true);
+                        }}
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                        title="Pantalla completa"
+                        aria-label="Pantalla completa"
+                      >
+                        <ExpandIcon className="h-4 w-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onClose();
+                      }}
+                      className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                      title="Cerrar ventana"
+                      aria-label="Cerrar ventana"
+                    >
+                      <CloseIcon />
+                    </button>
+                  </div>
+                </header>
+              )}
+              <main className={`flex-1 min-h-0 w-full flex flex-col relative ${overflowVisible ? 'overflow-visible' : 'overflow-y-auto custom-scrollbar'}`}>
+                {children}
+              </main>
+            </>
+          )}
+          {isResizable && <Resizer />}
         </div>
       )}
     </>
