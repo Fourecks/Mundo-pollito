@@ -381,7 +381,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [completionQuote, setCompletionQuote] = useState('');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [openWindows, setOpenWindows] = useState<WindowType[]>([]);
-  const [windowStates, setWindowStates] = useState<{ [key in WindowType]?: WindowState }>({});
+  const windowStatesRef = useRef<{ [key in WindowType]?: WindowState }>({});
+  const focusedWindowRef = useRef<WindowType | null>(null);
   const [focusedWindow, setFocusedWindow] = useState<WindowType | null>(null);
   const [windowZIndices, setWindowZIndices] = useState<{ [key in WindowType]?: number }>({});
   const [highestZIndex, setHighestZIndex] = useState<number>(100);
@@ -440,7 +441,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               cleaned[k] = item;
             }
           });
-          setWindowStates(cleaned);
+          windowStatesRef.current = cleaned;
         }
       } catch (e) {
         console.error('Error parsing stored window states:', e);
@@ -455,8 +456,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     }
   }, [getUserKey]);
 
-  useEffect(() => { localStorage.setItem(getUserKey('windowStates'), JSON.stringify(windowStates)); }, [windowStates, getUserKey]);
   useEffect(() => { localStorage.setItem(getUserKey('openWindows'), JSON.stringify(openWindows)); }, [openWindows, getUserKey]);
+
+  const handleWindowStateChange = useCallback((windowType: WindowType, newState: WindowState) => {
+    windowStatesRef.current[windowType] = newState;
+    try {
+      localStorage.setItem(getUserKey('windowStates'), JSON.stringify(windowStatesRef.current));
+    } catch (e) {
+      console.error('Error saving window states:', e);
+    }
+  }, [getUserKey]);
 
   const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
   
@@ -609,30 +618,36 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
 
   // --- Windowing and Misc Handlers ---
-  const bringToFront = (windowType: WindowType) => {
+  const bringToFront = useCallback((windowType: WindowType) => {
+    if (focusedWindowRef.current === windowType) return;
+    focusedWindowRef.current = windowType;
     setFocusedWindow(windowType);
     setHighestZIndex(prev => {
       const nextZ = prev + 1;
       setWindowZIndices(current => ({ ...current, [windowType]: nextZ }));
       return nextZ;
     });
-  };
+  }, []);
 
-  const toggleWindow = (windowType: WindowType) => {
+  const toggleWindow = useCallback((windowType: WindowType) => {
     setOpenWindows(open => {
       const isOpening = !open.includes(windowType);
       if (isOpening) {
         bringToFront(windowType);
         return [...open, windowType];
       } else {
+        if (focusedWindowRef.current === windowType) {
+          focusedWindowRef.current = null;
+          setFocusedWindow(null);
+        }
         return open.filter(w => w !== windowType);
       }
     });
-  };
+  }, [bringToFront]);
 
-  const getWindowZIndex = (windowType: WindowType) => {
+  const getWindowZIndex = useCallback((windowType: WindowType) => {
     return windowZIndices[windowType] ?? (focusedWindow === windowType ? 100 : 50);
-  };
+  }, [windowZIndices, focusedWindow]);
 
   const handleSelectFocusTask = (taskId: number | null) => {
     setPomodoroState(s => ({ ...s, activeFocusTaskId: taskId }));
@@ -809,7 +824,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       
         <main className={`${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {openWindows.includes('todo') && (
-            <ModalWindow isOpen={true} onClose={() => toggleWindow('todo')} title="Lista de Tareas" isDraggable isResizable zIndex={getWindowZIndex('todo')} onFocus={() => bringToFront('todo')} className="w-full max-w-3xl h-[80vh]" windowState={windowStates.todo} onStateChange={s => setWindowStates(ws => ({...ws, todo: s}))} allowFullscreen>
+            <ModalWindow isOpen={true} onClose={() => toggleWindow('todo')} title="Lista de Tareas" isDraggable isResizable zIndex={getWindowZIndex('todo')} onFocus={() => bringToFront('todo')} className="w-full max-w-3xl h-[80vh]" windowState={windowStatesRef.current.todo} onStateChange={s => handleWindowStateChange('todo', s)} allowFullscreen>
               <TodoListModule progressEmoji={uiSettings?.progressEmoji} 
                 allTodos={allTodos} 
                 addTodo={handleAddTodo} 
@@ -842,7 +857,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             </ModalWindow>
           )}
           {openWindows.includes('calendar') && (
-            <ModalWindow isOpen={true} onClose={() => toggleWindow('calendar')} title="Calendario y Sincronización" isDraggable isResizable zIndex={getWindowZIndex('calendar')} onFocus={() => bringToFront('calendar')} className="w-full max-w-5xl h-[85vh]" windowState={windowStates.calendar} onStateChange={s => setWindowStates(ws => ({...ws, calendar: s}))} allowFullscreen>
+            <ModalWindow isOpen={true} onClose={() => toggleWindow('calendar')} title="Calendario y Sincronización" isDraggable isResizable zIndex={getWindowZIndex('calendar')} onFocus={() => bringToFront('calendar')} className="w-full max-w-5xl h-[85vh]" windowState={windowStatesRef.current.calendar} onStateChange={s => handleWindowStateChange('calendar', s)} allowFullscreen>
               <CalendarModule
                 allTodos={allTodos}
                 calendarEvents={calendarEvents}
@@ -869,7 +884,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             </ModalWindow>
           )}
           {openWindows.includes('habits') && (
-            <ModalWindow isOpen={true} onClose={() => toggleWindow('habits')} title="Seguimiento de Hábitos" isDraggable isResizable zIndex={getWindowZIndex('habits')} onFocus={() => bringToFront('habits')} className="w-full max-w-2xl h-[70vh]" windowState={windowStates.habits} onStateChange={s => setWindowStates(ws => ({...ws, habits: s}))} allowFullscreen>
+            <ModalWindow isOpen={true} onClose={() => toggleWindow('habits')} title="Seguimiento de Hábitos" isDraggable isResizable zIndex={getWindowZIndex('habits')} onFocus={() => bringToFront('habits')} className="w-full max-w-2xl h-[70vh]" windowState={windowStatesRef.current.habits} onStateChange={s => handleWindowStateChange('habits', s)} allowFullscreen>
               <HabitTracker 
                 habits={habits} 
                 records={habitRecords} 
@@ -881,7 +896,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             </ModalWindow>
           )}
           {openWindows.includes('progreso') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('progreso')} title="Informe de Crecimiento" isDraggable isResizable zIndex={getWindowZIndex('progreso')} onFocus={() => bringToFront('progreso')} className="w-full max-w-4xl h-[85vh]" windowState={windowStates.progreso} onStateChange={s => setWindowStates(ws => ({...ws, progreso: s}))} allowFullscreen>
+              <ModalWindow isOpen onClose={() => toggleWindow('progreso')} title="Informe de Crecimiento" isDraggable isResizable zIndex={getWindowZIndex('progreso')} onFocus={() => bringToFront('progreso')} className="w-full max-w-4xl h-[85vh]" windowState={windowStatesRef.current.progreso} onStateChange={s => handleWindowStateChange('progreso', s)} allowFullscreen>
                   <ProgressView 
                       allTodos={allTodos} 
                       projects={projects} 
@@ -892,12 +907,12 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               </ModalWindow>
           )}
           {openWindows.includes('notes') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas del Pollito" isDraggable isResizable zIndex={getWindowZIndex('notes')} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStates.notes} onStateChange={s => setWindowStates(ws => ({...ws, notes: s}))} allowFullscreen>
+              <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas del Pollito" isDraggable isResizable zIndex={getWindowZIndex('notes')} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStatesRef.current.notes} onStateChange={s => handleWindowStateChange('notes', s)} allowFullscreen>
                   <NotesSection folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
               </ModalWindow>
           )}
           {openWindows.includes('pomodoro') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('pomodoro')} title="Pomodoro" isDraggable isResizable minWidth={440} minHeight={215} overflowVisible zIndex={getWindowZIndex('pomodoro')} onFocus={() => bringToFront('pomodoro')} className="w-[520px] h-[215px]" windowState={windowStates.pomodoro} onStateChange={s => setWindowStates(ws => ({...ws, pomodoro: s}))}>
+              <ModalWindow isOpen onClose={() => toggleWindow('pomodoro')} title="Pomodoro" isDraggable isResizable minWidth={440} minHeight={215} overflowVisible zIndex={getWindowZIndex('pomodoro')} onFocus={() => bringToFront('pomodoro')} className="w-[520px] h-[215px]" windowState={windowStatesRef.current.pomodoro} onStateChange={s => handleWindowStateChange('pomodoro', s)}>
                   <Pomodoro 
                       timeLeft={pomodoroState.timeLeft} 
                       isActive={pomodoroState.isActive} 
@@ -918,17 +933,17 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               </ModalWindow>
           )}
            {openWindows.includes('music') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('music')} frameless isDraggable isResizable zIndex={getWindowZIndex('music')} onFocus={() => bringToFront('music')} className="w-[600px] h-[450px]" windowState={windowStates.music} onStateChange={s => setWindowStates(ws => ({...ws, music: s}))}>
+              <ModalWindow isOpen onClose={() => toggleWindow('music')} frameless isDraggable isResizable zIndex={getWindowZIndex('music')} onFocus={() => bringToFront('music')} className="w-[600px] h-[450px]" windowState={windowStatesRef.current.music} onStateChange={s => handleWindowStateChange('music', s)}>
                   <MusicPlayer playlists={playlists} onAddPlaylist={handleAddPlaylist} onUpdatePlaylist={handleUpdatePlaylist} onDeletePlaylist={handleDeletePlaylist} onSelectTrack={handleSelectTrack} onClose={() => toggleWindow('music')} />
               </ModalWindow>
           )}
           {openWindows.includes('browser') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('browser')} title="IA Pollito" isDraggable isResizable zIndex={getWindowZIndex('browser')} onFocus={() => bringToFront('browser')} className="w-full max-w-xl h-[85vh]" windowState={windowStates.browser} onStateChange={s => setWindowStates(ws => ({...ws, browser: s}))} allowFullscreen>
+              <ModalWindow isOpen onClose={() => toggleWindow('browser')} title="IA Pollito" isDraggable isResizable zIndex={getWindowZIndex('browser')} onFocus={() => bringToFront('browser')} className="w-full max-w-xl h-[85vh]" windowState={windowStatesRef.current.browser} onStateChange={s => handleWindowStateChange('browser', s)} allowFullscreen>
                   <Browser session={browserSession} setSession={setBrowserSession} currentUser={currentUser} />
               </ModalWindow>
           )}
           {openWindows.includes('projects') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('projects')} title="Espacio de Proyectos" isDraggable isResizable zIndex={getWindowZIndex('projects')} onFocus={() => bringToFront('projects')} className="w-full max-w-6xl h-[88vh]" windowState={windowStates.projects} onStateChange={s => setWindowStates(ws => ({...ws, projects: s}))} allowFullscreen>
+              <ModalWindow isOpen onClose={() => toggleWindow('projects')} title="Espacio de Proyectos" isDraggable isResizable zIndex={getWindowZIndex('projects')} onFocus={() => bringToFront('projects')} className="w-full max-w-6xl h-[88vh]" windowState={windowStatesRef.current.projects} onStateChange={s => handleWindowStateChange('projects', s)} allowFullscreen>
                   <ProjectsWorkspace
                       projects={projects}
                       allTodos={flatAllTodos}

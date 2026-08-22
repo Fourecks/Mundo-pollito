@@ -1,4 +1,4 @@
-import React, { ReactNode, useRef, useState, useEffect, useCallback } from 'react';
+import React, { ReactNode, useRef, useState, useEffect, useCallback, memo } from 'react';
 import CloseIcon from './icons/CloseIcon';
 import ExpandIcon from './icons/ExpandIcon';
 import { WindowState } from '../types';
@@ -23,7 +23,7 @@ interface ModalWindowProps {
   overflowVisible?: boolean;
 }
 
-const ModalWindow: React.FC<ModalWindowProps> = ({ 
+const ModalWindowComponent: React.FC<ModalWindowProps> = ({ 
   isOpen, 
   onClose, 
   title, 
@@ -45,8 +45,36 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Position and size state: null means use default responsive centered styles
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
+    if (
+      windowState?.pos && 
+      typeof windowState.pos.x === 'number' && 
+      typeof windowState.pos.y === 'number' &&
+      typeof window.innerWidth === 'number'
+    ) {
+      const safeX = Math.max(0, Math.min(window.innerWidth - 80, windowState.pos.x));
+      const safeY = Math.max(0, Math.min(window.innerHeight - 40, windowState.pos.y));
+      return { x: safeX, y: safeY };
+    }
+    return null;
+  });
+
+  const [size, setSize] = useState<{ width: number; height: number } | null>(() => {
+    if (
+      windowState?.size && 
+      typeof windowState.size.width === 'number' && 
+      typeof windowState.size.height === 'number' &&
+      windowState.size.width >= 150 && 
+      windowState.size.height >= 100 &&
+      typeof window.innerWidth === 'number'
+    ) {
+      const safeWidth = Math.min(window.innerWidth - 30, Math.max(minWidth, windowState.size.width));
+      const safeHeight = Math.min(window.innerHeight - 30, Math.max(minHeight, windowState.size.height));
+      return { width: safeWidth, height: safeHeight };
+    }
+    return null;
+  });
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
 
@@ -70,12 +98,10 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     lastH: 0,
   });
 
-  // Sync state with incoming props on open
+  // Sync state if windowState was provided later and we have no state yet
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && pos === null && size === null && windowState?.pos && windowState?.size) {
       if (
-        windowState?.pos && 
-        windowState?.size && 
         typeof windowState.size.width === 'number' && 
         typeof windowState.size.height === 'number' &&
         windowState.size.width >= 150 && 
@@ -94,7 +120,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
         currentSizeRef.current = newSize;
       }
     }
-  }, [isOpen, windowState, minWidth, minHeight]);
+  }, [isOpen, windowState, minWidth, minHeight, pos, size]);
 
   // Keep refs synchronized with state
   useEffect(() => {
@@ -105,12 +131,15 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
   }, [size]);
 
   // High-performance direct DOM dragging and resizing via requestAnimationFrame
-  const onPointerMove = useCallback((e: MouseEvent) => {
+  const onPointerMove = useCallback((e: MouseEvent | TouchEvent) => {
     const info = interactionStateRef.current;
     if (!info.active || !info.type || !modalRef.current) return;
 
-    const deltaX = e.clientX - info.startX;
-    const deltaY = e.clientY - info.startY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    const deltaX = clientX - info.startX;
+    const deltaY = clientY - info.startY;
 
     if (info.type === 'drag') {
       const minVisibleHeaderX = 80;
@@ -168,6 +197,8 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
 
     window.removeEventListener('mousemove', onPointerMove);
     window.removeEventListener('mouseup', onPointerUp);
+    window.removeEventListener('touchmove', onPointerMove);
+    window.removeEventListener('touchend', onPointerUp);
 
     const finalPos = { x: info.lastX, y: info.lastY };
     const finalSize = { width: info.lastW, height: info.lastH };
@@ -176,19 +207,24 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     info.type = null;
     setIsInteracting(false);
 
+    if (modalRef.current) {
+      modalRef.current.style.willChange = 'auto';
+    }
+
     // Commit final coordinates to React state without unmounting
     setPos(finalPos);
     setSize(finalSize);
     currentPosRef.current = finalPos;
     currentSizeRef.current = finalSize;
 
+    // Send update to parent callback
     onStateChange?.({
       pos: finalPos,
       size: finalSize,
     });
   }, [onPointerMove, onStateChange]);
 
-  const startInteraction = useCallback((e: React.MouseEvent<HTMLElement>, type: 'drag' | 'resize') => {
+  const startInteraction = useCallback((e: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>, type: 'drag' | 'resize') => {
     onFocus?.();
     e.stopPropagation();
 
@@ -214,12 +250,16 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     modalRef.current.style.width = `${initialW}px`;
     modalRef.current.style.height = `${initialH}px`;
     modalRef.current.style.transform = 'none';
+    modalRef.current.style.willChange = 'left, top, width, height';
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
     interactionStateRef.current = {
       active: true,
       type,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: clientX,
+      startY: clientY,
       originX: initialX,
       originY: initialY,
       originWidth: initialW,
@@ -231,8 +271,10 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     };
 
     setIsInteracting(true);
-    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mousemove', onPointerMove, { passive: true });
     window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    window.addEventListener('touchend', onPointerUp);
   }, [onFocus, onPointerMove, onPointerUp]);
 
   // Clean up any lingering window listeners and rAF
@@ -241,6 +283,8 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
       window.removeEventListener('mousemove', onPointerMove);
       window.removeEventListener('mouseup', onPointerUp);
+      window.removeEventListener('touchmove', onPointerMove);
+      window.removeEventListener('touchend', onPointerUp);
     };
   }, [onPointerMove, onPointerUp]);
 
@@ -315,6 +359,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
   const Resizer = () => (
     <div
       onMouseDown={(e) => startInteraction(e, 'resize')}
+      onTouchStart={(e) => startInteraction(e, 'resize')}
       className="absolute bottom-1 right-1 w-6 h-6 cursor-nwse-resize z-40 flex items-end justify-end p-1 select-none text-gray-400 hover:text-primary transition-colors touch-none"
       title="Arrastra para redimensionar"
     >
@@ -383,7 +428,8 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             {!noHeader && (
               <header 
                 onMouseDown={isDraggable ? (e) => startInteraction(e, 'drag') : undefined}
-                className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-200/70 dark:border-gray-700/70 bg-gray-50/80 dark:bg-gray-900/60 backdrop-blur-md shrink-0 select-none ${isDraggable ? 'cursor-move' : 'cursor-default'}`}
+                onTouchStart={isDraggable ? (e) => startInteraction(e, 'drag') : undefined}
+                className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-200/70 dark:border-gray-700/70 bg-gray-50/80 dark:bg-gray-900/60 backdrop-blur-md shrink-0 select-none ${isDraggable ? 'cursor-move touch-none' : 'cursor-default'}`}
                 onDoubleClick={() => {
                   if (allowFullscreen) {
                     setIsFullscreen(true);
@@ -449,4 +495,5 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
   );
 };
 
+export const ModalWindow = memo(ModalWindowComponent);
 export default ModalWindow;
