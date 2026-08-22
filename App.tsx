@@ -376,6 +376,25 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     focusSessions, onLogFocusSession
   } = props;
   
+  // Main Daily Goal for Desktop
+  const todayGoalKey = new Date().toLocaleDateString('en-CA');
+  const todayMainGoal = uiSettings?.dailyGoals?.[todayGoalKey];
+  const handleUpdateMainDailyGoal = (goal: { text: string; completed: boolean } | null) => {
+    setUiSettings((prev: any) => {
+      const prevGoals = prev?.dailyGoals || {};
+      const updatedGoals = { ...prevGoals };
+      if (!goal || !goal.text) {
+        delete updatedGoals[todayGoalKey];
+      } else {
+        updatedGoals[todayGoalKey] = goal;
+      }
+      return {
+        ...(prev || {}),
+        dailyGoals: updatedGoals
+      };
+    });
+  };
+
   // Local UI State for Desktop
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionQuote, setCompletionQuote] = useState('');
@@ -820,7 +839,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             focusSessions={focusSessions}
             isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
             mainDailyGoal={todayMainGoal}
-            onUpdateMainDailyGoal={(goal) => handleUpdateMainDailyGoal(todayGoalKey, goal)}
+            onUpdateMainDailyGoal={handleUpdateMainDailyGoal}
           />
       </div>
       
@@ -1043,6 +1062,25 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [isProjectEditorOpen, setIsProjectEditorOpen] = useState(false);
     const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
     
+    // Main Daily Goal for Mobile
+    const todayGoalKey = new Date().toLocaleDateString('en-CA');
+    const todayMainGoal = uiSettings?.dailyGoals?.[todayGoalKey];
+    const handleUpdateMainDailyGoal = (goal: { text: string; completed: boolean } | null) => {
+      setUiSettings((prev: any) => {
+        const prevGoals = prev?.dailyGoals || {};
+        const updatedGoals = { ...prevGoals };
+        if (!goal || !goal.text) {
+          delete updatedGoals[todayGoalKey];
+        } else {
+          updatedGoals[todayGoalKey] = goal;
+        }
+        return {
+          ...(prev || {}),
+          dailyGoals: updatedGoals
+        };
+      });
+    };
+
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
 
     const handleShowCompletionModal = (quote: string) => {
@@ -1252,7 +1290,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 focusSessions={focusSessions}
                                 isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
                                 mainDailyGoal={todayMainGoal}
-                                onUpdateMainDailyGoal={(goal) => handleUpdateMainDailyGoal(todayGoalKey, goal)}
+                                onUpdateMainDailyGoal={handleUpdateMainDailyGoal}
                             />
                         </div>
                     </>
@@ -1709,27 +1747,6 @@ const App: React.FC = () => {
   const [userBackgrounds, setUserBackgrounds] = useState<Background[]>([]);
   const [backgroundsAreLoading, setBackgroundsAreLoading] = useState(false);
 
-  // Main Daily Goal synced via ui_settings in Supabase
-  const todayGoalKey = new Date().toLocaleDateString('en-CA');
-  const todayMainGoal = uiSettings?.dailyGoals?.[todayGoalKey];
-
-  const handleUpdateMainDailyGoal = (dateKey: string, goal: { text: string; completed: boolean } | null) => {
-    setUiSettings((prev: any) => {
-      const prevGoals = prev?.dailyGoals || {};
-      const updatedGoals = { ...prevGoals };
-      if (!goal || !goal.text) {
-        delete updatedGoals[dateKey];
-      } else {
-        updatedGoals[dateKey] = goal;
-      }
-      return {
-        ...(prev || {}),
-        dailyGoals: updatedGoals
-      };
-    });
-  };
-
-
   // OneSignal Notification State
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPermissionBlocked, setIsPermissionBlocked] = useState(false);
@@ -2059,7 +2076,7 @@ const App: React.FC = () => {
         supabase.from('projects').select('*').order('name'),
         supabase.from('habits').select('*').order('created_at'),
         supabase.from('habit_records').select('*').order('created_at'),
-        supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).single(),
+        supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).maybeSingle(),
       ]);
       
       if (todosData) {
@@ -2267,7 +2284,7 @@ const App: React.FC = () => {
         settingsSaveTimeout.current = window.setTimeout(async () => {
           const { durations, showBackgroundTimer, backgroundTimerOpacity, autoMinimizeWindows } = pomodoroState;
           const settingsToSave = { durations, showBackgroundTimer, backgroundTimerOpacity, autoMinimizeWindows };
-          await supabase.from('profiles').update({ pomodoro_settings: settingsToSave }).eq('id', user.id);
+          await supabase.from('profiles').upsert({ id: user.id, pomodoro_settings: settingsToSave });
         }, 1500);
       }
     }
@@ -2284,7 +2301,7 @@ const App: React.FC = () => {
       if (user && dataLoaded && isOnline) {
         if (settingsSaveTimeout.current) clearTimeout(settingsSaveTimeout.current);
         settingsSaveTimeout.current = window.setTimeout(async () => {
-          await supabase.from('profiles').update({ ui_settings: uiSettings }).eq('id', user.id);
+          await supabase.from('profiles').upsert({ id: user.id, ui_settings: uiSettings });
         }, 1000);
       }
     }
