@@ -3967,47 +3967,80 @@ const App: React.FC = () => {
 
 
   // --- OneSignal / Notifications ---
+  const oneSignalInitializedRef = useRef(false);
+
   useEffect(() => {
     if (!user?.id || !ONE_SIGNAL_APP_ID) {
         return;
     }
-
-    const OneSignal = window.OneSignal || [];
 
     const onPermissionChange = (newPermissionStatus: 'granted' | 'denied' | 'default') => {
         setIsPermissionBlocked(newPermissionStatus === 'denied');
     };
 
     const onSubscriptionChange = (subscriptionState: { current: { optedIn: boolean } }) => {
-        setIsSubscribed(subscriptionState.current.optedIn);
+        setIsSubscribed(!!subscriptionState?.current?.optedIn);
     };
 
     const initializeOneSignal = async () => {
-        await OneSignal.init({
-            appId: ONE_SIGNAL_APP_ID,
-            allowLocalhostAsSecureOrigin: true,
-            autoRegister: false, // We will handle this manually.
-        });
+        try {
+            window.OneSignalDeferred = window.OneSignalDeferred || [];
+            window.OneSignalDeferred.push(async function(OneSignal: any) {
+                if (!OneSignal) return;
 
-        await OneSignal.login(user.id);
-        
-        // Initial state check using synchronous properties from v16 SDK
-        setIsPermissionBlocked(OneSignal.Notifications.permission === 'denied');
-        setIsSubscribed(OneSignal.User.PushSubscription.optedIn);
+                if (!oneSignalInitializedRef.current) {
+                    try {
+                        await OneSignal.init({
+                            appId: ONE_SIGNAL_APP_ID,
+                            allowLocalhostAsSecureOrigin: true,
+                            autoRegister: false,
+                            notifyButton: { enable: false },
+                            serviceWorkerParam: { scope: '/' },
+                            serviceWorkerPath: 'sw.js',
+                        });
+                        oneSignalInitializedRef.current = true;
+                    } catch (initErr: any) {
+                        // Ignore already initialized or already subscribed notices
+                        console.debug("OneSignal init status:", initErr?.message || initErr);
+                    }
+                }
 
-        // Attach listeners
-        OneSignal.Notifications.addEventListener('permissionChange', onPermissionChange);
-        OneSignal.User.PushSubscription.addEventListener('change', onSubscriptionChange);
+                try {
+                    if (user?.id) {
+                        await OneSignal.login(user.id);
+                    }
+                } catch (loginErr: any) {
+                    console.debug("OneSignal login status:", loginErr?.message || loginErr);
+                }
+                
+                // Initial state check safely
+                if (OneSignal.Notifications) {
+                    setIsPermissionBlocked(OneSignal.Notifications.permission === 'denied');
+                    OneSignal.Notifications.removeEventListener('permissionChange', onPermissionChange);
+                    OneSignal.Notifications.addEventListener('permissionChange', onPermissionChange);
+                }
+
+                if (OneSignal.User?.PushSubscription) {
+                    setIsSubscribed(Boolean(OneSignal.User.PushSubscription.optedIn));
+                    OneSignal.User.PushSubscription.removeEventListener('change', onSubscriptionChange);
+                    OneSignal.User.PushSubscription.addEventListener('change', onSubscriptionChange);
+                }
+            });
+        } catch (err) {
+            console.debug("OneSignal setup notice:", err);
+        }
     };
 
     initializeOneSignal();
 
     // Cleanup listeners when the user changes or component unmounts
     return () => {
-        if (window.OneSignal && window.OneSignal.Notifications && window.OneSignal.User) {
-            OneSignal.Notifications.removeEventListener('permissionChange', onPermissionChange);
-            OneSignal.User.PushSubscription.removeEventListener('change', onSubscriptionChange);
-        }
+        try {
+            if (window.OneSignal?.Notifications && window.OneSignal?.User?.PushSubscription) {
+                window.OneSignal.Notifications.removeEventListener('permissionChange', onPermissionChange);
+                window.OneSignal.User.PushSubscription.removeEventListener('change', onSubscriptionChange);
+            }
+        } catch (e) {}
     };
 }, [user?.id]);
 
