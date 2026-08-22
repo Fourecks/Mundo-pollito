@@ -706,7 +706,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         )}
         <ParticleLayer type={particleType} reduceParticles={isPowerSavingActive} />
 
-      <header className="fixed top-4 right-4 z-[70000] flex flex-col items-end gap-3">
+      <div className="fixed top-0 bottom-0 right-0 w-4 z-[70000] app-right-header-trigger-area"></div>
+      <header className="app-right-header-container fixed top-4 right-4 z-[70000] flex flex-col items-end gap-3 transition-transform duration-500 ease-in-out">
         {isSyncing && (
             <div className="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-2">
                 <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -817,7 +818,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         onSendTestNotification={handleNotificationAction}
       />
       
-      <div className={`fixed top-4 left-4 z-30 space-y-3 transition-all duration-500 ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block w-[22vw] min-w-[220px] max-w-[320px]`}>
+      <div className="fixed top-0 bottom-0 left-0 w-4 z-[70000] app-left-sidebar-trigger-area hidden md:block"></div>
+      <div className={`app-left-sidebar-container fixed top-4 left-4 z-30 space-y-3 transition-transform duration-500 ease-in-out ${isFocusMode ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'} hidden md:block w-[22vw] min-w-[220px] max-w-[320px]`}>
           <div className="flex items-center gap-2">
             <Greeting name={capitalizedUserName} />
             <button onClick={() => toggleWindow('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800">
@@ -1005,7 +1007,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           onRemoveFromCalendar={onRemoveFromCalendar}
           onSyncToCalendar={onSyncToCalendar}
         />
-        {(activeSpotifyTrack || activeTrack) && <SpotifyFloatingPlayer track={activeSpotifyTrack || activeTrack!} onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} />}
+        {(activeSpotifyTrack || activeTrack) && (
+            <ModalWindow isOpen onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} frameless isDraggable isResizable zIndex={getWindowZIndex('spotify')} onFocus={() => bringToFront('spotify')} className="w-[320px] h-[352px]" windowState={windowStatesRef.current.spotify} onStateChange={s => handleWindowStateChange('spotify', s)}>
+                <SpotifyFloatingPlayer track={activeSpotifyTrack || activeTrack!} onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} />
+            </ModalWindow>
+        )}
         <ProjectEditorPanel
           isOpen={isProjectEditorOpen}
           onClose={() => setIsProjectEditorOpen(false)}
@@ -1014,7 +1020,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         />
       </div>
 
-      <div className={`fixed bottom-0 left-0 right-0 transition-opacity duration-500 z-[40000] ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <div className="fixed bottom-0 left-0 right-0 h-4 z-[70000] app-dock-trigger-area"></div>
+      <div className={`app-dock-container fixed bottom-0 left-0 right-0 transition-transform duration-500 ease-in-out z-[40000] ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <Dock onButtonClick={toggleWindow} openWindows={openWindows} />
       </div>
 

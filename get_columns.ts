@@ -1,7 +1,6 @@
 import { supabase } from './supabaseClient';
-async function getCols() {
-  const { data, error } = await supabase.rpc('get_schema'); 
-  // If rpc not available, maybe we can query a system view? Not easily via client API usually.
-  console.log(error);
+async function get() {
+    const { data, error } = await supabase.from('projects').insert([{ user_id: '00000000-0000-0000-0000-000000000000' }]).select();
+    console.log(error);
 }
-getCols();
+get();

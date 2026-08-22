@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectInboxItem, ProjectActivity } from '../types';
-import { Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight } from 'lucide-react';
+import { Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video } from 'lucide-react';
 import { format, parseISO, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -52,7 +52,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     onEditTodo,
     onOpenProjectEditor
 }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'inbox' | 'activity'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'inbox' | 'activity' | 'team'>('overview');
     
     // Inline Kanabn Add State
     const [addingToColumn, setAddingToColumn] = useState<string | null>(null);
@@ -213,6 +213,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                         { id: 'docs', label: 'Documentación', icon: FileText },
                         { id: 'inbox', label: 'Bandeja', icon: Inbox },
+                        { id: 'team', label: 'Equipo', icon: Users },
                         { id: 'activity', label: 'Historial', icon: Clock },
                     ].map(tab => (
                         <button
@@ -1062,6 +1063,77 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
+    const renderTeam = () => {
+        if (!activeProject) return null;
+        
+        return (
+            <div className="p-6 max-w-5xl mx-auto w-full h-full flex flex-col md:flex-row gap-6 pb-20">
+                <div className="flex-1 space-y-6">
+                    <div className="bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Miembros del Proyecto</h3>
+                            <button className="flex items-center gap-1 text-sm bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary-dark transition-colors">
+                                <Plus className="w-4 h-4" /> Invitar
+                            </button>
+                        </div>
+                        <p className="text-sm text-gray-500 mb-4">
+                            El sistema multi-usuario está preparado. Para activarlo completamente en tu base de datos Supabase, necesitas correr el archivo <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">supabase/migrations/project_collaboration.sql</code> proporcionado en el código fuente.
+                        </p>
+                        <div className="space-y-3">
+                            {/* Dummy current user */}
+                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-100 dark:border-gray-700/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                                        YO
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">Tú (Propietario)</p>
+                                        <p className="text-xs text-gray-500">Administrador</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold flex items-center gap-2"><Video className="w-5 h-5 text-emerald-500" /> Reuniones de Equipo</h3>
+                        </div>
+                        <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-lg p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                            <div>
+                                <h4 className="font-semibold text-emerald-800 dark:text-emerald-400">Google Meet Rápido</h4>
+                                <p className="text-sm text-emerald-600 dark:text-emerald-500/80 mt-1">Inicia una videollamada al instante y comparte el enlace con tu equipo.</p>
+                            </div>
+                            <button onClick={() => window.open('https://meet.google.com/new', '_blank')} className="flex items-center gap-2 whitespace-nowrap bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
+                                <Video className="w-4 h-4" /> Iniciar Meet
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex-[0.6] bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl flex flex-col shadow-sm h-[500px] md:h-auto">
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
+                        <MessageSquare className="w-5 h-5 text-blue-500" />
+                        <h3 className="text-lg font-bold">Chat del Proyecto</h3>
+                    </div>
+                    <div className="flex-1 p-4 flex flex-col justify-end bg-gray-50/50 dark:bg-black/20">
+                        <div className="text-center text-sm text-gray-500 my-auto p-4">
+                            No hay mensajes recientes en este proyecto.
+                        </div>
+                    </div>
+                    <div className="p-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#0a0a0a] rounded-b-xl">
+                        <div className="flex gap-2">
+                            <input type="text" placeholder="Escribe un mensaje al equipo..." className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" disabled />
+                            <button className="bg-blue-500 opacity-50 cursor-not-allowed text-white p-2 rounded-lg" disabled>
+                                <ArrowRight className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderActivity = () => {
         if (!activeProject) return null;
         const activities = activeProject.activities || [];
@@ -1105,6 +1177,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             {activeTab === 'roadmap' && renderRoadmap()}
                             {activeTab === 'docs' && renderDocs()}
                             {activeTab === 'inbox' && renderInbox()}
+                            {activeTab === 'team' && renderTeam()}
                             {activeTab === 'activity' && renderActivity()}
                         </div>
                     </>

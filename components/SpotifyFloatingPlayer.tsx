@@ -39,11 +39,11 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
 
     if (!sessionConfirmed) {
         return (
-            <div className="fixed bottom-4 right-4 z-[500] transition-all duration-300 ease-in-out animate-pop-in w-80 max-w-[calc(100vw-2rem)] bg-[#121212] border border-white/10 text-white rounded-2xl p-5 shadow-2xl">
+            <div className="w-full h-full bg-[#121212] border border-white/10 text-white rounded-2xl p-5 shadow-2xl flex flex-col justify-center">
                 <div className="relative">
                     <button
                         onClick={onClose}
-                        className="absolute -top-1 -right-1 p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                        className="absolute -top-3 -right-3 p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer z-50"
                         aria-label="Cerrar"
                     >
                         <CloseIcon />
@@ -88,12 +88,12 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
     }
 
     return (
-        <div className="fixed bottom-4 right-4 z-[500] transition-all duration-300 ease-in-out animate-pop-in w-80 group">
+        <div className="w-full h-full relative group">
             <iframe
                 title="Spotify Player"
                 src={embedUrl}
                 width="100%"
-                height={playerHeight}
+                height="100%"
                 frameBorder="0"
                 allowFullScreen
                 allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"

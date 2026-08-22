@@ -520,8 +520,8 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
                id="main-daily-goal-container"
                className={`rounded-xl p-2.5 mb-2.5 border transition-all duration-300 shadow-sm ${
                  isGoalCompleted
-                   ? 'bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-emerald-950/40 border-emerald-300/70 dark:border-emerald-700/60'
-                   : 'bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 dark:from-amber-950/40 dark:via-rose-950/30 dark:to-amber-950/40 border-amber-300/80 dark:border-amber-700/60'
+                   ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+                   : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
                }`}
              >
                 {/* Header with Badge & Status */}

@@ -78,6 +78,19 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
 
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.setAttribute('data-fullscreen-window', 'true');
+    } else {
+      // Small delay to prevent flashing if switching between windows
+      setTimeout(() => {
+        if (!document.querySelector('.is-fullscreen-window')) {
+          document.body.removeAttribute('data-fullscreen-window');
+        }
+      }, 50);
+    }
+  }, [isFullscreen]);
+
   // Refs for tracking live coordinates without causing component re-renders
   const currentPosRef = useRef<{ x: number; y: number } | null>(pos);
   const currentSizeRef = useRef<{ width: number; height: number } | null>(size);
@@ -296,7 +309,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
       <div
         ref={modalRef}
         onClick={onFocus}
-        className="fixed inset-0 flex flex-col bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 overflow-hidden select-auto animate-fade-in pointer-events-auto"
+        className="fixed inset-0 flex flex-col bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 overflow-hidden select-auto animate-fade-in pointer-events-auto is-fullscreen-window"
         role="dialog"
         aria-modal="true"
         style={{ zIndex: 60000 }}
