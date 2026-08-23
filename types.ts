@@ -107,6 +107,9 @@ export interface Sprint {
   start_date: string;
   end_date: string;
   status: 'planning' | 'active' | 'completed';
+  capacity_points?: number;
+  completed_points?: number;
+  retrospective?: string;
   created_at: string;
 }
 
@@ -115,16 +118,37 @@ export interface Milestone {
   project_id: number;
   name: string;
   target_date: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  start_date?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'delayed';
   description?: string;
+  category?: 'Sprint Release' | 'Product Launch' | 'Architecture' | 'Quality Assurance' | 'Client Review' | 'Other';
+  progress_percentage?: number;
+  owner_email?: string;
+  linked_sprint_id?: string;
+}
+
+export interface ProjectDocFolder {
+  id: string;
+  project_id: number;
+  name: string;
+  color?: string;
+  description?: string;
+  created_at: string;
 }
 
 export interface ProjectDoc {
   id: string;
   project_id: number;
+  folder_id?: string | null;
   title: string;
   content: string;
   category?: 'Requirements' | 'Meeting Notes' | 'Architecture' | 'Ideas' | 'Research' | 'Decisions' | 'Specifications' | 'Other';
+  file_url?: string;
+  file_name?: string;
+  file_type?: string;
+  file_size?: number;
+  tags?: string[];
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -132,9 +156,44 @@ export interface ProjectDoc {
 export interface ProjectInboxItem {
   id: string;
   project_id: number;
+  title?: string;
   text: string;
-  type?: 'idea' | 'task' | 'note' | 'link';
+  type?: 'announcement' | 'mention' | 'task_update' | 'alert' | 'idea' | 'note' | 'link';
+  priority?: 'urgent' | 'normal' | 'info';
+  author_name?: string;
+  author_email?: string;
+  is_read?: boolean;
+  is_starred?: boolean;
+  is_archived?: boolean;
+  related_tab?: 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat';
+  related_item_id?: string | number;
   created_at: string;
+}
+
+export interface ProjectChatMessage {
+  id: string;
+  project_id: number;
+  sender_id?: string;
+  sender_name: string;
+  sender_email: string;
+  text: string;
+  created_at: string;
+  doc_reference?: {
+    id: string;
+    title: string;
+    file_type?: string;
+    file_name?: string;
+    file_size_formatted?: string;
+    folder_name?: string;
+    url?: string;
+  };
+  reactions?: Record<string, string[]>;
+  is_pinned?: boolean;
+  reply_to?: {
+    id: string;
+    sender_name: string;
+    text: string;
+  };
 }
 
 export interface ProjectActivity {
@@ -167,8 +226,10 @@ export interface Project {
   template_type?: string | null;
   sprints?: Sprint[];
   milestones?: Milestone[];
+  doc_folders?: ProjectDocFolder[];
   docs?: ProjectDoc[];
   inbox?: ProjectInboxItem[];
+  chat_messages?: ProjectChatMessage[];
   activities?: ProjectActivity[];
 }
 
