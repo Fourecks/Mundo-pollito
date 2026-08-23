@@ -41,6 +41,19 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
     );
 };
 
+const VideoStream = ({ stream }: { stream: MediaStream | null }) => {
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    React.useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(err => console.warn("Error playing video stream:", err));
+        }
+    }, [stream]);
+    
+    if (!stream) return null;
+    return <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-lg" />;
+};
+
 export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     projects,
     allTodos,
@@ -99,14 +112,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
     const [newChannelName, setNewChannelName] = useState('');
     const [newChannelDescription, setNewChannelDescription] = useState('');
-    const [newChannelEmoji, setNewChannelEmoji] = useState('💬');
+    const [newChannelEmoji, setNewChannelEmoji] = useState('#');
     const [newChannelIsPrivate, setNewChannelIsPrivate] = useState(false);
 
     // Channel Edit/Delete States
     const [editingChannel, setEditingChannel] = useState<ProjectChannel | null>(null);
     const [editingChannelName, setEditingChannelName] = useState('');
     const [editingChannelDescription, setEditingChannelDescription] = useState('');
-    const [editingChannelEmoji, setEditingChannelEmoji] = useState('💬');
+    const [editingChannelEmoji, setEditingChannelEmoji] = useState('#');
     const [editingChannelIsPrivate, setEditingChannelIsPrivate] = useState(false);
     const [channelToDelete, setChannelToDelete] = useState<ProjectChannel | null>(null);
 
@@ -126,6 +139,17 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [huddleParticipants, setHuddleParticipants] = useState<any[]>([]);
     const [showHuddleParticipants, setShowHuddleParticipants] = useState(false);
+
+    // Live WebRTC and Audio Capture/Analyze States
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+    const localStreamRef = useRef<MediaStream | null>(null);
+    const screenStreamRef = useRef<MediaStream | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const [localVolume, setLocalVolume] = useState<number>(0);
+    const volumeIntervalRef = useRef<any>(null);
+    const [speakingParticipants, setSpeakingParticipants] = useState<Record<string, boolean>>({});
 
     // Simulated Typing Statuses
     const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
@@ -219,6 +243,97 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         return () => clearInterval(interval);
     }, [activeProject, selectedChannelId, activeTab]);
 
+    // Simulated active speaking for other participants
+    React.useEffect(() => {
+        if (!isHuddleActive) {
+            setSpeakingParticipants({});
+            return;
+        }
+        const sInterval = setInterval(() => {
+            const speaking: Record<string, boolean> = {};
+            huddleParticipants.forEach(p => {
+                if (p.name === 'Tú') {
+                    speaking['Tú'] = localVolume > 10;
+                } else if (p.has_mic && Math.random() > 0.65) {
+                    speaking[p.name] = true;
+                }
+            });
+            setSpeakingParticipants(speaking);
+        }, 1200);
+
+        return () => clearInterval(sInterval);
+    }, [isHuddleActive, huddleParticipants, localVolume]);
+
+    // Setup visual audio analysis using Web Audio API
+    const setUpAudioAnalysis = (stream: MediaStream) => {
+        try {
+            if (volumeIntervalRef.current) {
+                clearInterval(volumeIntervalRef.current);
+                volumeIntervalRef.current = null;
+            }
+            if (audioContextRef.current) {
+                audioContextRef.current.close().catch(() => {});
+            }
+
+            const audioTracks = stream.getAudioTracks();
+            if (audioTracks.length === 0) return;
+
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            audioContextRef.current = audioContext;
+
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            analyserRef.current = analyser;
+
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            volumeIntervalRef.current = setInterval(() => {
+                if (!analyserRef.current) return;
+                analyserRef.current.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / dataArray.length;
+                setLocalVolume(Math.min(100, Math.round((average / 128) * 100)));
+            }, 100);
+
+        } catch (e) {
+            console.warn("Audio Context setup not supported or failed:", e);
+        }
+    };
+
+    const stopLocalStream = () => {
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => track.stop());
+            localStreamRef.current = null;
+        }
+        setLocalStream(null);
+        
+        if (volumeIntervalRef.current) {
+            clearInterval(volumeIntervalRef.current);
+            volumeIntervalRef.current = null;
+        }
+        if (audioContextRef.current) {
+            audioContextRef.current.close().catch(() => {});
+            audioContextRef.current = null;
+        }
+        analyserRef.current = null;
+        setLocalVolume(0);
+    };
+
+    const stopScreenStream = () => {
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach(track => track.stop());
+            screenStreamRef.current = null;
+        }
+        setScreenStream(null);
+        setIsScreenSharing(false);
+    };
+
     // Simulated background huddle joiners
     React.useEffect(() => {
         if (!isHuddleActive) {
@@ -250,6 +365,97 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             clearTimeout(t2);
         };
     }, [isHuddleActive]);
+
+    // Handle initial streams & camera toggle
+    React.useEffect(() => {
+        if (!isHuddleActive) {
+            stopLocalStream();
+            stopScreenStream();
+            return;
+        }
+
+        const initMedia = async () => {
+            try {
+                if (localStreamRef.current) {
+                    localStreamRef.current.getTracks().forEach(track => track.stop());
+                }
+
+                const constraints = {
+                    audio: true, 
+                    video: isVideoOn ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } } : false
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                localStreamRef.current = stream;
+                setLocalStream(stream);
+
+                stream.getAudioTracks().forEach(track => {
+                    track.enabled = isMicOn;
+                });
+
+                if (isMicOn) {
+                    setUpAudioAnalysis(stream);
+                } else {
+                    setLocalVolume(0);
+                }
+
+            } catch (err) {
+                console.error("Error securing user media permissions:", err);
+                alert("No se pudo acceder al micrófono o la cámara. Verifica los permisos de tu navegador.");
+                setIsMicOn(false);
+                setIsVideoOn(false);
+            }
+        };
+
+        initMedia();
+
+        return () => {};
+    }, [isHuddleActive, isVideoOn]);
+
+    // Handle Mic toggle separately to avoid starting/stopping video tracks
+    React.useEffect(() => {
+        if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach(track => {
+                track.enabled = isMicOn;
+            });
+            if (isMicOn) {
+                setUpAudioAnalysis(localStreamRef.current);
+            } else {
+                setLocalVolume(0);
+                if (volumeIntervalRef.current) {
+                    clearInterval(volumeIntervalRef.current);
+                    volumeIntervalRef.current = null;
+                }
+            }
+        }
+    }, [isMicOn]);
+
+    // Handle Screen Sharing toggle
+    React.useEffect(() => {
+        if (!isHuddleActive) return;
+
+        const toggleScreen = async () => {
+            if (isScreenSharing) {
+                try {
+                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                    screenStreamRef.current = stream;
+                    setScreenStream(stream);
+
+                    stream.getVideoTracks()[0].onended = () => {
+                        stopScreenStream();
+                    };
+
+                } catch (err) {
+                    console.error("Error requesting screen share:", err);
+                    setIsScreenSharing(false);
+                }
+            } else {
+                stopScreenStream();
+            }
+        };
+
+        toggleScreen();
+    }, [isScreenSharing, isHuddleActive]);
 
     // Update user's media states in active huddle participants list
     React.useEffect(() => {
@@ -1030,25 +1236,30 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             e.preventDefault();
             if (!newChannelName.trim()) return;
 
-            const channelId = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
-            const duplicate = activeChannels.some(c => c.id === channelId);
+            const rawName = newChannelName.trim().toLowerCase();
+            const cleanName = rawName.replace(/^#+/, '').replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
+            if (!cleanName) {
+                alert('Nombre de canal inválido. Usa letras, números, guiones y guiones bajos.');
+                return;
+            }
+
+            const duplicate = activeChannels.some(c => c.id === cleanName);
             if (duplicate) {
                 alert('Ya existe un canal con ese nombre.');
                 return;
             }
 
             const newChan: ProjectChannel = {
-                id: channelId,
+                id: cleanName,
                 project_id: activeProject.id,
-                name: channelId,
+                name: cleanName,
                 description: newChannelDescription.trim() || undefined,
-                emoji: newChannelEmoji,
+                emoji: '#',
                 is_private: newChannelIsPrivate,
                 created_at: new Date().toISOString()
             };
 
             const updatedChannels = [...activeChannels, newChan];
-            onUpdateProject(activeProject.id, { channels: updatedChannels });
             
             // Post notification message in general about the new channel
             const systemMsg: ProjectChatMessage = {
@@ -1057,7 +1268,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 channel_id: 'general',
                 sender_name: 'Sistema 🐥',
                 sender_email: 'sistema@pollito.com',
-                text: `✨ El canal #${channelId} ha sido creado por Tú: "${newChannelDescription || 'Sin descripción'}"`,
+                text: `✨ El canal #${cleanName} ha sido creado por Tú: "${newChannelDescription || 'Sin descripción'}"`,
                 created_at: new Date().toISOString()
             };
 
@@ -1069,7 +1280,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             setSelectedChannelId(newChan.id);
             setNewChannelName('');
             setNewChannelDescription('');
-            setNewChannelEmoji('💬');
+            setNewChannelEmoji('#');
             setNewChannelIsPrivate(false);
             setIsCreateChannelOpen(false);
         };
@@ -1078,12 +1289,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             e.preventDefault();
             if (!editingChannel || !editingChannelName.trim()) return;
 
-            const updatedChanId = editingChannelName.trim().toLowerCase().replace(/\s+/g, '-');
+            const rawName = editingChannelName.trim().toLowerCase();
+            const cleanName = rawName.replace(/^#+/, '').replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
+            if (!cleanName) {
+                alert('Nombre de canal inválido. Usa letras, números, guiones y guiones bajos.');
+                return;
+            }
+
+            const updatedChanId = cleanName;
             const updatedChan: ProjectChannel = {
                 ...editingChannel,
                 name: updatedChanId,
                 description: editingChannelDescription.trim() || undefined,
-                emoji: editingChannelEmoji,
+                emoji: '#',
                 is_private: editingChannelIsPrivate
             };
 
@@ -1309,12 +1527,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         onClick={() => setSelectedChannelId(chan.id)}
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className="text-sm shrink-0">{chan.emoji}</span>
+                                            <span className="text-gray-400 dark:text-gray-500 shrink-0">
+                                                {chan.is_private ? <Lock className="w-3.5 h-3.5" /> : <Hash className="w-3.5 h-3.5" />}
+                                            </span>
                                             <div className="truncate flex items-center gap-1">
                                                 <span className="text-xs truncate">{chan.name}</span>
-                                                {chan.is_private && <Lock className="w-3 h-3 text-gray-400 shrink-0" />}
                                                 {isChanHuddleActive && (
-                                                    <span className="flex h-2 w-2 shrink-0">
+                                                    <span className="flex h-2 w-2 shrink-0 relative">
                                                         <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-emerald-400 opacity-75"></span>
                                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                                     </span>
@@ -1381,10 +1600,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     {/* Channel Main Header */}
                     <div className="px-6 py-3.5 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-4 shrink-0">
                         <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg">{currentChannel.emoji}</span>
-                                <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">#{currentChannel.name}</h2>
-                                {currentChannel.is_private && <Lock className="w-3.5 h-3.5 text-gray-400" />}
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-gray-400 dark:text-gray-500 shrink-0">
+                                    {currentChannel.is_private ? <Lock className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
+                                </span>
+                                <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">{currentChannel.name}</h2>
                             </div>
                             {currentChannel.description && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{currentChannel.description}</p>
@@ -1459,7 +1679,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         {huddleParticipants.map((p, idx) => (
                                             <div 
                                                 key={p.email || idx} 
-                                                className="w-6 h-6 rounded-full bg-blue-600 border border-slate-900 text-[10px] font-bold flex items-center justify-center"
+                                                className={`w-6 h-6 rounded-full bg-blue-600 border border-slate-900 text-[10px] font-bold flex items-center justify-center transition-all ${
+                                                    (p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name]) 
+                                                        ? 'ring-2 ring-emerald-400 scale-105' 
+                                                        : ''
+                                                }`}
                                                 title={`${p.name} (${p.email}) ${p.has_mic ? '🎙️' : '🔇'} ${p.has_video ? '📹' : ''}`}
                                             >
                                                 {p.name.charAt(0).toUpperCase()}
@@ -1517,38 +1741,58 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             {/* Expanded Participant Control & Camera Streams List */}
                             {(showHuddleParticipants || isVideoOn) && (
                                 <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                    {huddleParticipants.map((p, idx) => (
-                                        <div key={p.email || idx} className="bg-black/40 rounded-lg p-2.5 border border-white/5 relative overflow-hidden flex flex-col justify-between min-h-[90px]">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[11px] font-bold text-gray-200 truncate">{p.name}</span>
-                                                <span className="text-[10px] text-gray-500">{p.name === 'Tú' ? '(Tú)' : ''}</span>
-                                            </div>
-
-                                            {/* Video placeholder view */}
-                                            {p.has_video ? (
-                                                <div className="absolute inset-0 bg-slate-900 flex items-center justify-center mt-6">
-                                                    <div className="relative flex flex-col items-center">
-                                                        <span className="text-[20px] animate-bounce">🐥</span>
-                                                        <span className="text-[8px] tracking-widest text-emerald-400 uppercase font-bold">Cámara Activa</span>
-                                                    </div>
+                                    {huddleParticipants.map((p, idx) => {
+                                        const isSpeaking = p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name];
+                                        return (
+                                            <div 
+                                                key={p.email || idx} 
+                                                className={`bg-black/40 rounded-lg p-2.5 border relative overflow-hidden flex flex-col justify-between min-h-[110px] transition-all duration-200 ${
+                                                    isSpeaking 
+                                                        ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.35)]' 
+                                                        : 'border-white/5'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between z-10">
+                                                    <span className="text-[11px] font-bold text-gray-200 truncate">{p.name}</span>
+                                                    <span className="text-[10px] text-gray-500">{p.name === 'Tú' ? '(Tú)' : ''}</span>
                                                 </div>
-                                            ) : (
-                                                <div className="flex-1 flex items-center justify-center my-1.5">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 text-gray-300 font-bold text-xs flex items-center justify-center">
-                                                        {p.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                </div>
-                                            )}
 
-                                            <div className="flex items-center justify-between z-10 bg-black/50 p-1 rounded mt-auto text-[9px] text-gray-400">
-                                                <span className="flex items-center gap-1">
-                                                    {p.has_mic ? <Mic className="w-2.5 h-2.5 text-emerald-400" /> : <MicOff className="w-2.5 h-2.5 text-red-400" />}
-                                                    {p.has_mic ? 'Audio' : 'Mute'}
-                                                </span>
-                                                {p.has_screen && <span className="text-blue-400">Compartiendo</span>}
+                                                {/* Video Stream / Static Avatar view */}
+                                                {p.has_screen && p.name === 'Tú' && screenStream ? (
+                                                    <div className="absolute inset-0 bg-slate-900 mt-6 overflow-hidden">
+                                                        <VideoStream stream={screenStream} />
+                                                    </div>
+                                                ) : p.has_video ? (
+                                                    <div className="absolute inset-0 bg-slate-900 mt-6 overflow-hidden">
+                                                        {p.name === 'Tú' && localStream ? (
+                                                            <VideoStream stream={localStream} />
+                                                        ) : (
+                                                            <div className="w-full h-full flex flex-col items-center justify-center relative">
+                                                                <span className="text-[20px] animate-pulse">🐣</span>
+                                                                <span className="text-[8px] tracking-widest text-emerald-400 uppercase font-bold">Cámara Activa</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex-1 flex items-center justify-center my-1.5 z-10">
+                                                        <div className={`w-8 h-8 rounded-full bg-slate-800 border text-gray-300 font-bold text-xs flex items-center justify-center transition-all ${
+                                                            isSpeaking ? 'border-emerald-400 bg-slate-800 ring-2 ring-emerald-500/20' : 'border-slate-700'
+                                                        }`}>
+                                                            {p.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center justify-between z-10 bg-black/50 p-1 rounded mt-auto text-[9px] text-gray-400">
+                                                    <span className="flex items-center gap-1">
+                                                        {p.has_mic ? <Mic className="w-2.5 h-2.5 text-emerald-400" /> : <MicOff className="w-2.5 h-2.5 text-red-400" />}
+                                                        {p.has_mic ? 'Audio' : 'Mute'}
+                                                    </span>
+                                                    {p.has_screen && <span className="text-blue-400">Compartiendo</span>}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
 
@@ -1743,39 +1987,40 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         </button>
                                                     );
                                                 })}
-
-                                                {/* React Quick Picker Popover On Hover/Group */}
-                                                <div className="hidden group-hover:flex items-center gap-0.5 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-full px-1.5 py-0.5 shadow-sm">
-                                                    {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
-                                                        const voters = reactions[emoji] || [];
-                                                        const hasReacted = voters.includes('tu_correo@ejemplo.com');
-                                                        return (
-                                                            <button
-                                                                key={emoji}
-                                                                onClick={() => handleReactToMessage(msg.id, emoji)}
-                                                                className={`p-1 hover:scale-125 transition-transform rounded text-xs ${hasReacted ? 'grayscale-0' : 'grayscale hover:grayscale-0'}`}
-                                                            >
-                                                                {emoji}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
                                             </div>
 
                                         </div>
 
-                                        {/* 7. PIN & REPLY OVERLAY ACTIONS */}
-                                        <div className="absolute right-3 top-3 hidden group-hover:flex items-center gap-1 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-lg p-1 shadow-sm z-10">
+                                        {/* 7. FLOATING ACTIONS & REACTION PICKER OVERLAY (SLACK STYLE) */}
+                                        <div className="absolute right-4 -top-3 hidden group-hover:flex items-center gap-1 bg-white dark:bg-[#161616] border border-gray-200 dark:border-gray-800 rounded-lg p-1 shadow-md z-20">
+                                            {/* Quick Reactions Selector */}
+                                            <div className="flex items-center gap-0.5 border-r border-gray-100 dark:border-gray-800/80 pr-1.5 mr-1">
+                                                {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
+                                                    const voters = reactions[emoji] || [];
+                                                    const hasReacted = voters.includes('tu_correo@ejemplo.com');
+                                                    return (
+                                                        <button
+                                                            key={emoji}
+                                                            onClick={() => handleReactToMessage(msg.id, emoji)}
+                                                            className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all text-xs ${hasReacted ? 'grayscale-0 scale-110' : 'grayscale hover:grayscale-0 hover:scale-110'}`}
+                                                            title={`Reaccionar con ${emoji}`}
+                                                        >
+                                                            {emoji}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
                                             <button 
                                                 onClick={() => handleTogglePinMessage(msg.id)}
-                                                className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${isPinned ? 'text-amber-500' : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                                                className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-all ${isPinned ? 'text-amber-500' : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
                                                 title={isPinned ? 'Desfijar Mensaje' : 'Fijar Mensaje'}
                                             >
                                                 <Pin className="w-3.5 h-3.5" />
                                             </button>
                                             <button 
                                                 onClick={() => setReplyingToMessage(msg)}
-                                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-500"
+                                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-500 transition-all"
                                                 title="Responder"
                                             >
                                                 <Share2 className="w-3.5 h-3.5 rotate-180" />
@@ -1891,31 +2136,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Icono / Emoji</label>
-                                        <select 
-                                            value={newChannelEmoji}
-                                            onChange={e => setNewChannelEmoji(e.target.value)}
-                                            className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
-                                        >
-                                            {['💬', '💡', '📢', '🚀', '🎨', '🔒', '💻', '🍕', '⚙️', '📈', '🤝', '🐞'].map(em => (
-                                                <option key={em} value={em}>{em} {em === '💬' ? 'Chat' : em === '💡' ? 'Ideas' : em === '📢' ? 'Anuncios' : em === '💻' ? 'Código' : 'Otro'}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="flex flex-col justify-end">
-                                        <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
-                                            <input 
-                                                type="checkbox"
-                                                checked={newChannelIsPrivate}
-                                                onChange={e => setNewChannelIsPrivate(e.target.checked)}
-                                                className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
-                                            />
-                                            <span>Privado 🔒</span>
-                                        </label>
-                                    </div>
+                                <div className="flex items-center pt-1">
+                                    <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                                        <input 
+                                            type="checkbox"
+                                            checked={newChannelIsPrivate}
+                                            onChange={e => setNewChannelIsPrivate(e.target.checked)}
+                                            className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+                                        />
+                                        <span>Canal Privado 🔒</span>
+                                    </label>
                                 </div>
 
                                 <div className="pt-2 flex justify-end gap-2">
@@ -1979,31 +2209,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Icono / Emoji</label>
-                                        <select 
-                                            value={editingChannelEmoji}
-                                            onChange={e => setEditingChannelEmoji(e.target.value)}
-                                            className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
-                                        >
-                                            {['💬', '💡', '📢', '🚀', '🎨', '🔒', '💻', '🍕', '⚙️', '📈', '🤝', '🐞'].map(em => (
-                                                <option key={em} value={em}>{em}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="flex flex-col justify-end">
-                                        <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
-                                            <input 
-                                                type="checkbox"
-                                                checked={editingChannelIsPrivate}
-                                                onChange={e => setEditingChannelIsPrivate(e.target.checked)}
-                                                className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
-                                            />
-                                            <span>Privado 🔒</span>
-                                        </label>
-                                    </div>
+                                <div className="flex items-center pt-1">
+                                    <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                                        <input 
+                                            type="checkbox"
+                                            checked={editingChannelIsPrivate}
+                                            onChange={e => setEditingChannelIsPrivate(e.target.checked)}
+                                            className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+                                        />
+                                        <span>Canal Privado 🔒</span>
+                                    </label>
                                 </div>
 
                                 <div className="pt-2 flex justify-end gap-2">
