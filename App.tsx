@@ -992,7 +992,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       allTodos={flatAllTodos}
                       activeProjectId={viewingProjectId}
                       invitations={projectInvitations}
-                      currentUserEmail={user?.email}
+                      currentUserEmail={currentUser?.email}
                       onSendInvitation={onSendInvitation}
                       onAcceptInvitation={handleAcceptInvitation}
                       onDeclineInvitation={handleDeclineInvitation}
@@ -1375,7 +1375,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             allTodos={flatAllTodos}
                             activeProjectId={viewingProjectId}
                             invitations={projectInvitations}
-                            currentUserEmail={user?.email}
+                            currentUserEmail={currentUser?.email}
                             onSendInvitation={onSendInvitation}
                             onAcceptInvitation={handleAcceptInvitation}
                             onDeclineInvitation={handleDeclineInvitation}
