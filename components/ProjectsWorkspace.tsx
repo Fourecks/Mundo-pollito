@@ -9,6 +9,37 @@ import {
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+const safeParseDate = (d: any): Date | null => {
+    if (!d) return null;
+    if (typeof d === 'string') {
+        try {
+            const parsed = parseISO(d);
+            return isNaN(parsed.getTime()) ? null : parsed;
+        } catch {
+            return null;
+        }
+    }
+    if (typeof d === 'object' && d.year && d.month && d.day) {
+        return new Date(d.year, d.month - 1, d.day);
+    }
+    return null;
+};
+
+const formatDueDateString = (d: any): string => {
+    if (!d) return '';
+    if (typeof d === 'string') return d;
+    if (typeof d === 'object' && d.year && d.month && d.day) {
+        return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+    }
+    return String(d);
+};
+
+const isPastDueDate = (d: any): boolean => {
+    const parsed = safeParseDate(d);
+    if (!parsed) return false;
+    return isPast(parsed) && !isToday(parsed);
+};
+
 interface ProjectsWorkspaceProps {
     currentUser?: any;
     projects: Project[];
@@ -730,12 +761,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         
         const activeSprint = (activeProject.sprints || []).find(s => s.status === 'active');
         const pendingMilestones = (activeProject.milestones || []).filter(m => m.status !== 'completed');
-        const overdueTasks = projectTodos.filter(t => t.due_date && !t.completed && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)));
+        const overdueTasks = projectTodos.filter(t => t.due_date && !t.completed && isPastDueDate(t.due_date));
 
         // Project Health Score
         let healthLabel = 'Excelente';
         let healthBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400';
-        if (overdueTasks.length > 2 || (activeProject.target_date && isPast(parseISO(activeProject.target_date)))) {
+        if (overdueTasks.length > 2 || (activeProject.target_date && isPastDueDate(activeProject.target_date))) {
             healthLabel = 'Requiere Atención';
             healthBadgeClass = 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400';
         } else if (overdueTasks.length > 0) {
@@ -786,7 +817,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             {pendingMilestones.length > 0 ? pendingMilestones[0].name : 'Sin hitos pendientes'}
                         </span>
                         <span className="text-xs text-gray-500 mt-1">
-                            {pendingMilestones.length > 0 && pendingMilestones[0].target_date ? format(parseISO(pendingMilestones[0].target_date), 'd MMM yyyy', { locale: es }) : 'Configurar Hoja de Ruta'}
+                            {pendingMilestones.length > 0 && pendingMilestones[0].target_date && safeParseDate(pendingMilestones[0].target_date) ? format(safeParseDate(pendingMilestones[0].target_date)!, 'd MMM yyyy', { locale: es }) : 'Configurar Hoja de Ruta'}
                         </span>
                     </div>
                 </div>
@@ -837,7 +868,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             {item.type === 'announcement' && <Megaphone className="w-3.5 h-3.5 text-blue-500" />}
                                             {item.title || 'Nota Informativa'}
                                         </span>
-                                        <span className="text-[10px] text-gray-400">{format(parseISO(item.created_at), 'd MMM, HH:mm', { locale: es })}</span>
+                                        <span className="text-[10px] text-gray-400">{item.created_at && safeParseDate(item.created_at) ? format(safeParseDate(item.created_at)!, 'd MMM, HH:mm', { locale: es }) : ''}</span>
                                     </div>
                                     <p className="text-xs text-gray-600 dark:text-gray-300">{item.text}</p>
                                 </div>
@@ -1459,7 +1490,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
                                             </td>
                                             <td className="py-2.5 px-4 text-gray-500 text-[11px]">
-                                                {doc.created_at ? format(parseISO(doc.created_at), 'dd/MM/yyyy') : '-'}
+                                                {doc.created_at && safeParseDate(doc.created_at) ? format(safeParseDate(doc.created_at)!, 'dd/MM/yyyy') : '-'}
                                             </td>
                                             <td className="py-2.5 px-4 text-right">
                                                 <div className="flex items-center justify-end gap-1.5">
@@ -2161,7 +2192,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         {/* Sender Metadata */}
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <span className="text-xs font-bold text-gray-900 dark:text-white">{msg.sender_name}</span>
-                                                            <span className="text-[10px] text-gray-400">{format(parseISO(msg.created_at), 'HH:mm', { locale: es })}</span>
+                                                            <span className="text-[10px] text-gray-400">{msg.created_at && safeParseDate(msg.created_at) ? format(safeParseDate(msg.created_at)!, 'HH:mm', { locale: es }) : ''}</span>
                                                             {isPinned && (
                                                                 <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 uppercase tracking-wider bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.2 rounded border border-amber-200/40">
                                                                     📌 Fijado
@@ -2442,7 +2473,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-[11px] font-bold text-gray-900 dark:text-white truncate">{activeThreadMessage.sender_name}</p>
-                                            <p className="text-[8px] text-gray-400">{format(parseISO(activeThreadMessage.created_at), 'HH:mm', { locale: es })}</p>
+                                            <p className="text-[8px] text-gray-400">{activeThreadMessage.created_at && safeParseDate(activeThreadMessage.created_at) ? format(safeParseDate(activeThreadMessage.created_at)!, 'HH:mm', { locale: es }) : ''}</p>
                                         </div>
                                     </div>
                                     <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap pl-1">{activeThreadMessage.text}</p>
@@ -2467,7 +2498,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 mb-0.5">
                                                         <span className="text-[11px] font-bold text-gray-900 dark:text-white">{reply.sender_name}</span>
-                                                        <span className="text-[8px] text-gray-400">{format(parseISO(reply.created_at), 'HH:mm', { locale: es })}</span>
+                                                        <span className="text-[8px] text-gray-400">{reply.created_at && safeParseDate(reply.created_at) ? format(safeParseDate(reply.created_at)!, 'HH:mm', { locale: es }) : ''}</span>
                                                     </div>
                                                     <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{reply.text}</p>
                                                 </div>
@@ -3066,7 +3097,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         title: t.text,
                         status: t.completed ? 'completed' : (t.kanban_column === 'En progreso' ? 'in_progress' : 'pending'),
                         assignee_email: t.assignee || t.assigned_to || null,
-                        due_date: t.due_date || null,
+                        due_date: formatDueDateString(t.due_date) || null,
                         priority: t.priority || 'medium',
                         story_points: t.story_points || 1,
                         tags: t.tags || [],
@@ -3098,9 +3129,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             displayedItems = [...displayedItems].sort((a, b) => (priorityWeight[b.priority || 'medium'] - priorityWeight[a.priority || 'medium']));
         } else if (listCustomView === 'due_date') {
             displayedItems = [...displayedItems].sort((a, b) => {
-                if (!a.due_date) return 1;
-                if (!b.due_date) return -1;
-                return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+                const da = safeParseDate(a.due_date);
+                const db = safeParseDate(b.due_date);
+                if (!da) return 1;
+                if (!db) return -1;
+                return da.getTime() - db.getTime();
             });
         } else if (listCustomView === 'status') {
             const statusWeight = { blocked: 4, in_progress: 3, review: 2, pending: 1, completed: 0 };

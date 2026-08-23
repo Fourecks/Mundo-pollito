@@ -35,6 +35,38 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
     onOpenProjectEditor,
     addTodo
 }) => {
+    const safeParseDate = (d: any): Date | null => {
+        if (!d) return null;
+        if (typeof d === 'string') {
+            try {
+                const parsed = parseISO(d);
+                return isNaN(parsed.getTime()) ? null : parsed;
+            } catch {
+                return null;
+            }
+        }
+        if (typeof d === 'object' && d.year && d.month && d.day) {
+            return new Date(d.year, d.month - 1, d.day);
+        }
+        return null;
+    };
+
+    const formatDueDateStr = (d: any, formatPattern = 'd MMM'): string => {
+        const parsed = safeParseDate(d);
+        if (!parsed) return typeof d === 'string' ? d : '';
+        try {
+            return format(parsed, formatPattern, { locale: es });
+        } catch {
+            return '';
+        }
+    };
+
+    const isPastDueDate = (d: any): boolean => {
+        const parsed = safeParseDate(d);
+        if (!parsed) return false;
+        return isPast(parsed) && !isToday(parsed);
+    };
+
     const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
     const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
     const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -157,7 +189,7 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
                                     {project.target_date && (
                                         <span className="flex items-center gap-1">
                                             • <CalendarIcon className="w-3 h-3 text-gray-400" />
-                                            Límite: {format(parseISO(project.target_date), 'd MMM yyyy', { locale: es })}
+                                            Límite: {formatDueDateStr(project.target_date, 'd MMM yyyy')}
                                         </span>
                                     )}
                                 </div>
@@ -258,7 +290,7 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
                                             const hasSubtasks = task.subtasks && task.subtasks.length > 0;
                                             const completedSub = hasSubtasks ? task.subtasks!.filter(s => s.completed).length : 0;
                                             const totalSub = hasSubtasks ? task.subtasks!.length : 0;
-                                            const isOverdue = task.due_date && !task.completed && isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date));
+                                            const isOverdue = task.due_date && !task.completed && isPastDueDate(task.due_date);
 
                                             return (
                                                 <div
@@ -337,7 +369,7 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
                                                                 isOverdue ? 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300' : 'bg-black/5 text-gray-500'
                                                             }`}>
                                                                 <CalendarIcon className="w-2.5 h-2.5" />
-                                                                {format(parseISO(task.due_date), 'd MMM', { locale: es })}
+                                                                {formatDueDateStr(task.due_date)}
                                                             </span>
                                                         )}
                                                     </div>

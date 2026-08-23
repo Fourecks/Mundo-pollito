@@ -524,7 +524,12 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
                                             </p>
                                             <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-1">
                                                 <Clock className="w-3 h-3" />
-                                                {format(parseISO(inv.created_at), "d 'de' MMMM, HH:mm", { locale: es })}
+                                                {inv.created_at ? (() => {
+                                                    try {
+                                                        const p = parseISO(inv.created_at);
+                                                        return isNaN(p.getTime()) ? '' : format(p, "d 'de' MMMM, HH:mm", { locale: es });
+                                                    } catch { return ''; }
+                                                })() : ''}
                                             </span>
                                         </div>
                                     </div>
