@@ -1375,7 +1375,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             allTodos={flatAllTodos}
                             activeProjectId={viewingProjectId}
                             invitations={projectInvitations}
-                            currentUserEmail={currentUser?.email}
+                            currentUserEmail={user?.email}
                             onSendInvitation={onSendInvitation}
                             onAcceptInvitation={handleAcceptInvitation}
                             onDeclineInvitation={handleDeclineInvitation}
