@@ -222,6 +222,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [shareError, setShareError] = useState<string | null>(null);
     const [previewDocModal, setPreviewDocModal] = useState<ProjectDoc | null>(null);
 
+    // Sprint Detail & Share Update States
+    const [viewSprintModal, setViewSprintModal] = useState<Sprint | null>(null);
+    const [shareUpdateModal, setShareUpdateModal] = useState<{ isOpen: boolean; title: string; updateText: string } | null>(null);
+
     // Team Search State
     const [memberSearchText, setMemberSearchText] = useState<string>('');
 
