@@ -1076,11 +1076,47 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const projectMembers = activeProject.members || [];
         const projectInvitations = (invitations || []).filter(inv => inv.project_id === activeProject.id);
 
-        const isEmailValid = inviteEmail.trim().length > 3 && inviteEmail.includes('@');
+        const currentUserEmail = (user?.email || '').trim().toLowerCase();
         const searchEmailClean = inviteEmail.trim().toLowerCase();
 
-        const isAlreadyMember = searchEmailClean && projectMembers.some(m => m.email?.toLowerCase() === searchEmailClean);
-        const isAlreadyInvited = searchEmailClean && projectInvitations.some(inv => inv.invitee_email.toLowerCase() === searchEmailClean && inv.status === 'pending');
+        // Gather all candidate emails across projects & invitations
+        const candidateSet = new Set<string>();
+        const knownDemoContacts = [
+            'rene.05gonzalez@gmail.com',
+            'desarrollo@ejemplo.com',
+            'colaborador@pollito.com'
+        ];
+        knownDemoContacts.forEach(e => candidateSet.add(e.toLowerCase()));
+
+        projects.forEach(p => {
+            (p.members || []).forEach(m => {
+                const em = typeof m === 'string' ? m : m?.email;
+                if (em && typeof em === 'string' && em.includes('@')) {
+                    candidateSet.add(em.trim().toLowerCase());
+                }
+            });
+        });
+
+        (invitations || []).forEach(inv => {
+            const rec = inv.receiver_email || inv.invitee_email;
+            const send = inv.sender_email || inv.inviter_email;
+            if (rec && typeof rec === 'string' && rec.includes('@')) candidateSet.add(rec.trim().toLowerCase());
+            if (send && typeof send === 'string' && send.includes('@')) candidateSet.add(send.trim().toLowerCase());
+        });
+
+        if (currentUserEmail) {
+            candidateSet.delete(currentUserEmail);
+        }
+
+        const allCandidates = Array.from(candidateSet);
+        let matchingCandidates = allCandidates.filter(em => 
+            searchEmailClean === '' || em.toLowerCase().includes(searchEmailClean)
+        );
+
+        const isTypedEmailValid = searchEmailClean.length > 3 && searchEmailClean.includes('@');
+        if (isTypedEmailValid && !matchingCandidates.includes(searchEmailClean) && searchEmailClean !== currentUserEmail) {
+            matchingCandidates = [searchEmailClean, ...matchingCandidates];
+        }
 
         const handleSendInviteClick = async (emailToSend: string) => {
             if (!emailToSend || !onSendInvitation) return;
@@ -1126,7 +1162,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <div className="flex justify-between items-center mb-3">
                             <div>
                                 <h3 className="font-bold text-base text-gray-900 dark:text-white">Buscar usuario por correo</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">Ingresa únicamente la dirección de correo electrónico del usuario.</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Escribe el correo y verás aparecer las coincidencias en tiempo real.</p>
                             </div>
                             <button onClick={() => setIsInviteModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X className="w-4 h-4" /></button>
                         </div>
@@ -1136,11 +1172,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                                 <input 
                                     type="email" 
-                                    placeholder="ejemplo@correo.com" 
+                                    placeholder="Escribe un correo (ej: rene.05gonzalez@gmail.com)..." 
                                     value={inviteEmail}
                                     onChange={(e) => setInviteEmail(e.target.value)}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && isEmailValid && !isAlreadyMember && !isAlreadyInvited) {
+                                        if (e.key === 'Enter' && isTypedEmailValid) {
                                             handleSendInviteClick(searchEmailClean);
                                         }
                                     }}
@@ -1149,44 +1185,71 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         </div>
 
-                        {/* Result list */}
-                        {searchEmailClean && (
-                            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
-                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Personas Encontradas</span>
-                                
-                                <div className="p-3 bg-gray-50 dark:bg-[#181818] rounded-xl border border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-sm uppercase">
-                                            {searchEmailClean.charAt(0)}
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-sm text-gray-900 dark:text-white">{searchEmailClean}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                {isEmailValid ? 'Correo listo para recibir invitación' : 'Ingresa un correo válido (ej: usuario@dominio.com)'}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {isAlreadyMember ? (
-                                        <span className="text-xs px-3 py-1.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium">
-                                            Ya es Miembro
-                                        </span>
-                                    ) : isAlreadyInvited ? (
-                                        <span className="text-xs px-3 py-1.5 bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 rounded-lg font-medium">
-                                            Invitación Pendiente
-                                        </span>
-                                    ) : (
-                                        <button 
-                                            onClick={() => handleSendInviteClick(searchEmailClean)}
-                                            disabled={!isEmailValid}
-                                            className="px-4 py-2 bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white text-white dark:text-black rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                        >
-                                            Mandar Invitación
-                                        </button>
-                                    )}
-                                </div>
+                        {/* Real-time Matching Candidates List */}
+                        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">
+                                    {searchEmailClean ? 'Coincidencias en tiempo real' : 'Contactos sugeridos'}
+                                </span>
+                                <span className="text-[10px] text-gray-400">
+                                    {matchingCandidates.length} correo{matchingCandidates.length !== 1 ? 's' : ''}
+                                </span>
                             </div>
-                        )}
+
+                            {matchingCandidates.length === 0 ? (
+                                <p className="text-xs text-gray-500 py-3 text-center">
+                                    No hay resultados que coincidan. Completa el correo arriba para enviarle la invitación.
+                                </p>
+                            ) : (
+                                matchingCandidates.map(cEmail => {
+                                    const isAlreadyMember = projectMembers.some(m => {
+                                        const em = typeof m === 'string' ? m : m?.email;
+                                        return em?.toLowerCase() === cEmail;
+                                    });
+                                    const isAlreadyInvited = projectInvitations.some(inv => {
+                                        const em = inv.receiver_email || inv.invitee_email;
+                                        return em?.toLowerCase() === cEmail && inv.status === 'pending';
+                                    });
+                                    const isValid = cEmail.length > 3 && cEmail.includes('@');
+
+                                    return (
+                                        <div key={cEmail} className="p-3 bg-gray-50 dark:bg-[#181818] rounded-xl border border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3 hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-sm uppercase shrink-0">
+                                                    {cEmail.charAt(0)}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{cEmail}</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                        {isAlreadyMember ? 'Ya es miembro de este proyecto' : isAlreadyInvited ? 'Invitación enviada y pendiente' : 'Listo para recibir invitación'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="shrink-0">
+                                                {isAlreadyMember ? (
+                                                    <span className="text-xs px-3 py-1.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium inline-block">
+                                                        Ya es Miembro
+                                                    </span>
+                                                ) : isAlreadyInvited ? (
+                                                    <span className="text-xs px-3 py-1.5 bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 rounded-lg font-medium inline-block">
+                                                        Invitación Pendiente
+                                                    </span>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => handleSendInviteClick(cEmail)}
+                                                        disabled={!isValid}
+                                                        className="px-3.5 py-1.5 bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white text-white dark:text-black rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm active:scale-95"
+                                                    >
+                                                        Invitar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -1207,22 +1270,29 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     </div>
                                 </div>
 
-                                {projectMembers.map((member, idx) => (
-                                    <div key={member.id || idx} className="flex items-center justify-between p-3 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase">
-                                                {member.name.charAt(0)}
+                                {projectMembers.map((member, idx) => {
+                                    const mName = typeof member === 'string' ? member : (member?.name || member?.email || 'Miembro');
+                                    const mEmail = typeof member === 'string' ? member : (member?.email || '');
+                                    const mRole = typeof member === 'string' ? 'member' : (member?.role || 'member');
+                                    const mInitial = (mName || 'M').charAt(0).toUpperCase();
+
+                                    return (
+                                        <div key={typeof member === 'object' && member?.id ? member.id : idx} className="flex items-center justify-between p-3 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase">
+                                                    {mInitial}
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white text-sm">{mName}</p>
+                                                    <p className="text-xs text-gray-500">{mEmail || mRole}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-medium text-gray-900 dark:text-white text-sm">{member.name}</p>
-                                                <p className="text-xs text-gray-500">{member.email || member.role}</p>
-                                            </div>
+                                            <span className="text-[11px] px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded font-medium">
+                                                {mRole === 'owner' ? 'Propietario' : 'Miembro'}
+                                            </span>
                                         </div>
-                                        <span className="text-[11px] px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded font-medium">
-                                            {member.role === 'owner' ? 'Propietario' : 'Miembro'}
-                                        </span>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -1230,25 +1300,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <div>
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Invitaciones Enviadas</h3>
                                 <div className="space-y-2">
-                                    {projectInvitations.map((inv) => (
-                                        <div key={inv.id} className="p-3 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm flex items-center justify-between">
-                                            <div className="truncate pr-2">
-                                                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{inv.invitee_email}</p>
-                                                <p className="text-[10px] text-gray-400 mt-0.5">
-                                                    {format(parseISO(inv.created_at), 'd MMM, HH:mm', { locale: es })}
-                                                </p>
+                                    {projectInvitations.map((inv) => {
+                                        const displayEmail = inv.invitee_email || inv.receiver_email || 'Correo sin especificar';
+                                        return (
+                                            <div key={inv.id} className="p-3 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm flex items-center justify-between">
+                                                <div className="truncate pr-2">
+                                                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{displayEmail}</p>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                                        {inv.created_at ? format(parseISO(inv.created_at), 'd MMM, HH:mm', { locale: es }) : ''}
+                                                    </p>
+                                                </div>
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                                                    inv.status === 'pending' 
+                                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                                        : inv.status === 'accepted'
+                                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                                        : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
+                                                }`}>
+                                                    {inv.status === 'pending' ? 'Pendiente' : inv.status === 'accepted' ? 'Aceptada' : 'Rechazada'}
+                                                </span>
                                             </div>
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
-                                                inv.status === 'pending' 
-                                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                                                    : inv.status === 'accepted'
-                                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                                    : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
-                                            }`}>
-                                                {inv.status === 'pending' ? 'Pendiente' : inv.status === 'accepted' ? 'Aceptada' : 'Rechazada'}
-                                            </span>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}

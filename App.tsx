@@ -2131,7 +2131,7 @@ const App: React.FC = () => {
         supabase.from('habit_records').select('*').order('created_at'),
         supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).maybeSingle(),
         user?.email
-          ? supabase.from('project_invitations').select('*').or(`receiver_email.eq.${user.email},sender_email.eq.${user.email}`).order('created_at', { ascending: false })
+          ? supabase.from('project_invitations').select('*').or(`receiver_email.eq.${user.email},sender_email.eq.${user.email},invitee_email.eq.${user.email},inviter_email.eq.${user.email}`).order('created_at', { ascending: false })
           : Promise.resolve({ data: null, error: null })
       ]);
       
@@ -3258,6 +3258,8 @@ const App: React.FC = () => {
   const handleSendInvitation = useCallback(async (project: Project, receiverEmail: string) => {
     if (!user?.email) return;
 
+    const cleanReceiver = receiverEmail.trim().toLowerCase();
+
     const newInvitation: ProjectInvitation = {
       id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       project_id: project.id,
@@ -3265,13 +3267,17 @@ const App: React.FC = () => {
       project_emoji: project.emoji || '📁',
       sender_id: user.id,
       sender_email: user.email,
-      receiver_email: receiverEmail,
+      inviter_id: user.id,
+      inviter_email: user.email,
+      inviter_name: user.email.split('@')[0],
+      receiver_email: cleanReceiver,
+      invitee_email: cleanReceiver,
       status: 'pending',
       created_at: new Date().toISOString()
     };
 
     setProjectInvitations(prev => {
-      const updated = [newInvitation, ...prev.filter(i => !(i.project_id === project.id && i.receiver_email === receiverEmail))];
+      const updated = [newInvitation, ...prev.filter(i => !(i.project_id === project.id && (i.receiver_email === cleanReceiver || i.invitee_email === cleanReceiver)))];
       localStorage.setItem(`invitations_${user.email}`, JSON.stringify(updated));
       return updated;
     });
@@ -3284,7 +3290,11 @@ const App: React.FC = () => {
         project_emoji: newInvitation.project_emoji,
         sender_id: newInvitation.sender_id,
         sender_email: newInvitation.sender_email,
+        inviter_id: newInvitation.inviter_id,
+        inviter_email: newInvitation.inviter_email,
+        inviter_name: newInvitation.inviter_name,
         receiver_email: newInvitation.receiver_email,
+        invitee_email: newInvitation.invitee_email,
         status: newInvitation.status,
         created_at: newInvitation.created_at
       }]);
@@ -3296,7 +3306,7 @@ const App: React.FC = () => {
     try {
       await supabase.functions.invoke('onesignal-notification', {
         body: {
-          receiver_email: receiverEmail,
+          receiver_email: cleanReceiver,
           title: '¡Nueva invitación a proyecto!',
           message: `${user.email} te ha invitado a colaborar en "${project.name}".`
         }

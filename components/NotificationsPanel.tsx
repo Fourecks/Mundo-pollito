@@ -140,7 +140,7 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
                                                     {inv.project_name}
                                                 </h5>
                                                 <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
-                                                    Invitado por: <span className="font-semibold text-gray-900 dark:text-white">{inv.inviter_name || inv.inviter_email}</span>
+                                                    Invitado por: <span className="font-semibold text-gray-900 dark:text-white">{inv.inviter_name || inv.inviter_email || inv.sender_email || 'Usuario'}</span>
                                                 </p>
                                                 <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-1">
                                                     <Clock className="w-3 h-3" />
@@ -177,7 +177,7 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
                                             <div key={inv.id} className="p-3 bg-white/50 dark:bg-gray-800/40 rounded-xl flex items-center justify-between text-xs">
                                                 <div className="truncate pr-2">
                                                     <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{inv.project_name}</p>
-                                                    <p className="text-[10px] text-gray-400">De: {inv.inviter_email}</p>
+                                                    <p className="text-[10px] text-gray-400">De: {inv.inviter_email || inv.sender_email || 'Desconocido'}</p>
                                                 </div>
                                                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                                                     inv.status === 'accepted' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'

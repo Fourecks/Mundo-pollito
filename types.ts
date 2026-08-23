@@ -88,11 +88,14 @@ export interface ProjectInvitation {
   project_name: string;
   project_emoji?: string | null;
   project_color?: string | null;
-  inviter_id: string;
-  inviter_name: string;
-  inviter_email: string;
-  invitee_email: string;
-  status: 'pending' | 'accepted' | 'declined';
+  inviter_id?: string;
+  inviter_name?: string;
+  inviter_email?: string;
+  sender_id?: string;
+  sender_email?: string;
+  invitee_email?: string;
+  receiver_email?: string;
+  status: 'pending' | 'accepted' | 'declined' | 'rejected';
   created_at: string;
 }
 
