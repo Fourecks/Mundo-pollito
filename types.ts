@@ -399,6 +399,12 @@ export interface ThemeColors {
   secondary: string;
 }
 
+export interface PushNotificationPreferences {
+  projectMembers: boolean;    // Nuevos miembros en proyectos e invitaciones
+  taskReminders: boolean;     // Recordatorios de tareas y alertas de vencimiento
+  channelMentions: boolean;   // Menciones en canales (@nombre, @todos) y chats
+}
+
 export interface UiSettings {
   themeColors: ThemeColors;
   activeBackgroundId: string | null;
@@ -412,6 +418,7 @@ export interface UiSettings {
   enableBatterySaver: boolean;
   progressEmoji?: string;
   dailyGoals?: { [dateKey: string]: { text: string; completed: boolean } };
+  pushPreferences?: PushNotificationPreferences;
 }
 
 export interface SupabaseUser {

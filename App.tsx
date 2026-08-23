@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences } from './types';
+import { DEFAULT_PUSH_PREFERENCES, syncPreferencesToOneSignal, sendPushNotification, sendSampleNotificationForEvent, NotificationEventType } from './services/pushNotificationService';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -832,9 +833,14 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         invitations={projectInvitations}
         onAcceptInvitation={onAcceptInvitation}
         onDeclineInvitation={onDeclineInvitation}
-        dailyEncouragementHour={uiSettings.dailyEncouragementLocalHour}
+        pushPreferences={uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES}
+        onUpdatePushPreferences={handleUpdatePushPreferences}
+        isSubscribed={isSubscribed}
+        isPermissionBlocked={isPermissionBlocked}
+        onToggleSubscription={handleToggleSubscription}
+        dailyEncouragementHour={uiSettings?.dailyEncouragementLocalHour ?? null}
         onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
-        dailySummaryHour={uiSettings.dailySummaryHour}
+        dailySummaryHour={uiSettings?.dailySummaryHour ?? null}
         onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
         onSendTestNotification={handleNotificationAction}
       />
@@ -994,6 +1000,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       activeProjectId={viewingProjectId}
                       invitations={projectInvitations}
                       onSendInvitation={onSendInvitation}
+                      pushPreferences={uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES}
                       onSelectProject={(id) => setViewingProjectId(id)}
                       onAddProject={async (name, emoji, color) => {
                           const p = await handleAddProject(name, emoji, color);
@@ -1375,6 +1382,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             activeProjectId={viewingProjectId}
                             invitations={projectInvitations}
                             onSendInvitation={onSendInvitation}
+                            pushPreferences={uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES}
                             onSelectProject={(id) => setViewingProjectId(id)}
                             onAddProject={async (name, emoji, color) => {
                                 const p = await handleAddProject(name, emoji, color);
@@ -1601,9 +1609,14 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 invitations={projectInvitations}
                 onAcceptInvitation={onAcceptInvitation}
                 onDeclineInvitation={onDeclineInvitation}
-                dailyEncouragementHour={uiSettings.dailyEncouragementLocalHour}
+                pushPreferences={uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES}
+                onUpdatePushPreferences={handleUpdatePushPreferences}
+                isSubscribed={isSubscribed}
+                isPermissionBlocked={isPermissionBlocked}
+                onToggleSubscription={handleToggleSubscription}
+                dailyEncouragementHour={uiSettings?.dailyEncouragementLocalHour ?? null}
                 onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
-                dailySummaryHour={uiSettings.dailySummaryHour}
+                dailySummaryHour={uiSettings?.dailySummaryHour ?? null}
                 onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
                 onSendTestNotification={handleNotificationAction}
             />
@@ -1809,6 +1822,16 @@ const App: React.FC = () => {
         notes: notes.filter(note => note.folder_id === folder.id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     }));
   }, [folders, notes]);
+
+  const flatAllTodos = useMemo(() => {
+    const list: Todo[] = [];
+    Object.keys(allTodos).forEach(key => {
+      if (Array.isArray(allTodos[key])) {
+        list.push(...allTodos[key]);
+      }
+    });
+    return list;
+  }, [allTodos]);
 
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -2082,7 +2105,8 @@ const App: React.FC = () => {
       dailyEncouragementLocalHour: null,
       dailySummaryHour: null,
       enableBatterySaver: false,
-      progressEmoji: '🚀'
+      progressEmoji: '🚀',
+      pushPreferences: DEFAULT_PUSH_PREFERENCES
     };
     if (savedUiSettings) {
       try {
@@ -2237,6 +2261,7 @@ const App: React.FC = () => {
               enableBatterySaver: settings.enableBatterySaver ?? prev?.enableBatterySaver ?? false,
               progressEmoji: settings.progressEmoji || prev?.progressEmoji || '🚀',
               dailyGoals: settings.dailyGoals || prev?.dailyGoals || {},
+              pushPreferences: settings.pushPreferences || prev?.pushPreferences || DEFAULT_PUSH_PREFERENCES,
           }));
 
           // Check and update user's timezone offset for notifications
@@ -4270,6 +4295,11 @@ const App: React.FC = () => {
 
     initializeOneSignal();
 
+    // Sync tags on initial load if user has pushPreferences
+    if (uiSettings?.pushPreferences) {
+        syncPreferencesToOneSignal(uiSettings.pushPreferences);
+    }
+
     // Cleanup listeners when the user changes or component unmounts
     return () => {
         try {
@@ -4281,7 +4311,50 @@ const App: React.FC = () => {
     };
 }, [user?.id]);
 
-  const handleNotificationAction = async () => {
+  const handleUpdatePushPreferences = useCallback(async (newPrefs: PushNotificationPreferences) => {
+      setUiSettings((prev: any) => {
+          const updated = { ...(prev || {}), pushPreferences: newPrefs };
+          if (user) {
+              localStorage.setItem(getUserKey('ui_settings'), JSON.stringify(updated));
+              supabase.from('profiles').update({ ui_settings: updated }).eq('id', user.id).then(({ error }) => {
+                  if (error) console.error("Error saving push preferences to profiles:", error);
+              });
+          }
+          return updated;
+      });
+      await syncPreferencesToOneSignal(newPrefs);
+  }, [user, getUserKey]);
+
+  const handleToggleSubscription = useCallback(async () => {
+      const OneSignal = window.OneSignal;
+      if (!OneSignal) return;
+
+      if (isPermissionBlocked) {
+          alert('Las notificaciones están bloqueadas en la configuración de tu navegador. Por favor, habilítalas para esta página.');
+          return;
+      }
+
+      try {
+          if (isSubscribed) {
+              if (OneSignal.User?.PushSubscription?.optOut) {
+                  await OneSignal.User.PushSubscription.optOut();
+                  setIsSubscribed(false);
+              }
+          } else {
+              if (OneSignal.User?.PushSubscription?.optIn) {
+                  await OneSignal.User.PushSubscription.optIn();
+                  setIsSubscribed(true);
+                  if (uiSettings?.pushPreferences) {
+                      await syncPreferencesToOneSignal(uiSettings.pushPreferences);
+                  }
+              }
+          }
+      } catch (e) {
+          console.error("Error toggling OneSignal subscription:", e);
+      }
+  }, [isPermissionBlocked, isSubscribed, uiSettings?.pushPreferences]);
+
+  const handleNotificationAction = async (eventType?: NotificationEventType) => {
       const OneSignal = window.OneSignal;
       if (!OneSignal) return;
 
@@ -4291,23 +4364,75 @@ const App: React.FC = () => {
       }
       
       if (isSubscribed) {
-          // Send a test notification
-          supabase.functions.invoke('send-pushalert-notification', {
-            body: {
-              title: "¡Notificación de Prueba! 🐣",
-              message: "¡Así se verán los recordatorios de tus tareas!",
-            },
-          }).then(({ error }) => {
-              if (error) {
-                  console.error("Error sending test notification:", error);
-                  alert("Error al enviar la notificación de prueba.");
+          if (eventType) {
+              const res = await sendSampleNotificationForEvent(eventType, uiSettings?.pushPreferences);
+              if (!res.sent && res.reason === 'disabled_by_user') {
+                  alert(`Las notificaciones para este evento están desactivadas en tus preferencias.`);
               }
-          });
+          } else {
+              // Send general test notification
+              supabase.functions.invoke('send-pushalert-notification', {
+                body: {
+                  title: "¡Notificación de Prueba! 🐣",
+                  message: "¡Tus notificaciones push de Pollito To-Do están funcionando correctamente!",
+                },
+              }).then(({ error }) => {
+                  if (error) {
+                      console.error("Error sending test notification:", error);
+                      alert("Error al enviar la notificación de prueba.");
+                  }
+              });
+          }
       } else {
           // This will trigger the native browser prompt.
           await OneSignal.User.PushSubscription.optIn();
       }
   };
+
+  // Background task reminder notification ticker
+  const notifiedTaskIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+      if (!isSubscribed || !flatAllTodos || flatAllTodos.length === 0) return;
+      if (uiSettings?.pushPreferences?.taskReminders === false) return;
+
+      const checkTaskReminders = () => {
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth() + 1;
+          const currentDay = now.getDate();
+          const currentHour = now.getHours();
+          const currentMinute = now.getMinutes();
+
+          flatAllTodos.forEach((todo: Todo) => {
+              if (todo.completed) return;
+              if (!todo.reminder_time && !todo.due_date) return;
+
+              const reminderKey = `${todo.id}_${todo.reminder_time || ''}_${todo.due_date?.day || ''}`;
+              if (notifiedTaskIdsRef.current.has(reminderKey)) return;
+
+              if (todo.reminder_time) {
+                  const [rHour, rMinute] = todo.reminder_time.split(':').map(Number);
+                  const isToday = !todo.due_date || (
+                      todo.due_date.year === currentYear &&
+                      todo.due_date.month === currentMonth &&
+                      todo.due_date.day === currentDay
+                  );
+
+                  if (isToday && rHour === currentHour && Math.abs(rMinute - currentMinute) <= 1) {
+                      notifiedTaskIdsRef.current.add(reminderKey);
+                      sendPushNotification({
+                          title: `⏰ Recordatorio de tarea`,
+                          message: `Es hora de: "${todo.text}"`,
+                          eventType: 'taskReminders'
+                      }, uiSettings?.pushPreferences);
+                  }
+              }
+          });
+      };
+
+      const interval = setInterval(checkTaskReminders, 30000);
+      return () => clearInterval(interval);
+  }, [flatAllTodos, isSubscribed, uiSettings?.pushPreferences]);
   
   if (authLoading || (user && !dataLoaded) || (user && !uiSettings)) {
     return (

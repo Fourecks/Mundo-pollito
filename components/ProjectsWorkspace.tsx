@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle } from '../types';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences } from '../types';
+import { sendPushNotification } from '../services/pushNotificationService';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List
 } from 'lucide-react';
@@ -23,6 +24,7 @@ interface ProjectsWorkspaceProps {
     deleteTodo: (id: number) => void;
     onEditTodo?: (todo: Todo) => void;
     onOpenProjectEditor?: (project: Project) => void;
+    pushPreferences?: PushNotificationPreferences;
 }
 
 const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
@@ -70,7 +72,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     updateTodo,
     deleteTodo,
     onEditTodo,
-    onOpenProjectEditor
+    onOpenProjectEditor,
+    pushPreferences
 }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team'>('overview');
     
@@ -1473,6 +1476,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             };
 
             onUpdateProject(activeProject.id, { chat_messages: [...messages, newMessage] });
+            
+            // Check for mentions (@user or @todos) and trigger push notification if enabled
+            if (chatText.includes('@') && pushPreferences?.channelMentions !== false) {
+                sendPushNotification({
+                    title: `💬 Mención en #${currentChannel.name || 'general'}`,
+                    message: `Has sido mencionado en "${activeProject.name}": "${chatText.trim().substring(0, 75)}${chatText.trim().length > 75 ? '...' : ''}"`,
+                    eventType: 'channelMentions'
+                }, pushPreferences);
+            }
+
             setChatText('');
             setReplyingToMessage(null);
             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
