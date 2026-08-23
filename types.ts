@@ -79,6 +79,21 @@ export interface ProjectMember {
   name: string;
   avatar?: string;
   role: 'owner' | 'lead' | 'member';
+  email?: string;
+}
+
+export interface ProjectInvitation {
+  id: string;
+  project_id: number;
+  project_name: string;
+  project_emoji?: string | null;
+  project_color?: string | null;
+  inviter_id: string;
+  inviter_name: string;
+  inviter_email: string;
+  invitee_email: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
 }
 
 export interface Sprint {

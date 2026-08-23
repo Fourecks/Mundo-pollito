@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession } from './types';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
 import Pomodoro from './components/Pomodoro';
@@ -350,6 +350,11 @@ interface AppComponentProps {
   batteryStatus: any;
   focusSessions: FocusSession[];
   onLogFocusSession: (minutes: number) => void;
+  // Project Invitations
+  projectInvitations: ProjectInvitation[];
+  onSendInvitation: (project: Project, email: string) => Promise<void>;
+  onAcceptInvitation: (invitationId: string) => Promise<void>;
+  onDeclineInvitation: (invitationId: string) => Promise<void>;
 }
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -373,7 +378,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     onSyncNotion,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
     isPowerSavingActive, batteryStatus,
-    focusSessions, onLogFocusSession
+    focusSessions, onLogFocusSession,
+    projectInvitations, onSendInvitation, onAcceptInvitation, onDeclineInvitation
   } = props;
   
   // Main Daily Goal for Desktop
@@ -763,6 +769,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               disabled={isPermissionBlocked}
           >
               <BellIcon className="h-6 w-6" />
+              {projectInvitations.filter(i => i.status === 'pending').length > 0 && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-white dark:border-gray-800 animate-pulse" />
+              )}
               {isPermissionBlocked && (
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
@@ -820,6 +829,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       <NotificationsPanel
         isOpen={isNotificationsPanelOpen}
         onClose={() => setIsNotificationsPanelOpen(false)}
+        invitations={projectInvitations}
+        onAcceptInvitation={onAcceptInvitation}
+        onDeclineInvitation={onDeclineInvitation}
         dailyEncouragementHour={uiSettings.dailyEncouragementLocalHour}
         onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
         dailySummaryHour={uiSettings.dailySummaryHour}
@@ -980,6 +992,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       projects={projects}
                       allTodos={flatAllTodos}
                       activeProjectId={viewingProjectId}
+                      invitations={projectInvitations}
+                      onSendInvitation={onSendInvitation}
                       onSelectProject={(id) => setViewingProjectId(id)}
                       onAddProject={async (name, emoji, color) => {
                           const p = await handleAddProject(name, emoji, color);
@@ -1060,7 +1074,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       onSyncNotion,
       isSubscribed, isPermissionBlocked, handleNotificationAction,
       isPowerSavingActive, batteryStatus,
-      focusSessions, onLogFocusSession
+      focusSessions, onLogFocusSession,
+      projectInvitations, onSendInvitation, onAcceptInvitation, onDeclineInvitation
     } = props;
 
     // Local UI state for Mobile
@@ -1357,6 +1372,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             projects={projects}
                             allTodos={flatAllTodos}
                             activeProjectId={viewingProjectId}
+                            invitations={projectInvitations}
+                            onSendInvitation={onSendInvitation}
                             onSelectProject={(id) => setViewingProjectId(id)}
                             onAddProject={async (name, emoji, color) => {
                                 const p = await handleAddProject(name, emoji, color);
@@ -1465,9 +1482,16 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                     </button>
                                     
                                     <button onClick={() => setIsNotificationsPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5" disabled={isPermissionBlocked}>
-                                        <h3 className={`font-bold text-lg transition-colors ${ isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary' }`}>
-                                            Notificaciones
-                                        </h3>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className={`font-bold text-lg transition-colors ${ isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary' }`}>
+                                                Notificaciones
+                                            </h3>
+                                            {projectInvitations.filter(i => i.status === 'pending').length > 0 && (
+                                                <span className="px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                                                    {projectInvitations.filter(i => i.status === 'pending').length}
+                                                </span>
+                                            )}
+                                        </div>
                                         {!isPermissionBlocked && <ChevronRightIcon />}
                                     </button>
 
@@ -1571,6 +1595,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 isOpen={isNotificationsPanelOpen}
                 onClose={() => setIsNotificationsPanelOpen(false)}
                 isMobile={true}
+                invitations={projectInvitations}
+                onAcceptInvitation={onAcceptInvitation}
+                onDeclineInvitation={onDeclineInvitation}
                 dailyEncouragementHour={uiSettings.dailyEncouragementLocalHour}
                 onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
                 dailySummaryHour={uiSettings.dailySummaryHour}
@@ -1699,6 +1726,7 @@ const App: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectInvitations, setProjectInvitations] = useState<ProjectInvitation[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitRecords, setHabitRecords] = useState<HabitRecord[]>([]);
   const [processingHabitRecord, setProcessingHabitRecord] = useState<string | null>(null);
@@ -2008,6 +2036,14 @@ const App: React.FC = () => {
     setProjects(cachedProjects);
     setHabitRecords(cachedHabitRecords);
 
+    // Load cached project invitations
+    if (user?.email) {
+      const cachedInv = localStorage.getItem(`invitations_${user.email}`);
+      if (cachedInv) {
+        try { setProjectInvitations(JSON.parse(cachedInv)); } catch (e) {}
+      }
+    }
+
     // Parse habits from cache
     const parsedCachedHabits: Habit[] = (cachedHabits as any[]).map((h: any) => {
         let parsedFrequency: HabitFrequency;
@@ -2082,7 +2118,8 @@ const App: React.FC = () => {
         { data: projectsData },
         { data: habitsData },
         { data: habitRecordsData },
-        { data: profileData }
+        { data: profileData },
+        { data: invitationsData }
       ] = await Promise.all([
         supabase.from('todos').select('*, subtasks(*)').order('created_at'),
         supabase.from('folders').select('*').order('created_at'),
@@ -2093,6 +2130,9 @@ const App: React.FC = () => {
         supabase.from('habits').select('*').order('created_at'),
         supabase.from('habit_records').select('*').order('created_at'),
         supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).maybeSingle(),
+        user?.email
+          ? supabase.from('project_invitations').select('*').or(`receiver_email.eq.${user.email},sender_email.eq.${user.email}`).order('created_at', { ascending: false })
+          : Promise.resolve({ data: null, error: null })
       ]);
       
       if (todosData) {
@@ -2140,6 +2180,10 @@ const App: React.FC = () => {
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
       if(projectsData) { setProjects(projectsData); await clearAndPutAll('projects', projectsData); }
+      if(invitationsData && user?.email) {
+        setProjectInvitations(invitationsData);
+        localStorage.setItem(`invitations_${user.email}`, JSON.stringify(invitationsData));
+      }
       if(habitsData) { 
             const parsedHabits: Habit[] = (habitsData as any[]).map((h: any) => {
                 let parsedFrequency: HabitFrequency;
@@ -3211,6 +3255,113 @@ const App: React.FC = () => {
     await syncableDelete('projects', projectId);
   };
 
+  const handleSendInvitation = useCallback(async (project: Project, receiverEmail: string) => {
+    if (!user?.email) return;
+
+    const newInvitation: ProjectInvitation = {
+      id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      project_id: project.id,
+      project_name: project.name,
+      project_emoji: project.emoji || '📁',
+      sender_id: user.id,
+      sender_email: user.email,
+      receiver_email: receiverEmail,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+
+    setProjectInvitations(prev => {
+      const updated = [newInvitation, ...prev.filter(i => !(i.project_id === project.id && i.receiver_email === receiverEmail))];
+      localStorage.setItem(`invitations_${user.email}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const { error } = await supabase.from('project_invitations').insert([{
+        id: newInvitation.id,
+        project_id: newInvitation.project_id,
+        project_name: newInvitation.project_name,
+        project_emoji: newInvitation.project_emoji,
+        sender_id: newInvitation.sender_id,
+        sender_email: newInvitation.sender_email,
+        receiver_email: newInvitation.receiver_email,
+        status: newInvitation.status,
+        created_at: newInvitation.created_at
+      }]);
+      if (error) console.log('Supabase insert invitation notice:', error.message);
+    } catch (err) {
+      console.error('Error inserting invitation:', err);
+    }
+
+    try {
+      await supabase.functions.invoke('onesignal-notification', {
+        body: {
+          receiver_email: receiverEmail,
+          title: '¡Nueva invitación a proyecto!',
+          message: `${user.email} te ha invitado a colaborar en "${project.name}".`
+        }
+      });
+    } catch (err) {
+      console.log('Push notification invocation note:', err);
+    }
+  }, [user]);
+
+  const handleAcceptInvitation = useCallback(async (invitationId: string) => {
+    const invitation = projectInvitations.find(i => i.id === invitationId);
+    if (!invitation || !user?.email) return;
+
+    setProjectInvitations(prev => {
+      const updated = prev.map(inv => inv.id === invitationId ? { ...inv, status: 'accepted' as const } : inv);
+      localStorage.setItem(`invitations_${user.email}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await supabase.from('project_invitations').update({ status: 'accepted' }).eq('id', invitationId);
+    } catch (err) {
+      console.log('Supabase invitation accept update notice:', err);
+    }
+
+    const projectToUpdate = projects.find(p => p.id === invitation.project_id);
+    if (projectToUpdate) {
+      const currentMembers = projectToUpdate.members || [];
+      if (!currentMembers.includes(user.email)) {
+        const updatedMembers = [...currentMembers, user.email];
+        await handleUpdateProject(projectToUpdate.id, { members: updatedMembers });
+      }
+    } else {
+      try {
+        const { data: remoteProj } = await supabase.from('projects').select('*').eq('id', invitation.project_id).maybeSingle();
+        if (remoteProj) {
+          const members = remoteProj.members || [];
+          if (!members.includes(user.email)) {
+            members.push(user.email);
+          }
+          await syncableUpdate('projects', { ...remoteProj, members });
+          setProjects(prev => [...prev.filter(p => p.id !== remoteProj.id), { ...remoteProj, members }]);
+        }
+      } catch (err) {
+        console.log('Error updating project members on accept:', err);
+      }
+    }
+  }, [projectInvitations, user, projects, handleUpdateProject]);
+
+  const handleDeclineInvitation = useCallback(async (invitationId: string) => {
+    if (!user?.email) return;
+
+    setProjectInvitations(prev => {
+      const updated = prev.map(inv => inv.id === invitationId ? { ...inv, status: 'rejected' as const } : inv);
+      localStorage.setItem(`invitations_${user.email}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await supabase.from('project_invitations').update({ status: 'rejected' }).eq('id', invitationId);
+    } catch (err) {
+      console.log('Supabase invitation decline update notice:', err);
+    }
+  }, [user]);
+
   const handleAddPlaylist = useCallback(async (playlistData: Omit<Playlist, 'id'|'user_id'|'created_at'>) => {
     if (!user) return;
     const tempId = -Date.now();
@@ -4194,7 +4345,11 @@ const App: React.FC = () => {
     isPowerSavingActive,
     batteryStatus,
     focusSessions,
-    onLogFocusSession: handleLogFocusSession
+    onLogFocusSession: handleLogFocusSession,
+    projectInvitations,
+    onSendInvitation: handleSendInvitation,
+    onAcceptInvitation: handleAcceptInvitation,
+    onDeclineInvitation: handleDeclineInvitation
   };
 
   return (

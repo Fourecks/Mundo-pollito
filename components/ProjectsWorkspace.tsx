@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectInboxItem, ProjectActivity } from '../types';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectInboxItem, ProjectActivity, ProjectInvitation } from '../types';
 import { Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search } from 'lucide-react';
 import { format, parseISO, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,11 +8,13 @@ interface ProjectsWorkspaceProps {
     projects: Project[];
     allTodos: Todo[];
     activeProjectId: number | null;
+    invitations?: ProjectInvitation[];
     onSelectProject: (id: number | null) => void;
     onAddProject: (name: string, emoji: string | null, color: string | null) => Promise<Project | null>;
     onUpdateProject: (id: number, updates: Partial<Project>) => Promise<void>;
     onDeleteProject: (id: number) => Promise<void>;
     onArchiveProject: (id: number, isArchived: boolean) => Promise<void>;
+    onSendInvitation?: (project: Project, inviteeEmail: string) => Promise<void>;
     addTodo: (text: string, options?: any) => Promise<void>;
     updateTodo: (id: number, updates: Partial<Todo>) => void;
     deleteTodo: (id: number) => void;
@@ -41,11 +43,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     projects,
     allTodos,
     activeProjectId,
+    invitations = [],
     onSelectProject,
     onAddProject,
     onUpdateProject,
     onDeleteProject,
     onArchiveProject,
+    onSendInvitation,
     addTodo,
     updateTodo,
     deleteTodo,
@@ -68,6 +72,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [docModal, setDocModal] = useState<{ isOpen: boolean, doc: ProjectDoc | null }>({ isOpen: false, doc: null });
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteSuccessMessage, setInviteSuccessMessage] = useState<string | null>(null);
     const [activeSprintId, setActiveSprintId] = useState<string | null>(null);
     const [activeMilestoneId, setActiveMilestoneId] = useState<string | null>(null);
     
@@ -1068,67 +1073,189 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const renderTeam = () => {
         if (!activeProject) return null;
         
+        const projectMembers = activeProject.members || [];
+        const projectInvitations = (invitations || []).filter(inv => inv.project_id === activeProject.id);
+
+        const isEmailValid = inviteEmail.trim().length > 3 && inviteEmail.includes('@');
+        const searchEmailClean = inviteEmail.trim().toLowerCase();
+
+        const isAlreadyMember = searchEmailClean && projectMembers.some(m => m.email?.toLowerCase() === searchEmailClean);
+        const isAlreadyInvited = searchEmailClean && projectInvitations.some(inv => inv.invitee_email.toLowerCase() === searchEmailClean && inv.status === 'pending');
+
+        const handleSendInviteClick = async (emailToSend: string) => {
+            if (!emailToSend || !onSendInvitation) return;
+            try {
+                await onSendInvitation(activeProject, emailToSend);
+                setInviteSuccessMessage(`¡Invitación enviada exitosamente a ${emailToSend}!`);
+                setInviteEmail('');
+                setTimeout(() => setInviteSuccessMessage(null), 4000);
+            } catch (err) {
+                console.error("Error al enviar invitación:", err);
+            }
+        };
+
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full pb-20">
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Equipo del Proyecto</h2>
-                        <p className="text-sm text-gray-500 mt-1">Gestiona los miembros y el chat grupal.</p>
+                        <p className="text-sm text-gray-500 mt-1">Busca por correo electrónico para invitar colaboradores y coordinar el trabajo.</p>
                     </div>
                     <div className="flex gap-2">
                         <button onClick={() => window.open('https://meet.google.com/new', '_blank')} className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-medium transition-colors">
                             <Video className="w-4 h-4" /> Meet
                         </button>
-                        <button onClick={() => setIsInviteModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white text-white dark:text-black rounded-lg text-sm font-medium transition-colors">
-                            <Plus className="w-4 h-4" /> Invitar
+                        <button onClick={() => setIsInviteModalOpen(!isInviteModalOpen)} className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white text-white dark:text-black rounded-lg text-sm font-medium transition-colors">
+                            <Plus className="w-4 h-4" /> Invitar por correo
                         </button>
                     </div>
                 </div>
 
-                {isInviteModalOpen && (
-                    <div className="mb-8 p-4 bg-gray-50 dark:bg-gray-800/30 rounded-xl border border-gray-200 dark:border-gray-800">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-semibold text-gray-900 dark:text-white">Invitar al equipo</h3>
-                            <button onClick={() => setIsInviteModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+                {inviteSuccessMessage && (
+                    <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm flex items-center justify-between animate-fade-in">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                            <span>{inviteSuccessMessage}</span>
                         </div>
+                        <button onClick={() => setInviteSuccessMessage(null)} className="text-emerald-500 hover:text-emerald-700"><X className="w-4 h-4" /></button>
+                    </div>
+                )}
+
+                {isInviteModalOpen && (
+                    <div className="mb-8 p-5 bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 shadow-md transition-all">
+                        <div className="flex justify-between items-center mb-3">
+                            <div>
+                                <h3 className="font-bold text-base text-gray-900 dark:text-white">Buscar usuario por correo</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Ingresa únicamente la dirección de correo electrónico del usuario.</p>
+                            </div>
+                            <button onClick={() => setIsInviteModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X className="w-4 h-4" /></button>
+                        </div>
+
                         <div className="flex gap-2">
                             <div className="relative flex-1">
-                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                                 <input 
-                                    type="text" 
-                                    placeholder="Buscar por nombre de usuario o correo..." 
+                                    type="email" 
+                                    placeholder="ejemplo@correo.com" 
                                     value={inviteEmail}
                                     onChange={(e) => setInviteEmail(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 outline-none transition-all"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && isEmailValid && !isAlreadyMember && !isAlreadyInvited) {
+                                            handleSendInviteClick(searchEmailClean);
+                                        }
+                                    }}
+                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100 outline-none transition-all text-gray-900 dark:text-white"
                                 />
                             </div>
-                            <button className="px-4 py-2 bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white text-white dark:text-black rounded-lg text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50" disabled={!inviteEmail}>
-                                Enviar Invitación
-                            </button>
                         </div>
+
+                        {/* Result list */}
+                        {searchEmailClean && (
+                            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Personas Encontradas</span>
+                                
+                                <div className="p-3 bg-gray-50 dark:bg-[#181818] rounded-xl border border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-sm uppercase">
+                                            {searchEmailClean.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-sm text-gray-900 dark:text-white">{searchEmailClean}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                {isEmailValid ? 'Correo listo para recibir invitación' : 'Ingresa un correo válido (ej: usuario@dominio.com)'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {isAlreadyMember ? (
+                                        <span className="text-xs px-3 py-1.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium">
+                                            Ya es Miembro
+                                        </span>
+                                    ) : isAlreadyInvited ? (
+                                        <span className="text-xs px-3 py-1.5 bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 rounded-lg font-medium">
+                                            Invitación Pendiente
+                                        </span>
+                                    ) : (
+                                        <button 
+                                            onClick={() => handleSendInviteClick(searchEmailClean)}
+                                            disabled={!isEmailValid}
+                                            className="px-4 py-2 bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white text-white dark:text-black rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                        >
+                                            Mandar Invitación
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
                 <div className="grid md:grid-cols-3 gap-6">
-                    <div className="md:col-span-1 space-y-4">
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Miembros</h3>
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between p-3 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-gray-900 dark:bg-gray-100 flex items-center justify-center text-white dark:text-black font-bold text-xs">
-                                        YO
-                                    </div>
-                                    <div>
-                                        <p className="font-medium text-gray-900 dark:text-white text-sm">Tú (Propietario)</p>
-                                        <p className="text-xs text-gray-500">Admin</p>
+                    <div className="md:col-span-1 space-y-6">
+                        <div>
+                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Miembros Actuales</h3>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between p-3 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-gray-900 dark:bg-gray-100 flex items-center justify-center text-white dark:text-black font-bold text-xs">
+                                            YO
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-gray-900 dark:text-white text-sm">Tú (Propietario)</p>
+                                            <p className="text-xs text-gray-500">Admin</p>
+                                        </div>
                                     </div>
                                 </div>
+
+                                {projectMembers.map((member, idx) => (
+                                    <div key={member.id || idx} className="flex items-center justify-between p-3 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase">
+                                                {member.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-900 dark:text-white text-sm">{member.name}</p>
+                                                <p className="text-xs text-gray-500">{member.email || member.role}</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-[11px] px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded font-medium">
+                                            {member.role === 'owner' ? 'Propietario' : 'Miembro'}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
+
+                        {projectInvitations.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Invitaciones Enviadas</h3>
+                                <div className="space-y-2">
+                                    {projectInvitations.map((inv) => (
+                                        <div key={inv.id} className="p-3 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm flex items-center justify-between">
+                                            <div className="truncate pr-2">
+                                                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{inv.invitee_email}</p>
+                                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                                    {format(parseISO(inv.created_at), 'd MMM, HH:mm', { locale: es })}
+                                                </p>
+                                            </div>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                                                inv.status === 'pending' 
+                                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                                    : inv.status === 'accepted'
+                                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                                    : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
+                                            }`}>
+                                                {inv.status === 'pending' ? 'Pendiente' : inv.status === 'accepted' ? 'Aceptada' : 'Rechazada'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="md:col-span-2">
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Chat Grupal</h3>
+                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Chat Grupal</h3>
                         <div className="bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl flex flex-col h-[400px] shadow-sm">
                             <div className="flex-1 p-4 flex flex-col justify-end bg-gray-50/50 dark:bg-[#0a0a0a]/50">
                                 <div className="text-center text-sm text-gray-500 my-auto">
