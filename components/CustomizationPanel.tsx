@@ -8,7 +8,7 @@ import {
   Video as VideoIconLucide, Volume2, CloudOff, Snowflake, 
   CloudRain, Stars, Circle, Zap, TreePine, Coffee, Waves, 
   VolumeX, LogOut, Palette, Sparkles, Smile, Battery, 
-  ChevronRight, Bell, Sun, ClipboardList, Send, CheckCircle2 
+  ChevronRight 
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import { UnsplashGallery } from './UnsplashGallery';
@@ -38,11 +38,6 @@ interface CustomizationPanelProps {
   batteryStatus: any;
   currentUser?: SupabaseUser;
   onLogout?: () => void;
-  dailyEncouragementHour?: number | null;
-  onSetDailyEncouragement?: (hour: number | null) => void;
-  dailySummaryHour?: number | null;
-  onSetDailySummary?: (hour: number | null) => void;
-  onSendTestNotification?: () => void;
 }
 
 const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
@@ -55,7 +50,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
     batteryStatus
   } = props;
   
-  const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'notifications' | 'backgrounds' | 'ambience' | 'emoji'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'backgrounds' | 'ambience' | 'emoji'>('account');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bgSubTab, setBgSubTab] = useState<'unsplash' | 'custom'>('unsplash');
   const [view, setView] = useState<'all' | 'favorites'>('all');
@@ -65,7 +60,6 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
   const tabs = [
     { id: 'account', label: 'Cuenta', icon: User },
     { id: 'colors', label: 'Apariencia', icon: Palette },
-    { id: 'notifications', label: 'Notificaciones', icon: Bell },
     { id: 'backgrounds', label: 'Fondos', icon: ImageIconLucide },
     { id: 'ambience', label: 'Efectos', icon: Sparkles },
     { id: 'emoji', label: 'Emoji', icon: Smile },
@@ -164,107 +158,6 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
                 <button onClick={onReset} className="w-[200px] py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors text-[14px]">
                   Restaurar colores
                 </button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'notifications':
-        return (
-          <div className="flex flex-col h-full animate-in fade-in duration-200">
-            <div className="mb-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Configuración de notificaciones</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Personaliza tus recordatorios diarios y dosis de ánimo automatizadas.</p>
-            </div>
-
-            <div className="space-y-5 flex-1 overflow-y-auto custom-scrollbar pr-1 pb-6">
-              {/* Dosis de Ánimo */}
-              <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800/80 space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                      <Sun className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-[15px] font-semibold text-gray-900 dark:text-white">Dosis de Ánimo Matutina</h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Recibe un saludo inspirador e impulso de energía para iniciar tu día.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Horario de notificación
-                  </label>
-                  <select
-                    value={props.dailyEncouragementHour === null || props.dailyEncouragementHour === undefined ? '' : props.dailyEncouragementHour}
-                    onChange={(e) => props.onSetDailyEncouragement?.(e.target.value === '' ? null : Number(e.target.value))}
-                    className="w-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Desactivado</option>
-                    {[5, 6, 7, 8, 9, 10, 11].map((h) => (
-                      <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00 hs`}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Resumen Diario */}
-              <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800/80 space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                      <ClipboardList className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-[15px] font-semibold text-gray-900 dark:text-white">Resumen Diario de Tareas</h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Un resumen completo de tus compromisos, pendientes y hábitos del día.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Horario del resumen
-                  </label>
-                  <select
-                    value={props.dailySummaryHour === null || props.dailySummaryHour === undefined ? '' : props.dailySummaryHour}
-                    onChange={(e) => props.onSetDailySummary?.(e.target.value === '' ? null : Number(e.target.value))}
-                    className="w-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Desactivado</option>
-                    {Array.from({ length: 24 }, (_, i) => i).map((h) => (
-                      <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00 hs`}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Prueba de Notificación */}
-              <div className="p-5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                    <Send className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-[14px] font-semibold text-gray-900 dark:text-white">Comprobar Notificaciones</h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Envía una notificación emergente de prueba a tu navegador.</p>
-                  </div>
-                </div>
-                <button
-                  onClick={props.onSendTestNotification}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl text-xs transition-colors shadow-sm shrink-0 whitespace-nowrap"
-                >
-                  Enviar Prueba
-                </button>
-              </div>
-
-              {/* Info Note */}
-              <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800 flex items-start gap-3">
-                <Bell className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                  Las invitaciones a proyectos y avisos de actualizaciones del sistema se muestran directamente en el panel de notificaciones (icono de campana en la barra superior).
-                </p>
               </div>
             </div>
           </div>

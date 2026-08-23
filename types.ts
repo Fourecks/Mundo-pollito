@@ -196,45 +196,6 @@ export interface ProjectChatMessage {
   };
 }
 
-export interface ProjectRisk {
-  id: string;
-  project_id: number;
-  title: string;
-  description?: string;
-  probability: 'low' | 'medium' | 'high';
-  impact: 'low' | 'medium' | 'high';
-  risk_level?: 'low' | 'medium' | 'high' | 'critical';
-  mitigation_plan?: string;
-  owner_email?: string;
-  status: 'open' | 'mitigated' | 'closed' | 'occurred';
-  created_at: string;
-}
-
-export interface ProjectExpense {
-  id: string;
-  project_id: number;
-  title: string;
-  amount: number;
-  category: 'Hardware' | 'Software / Subscriptions' | 'Personnel / Freelance' | 'Design' | 'Marketing' | 'Services' | 'Other';
-  date: string;
-  recorded_by?: string;
-  notes?: string;
-  created_at: string;
-}
-
-export interface ProjectTimeLog {
-  id: string;
-  project_id: number;
-  task_id?: number | null;
-  task_title?: string;
-  member_email: string;
-  member_name?: string;
-  hours: number;
-  date: string;
-  description: string;
-  created_at: string;
-}
-
 export interface ProjectActivity {
   id: string;
   project_id: number;
@@ -249,7 +210,6 @@ export interface Project {
   user_id: string;
   name: string;
   description?: string | null;
-  category?: string | null;
   created_at: string;
   todos?: Todo[]; // Populated on the client
   emoji?: string | null;
@@ -264,7 +224,6 @@ export interface Project {
   members?: ProjectMember[];
   goal_id?: number | null;
   template_type?: string | null;
-  budget?: number | null;
   sprints?: Sprint[];
   milestones?: Milestone[];
   doc_folders?: ProjectDocFolder[];
@@ -272,9 +231,6 @@ export interface Project {
   inbox?: ProjectInboxItem[];
   chat_messages?: ProjectChatMessage[];
   activities?: ProjectActivity[];
-  risks?: ProjectRisk[];
-  expenses?: ProjectExpense[];
-  time_logs?: ProjectTimeLog[];
 }
 
 export interface Note {
