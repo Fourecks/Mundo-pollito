@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember } from '../types';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
 import { useHuddle } from '../src/context/HuddleContext';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -225,6 +225,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // Sprint Detail & Share Update States
     const [viewSprintModal, setViewSprintModal] = useState<Sprint | null>(null);
     const [shareUpdateModal, setShareUpdateModal] = useState<{ isOpen: boolean; title: string; updateText: string } | null>(null);
+
+    // Custom Lists & Task Thread States
+    const [selectedListId, setSelectedListId] = useState<string | null>(null);
+    const [createListModal, setCreateListModal] = useState<{ isOpen: boolean; templateType: string }>({ isOpen: false, templateType: 'project_tracking' });
+    const [newListTitle, setNewListTitle] = useState<string>('');
+    const [newListDescription, setNewListDescription] = useState<string>('');
+    const [activeTaskThreadItem, setActiveTaskThreadItem] = useState<{ listId: string; item: ProjectListItem } | null>(null);
+    const [listThreadCommentText, setListThreadCommentText] = useState<string>('');
+    const [listCustomView, setListCustomView] = useState<'all' | 'priority' | 'assigned_to_me' | 'due_date' | 'status'>('all');
+    const [newItemTitle, setNewItemTitle] = useState<string>('');
+    const [newItemAssignee, setNewItemAssignee] = useState<string>('');
+    const [newItemDueDate, setNewItemDueDate] = useState<string>('');
+    const [newItemPriority, setNewItemPriority] = useState<Priority>('medium');
+    const [newItemSP, setNewItemSP] = useState<number>(1);
 
     // Team Search State
     const [memberSearchText, setMemberSearchText] = useState<string>('');
@@ -3031,33 +3045,178 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // LISTAS TAB (Administrar Proyecto & Prioridades Trimestrales)
+    // LISTAS TAB (Administrar Proyecto con Múltiples Listas, Vistas y Comentarios)
     const renderListas = () => {
         if (!activeProject) return null;
 
-        const filteredTodos = projectTodos.filter(t => {
-            if (listasFilter === 'pending') return !t.completed && t.kanban_column !== 'Completado';
-            if (listasFilter === 'in_progress') return !t.completed && t.kanban_column === 'En progreso';
-            if (listasFilter === 'completed') return t.completed || t.kanban_column === 'Completado';
-            return true;
-        }).filter(t => {
+        // Auto-initialize default list if no lists exist
+        const projectLists: ProjectList[] = (activeProject.lists && activeProject.lists.length > 0)
+            ? activeProject.lists
+            : [
+                {
+                    id: 'list-default-1',
+                    project_id: activeProject.id,
+                    name: 'Seguimiento de Proyecto',
+                    description: 'Lista principal para realizar un seguimiento de tareas clave y fechas de entrega.',
+                    template_type: 'project_tracking',
+                    created_at: new Date().toISOString(),
+                    items: (activeProject.todos || []).map((t, idx) => ({
+                        id: `item-${t.id || idx}`,
+                        list_id: 'list-default-1',
+                        title: t.text,
+                        status: t.completed ? 'completed' : (t.kanban_column === 'En progreso' ? 'in_progress' : 'pending'),
+                        assignee_email: t.assignee || t.assigned_to || null,
+                        due_date: t.due_date || null,
+                        priority: t.priority || 'medium',
+                        story_points: t.story_points || 1,
+                        tags: t.tags || [],
+                        notifications_enabled: true,
+                        comments: t.comments || [],
+                        todo_id: t.id,
+                        created_at: t.created_at || new Date().toISOString()
+                    }))
+                }
+            ];
+
+        // Active list selection
+        const currentListId = selectedListId && projectLists.some(l => l.id === selectedListId)
+            ? selectedListId
+            : projectLists[0].id;
+        
+        const activeList = projectLists.find(l => l.id === currentListId) || projectLists[0];
+
+        // Filter and sort items based on custom views and search
+        let displayedItems = (activeList.items || []).filter(item => {
             if (!listasSearch.trim()) return true;
-            return t.text.toLowerCase().includes(listasSearch.toLowerCase());
+            return item.title.toLowerCase().includes(listasSearch.toLowerCase());
         });
 
-        const quarterlyPriorities = (activeProject.quarterly_priorities || []).filter(q => q.quarter === selectedQuarter);
-
-        const handleAddInlineTask = async (e: React.FormEvent) => {
-            e.preventDefault();
-            if (!inlineTaskText.trim()) return;
-            await addTodo(inlineTaskText.trim(), {
-                project_id: activeProject.id,
-                story_points: inlineTaskSP,
-                priority: inlineTaskPriority,
-                assigned_to: inlineTaskAssignee || undefined,
-                kanban_column: 'Por hacer'
+        if (listCustomView === 'assigned_to_me') {
+            displayedItems = displayedItems.filter(i => i.assignee_email === currentUserEmail);
+        } else if (listCustomView === 'priority') {
+            const priorityWeight = { high: 3, medium: 2, low: 1 };
+            displayedItems = [...displayedItems].sort((a, b) => (priorityWeight[b.priority || 'medium'] - priorityWeight[a.priority || 'medium']));
+        } else if (listCustomView === 'due_date') {
+            displayedItems = [...displayedItems].sort((a, b) => {
+                if (!a.due_date) return 1;
+                if (!b.due_date) return -1;
+                return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
             });
-            setInlineTaskText('');
+        } else if (listCustomView === 'status') {
+            const statusWeight = { blocked: 4, in_progress: 3, review: 2, pending: 1, completed: 0 };
+            displayedItems = [...displayedItems].sort((a, b) => (statusWeight[b.status] - statusWeight[a.status]));
+        }
+
+        // Helper to update list items in project state
+        const updateProjectLists = (updatedLists: ProjectList[]) => {
+            onUpdateProject(activeProject.id, { lists: updatedLists });
+        };
+
+        const handleAddItem = (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!newItemTitle.trim()) return;
+
+            const newItem: ProjectListItem = {
+                id: `item-${Date.now()}`,
+                list_id: activeList.id,
+                title: newItemTitle.trim(),
+                status: 'pending',
+                assignee_email: newItemAssignee || currentUserEmail,
+                due_date: newItemDueDate || null,
+                priority: newItemPriority,
+                story_points: newItemSP,
+                notifications_enabled: true,
+                comments: [],
+                created_at: new Date().toISOString()
+            };
+
+            // Create corresponding ProjectTodo so it's visible in Kanban/Sprints
+            const newTodo: Todo = {
+                id: Date.now(),
+                project_id: activeProject.id,
+                text: newItemTitle.trim(),
+                completed: false,
+                priority: newItemPriority,
+                story_points: newItemSP,
+                assigned_to: newItemAssignee || currentUserEmail,
+                kanban_column: 'Por hacer',
+                due_date: newItemDueDate || undefined,
+                created_at: new Date().toISOString()
+            };
+
+            newItem.todo_id = newTodo.id;
+
+            const updatedList = {
+                ...activeList,
+                items: [newItem, ...activeList.items]
+            };
+
+            const updatedLists = projectLists.map(l => l.id === activeList.id ? updatedList : l);
+            const updatedTodos = [newTodo, ...(activeProject.todos || [])];
+
+            onUpdateProject(activeProject.id, { lists: updatedLists, todos: updatedTodos });
+
+            setNewItemTitle('');
+            setNewItemDueDate('');
+        };
+
+        const handleUpdateItemField = (itemId: string, field: keyof ProjectListItem, value: any) => {
+            const updatedItems = activeList.items.map(item => {
+                if (item.id === itemId) {
+                    const updated = { ...item, [field]: value };
+                    
+                    // Keep status in sync with todo completion
+                    if (field === 'status' && item.todo_id) {
+                        const isDone = value === 'completed';
+                        const updatedTodos = (activeProject.todos || []).map(t => 
+                            t.id === item.todo_id 
+                                ? { ...t, completed: isDone, kanban_column: isDone ? 'Completado' : (value === 'in_progress' ? 'En progreso' : 'Por hacer') }
+                                : t
+                        );
+                        onUpdateProject(activeProject.id, { todos: updatedTodos });
+                    }
+                    return updated;
+                }
+                return item;
+            });
+
+            const updatedLists = projectLists.map(l => l.id === activeList.id ? { ...activeList, items: updatedItems } : l);
+            updateProjectLists(updatedLists);
+        };
+
+        const handleDeleteItem = (itemId: string) => {
+            const targetItem = activeList.items.find(i => i.id === itemId);
+            const updatedItems = activeList.items.filter(i => i.id !== itemId);
+            const updatedLists = projectLists.map(l => l.id === activeList.id ? { ...activeList, items: updatedItems } : l);
+            
+            let updatedTodos = activeProject.todos || [];
+            if (targetItem?.todo_id) {
+                updatedTodos = updatedTodos.filter(t => t.id !== targetItem.todo_id);
+            }
+
+            onUpdateProject(activeProject.id, { lists: updatedLists, todos: updatedTodos });
+        };
+
+        const handleShareListSummary = () => {
+            const pendingCount = activeList.items.filter(i => i.status !== 'completed').length;
+            const completedCount = activeList.items.filter(i => i.status === 'completed').length;
+            
+            let summaryText = `📋 **Lista de Seguimiento: ${activeList.name}**\n`;
+            if (activeList.description) summaryText += `_${activeList.description}_\n\n`;
+            summaryText += `📊 **Resumen:** ${completedCount} Tareas completadas | ${pendingCount} Pendientes\n\n`;
+            summaryText += `**Tareas Clave:**\n`;
+            activeList.items.slice(0, 8).forEach(item => {
+                const statusBadge = item.status === 'completed' ? '✅' : (item.status === 'in_progress' ? '🔄' : '📌');
+                const assignee = item.assignee_email ? `@${item.assignee_email.split('@')[0]}` : 'Sin Asignar';
+                const dueDate = item.due_date ? `(Entrega: ${item.due_date})` : '';
+                summaryText += `- ${statusBadge} **${item.title}** - Asignado a ${assignee} ${dueDate}\n`;
+            });
+
+            setShareUpdateModal({
+                isOpen: true,
+                title: `Compartir Lista: ${activeList.name}`,
+                updateText: summaryText
+            });
         };
 
         return (
@@ -3090,74 +3249,134 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                 {/* Subtab 1: Administrar un proyecto */}
                 {listasSubTab === 'admin' && (
-                    <div className="space-y-4">
-                        <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
-                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Lista Compartida del Proyecto</h3>
-                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                                Planifica y asigna tareas, luego realiza un seguimiento de sus estados en una lista compartida con tu equipo del proyecto.
-                            </p>
+                    <div className="space-y-5">
+                        {/* List Selector Header */}
+                        <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800 pb-3">
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <List className="w-4 h-4 text-blue-500" /> Listas del Proyecto
+                                    </h3>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Coordina el trabajo del equipo, fechas de entrega y estados clave con listas personalizadas.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handleShareListSummary}
+                                        className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-700"
+                                    >
+                                        <Share2 className="w-3.5 h-3.5 text-blue-500" /> Compartir en Canal
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setCreateListModal({ isOpen: true, templateType: 'project_tracking' });
+                                            setNewListTitle('');
+                                            setNewListDescription('');
+                                        }}
+                                        className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-xs"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" /> Nueva Lista
+                                    </button>
+                                </div>
+                            </div>
 
-                            <form onSubmit={handleAddInlineTask} className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-2">
+                            {/* List Tabs */}
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                {projectLists.map(list => (
+                                    <button
+                                        key={list.id}
+                                        onClick={() => setSelectedListId(list.id)}
+                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap shrink-0 border ${
+                                            list.id === activeList.id
+                                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-800 shadow-xs'
+                                                : 'bg-gray-50 dark:bg-black/40 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        <ListOrdered className="w-3.5 h-3.5" />
+                                        {list.name}
+                                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-200/50 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-mono">
+                                            {list.items?.length || 0}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Quick Add Form for Active List */}
+                            <form onSubmit={handleAddItem} className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-2">
                                 <input
                                     type="text"
-                                    placeholder="Nueva tarea para la lista del proyecto..."
-                                    value={inlineTaskText}
-                                    onChange={e => setInlineTaskText(e.target.value)}
+                                    placeholder={`Agregar nuevo elemento a "${activeList.name}"...`}
+                                    value={newItemTitle}
+                                    onChange={e => setNewItemTitle(e.target.value)}
                                     className="flex-1 min-w-[200px] px-3 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                                 />
                                 <select
-                                    value={inlineTaskSP}
-                                    onChange={e => setInlineTaskSP(Number(e.target.value))}
-                                    className="px-2.5 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none font-mono"
+                                    value={newItemAssignee}
+                                    onChange={e => setNewItemAssignee(e.target.value)}
+                                    className="px-2.5 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none max-w-[140px]"
                                 >
-                                    <option value={1}>1 SP</option>
-                                    <option value={2}>2 SP</option>
-                                    <option value={3}>3 SP</option>
-                                    <option value={5}>5 SP</option>
-                                    <option value={8}>8 SP</option>
-                                    <option value={13}>13 SP</option>
-                                </select>
-                                <select
-                                    value={inlineTaskPriority}
-                                    onChange={e => setInlineTaskPriority(e.target.value as any)}
-                                    className="px-2.5 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none"
-                                >
-                                    <option value="low">Prioridad Baja</option>
-                                    <option value="medium">Prioridad Media</option>
-                                    <option value="high">Prioridad Alta</option>
-                                </select>
-                                <select
-                                    value={inlineTaskAssignee}
-                                    onChange={e => setInlineTaskAssignee(e.target.value)}
-                                    className="px-2.5 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none max-w-[150px]"
-                                >
-                                    <option value="">Sin Asignar</option>
+                                    <option value="">(Asignar)</option>
                                     {realMembers.map(m => (
-                                        <option key={m.email} value={m.email}>{m.name || m.email}</option>
+                                        <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
                                     ))}
                                 </select>
-                                <button type="submit" className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-xs">
-                                    <Plus className="w-3.5 h-3.5" /> Agregar Tarea
+                                <input
+                                    type="date"
+                                    value={newItemDueDate}
+                                    onChange={e => setNewItemDueDate(e.target.value)}
+                                    className="px-2 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none"
+                                />
+                                <select
+                                    value={newItemPriority}
+                                    onChange={e => setNewItemPriority(e.target.value as any)}
+                                    className="px-2 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none"
+                                >
+                                    <option value="low">Baja</option>
+                                    <option value="medium">Media</option>
+                                    <option value="high">Alta</option>
+                                </select>
+                                <select
+                                    value={newItemSP}
+                                    onChange={e => setNewItemSP(Number(e.target.value))}
+                                    className="px-2 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none font-mono"
+                                >
+                                    {[1, 2, 3, 5, 8, 13].map(sp => (
+                                        <option key={sp} value={sp}>{sp} SP</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="submit"
+                                    className="px-3.5 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 shadow-xs shrink-0"
+                                >
+                                    <Plus className="w-3.5 h-3.5" /> Agregar
                                 </button>
                             </form>
                         </div>
 
+                        {/* Views Toolbar & Search */}
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg border border-gray-200 dark:border-gray-800">
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200 dark:border-gray-800 text-xs">
+                                <span className="text-[10px] uppercase font-bold text-gray-400 px-2 flex items-center gap-1">
+                                    <SlidersHorizontal className="w-3 h-3" /> Vistas:
+                                </span>
                                 {[
-                                    { id: 'all', label: 'Todas' },
-                                    { id: 'pending', label: 'Por Hacer' },
-                                    { id: 'in_progress', label: 'En Progreso' },
-                                    { id: 'completed', label: 'Completadas' },
-                                ].map(f => (
+                                    { id: 'all', label: 'Todas las Tareas' },
+                                    { id: 'priority', label: 'Por Prioridad' },
+                                    { id: 'assigned_to_me', label: 'Asignados a ti' },
+                                    { id: 'due_date', label: 'Por Fecha' },
+                                    { id: 'status', label: 'Por Estado' }
+                                ].map(v => (
                                     <button
-                                        key={f.id}
-                                        onClick={() => setListasFilter(f.id as any)}
-                                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                                            listasFilter === f.id ? 'bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
+                                        key={v.id}
+                                        onClick={() => setListCustomView(v.id as any)}
+                                        className={`px-2.5 py-1 font-medium rounded-lg transition-colors ${
+                                            listCustomView === v.id
+                                                ? 'bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs font-semibold'
+                                                : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
                                         }`}
                                     >
-                                        {f.label}
+                                        {v.label}
                                     </button>
                                 ))}
                             </div>
@@ -3174,51 +3393,166 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800/60 overflow-hidden shadow-sm">
-                            {filteredTodos.map(todo => (
-                                <div key={todo.id} className="p-3.5 flex items-center justify-between gap-4 hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
-                                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                                        <button onClick={() => updateTodo(todo.id, { completed: !todo.completed })} className="shrink-0">
-                                            {todo.completed ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Circle className="w-4 h-4 text-gray-400 hover:text-gray-600" />}
-                                        </button>
-                                        <span className={`text-xs flex-1 ${todo.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-gray-100 font-medium'}`}>
-                                            {todo.text}
-                                        </span>
-                                    </div>
+                        {/* Main List Data Table */}
+                        <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 dark:bg-zinc-900/80 border-b border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 font-semibold text-[11px] uppercase tracking-wider">
+                                            <th className="py-3 px-3 w-8 text-center">🔔</th>
+                                            <th className="py-3 px-3">Tarea / Descripción</th>
+                                            <th className="py-3 px-3">Estado</th>
+                                            <th className="py-3 px-3">Persona Asignada</th>
+                                            <th className="py-3 px-3">Fecha de Entrega</th>
+                                            <th className="py-3 px-3">Prioridad</th>
+                                            <th className="py-3 px-3 text-center">Story Points</th>
+                                            <th className="py-3 px-3 text-center">Hilo / Comentarios</th>
+                                            <th className="py-3 px-3 text-right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800/70">
+                                        {displayedItems.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={9} className="py-8 text-center text-gray-400 italic">
+                                                    No hay elementos en esta vista. Agrega un elemento arriba o cambia el filtro de búsqueda.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            displayedItems.map(item => (
+                                                <tr key={item.id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
+                                                    {/* Notifications Bell */}
+                                                    <td className="py-3 px-3 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleUpdateItemField(item.id, 'notifications_enabled', !item.notifications_enabled)}
+                                                            className={`p-1 rounded-md transition-colors ${
+                                                                item.notifications_enabled ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30' : 'text-gray-300 dark:text-gray-700 hover:text-gray-500'
+                                                            }`}
+                                                            title={item.notifications_enabled ? 'Notificaciones activadas' : 'Notificaciones desactivadas'}
+                                                        >
+                                                            {item.notifications_enabled ? <Bell className="w-3.5 h-3.5 fill-amber-500/20" /> : <BellOff className="w-3.5 h-3.5" />}
+                                                        </button>
+                                                    </td>
 
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        {todo.story_points ? (
-                                            <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-mono border border-gray-200 dark:border-gray-700">
-                                                {todo.story_points} SP
-                                            </span>
-                                        ) : null}
+                                                    {/* Title */}
+                                                    <td className="py-3 px-3 font-medium text-gray-900 dark:text-gray-100 min-w-[200px]">
+                                                        <span className={item.status === 'completed' ? 'line-through text-gray-400' : ''}>
+                                                            {item.title}
+                                                        </span>
+                                                    </td>
 
-                                        {todo.priority && (
-                                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${
-                                                todo.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300' :
-                                                todo.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300' :
-                                                'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
-                                            }`}>
-                                                {todo.priority === 'high' ? 'Alta' : todo.priority === 'low' ? 'Baja' : 'Media'}
-                                            </span>
+                                                    {/* Status Dropdown */}
+                                                    <td className="py-3 px-3">
+                                                        <select
+                                                            value={item.status}
+                                                            onChange={e => handleUpdateItemField(item.id, 'status', e.target.value)}
+                                                            className={`px-2 py-1 rounded-md text-[11px] font-bold border focus:outline-none cursor-pointer ${
+                                                                item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
+                                                                item.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300' :
+                                                                item.status === 'review' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300' :
+                                                                item.status === 'blocked' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300' :
+                                                                'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300'
+                                                            }`}
+                                                        >
+                                                            <option value="pending">Por hacer</option>
+                                                            <option value="in_progress">En progreso</option>
+                                                            <option value="review">En revisión</option>
+                                                            <option value="blocked">Bloqueado</option>
+                                                            <option value="completed">Completado</option>
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Assignee */}
+                                                    <td className="py-3 px-3">
+                                                        <select
+                                                            value={item.assignee_email || ''}
+                                                            onChange={e => handleUpdateItemField(item.id, 'assignee_email', e.target.value || null)}
+                                                            className="bg-transparent text-gray-700 dark:text-gray-300 text-xs focus:outline-none cursor-pointer max-w-[130px] truncate"
+                                                        >
+                                                            <option value="">(Sin Asignar)</option>
+                                                            {realMembers.map(m => (
+                                                                <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Due Date */}
+                                                    <td className="py-3 px-3">
+                                                        <input
+                                                            type="date"
+                                                            value={item.due_date || ''}
+                                                            onChange={e => handleUpdateItemField(item.id, 'due_date', e.target.value || null)}
+                                                            className="bg-transparent text-gray-600 dark:text-gray-400 text-xs focus:outline-none"
+                                                        />
+                                                    </td>
+
+                                                    {/* Priority Dropdown */}
+                                                    <td className="py-3 px-3">
+                                                        <select
+                                                            value={item.priority || 'medium'}
+                                                            onChange={e => handleUpdateItemField(item.id, 'priority', e.target.value)}
+                                                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border focus:outline-none cursor-pointer ${
+                                                                item.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40' :
+                                                                item.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40' :
+                                                                'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40'
+                                                            }`}
+                                                        >
+                                                            <option value="low">Baja</option>
+                                                            <option value="medium">Media</option>
+                                                            <option value="high">Alta</option>
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Story Points */}
+                                                    <td className="py-3 px-3 text-center">
+                                                        <select
+                                                            value={item.story_points || 1}
+                                                            onChange={e => handleUpdateItemField(item.id, 'story_points', Number(e.target.value))}
+                                                            className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[11px] font-mono px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700 focus:outline-none"
+                                                        >
+                                                            {[1, 2, 3, 5, 8, 13].map(sp => (
+                                                                <option key={sp} value={sp}>{sp} SP</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Thread / Discussion */}
+                                                    <td className="py-3 px-3 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setActiveTaskThreadItem({ listId: activeList.id, item });
+                                                                setListThreadCommentText('');
+                                                            }}
+                                                            className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[11px] font-medium rounded-lg hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 transition-colors inline-flex items-center gap-1 border border-gray-200 dark:border-gray-700"
+                                                        >
+                                                            <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
+                                                            <span>Hilo</span>
+                                                            {item.comments && item.comments.length > 0 && (
+                                                                <span className="ml-0.5 px-1.5 py-0.2 text-[9px] font-bold bg-blue-600 text-white rounded-full">
+                                                                    {item.comments.length}
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    </td>
+
+                                                    {/* Delete */}
+                                                    <td className="py-3 px-3 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteItem(item.id)}
+                                                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                                            title="Eliminar elemento de la lista"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
                                         )}
-
-                                        {todo.assigned_to && (
-                                            <span className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1 bg-gray-50 dark:bg-black px-2 py-0.5 rounded border border-gray-200 dark:border-gray-800">
-                                                <Users className="w-3 h-3 text-blue-500" />
-                                                {todo.assigned_to.split('@')[0]}
-                                            </span>
-                                        )}
-
-                                        <button onClick={() => deleteTodo(todo.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors">
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            {filteredTodos.length === 0 && (
-                                <div className="p-8 text-center text-xs text-gray-500">No hay tareas registradas en esta vista.</div>
-                            )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -4384,6 +4718,263 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    );
+                })()}
+            </Modal>
+
+            {/* CREATE NEW LIST MODAL */}
+            <Modal
+                isOpen={!!createListModal?.isOpen}
+                onClose={() => setCreateListModal(null)}
+                title="Crear Nueva Lista de Seguimiento"
+            >
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!activeProject || !newListTitle.trim()) return;
+
+                    const listId = `list-${Date.now()}`;
+                    const templateType = createListModal?.templateType || 'project_tracking';
+                    
+                    // Prepopulate template items if desired
+                    let templateItems: ProjectListItem[] = [];
+                    if (templateType === 'project_tracking') {
+                        templateItems = [
+                            {
+                                id: `item-${Date.now()}-1`,
+                                list_id: listId,
+                                title: 'Definir alcance y requerimientos clave',
+                                status: 'completed',
+                                assignee_email: currentUserEmail,
+                                due_date: new Date().toISOString().split('T')[0],
+                                priority: 'high',
+                                story_points: 3,
+                                notifications_enabled: true,
+                                comments: [],
+                                created_at: new Date().toISOString()
+                            },
+                            {
+                                id: `item-${Date.now()}-2`,
+                                list_id: listId,
+                                title: 'Diseñar prototipos de interfaz de usuario',
+                                status: 'in_progress',
+                                assignee_email: currentUserEmail,
+                                due_date: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+                                priority: 'medium',
+                                story_points: 5,
+                                notifications_enabled: true,
+                                comments: [],
+                                created_at: new Date().toISOString()
+                            }
+                        ];
+                    }
+
+                    const newList: ProjectList = {
+                        id: listId,
+                        project_id: activeProject.id,
+                        name: newListTitle.trim(),
+                        description: newListDescription.trim(),
+                        template_type: templateType,
+                        created_at: new Date().toISOString(),
+                        items: templateItems
+                    };
+
+                    const existingLists = activeProject.lists || [];
+                    const updatedLists = [...existingLists, newList];
+
+                    onUpdateProject(activeProject.id, { lists: updatedLists });
+                    setSelectedListId(listId);
+                    setCreateListModal(null);
+                    setNewListTitle('');
+                    setNewListDescription('');
+                }} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Seleccionar Plantilla de Lista
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {[
+                                { id: 'project_tracking', name: '📋 Seguimiento de Proyecto', desc: 'Tarea, Estado, Persona asignada, Fecha de entrega' },
+                                { id: 'product_launch', name: '🚀 Lanzamiento de Producto', desc: 'Funcionalidad, QA, Responsable, Sprint' },
+                                { id: 'marketing_launch', name: '📢 Lanzamiento de Marketing', desc: 'Canal, Contenido, Publicación' },
+                                { id: 'bug_tracking', name: '🐛 Control de Errores / Bugs', desc: 'Severidad, Módulo, Estado' },
+                            ].map(tpl => (
+                                <button
+                                    key={tpl.id}
+                                    type="button"
+                                    onClick={() => setCreateListModal({ isOpen: true, templateType: tpl.id as any })}
+                                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                                        createListModal?.templateType === tpl.id
+                                            ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 ring-1 ring-blue-500'
+                                            : 'bg-gray-50 dark:bg-black/50 border-gray-200 dark:border-gray-800 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    <div className="text-xs font-bold text-gray-900 dark:text-white">{tpl.name}</div>
+                                    <div className="text-[10px] text-gray-500 mt-0.5">{tpl.desc}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                            Nombre de la Lista
+                        </label>
+                        <input
+                            type="text"
+                            required
+                            placeholder="Ej: Seguimiento del Proyecto Alpha"
+                            value={newListTitle}
+                            onChange={e => setNewListTitle(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                            Descripción / Propósito (Opcional)
+                        </label>
+                        <textarea
+                            rows={2}
+                            placeholder="Detalla los objetivos de esta lista para el equipo..."
+                            value={newListDescription}
+                            onChange={e => setNewListDescription(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button
+                            type="button"
+                            onClick={() => setCreateListModal(null)}
+                            className="px-3.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs"
+                        >
+                            Crear Lista
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* TASK DISCUSSION THREAD MODAL */}
+            <Modal
+                isOpen={!!activeTaskThreadItem}
+                onClose={() => setActiveTaskThreadItem(null)}
+                title={activeTaskThreadItem ? `Hilo de Discusión: ${activeTaskThreadItem.item.title}` : "Hilo de Tarea"}
+            >
+                {activeTaskThreadItem && (() => {
+                    const { listId, item } = activeTaskThreadItem;
+                    const comments = item.comments || [];
+
+                    const handleAddComment = (e: React.FormEvent) => {
+                        e.preventDefault();
+                        if (!listThreadCommentText.trim() || !activeProject) return;
+
+                        const newComment = {
+                            id: `cmt-${Date.now()}`,
+                            user_email: currentUserEmail,
+                            user_name: currentUserEmail.split('@')[0],
+                            content: listThreadCommentText.trim(),
+                            created_at: new Date().toISOString()
+                        };
+
+                        const updatedComments = [...comments, newComment];
+
+                        // Update item in lists
+                        const currentLists = activeProject.lists || [];
+                        const updatedLists = currentLists.map(l => {
+                            if (l.id === listId) {
+                                return {
+                                    ...l,
+                                    items: l.items.map(i => i.id === item.id ? { ...i, comments: updatedComments } : i)
+                                };
+                            }
+                            return l;
+                        });
+
+                        onUpdateProject(activeProject.id, { lists: updatedLists });
+                        setActiveTaskThreadItem({ listId, item: { ...item, comments: updatedComments } });
+                        setListThreadCommentText('');
+                    };
+
+                    return (
+                        <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                            {/* Metadata Header */}
+                            <div className="p-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl space-y-2 text-xs">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                        <Users className="w-3.5 h-3.5 text-blue-500" />
+                                        Asignado: {item.assignee_email || 'Sin asignar'}
+                                    </span>
+                                    <span className="text-gray-500">
+                                        Entrega: {item.due_date || 'Sin fecha'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                                        item.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                                    }`}>
+                                        {item.status}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Comments Feed */}
+                            <div className="space-y-3">
+                                <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                                    <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
+                                    Comentarios del Hilo ({comments.length})
+                                </h4>
+
+                                {comments.length === 0 ? (
+                                    <p className="text-xs text-gray-400 italic py-4 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
+                                        No hay comentarios en este hilo aún. Inicia la conversación abajo.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                                        {comments.map(c => (
+                                            <div key={c.id} className="p-3 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl space-y-1">
+                                                <div className="flex items-center justify-between text-[11px]">
+                                                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                                                        {c.user_name || c.user_email}
+                                                    </span>
+                                                    <span className="text-gray-400 text-[10px]">
+                                                        {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed">
+                                                    {c.content}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Comment Input Form */}
+                            <form onSubmit={handleAddComment} className="pt-2 border-t border-gray-200 dark:border-gray-800 space-y-2">
+                                <textarea
+                                    rows={2}
+                                    placeholder="Escribe un comentario en este hilo..."
+                                    value={listThreadCommentText}
+                                    onChange={e => setListThreadCommentText(e.target.value)}
+                                    className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg p-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                        <Bell className="w-3 h-3 text-amber-500" /> Notificaciones activadas
+                                    </span>
+                                    <button
+                                        type="submit"
+                                        className="px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1"
+                                    >
+                                        <Send className="w-3 h-3" /> Publicar
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     );
                 })()}

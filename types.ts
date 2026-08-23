@@ -314,6 +314,35 @@ export interface Project {
   expenses?: ProjectExpense[];
   time_entries?: ProjectTimeEntry[];
   quarterly_priorities?: ProjectQuarterlyPriority[];
+  lists?: ProjectList[];
+}
+
+export interface ProjectListItem {
+  id: string;
+  list_id: string;
+  title: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'blocked' | 'review';
+  assignee_email?: string | null;
+  due_date?: string | null;
+  priority?: Priority;
+  story_points?: number | null;
+  tags?: string[];
+  notifications_enabled?: boolean;
+  comments?: TaskComment[];
+  todo_id?: number;
+  created_at: string;
+}
+
+export interface ProjectList {
+  id: string;
+  project_id: number;
+  name: string;
+  description?: string;
+  template_type?: 'custom' | 'project_tracking' | 'product_launch' | 'bug_tracking' | 'marketing';
+  items: ProjectListItem[];
+  created_at: string;
+  created_by?: string;
+  columns?: string[];
 }
 
 export interface ProjectQuarterlyPriority {
