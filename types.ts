@@ -173,6 +173,7 @@ export interface ProjectInboxItem {
 export interface ProjectChatMessage {
   id: string;
   project_id: number;
+  channel_id?: string;
   sender_id?: string;
   sender_name: string;
   sender_email: string;
@@ -194,6 +195,52 @@ export interface ProjectChatMessage {
     sender_name: string;
     text: string;
   };
+  poll_id?: string;
+}
+
+export interface ProjectChannel {
+  id: string;
+  project_id: number;
+  name: string;
+  description?: string;
+  emoji: string;
+  is_private: boolean;
+  created_at: string;
+}
+
+export interface ProjectPollOption {
+  id: string;
+  text: string;
+  voters: string[]; // List of voter names/emails
+}
+
+export interface ProjectPoll {
+  id: string;
+  project_id: number;
+  channel_id: string;
+  question: string;
+  options: ProjectPollOption[];
+  allow_multiple: boolean;
+  created_by: string;
+  created_at: string;
+  is_closed?: boolean;
+}
+
+export interface ProjectHuddleParticipant {
+  name: string;
+  email: string;
+  has_mic: boolean;
+  has_video: boolean;
+  has_screen: boolean;
+}
+
+export interface ProjectHuddle {
+  id: string;
+  project_id: number;
+  channel_id: string;
+  active: boolean;
+  started_at: string;
+  participants: ProjectHuddleParticipant[];
 }
 
 export interface ProjectActivity {
@@ -231,6 +278,9 @@ export interface Project {
   inbox?: ProjectInboxItem[];
   chat_messages?: ProjectChatMessage[];
   activities?: ProjectActivity[];
+  channels?: ProjectChannel[];
+  polls?: ProjectPoll[];
+  huddles?: ProjectHuddle[];
 }
 
 export interface Note {

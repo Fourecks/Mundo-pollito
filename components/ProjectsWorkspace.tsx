@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation } from '../types';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle } from '../types';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -94,6 +94,42 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const chatEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Communication & Channels States
+    const [selectedChannelId, setSelectedChannelId] = useState<string>('general');
+    const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+    const [newChannelName, setNewChannelName] = useState('');
+    const [newChannelDescription, setNewChannelDescription] = useState('');
+    const [newChannelEmoji, setNewChannelEmoji] = useState('💬');
+    const [newChannelIsPrivate, setNewChannelIsPrivate] = useState(false);
+
+    // Channel Edit/Delete States
+    const [editingChannel, setEditingChannel] = useState<ProjectChannel | null>(null);
+    const [editingChannelName, setEditingChannelName] = useState('');
+    const [editingChannelDescription, setEditingChannelDescription] = useState('');
+    const [editingChannelEmoji, setEditingChannelEmoji] = useState('💬');
+    const [editingChannelIsPrivate, setEditingChannelIsPrivate] = useState(false);
+    const [channelToDelete, setChannelToDelete] = useState<ProjectChannel | null>(null);
+
+    // Team Polls States
+    const [isCreatePollOpen, setIsCreatePollOpen] = useState(false);
+    const [newPollQuestion, setNewPollQuestion] = useState('');
+    const [newPollOptions, setNewPollOptions] = useState<string[]>(['', '']);
+    const [newPollAllowMultiple, setNewPollAllowMultiple] = useState(false);
+
+    // Pinned Filter State
+    const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+
+    // Huddle States
+    const [isHuddleActive, setIsHuddleActive] = useState(false);
+    const [isMicOn, setIsMicOn] = useState(true);
+    const [isVideoOn, setIsVideoOn] = useState(false);
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const [huddleParticipants, setHuddleParticipants] = useState<any[]>([]);
+    const [showHuddleParticipants, setShowHuddleParticipants] = useState(false);
+
+    // Simulated Typing Statuses
+    const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+
     // Auto fallback to first active project
     const activeProject = useMemo(() => {
         if (activeProjectId) {
@@ -103,6 +139,124 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const activeList = projects.filter(p => !p.is_archived);
         return activeList.length > 0 ? activeList[0] : (projects.length > 0 ? projects[0] : null);
     }, [projects, activeProjectId]);
+
+    const activeChannels = useMemo(() => {
+        if (!activeProject) return [];
+        if (!activeProject.channels || activeProject.channels.length === 0) {
+            return [
+                { id: 'general', project_id: activeProject.id, name: 'general', description: 'Canal principal para charlar de todo un poco', emoji: '💬', is_private: false, created_at: activeProject.created_at },
+                { id: 'ideas', project_id: activeProject.id, name: 'ideas', description: 'Tormenta de ideas y sugerencias del proyecto', emoji: '💡', is_private: false, created_at: activeProject.created_at },
+                { id: 'anuncios', project_id: activeProject.id, name: 'anuncios', description: 'Notificaciones oficiales del proyecto', emoji: '📢', is_private: false, created_at: activeProject.created_at },
+                { id: 'privado', project_id: activeProject.id, name: 'privado', description: 'Conversaciones privadas entre líderes', emoji: '🔒', is_private: true, created_at: activeProject.created_at }
+            ];
+        }
+        return activeProject.channels;
+    }, [activeProject]);
+
+    const activePolls = useMemo(() => {
+        if (!activeProject) return [];
+        return activeProject.polls || [];
+    }, [activeProject]);
+
+    const activeHuddles = useMemo(() => {
+        if (!activeProject) return [];
+        return activeProject.huddles || [];
+    }, [activeProject]);
+
+    // Handle channel selection synchronization
+    React.useEffect(() => {
+        if (activeChannels.length > 0) {
+            const exists = activeChannels.some(c => c.id === selectedChannelId);
+            if (!exists) {
+                setSelectedChannelId(activeChannels[0].id);
+            }
+        } else {
+            setSelectedChannelId('general');
+        }
+    }, [activeProject, activeChannels]);
+
+    // Typing effect simulation
+    React.useEffect(() => {
+        if (!activeProject || activeTab !== 'chat') return;
+        
+        const interval = setInterval(() => {
+            const members = activeProject.members || [];
+            if (members.length <= 1) {
+                // If only user exists, simulate other team members
+                const mockNames = ['Carlos 🐣', 'Ana 🐤', 'Sofía 🐣'];
+                const randomName = mockNames[Math.floor(Math.random() * mockNames.length)];
+                setTypingUsers(prev => ({ ...prev, [selectedChannelId]: randomName }));
+                setTimeout(() => {
+                    setTypingUsers(prev => {
+                        const copy = { ...prev };
+                        delete copy[selectedChannelId];
+                        return copy;
+                    });
+                }, 3000);
+                return;
+            }
+            
+            const randomMember = members[Math.floor(Math.random() * members.length)];
+            if (randomMember.name === 'Tú') return;
+
+            const name = randomMember.name || 'Pollito 🐣';
+            
+            setTypingUsers(prev => ({
+                ...prev,
+                [selectedChannelId]: name
+            }));
+
+            setTimeout(() => {
+                setTypingUsers(prev => {
+                    const copy = { ...prev };
+                    delete copy[selectedChannelId];
+                    return copy;
+                });
+            }, 3500);
+
+        }, 12000);
+
+        return () => clearInterval(interval);
+    }, [activeProject, selectedChannelId, activeTab]);
+
+    // Simulated background huddle joiners
+    React.useEffect(() => {
+        if (!isHuddleActive) {
+            setHuddleParticipants([]);
+            return;
+        }
+
+        // Add user immediately
+        setHuddleParticipants([{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }]);
+
+        // Carlos joins
+        const t1 = setTimeout(() => {
+            setHuddleParticipants(prev => [
+                ...prev,
+                { name: 'Carlos 🐣', email: 'carlos@pollito.com', has_mic: true, has_video: false, has_screen: false }
+            ]);
+        }, 2000);
+
+        // Ana joins
+        const t2 = setTimeout(() => {
+            setHuddleParticipants(prev => [
+                ...prev,
+                { name: 'Ana 🐤', email: 'ana@pollito.com', has_mic: true, has_video: true, has_screen: false }
+            ]);
+        }, 4500);
+
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+        };
+    }, [isHuddleActive]);
+
+    // Update user's media states in active huddle participants list
+    React.useEffect(() => {
+        if (isHuddleActive) {
+            setHuddleParticipants(prev => prev.map(p => p.name === 'Tú' ? { ...p, has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing } : p));
+        }
+    }, [isMicOn, isVideoOn, isScreenSharing, isHuddleActive]);
 
     React.useEffect(() => {
         if (!activeProjectId && activeProject) {
@@ -274,7 +428,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         { id: 'sprints', label: 'Sprints', icon: Target },
                         { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                         { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
-                        { id: 'chat', label: 'Chat Grupal', icon: MessageSquare, badge: activeProject.chat_messages?.length },
+                        { id: 'chat', label: 'Canales', icon: MessageSquare, badge: activeProject.chat_messages?.length, isHuddle: isHuddleActive || (activeProject.huddles || []).some(h => h.active) },
                         { id: 'inbox', label: 'Bandeja', icon: Inbox, badge: activeProject.inbox?.filter(i => !i.is_read).length },
                         { id: 'team', label: 'Equipo', icon: Users, badge: (activeProject.members?.length || 1) },
                         { id: 'activity', label: 'Historial', icon: Clock },
@@ -290,6 +444,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         >
                             <tab.icon className="w-3.5 h-3.5" />
                             {tab.label}
+                            {tab.isHuddle && (
+                                <span className="absolute -top-0.5 right-0 flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                            )}
                             {tab.badge ? (
                                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                                     activeTab === tab.id ? 'bg-white/20 dark:bg-black/20' : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
@@ -818,11 +978,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // TEAM CHAT TAB
+    // TEAM CHAT & CHANNELS TAB
     const renderChat = () => {
         if (!activeProject) return null;
+        
         const messages = activeProject.chat_messages || [];
-        const filteredMessages = chatSearch ? messages.filter(m => m.text.toLowerCase().includes(chatSearch.toLowerCase())) : messages;
+        const currentChannel = activeChannels.find(c => c.id === selectedChannelId) || activeChannels[0] || { id: 'general', name: 'general', emoji: '💬', description: 'Canal principal' };
+
+        // Filter messages by channel (handling legacy messages without channel_id as 'general')
+        let channelMessages = messages.filter(m => {
+            const mChanId = m.channel_id || 'general';
+            return mChanId === currentChannel.id;
+        });
+
+        // Filter messages by search if specified
+        if (chatSearch) {
+            channelMessages = channelMessages.filter(m => m.text.toLowerCase().includes(chatSearch.toLowerCase()));
+        }
+
+        // Filter pinned only if toggled
+        if (showPinnedOnly) {
+            channelMessages = channelMessages.filter(m => m.is_pinned);
+        }
 
         const handleSendMessage = (e: React.FormEvent) => {
             e.preventDefault();
@@ -831,6 +1008,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             const newMessage: ProjectChatMessage = {
                 id: crypto.randomUUID(),
                 project_id: activeProject.id,
+                channel_id: currentChannel.id,
                 sender_name: 'Tú',
                 sender_email: 'tu_correo@ejemplo.com',
                 text: chatText.trim(),
@@ -848,95 +1026,1132 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         };
 
+        const handleCreateChannel = (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!newChannelName.trim()) return;
+
+            const channelId = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
+            const duplicate = activeChannels.some(c => c.id === channelId);
+            if (duplicate) {
+                alert('Ya existe un canal con ese nombre.');
+                return;
+            }
+
+            const newChan: ProjectChannel = {
+                id: channelId,
+                project_id: activeProject.id,
+                name: channelId,
+                description: newChannelDescription.trim() || undefined,
+                emoji: newChannelEmoji,
+                is_private: newChannelIsPrivate,
+                created_at: new Date().toISOString()
+            };
+
+            const updatedChannels = [...activeChannels, newChan];
+            onUpdateProject(activeProject.id, { channels: updatedChannels });
+            
+            // Post notification message in general about the new channel
+            const systemMsg: ProjectChatMessage = {
+                id: crypto.randomUUID(),
+                project_id: activeProject.id,
+                channel_id: 'general',
+                sender_name: 'Sistema 🐥',
+                sender_email: 'sistema@pollito.com',
+                text: `✨ El canal #${channelId} ha sido creado por Tú: "${newChannelDescription || 'Sin descripción'}"`,
+                created_at: new Date().toISOString()
+            };
+
+            onUpdateProject(activeProject.id, { 
+                channels: updatedChannels,
+                chat_messages: [...messages, systemMsg]
+            });
+
+            setSelectedChannelId(newChan.id);
+            setNewChannelName('');
+            setNewChannelDescription('');
+            setNewChannelEmoji('💬');
+            setNewChannelIsPrivate(false);
+            setIsCreateChannelOpen(false);
+        };
+
+        const handleEditChannelSubmit = (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!editingChannel || !editingChannelName.trim()) return;
+
+            const updatedChanId = editingChannelName.trim().toLowerCase().replace(/\s+/g, '-');
+            const updatedChan: ProjectChannel = {
+                ...editingChannel,
+                name: updatedChanId,
+                description: editingChannelDescription.trim() || undefined,
+                emoji: editingChannelEmoji,
+                is_private: editingChannelIsPrivate
+            };
+
+            const updatedChannels = activeChannels.map(c => c.id === editingChannel.id ? updatedChan : c);
+            
+            // Update messages' channel_id if the channel ID changed
+            const updatedMessages = messages.map(m => m.channel_id === editingChannel.id ? { ...m, channel_id: updatedChanId } : m);
+
+            onUpdateProject(activeProject.id, { 
+                channels: updatedChannels,
+                chat_messages: updatedMessages
+            });
+
+            if (selectedChannelId === editingChannel.id) {
+                setSelectedChannelId(updatedChanId);
+            }
+
+            setEditingChannel(null);
+        };
+
+        const confirmDeleteChannel = (channel: ProjectChannel) => {
+            if (channel.id === 'general') return;
+            const updatedChannels = activeChannels.filter(c => c.id !== channel.id);
+            const updatedMessages = messages.filter(m => m.channel_id !== channel.id);
+            
+            onUpdateProject(activeProject.id, { 
+                channels: updatedChannels,
+                chat_messages: updatedMessages
+            });
+
+            if (selectedChannelId === channel.id) {
+                setSelectedChannelId('general');
+            }
+            setChannelToDelete(null);
+        };
+
+        const handleCreatePollSubmit = (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!newPollQuestion.trim()) return;
+            
+            const filteredOptions = newPollOptions.filter(o => o.trim() !== '');
+            if (filteredOptions.length < 2) {
+                alert('Por favor, ingresa al menos 2 opciones.');
+                return;
+            }
+
+            const pollId = crypto.randomUUID();
+            const newPoll: ProjectPoll = {
+                id: pollId,
+                project_id: activeProject.id,
+                channel_id: currentChannel.id,
+                question: newPollQuestion.trim(),
+                options: filteredOptions.map((text, idx) => ({
+                    id: `opt-${idx}`,
+                    text: text.trim(),
+                    voters: []
+                })),
+                allow_multiple: newPollAllowMultiple,
+                created_by: 'Tú',
+                created_at: new Date().toISOString()
+            };
+
+            const updatedPolls = [...activePolls, newPoll];
+            
+            const newMessage: ProjectChatMessage = {
+                id: crypto.randomUUID(),
+                project_id: activeProject.id,
+                channel_id: currentChannel.id,
+                sender_name: 'Tú',
+                sender_email: 'tu_correo@ejemplo.com',
+                text: `🗳️ ENCUESTA DE EQUIPO: ${newPollQuestion.trim()}\nResponde directamente haciendo clic en las opciones.`,
+                created_at: new Date().toISOString(),
+                poll_id: pollId
+            };
+
+            onUpdateProject(activeProject.id, {
+                polls: updatedPolls,
+                chat_messages: [...messages, newMessage]
+            });
+
+            setNewPollQuestion('');
+            setNewPollOptions(['', '']);
+            setNewPollAllowMultiple(false);
+            setIsCreatePollOpen(false);
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        };
+
+        const handleVoteOption = (pollId: string, optionId: string) => {
+            const userEmail = 'tu_correo@ejemplo.com';
+            const updatedPolls = activePolls.map(poll => {
+                if (poll.id !== pollId) return poll;
+
+                const options = poll.options.map(opt => {
+                    const hasVoted = opt.voters.includes(userEmail);
+                    if (opt.id === optionId) {
+                        return {
+                            ...opt,
+                            voters: hasVoted ? opt.voters.filter(v => v !== userEmail) : [...opt.voters, userEmail]
+                        };
+                    } else if (!poll.allow_multiple) {
+                        // Clear vote from other options if single choice only
+                        return {
+                            ...opt,
+                            voters: opt.voters.filter(v => v !== userEmail)
+                        };
+                    }
+                    return opt;
+                });
+
+                return { ...poll, options };
+            });
+
+            onUpdateProject(activeProject.id, { polls: updatedPolls });
+        };
+
+        const handleReactToMessage = (messageId: string, emoji: string) => {
+            const userEmail = 'tu_correo@ejemplo.com';
+            const updatedMessages = messages.map(msg => {
+                if (msg.id !== messageId) return msg;
+
+                const reactions = { ...(msg.reactions || {}) };
+                const voters = reactions[emoji] || [];
+                const hasVoted = voters.includes(userEmail);
+
+                if (hasVoted) {
+                    reactions[emoji] = voters.filter(v => v !== userEmail);
+                } else {
+                    reactions[emoji] = [...voters, userEmail];
+                }
+
+                if (reactions[emoji].length === 0) {
+                    delete reactions[emoji];
+                }
+
+                return { ...msg, reactions };
+            });
+
+            onUpdateProject(activeProject.id, { chat_messages: updatedMessages });
+        };
+
+        const handleTogglePinMessage = (messageId: string) => {
+            const updatedMessages = messages.map(msg => {
+                if (msg.id !== messageId) return msg;
+                return { ...msg, is_pinned: !msg.is_pinned };
+            });
+            onUpdateProject(activeProject.id, { chat_messages: updatedMessages });
+        };
+
+        const handleToggleHuddle = () => {
+            if (isHuddleActive) {
+                setIsHuddleActive(false);
+                const updatedHuddles = activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: false, participants: [] } : h);
+                onUpdateProject(activeProject.id, { huddles: updatedHuddles });
+            } else {
+                setIsHuddleActive(true);
+                const updatedHuddles = activeHuddles.some(h => h.channel_id === currentChannel.id)
+                    ? activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: true, started_at: new Date().toISOString(), participants: [{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] } : h)
+                    : [...activeHuddles, { id: crypto.randomUUID(), project_id: activeProject.id, channel_id: currentChannel.id, active: true, started_at: new Date().toISOString(), participants: [{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] }];
+                onUpdateProject(activeProject.id, { huddles: updatedHuddles });
+            }
+        };
+
         return (
-            <div className="flex flex-col h-full bg-gray-50/50 dark:bg-[#050505]">
-                {/* Chat Top Search Bar */}
-                <div className="px-6 py-2.5 bg-white dark:bg-[#0e0e0e] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold">
-                        <MessageSquare className="w-4 h-4 text-blue-500" /> Chat del Proyecto ({messages.length} mensajes)
+            <div className="flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden">
+                
+                {/* 1. CHANNELS SIDEBAR */}
+                <div className="w-64 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0c0c0c] flex flex-col justify-between shrink-0 h-full">
+                    
+                    <div className="flex-1 overflow-y-auto">
+                        
+                        {/* Sidebar Header */}
+                        <div className="p-4 border-b border-gray-100 dark:border-gray-800/80 flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Canales de Equipo</span>
+                            <button 
+                                onClick={() => setIsCreateChannelOpen(true)}
+                                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors text-blue-600 dark:text-blue-400"
+                                title="Crear nuevo canal"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Active Global Huddle Banner */}
+                        {(isHuddleActive || activeHuddles.some(h => h.active)) && (
+                            <div className="mx-3 my-2 p-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    <span className="text-[10px] uppercase font-bold text-emerald-800 dark:text-emerald-400">Reunión en Curso</span>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        const runningHuddle = activeHuddles.find(h => h.active) || { channel_id: 'general' };
+                                        setSelectedChannelId(runningHuddle.channel_id);
+                                        setIsHuddleActive(true);
+                                    }}
+                                    className="w-full text-center py-1 text-[11px] bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 transition-colors"
+                                >
+                                    Unirse al Huddle 🎙️
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Channels List */}
+                        <div className="p-2 space-y-0.5">
+                            {activeChannels.map(chan => {
+                                const isSelected = chan.id === currentChannel.id;
+                                const isChanHuddleActive = (activeHuddles.find(h => h.channel_id === chan.id)?.active) || (isHuddleActive && chan.id === currentChannel.id);
+                                
+                                // Simulation: unread notifications for non-selected channels (e.g. general usually has some history)
+                                const hasUnread = !isSelected && chan.id === 'ideas';
+
+                                return (
+                                    <div 
+                                        key={chan.id}
+                                        className={`group/chan flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                                            isSelected 
+                                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 font-semibold' 
+                                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
+                                        }`}
+                                        onClick={() => setSelectedChannelId(chan.id)}
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-sm shrink-0">{chan.emoji}</span>
+                                            <div className="truncate flex items-center gap-1">
+                                                <span className="text-xs truncate">{chan.name}</span>
+                                                {chan.is_private && <Lock className="w-3 h-3 text-gray-400 shrink-0" />}
+                                                {isChanHuddleActive && (
+                                                    <span className="flex h-2 w-2 shrink-0">
+                                                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-emerald-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1">
+                                            {hasUnread && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                            )}
+
+                                            {/* Edit & Delete Action Triggers */}
+                                            {chan.id !== 'general' && (
+                                                <div className="hidden group-hover/chan:flex items-center gap-0.5">
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingChannel(chan);
+                                                            setEditingChannelName(chan.name);
+                                                            setEditingChannelDescription(chan.description || '');
+                                                            setEditingChannelEmoji(chan.emoji);
+                                                            setEditingChannelIsPrivate(chan.is_private);
+                                                        }}
+                                                        className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                                    >
+                                                        <Edit2 className="w-3 h-3" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setChannelToDelete(chan);
+                                                        }}
+                                                        className="p-0.5 hover:bg-red-100 dark:hover:bg-red-950/50 rounded text-red-500 hover:text-red-700"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
                     </div>
-                    <div className="relative w-64">
-                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
-                        <input 
-                            type="text" 
-                            placeholder="Buscar en el chat..." 
-                            value={chatSearch} 
-                            onChange={e => setChatSearch(e.target.value)} 
-                            className="w-full pl-8 pr-3 py-1 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none"
-                        />
+
+                    {/* Bottom Active User Profile Mini Card */}
+                    <div className="p-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-black/30 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center">T</div>
+                            <div className="truncate">
+                                <p className="font-bold text-gray-800 dark:text-gray-200 truncate">Tú (Líder)</p>
+                                <p className="text-[10px] text-gray-400 truncate">En línea</p>
+                            </div>
+                        </div>
                     </div>
+
                 </div>
 
-                {/* Messages Stream */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                    {filteredMessages.length === 0 ? renderEmptyState('Inicio de la conversación', 'Utiliza este chat para colaborar en tiempo real y referenciar documentos.') : (
-                        filteredMessages.map(msg => (
-                            <div key={msg.id} className="flex items-start gap-3 group">
-                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                                    {msg.sender_name.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xs font-bold text-gray-900 dark:text-white">{msg.sender_name}</span>
-                                        <span className="text-[10px] text-gray-400">{format(parseISO(msg.created_at), 'HH:mm', { locale: es })}</span>
+                {/* 2. CHAT WORKSPACE AREA */}
+                <div className="flex-1 flex flex-col h-full bg-white dark:bg-[#050505] overflow-hidden relative">
+                    
+                    {/* Channel Main Header */}
+                    <div className="px-6 py-3.5 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-4 shrink-0">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">{currentChannel.emoji}</span>
+                                <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">#{currentChannel.name}</h2>
+                                {currentChannel.is_private && <Lock className="w-3.5 h-3.5 text-gray-400" />}
+                            </div>
+                            {currentChannel.description && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{currentChannel.description}</p>
+                            )}
+                        </div>
+
+                        {/* Channel Header Actions */}
+                        <div className="flex items-center gap-2">
+                            
+                            {/* Toggle Pin Filter Button */}
+                            <button 
+                                onClick={() => setShowPinnedOnly(prev => !prev)}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-all ${
+                                    showPinnedOnly 
+                                        ? 'bg-amber-500 border-amber-600 text-white shadow-sm' 
+                                        : 'bg-white dark:bg-[#111] border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                }`}
+                                title="Filtrar por mensajes fijados"
+                            >
+                                <Pin className="w-3.5 h-3.5" /> 
+                                <span className="hidden sm:inline">Pines ({messages.filter(m => m.channel_id === currentChannel.id && m.is_pinned).length})</span>
+                            </button>
+
+                            {/* Create Poll Trigger */}
+                            <button 
+                                onClick={() => setIsCreatePollOpen(true)}
+                                className="px-2.5 py-1.5 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                            >
+                                <BarChart2 className="w-3.5 h-3.5 text-blue-500" />
+                                <span className="hidden sm:inline">Nueva Encuesta</span>
+                            </button>
+
+                            {/* Huddle Live Meet Button */}
+                            <button 
+                                onClick={handleToggleHuddle}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
+                                    isHuddleActive 
+                                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                                        : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active)
+                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
+                                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                }`}
+                            >
+                                <Video className="w-3.5 h-3.5" />
+                                {isHuddleActive ? 'Salir del Huddle' : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active) ? 'Unirse al Huddle' : 'Iniciar Huddle'}
+                            </button>
+
+                        </div>
+                    </div>
+
+                    {/* 3. HUDDLE ACTIVE AUDIO/VIDEO BAR */}
+                    {isHuddleActive && (
+                        <div className="bg-gradient-to-r from-slate-900 via-[#1e293b] to-slate-900 text-white p-4 shrink-0 shadow-lg border-b border-slate-800">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                    <div>
+                                        <p className="text-xs font-bold text-white flex items-center gap-2">
+                                            Huddle Activo en #{currentChannel.name}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">
+                                            {huddleParticipants.length} participantes • Audio & Video conectados
+                                        </p>
                                     </div>
+                                </div>
 
-                                    {msg.reply_to && (
-                                        <div className="p-2 mb-1 bg-gray-100 dark:bg-gray-800/60 rounded border-l-2 border-blue-500 text-xs text-gray-600 dark:text-gray-300">
-                                            <strong className="block text-[10px] text-blue-500">Respondiendo a {msg.reply_to.sender_name}:</strong>
-                                            {msg.reply_to.text}
-                                        </div>
-                                    )}
+                                {/* Live Participants Avatars */}
+                                <div className="flex items-center gap-3 bg-black/30 px-3 py-1.5 rounded-lg border border-white/5">
+                                    <span className="text-[10px] uppercase font-bold text-gray-400">En Llamada:</span>
+                                    <div className="flex -space-x-2 overflow-hidden">
+                                        {huddleParticipants.map((p, idx) => (
+                                            <div 
+                                                key={p.email || idx} 
+                                                className="w-6 h-6 rounded-full bg-blue-600 border border-slate-900 text-[10px] font-bold flex items-center justify-center"
+                                                title={`${p.name} (${p.email}) ${p.has_mic ? '🎙️' : '🔇'} ${p.has_video ? '📹' : ''}`}
+                                            >
+                                                {p.name.charAt(0).toUpperCase()}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button 
+                                        onClick={() => setShowHuddleParticipants(prev => !prev)}
+                                        className="text-[10px] underline text-blue-400 hover:text-blue-300 font-bold"
+                                    >
+                                        {showHuddleParticipants ? 'Ocultar' : 'Ver Detalles'}
+                                    </button>
+                                </div>
 
-                                    <div className="p-3 bg-white dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-gray-800 text-xs text-gray-800 dark:text-gray-200 shadow-sm">
-                                        <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                                {/* Integrated Call Controllers */}
+                                <div className="flex items-center gap-2">
+                                    {/* Mic Mute/Unmute */}
+                                    <button 
+                                        onClick={() => setIsMicOn(prev => !prev)}
+                                        className={`p-2 rounded-lg transition-all ${isMicOn ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-red-500/90 hover:bg-red-600 text-white'}`}
+                                        title={isMicOn ? 'Silenciar Micrófono' : 'Activar Micrófono'}
+                                    >
+                                        {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                                    </button>
 
-                                        {/* Doc Reference Card */}
-                                        {msg.doc_reference && (
-                                            <div className="mt-2.5 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-lg flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    {getFileIcon(msg.doc_reference.file_type, msg.doc_reference.file_name)}
-                                                    <div className="truncate">
-                                                        <h4 className="text-xs font-bold text-blue-900 dark:text-blue-200 truncate">{msg.doc_reference.title}</h4>
-                                                        <span className="text-[10px] text-blue-600 dark:text-blue-400">{msg.doc_reference.folder_name} • {msg.doc_reference.file_size_formatted}</span>
+                                    {/* Video Camera Toggle */}
+                                    <button 
+                                        onClick={() => setIsVideoOn(prev => !prev)}
+                                        className={`p-2 rounded-lg transition-all ${isVideoOn ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                                        title={isVideoOn ? 'Desactivar Cámara' : 'Activar Cámara'}
+                                    >
+                                        {isVideoOn ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
+                                    </button>
+
+                                    {/* Screen Sharing Toggle */}
+                                    <button 
+                                        onClick={() => setIsScreenSharing(prev => !prev)}
+                                        className={`p-2 rounded-lg transition-all ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                                        title={isScreenSharing ? 'Detener Compartir Pantalla' : 'Compartir Pantalla'}
+                                    >
+                                        <Monitor className="w-4 h-4" />
+                                    </button>
+
+                                    <button 
+                                        onClick={handleToggleHuddle}
+                                        className="px-2.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all"
+                                        title="Finalizar llamada"
+                                    >
+                                        Colgar 📞
+                                    </button>
+                                </div>
+
+                            </div>
+
+                            {/* Expanded Participant Control & Camera Streams List */}
+                            {(showHuddleParticipants || isVideoOn) && (
+                                <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                    {huddleParticipants.map((p, idx) => (
+                                        <div key={p.email || idx} className="bg-black/40 rounded-lg p-2.5 border border-white/5 relative overflow-hidden flex flex-col justify-between min-h-[90px]">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[11px] font-bold text-gray-200 truncate">{p.name}</span>
+                                                <span className="text-[10px] text-gray-500">{p.name === 'Tú' ? '(Tú)' : ''}</span>
+                                            </div>
+
+                                            {/* Video placeholder view */}
+                                            {p.has_video ? (
+                                                <div className="absolute inset-0 bg-slate-900 flex items-center justify-center mt-6">
+                                                    <div className="relative flex flex-col items-center">
+                                                        <span className="text-[20px] animate-bounce">🐥</span>
+                                                        <span className="text-[8px] tracking-widest text-emerald-400 uppercase font-bold">Cámara Activa</span>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-1 shrink-0">
+                                            ) : (
+                                                <div className="flex-1 flex items-center justify-center my-1.5">
+                                                    <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 text-gray-300 font-bold text-xs flex items-center justify-center">
+                                                        {p.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="flex items-center justify-between z-10 bg-black/50 p-1 rounded mt-auto text-[9px] text-gray-400">
+                                                <span className="flex items-center gap-1">
+                                                    {p.has_mic ? <Mic className="w-2.5 h-2.5 text-emerald-400" /> : <MicOff className="w-2.5 h-2.5 text-red-400" />}
+                                                    {p.has_mic ? 'Audio' : 'Mute'}
+                                                </span>
+                                                {p.has_screen && <span className="text-blue-400">Compartiendo</span>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                        </div>
+                    )}
+
+                    {/* Messages Search Bar Inside Main Chat Workspace */}
+                    <div className="px-6 py-2 bg-gray-50 dark:bg-black/30 border-b border-gray-100 dark:border-gray-800/80 flex items-center justify-between gap-4 shrink-0">
+                        <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">Mensajes en este canal:</span> 
+                            {channelMessages.length} total
+                        </div>
+                        <div className="relative w-64">
+                            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
+                            <input 
+                                type="text" 
+                                placeholder="Buscar en este canal..." 
+                                value={chatSearch} 
+                                onChange={e => setChatSearch(e.target.value)} 
+                                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    {/* 4. MESSAGES STREAM */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                        
+                        {channelMessages.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto">
+                                <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 mb-3">
+                                    <MessageSquare className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-1">
+                                    Inicio del canal #{currentChannel.name}
+                                </h3>
+                                <p className="text-xs text-gray-500 leading-relaxed">
+                                    {currentChannel.description || 'Este es el inicio de la conversación de este canal. ¡Saluda a tu equipo!'}
+                                </p>
+                            </div>
+                        ) : (
+                            channelMessages.map(msg => {
+                                const isSystem = msg.sender_name.includes('Sistema');
+                                const isUser = msg.sender_email === 'tu_correo@ejemplo.com';
+                                const reactions = msg.reactions || {};
+                                const isPinned = msg.is_pinned;
+
+                                // If message has a poll_id, locate the poll
+                                const poll = msg.poll_id ? activePolls.find(p => p.id === msg.poll_id) : null;
+
+                                return (
+                                    <div 
+                                        key={msg.id} 
+                                        className={`flex items-start gap-3 group relative p-3 rounded-xl transition-all ${
+                                            isPinned 
+                                                ? 'bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/50 dark:border-amber-900/30' 
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-800/10'
+                                        }`}
+                                    >
+                                        
+                                        {/* Sender Avatar */}
+                                        <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 shadow-sm text-white ${
+                                            isSystem ? 'bg-amber-500' : isUser ? 'bg-blue-600' : 'bg-indigo-600'
+                                        }`}>
+                                            {msg.sender_name.charAt(0).toUpperCase()}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            
+                                            {/* Sender Metadata */}
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-xs font-bold text-gray-900 dark:text-white">{msg.sender_name}</span>
+                                                <span className="text-[10px] text-gray-400">{format(parseISO(msg.created_at), 'HH:mm', { locale: es })}</span>
+                                                {isPinned && (
+                                                    <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 uppercase tracking-wider bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.2 rounded border border-amber-200/40">
+                                                        📌 Fijado
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Replying Context Bar */}
+                                            {msg.reply_to && (
+                                                <div className="p-2 mb-1.5 bg-gray-100 dark:bg-gray-800/60 rounded border-l-2 border-blue-500 text-[11px] text-gray-600 dark:text-gray-300">
+                                                    <strong className="block text-[10px] text-blue-500">Respondiendo a {msg.reply_to.sender_name}:</strong>
+                                                    {msg.reply_to.text}
+                                                </div>
+                                            )}
+
+                                            {/* Message Bubble/Content */}
+                                            <div className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                                                {msg.text}
+                                            </div>
+
+                                            {/* 5. INTERACTIVE TEAM POLL CARD (If Poll is attached) */}
+                                            {poll && (
+                                                <div className="mt-3 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl p-4 max-w-md shadow-sm">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <BarChart2 className="w-4 h-4 text-blue-500" />
+                                                        <span className="text-xs font-bold text-gray-900 dark:text-white">{poll.question}</span>
+                                                    </div>
+                                                    
+                                                    <p className="text-[10px] text-gray-400 mb-3">
+                                                        {poll.allow_multiple ? '● Opción Múltiple Permitida' : '● Opción Única'}
+                                                    </p>
+
+                                                    <div className="space-y-2.5">
+                                                        {poll.options.map(opt => {
+                                                            const totalPollVotes = poll.options.reduce((sum, o) => sum + o.voters.length, 0);
+                                                            const percentage = totalPollVotes > 0 ? Math.round((opt.voters.length / totalPollVotes) * 100) : 0;
+                                                            const userVoted = opt.voters.includes('tu_correo@ejemplo.com');
+
+                                                            return (
+                                                                <div 
+                                                                    key={opt.id}
+                                                                    onClick={() => handleVoteOption(poll.id, opt.id)}
+                                                                    className={`p-2.5 rounded-lg border text-xs cursor-pointer transition-all relative overflow-hidden group ${
+                                                                        userVoted 
+                                                                            ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-950/10' 
+                                                                            : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111] hover:border-gray-300'
+                                                                    }`}
+                                                                >
+                                                                    {/* Voting Progress Fill */}
+                                                                    <div 
+                                                                        className={`absolute inset-y-0 left-0 transition-all duration-500 -z-0 ${
+                                                                            userVoted ? 'bg-blue-500/10' : 'bg-gray-100 dark:bg-gray-800/40'
+                                                                        }`} 
+                                                                        style={{ width: `${percentage}%` }} 
+                                                                    />
+
+                                                                    <div className="relative flex items-center justify-between z-10">
+                                                                        <span className={`font-semibold ${userVoted ? 'text-blue-600 dark:text-blue-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                                                                            {opt.text}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-gray-400 font-bold">{opt.voters.length} votos ({percentage}%)</span>
+                                                                    </div>
+
+                                                                    {/* Voter List Detail Tooltip-like Info */}
+                                                                    {opt.voters.length > 0 && (
+                                                                        <div className="relative z-10 text-[9px] text-gray-400 mt-1 flex flex-wrap gap-1 items-center">
+                                                                            <span className="font-semibold text-gray-500">Votado por:</span>
+                                                                            {opt.voters.map((v, i) => (
+                                                                                <span key={i} className="px-1 py-0.2 bg-gray-100 dark:bg-gray-800 rounded">{v === 'tu_correo@ejemplo.com' ? 'Tú' : v.split('@')[0]}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Referenced Documentation attachment card */}
+                                            {msg.doc_reference && (
+                                                <div className="mt-2.5 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-lg flex items-center justify-between gap-3 max-w-sm">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        {getFileIcon(msg.doc_reference.file_type, msg.doc_reference.file_name)}
+                                                        <div className="truncate">
+                                                            <h4 className="text-xs font-bold text-blue-900 dark:text-blue-200 truncate">{msg.doc_reference.title}</h4>
+                                                            <span className="text-[10px] text-blue-600 dark:text-blue-400">{msg.doc_reference.folder_name} • {msg.doc_reference.file_size_formatted}</span>
+                                                        </div>
+                                                    </div>
                                                     <button 
                                                         onClick={() => { setSelectedFolderId(null); setActiveTab('docs'); }}
-                                                        className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded font-semibold hover:bg-blue-700"
+                                                        className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 shrink-0"
                                                     >
                                                         Abrir
                                                     </button>
                                                 </div>
+                                            )}
+
+                                            {/* 6. REAL-TIME EMOJI REACTIONS BAR UNDER THE MESSAGE */}
+                                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                                {/* Map and alternate interactive reactions */}
+                                                {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
+                                                    const voters = reactions[emoji] || [];
+                                                    const hasReacted = voters.includes('tu_correo@ejemplo.com');
+                                                    if (voters.length === 0) return null;
+
+                                                    return (
+                                                        <button
+                                                            key={emoji}
+                                                            onClick={() => handleReactToMessage(msg.id, emoji)}
+                                                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all flex items-center gap-1 ${
+                                                                hasReacted 
+                                                                    ? 'bg-blue-50 border-blue-300 text-blue-800 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200' 
+                                                                    : 'bg-gray-50 border-gray-200 dark:bg-gray-800/30 dark:border-gray-800/60 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
+                                                            }`}
+                                                            title={`Reaccionado por: ${voters.join(', ')}`}
+                                                        >
+                                                            <span>{emoji}</span>
+                                                            <span>{voters.length}</span>
+                                                        </button>
+                                                    );
+                                                })}
+
+                                                {/* React Quick Picker Popover On Hover/Group */}
+                                                <div className="hidden group-hover:flex items-center gap-0.5 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-full px-1.5 py-0.5 shadow-sm">
+                                                    {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
+                                                        const voters = reactions[emoji] || [];
+                                                        const hasReacted = voters.includes('tu_correo@ejemplo.com');
+                                                        return (
+                                                            <button
+                                                                key={emoji}
+                                                                onClick={() => handleReactToMessage(msg.id, emoji)}
+                                                                className={`p-1 hover:scale-125 transition-transform rounded text-xs ${hasReacted ? 'grayscale-0' : 'grayscale hover:grayscale-0'}`}
+                                                            >
+                                                                {emoji}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        )}
+
+                                        </div>
+
+                                        {/* 7. PIN & REPLY OVERLAY ACTIONS */}
+                                        <div className="absolute right-3 top-3 hidden group-hover:flex items-center gap-1 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-lg p-1 shadow-sm z-10">
+                                            <button 
+                                                onClick={() => handleTogglePinMessage(msg.id)}
+                                                className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 ${isPinned ? 'text-amber-500' : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                                                title={isPinned ? 'Desfijar Mensaje' : 'Fijar Mensaje'}
+                                            >
+                                                <Pin className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button 
+                                                onClick={() => setReplyingToMessage(msg)}
+                                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-500"
+                                                title="Responder"
+                                            >
+                                                <Share2 className="w-3.5 h-3.5 rotate-180" />
+                                            </button>
+                                        </div>
+
                                     </div>
-                                </div>
-                            </div>
-                        ))
+                                );
+                            })
+                        )}
+
+                        <div ref={chatEndRef} />
+                    </div>
+
+                    {/* 8. TYPING STATUS INDICATOR */}
+                    {typingUsers[currentChannel.id] && (
+                        <div className="px-6 py-1 bg-white dark:bg-black/30 text-[10px] text-gray-500 dark:text-gray-400 italic flex items-center gap-1.5 shrink-0 select-none">
+                            <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"></span>
+                            </span>
+                            <span>{typingUsers[currentChannel.id]} está escribiendo...</span>
+                        </div>
                     )}
-                    <div ref={chatEndRef} />
+
+                    {/* 9. MESSAGE INPUT COMPONENT */}
+                    <div className="p-4 bg-white dark:bg-[#0c0c0c] border-t border-gray-200 dark:border-gray-800 shrink-0">
+                        
+                        {/* Replying Context Bar */}
+                        {replyingToMessage && (
+                            <div className="mb-2 p-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg text-xs flex items-center justify-between">
+                                <div className="truncate">
+                                    <span className="font-semibold text-gray-500">Respondiendo a: </span>
+                                    <span className="font-bold text-gray-800 dark:text-gray-200">{replyingToMessage.sender_name}</span>
+                                    <p className="text-gray-500 truncate mt-0.5">{replyingToMessage.text}</p>
+                                </div>
+                                <button onClick={() => setReplyingToMessage(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400">
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                            
+                            {/* Insert note attachment quickpicker */}
+                            <button 
+                                type="button" 
+                                onClick={() => setActiveTab('docs')} 
+                                title="Referenciar un documento o nota" 
+                                className="p-2 text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all"
+                            >
+                                <Paperclip className="w-5 h-5" />
+                            </button>
+
+                            <input 
+                                type="text" 
+                                placeholder={`Enviar un mensaje a #${currentChannel.name}...`} 
+                                value={chatText} 
+                                onChange={e => setChatText(e.target.value)} 
+                                className="flex-1 bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-[#111] transition-all"
+                            />
+
+                            <button 
+                                type="submit" 
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
+                            >
+                                <Send className="w-3.5 h-3.5" /> Enviar
+                            </button>
+
+                        </form>
+                    </div>
+
                 </div>
 
-                {/* Message Input Bar */}
-                <form onSubmit={handleSendMessage} className="p-4 bg-white dark:bg-[#0e0e0e] border-t border-gray-200 dark:border-gray-800">
-                    <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => setActiveTab('docs')} title="Referenciar un documento" className="p-2 text-gray-400 hover:text-blue-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                            <FileText className="w-5 h-5" />
-                        </button>
-                        <input 
-                            type="text" 
-                            placeholder="Escribe un mensaje al equipo..." 
-                            value={chatText} 
-                            onChange={e => setChatText(e.target.value)} 
-                            className="flex-1 bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-                        />
-                        <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 shadow-sm">
-                            <Send className="w-3.5 h-3.5" /> Enviar
-                        </button>
+                {/* 10. CREATE CHANNEL DIALOG/MODAL */}
+                {isCreateChannelOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full shadow-2xl relative">
+                            
+                            <button 
+                                onClick={() => setIsCreateChannelOpen(false)}
+                                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4">Crear Nuevo Canal</h3>
+                            
+                            <form onSubmit={handleCreateChannel} className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Nombre del Canal</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-xs text-gray-400 font-bold">#</span>
+                                        <input 
+                                            type="text" 
+                                            placeholder="ej. desarrollo"
+                                            value={newChannelName}
+                                            onChange={e => setNewChannelName(e.target.value)}
+                                            className="w-full pl-7 pr-3 py-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white font-semibold"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Descripción</label>
+                                    <textarea 
+                                        placeholder="¿De qué trata este canal?"
+                                        value={newChannelDescription}
+                                        onChange={e => setNewChannelDescription(e.target.value)}
+                                        className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                                        rows={2}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Icono / Emoji</label>
+                                        <select 
+                                            value={newChannelEmoji}
+                                            onChange={e => setNewChannelEmoji(e.target.value)}
+                                            className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                                        >
+                                            {['💬', '💡', '📢', '🚀', '🎨', '🔒', '💻', '🍕', '⚙️', '📈', '🤝', '🐞'].map(em => (
+                                                <option key={em} value={em}>{em} {em === '💬' ? 'Chat' : em === '💡' ? 'Ideas' : em === '📢' ? 'Anuncios' : em === '💻' ? 'Código' : 'Otro'}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col justify-end">
+                                        <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                                            <input 
+                                                type="checkbox"
+                                                checked={newChannelIsPrivate}
+                                                onChange={e => setNewChannelIsPrivate(e.target.checked)}
+                                                className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+                                            />
+                                            <span>Privado 🔒</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 flex justify-end gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsCreateChannelOpen(false)}
+                                        className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg font-semibold"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow"
+                                    >
+                                        Crear Canal
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </form>
+                )}
+
+                {/* 11. EDIT CHANNEL DIALOG/MODAL */}
+                {editingChannel && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full shadow-2xl relative">
+                            
+                            <button 
+                                onClick={() => setEditingChannel(null)}
+                                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 font-sans">Editar Canal</h3>
+                            
+                            <form onSubmit={handleEditChannelSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Nombre del Canal</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-xs text-gray-400 font-bold">#</span>
+                                        <input 
+                                            type="text" 
+                                            placeholder="ej. desarrollo"
+                                            value={editingChannelName}
+                                            onChange={e => setEditingChannelName(e.target.value)}
+                                            className="w-full pl-7 pr-3 py-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white font-semibold"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Descripción</label>
+                                    <textarea 
+                                        placeholder="¿De qué trata este canal?"
+                                        value={editingChannelDescription}
+                                        onChange={e => setEditingChannelDescription(e.target.value)}
+                                        className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                                        rows={2}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Icono / Emoji</label>
+                                        <select 
+                                            value={editingChannelEmoji}
+                                            onChange={e => setEditingChannelEmoji(e.target.value)}
+                                            className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                                        >
+                                            {['💬', '💡', '📢', '🚀', '🎨', '🔒', '💻', '🍕', '⚙️', '📈', '🤝', '🐞'].map(em => (
+                                                <option key={em} value={em}>{em}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col justify-end">
+                                        <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                                            <input 
+                                                type="checkbox"
+                                                checked={editingChannelIsPrivate}
+                                                onChange={e => setEditingChannelIsPrivate(e.target.checked)}
+                                                className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+                                            />
+                                            <span>Privado 🔒</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 flex justify-end gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setEditingChannel(null)}
+                                        className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg font-semibold"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow"
+                                    >
+                                        Guardar Cambios
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* 12. CREATE POLL DIALOG/MODAL */}
+                {isCreatePollOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full shadow-2xl relative">
+                            
+                            <button 
+                                onClick={() => setIsCreatePollOpen(false)}
+                                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4">Crear Encuesta de Equipo</h3>
+                            
+                            <form onSubmit={handleCreatePollSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Pregunta de la Encuesta</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="ej. ¿Cuándo hacemos la retrospectiva?"
+                                        value={newPollQuestion}
+                                        onChange={e => setNewPollQuestion(e.target.value)}
+                                        className="w-full px-3 py-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white font-semibold"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Opciones</label>
+                                    {newPollOptions.map((opt, idx) => (
+                                        <div key={idx} className="flex items-center gap-1">
+                                            <input 
+                                                type="text" 
+                                                placeholder={`Opción ${idx + 1}`}
+                                                value={opt}
+                                                onChange={e => {
+                                                    const copy = [...newPollOptions];
+                                                    copy[idx] = e.target.value;
+                                                    setNewPollOptions(copy);
+                                                }}
+                                                className="flex-1 px-3 py-1.5 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                                                required={idx < 2}
+                                            />
+                                            {newPollOptions.length > 2 && (
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setNewPollOptions(newPollOptions.filter((_, i) => i !== idx))}
+                                                    className="p-1.5 hover:bg-red-50 text-red-500 dark:hover:bg-red-950 rounded"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setNewPollOptions([...newPollOptions, ''])}
+                                        className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 pt-1"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" /> Añadir otra opción
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-1">
+                                    <input 
+                                        type="checkbox"
+                                        id="allow_mult"
+                                        checked={newPollAllowMultiple}
+                                        onChange={e => setNewPollAllowMultiple(e.target.checked)}
+                                        className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <label htmlFor="allow_mult" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                                        Permitir votar múltiples opciones
+                                    </label>
+                                </div>
+
+                                <div className="pt-2 flex justify-end gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsCreatePollOpen(false)}
+                                        className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg font-semibold"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow"
+                                    >
+                                        Lanzar Encuesta
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* 13. CONFIRM DELETE CHANNEL MODAL */}
+                {channelToDelete && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full shadow-2xl text-center">
+                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 flex items-center justify-center mx-auto mb-3">
+                                <AlertTriangle className="w-6 h-6" />
+                            </div>
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">¿Eliminar canal #{channelToDelete.name}?</h3>
+                            <p className="text-xs text-gray-500 mb-6">
+                                Esta acción es irreversible. Se eliminarán permanentemente todos los mensajes y archivos enviados en este canal.
+                            </p>
+                            <div className="flex justify-center gap-2">
+                                <button 
+                                    onClick={() => setChannelToDelete(null)}
+                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-semibold"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={() => confirmDeleteChannel(channelToDelete)}
+                                    className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow"
+                                >
+                                    Eliminar Canal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
             </div>
         );
     };
