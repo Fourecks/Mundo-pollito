@@ -71,7 +71,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     onEditTodo,
     onOpenProjectEditor
 }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'inbox' | 'team' | 'activity'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team'>('overview');
     
     // Kanban Add State
     const [addingToColumn, setAddingToColumn] = useState<string | null>(null);
@@ -296,6 +296,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
         analyserRef.current = null;
         setLocalVolume(0);
+        setIsMicOn(false);
+        setIsVideoOn(false);
     };
 
     const stopScreenStream = () => {
@@ -323,6 +325,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!isHuddleActive) {
             stopLocalStream();
             stopScreenStream();
+            setIsHuddleFullScreen(false);
             return;
         }
 
@@ -334,7 +337,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                 const constraints = {
                     audio: true, 
-                    video: isVideoOn ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } } : false
+                    video: isVideoOn ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 60 } } : false
                 };
 
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -535,8 +538,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         </div>
     );
 
+    const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+
     const renderProjectHeader = () => {
-        if (!activeProject) return null;
+        if (!activeProject) {
+            return (
+                <div className="px-6 py-4 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between">
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Proyectos</h1>
+                    <button onClick={() => setIsCreateProjectModalOpen(true)} className="px-3 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg flex items-center gap-1.5 hover:bg-blue-700">
+                        <Plus className="w-3.5 h-3.5" /> Nuevo Proyecto
+                    </button>
+                </div>
+            );
+        }
 
         return (
             <div className="px-6 py-4 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 shadow-sm">
@@ -545,7 +559,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <span className="text-2xl">{activeProject.emoji || '📁'}</span>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">{activeProject.name}</h1>
+                                <select 
+                                    className="text-xl font-bold text-gray-900 dark:text-white bg-transparent border-none appearance-none focus:ring-0 cursor-pointer pr-4 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg p-1 -ml-1 transition-colors"
+                                    value={activeProject.id}
+                                    onChange={(e) => onSelectProject(Number(e.target.value))}
+                                >
+                                    {projects.map(p => (
+                                        <option key={p.id} value={p.id} className="text-base text-black">{p.emoji || '📁'} {p.name}</option>
+                                    ))}
+                                </select>
+                                <button 
+                                    onClick={() => setIsCreateProjectModalOpen(true)} 
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-gray-500" 
+                                    title="Nuevo Proyecto"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
                                 {activeProject.priority && (
                                     <span className={`px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded border ${
                                         activeProject.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60' :
@@ -563,6 +592,18 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => {
+                                if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"?`)) {
+                                    onDeleteProject(activeProject.id);
+                                    onSelectProject(null);
+                                }
+                            }}
+                            className="px-3 py-1.5 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
+                            title="Eliminar Proyecto"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                         <button 
                             onClick={() => setExportReportModal(true)}
                             className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
@@ -587,9 +628,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                         { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
                         { id: 'chat', label: 'Canales', icon: MessageSquare, badge: activeProject.chat_messages?.length, isHuddle: isHuddleActive || (activeProject.huddles || []).some(h => h.active) },
-                        { id: 'inbox', label: 'Bandeja', icon: Inbox, badge: activeProject.inbox?.filter(i => !i.is_read).length },
+                        { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: activeProject.expenses?.length },
+                        { id: 'time', label: 'Tiempo', icon: Clock, badge: activeProject.time_entries?.length },
                         { id: 'team', label: 'Equipo', icon: Users, badge: (activeProject.members?.length || 1) },
-                        { id: 'activity', label: 'Historial', icon: Clock },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -1576,7 +1617,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     
                     {/* FULLSCREEN HUDDLE VIEW */}
                     {isHuddleActive && isHuddleFullScreen && (
-                        <div className="absolute inset-0 bg-slate-950 text-white z-[45] flex flex-col p-6 select-none animate-in fade-in zoom-in-95 duration-200">
+                        <div className="fixed inset-0 bg-slate-950 text-white z-[9999] flex flex-col p-6 select-none animate-in fade-in zoom-in-95 duration-200">
                             {/* Header */}
                             <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6 shrink-0">
                                 <div className="flex items-center gap-3">
@@ -2659,74 +2700,120 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // INBOX TAB
-    const renderInbox = () => {
+    // EXPENSES TAB
+    const renderExpenses = () => {
         if (!activeProject) return null;
-        const inbox = activeProject.inbox || [];
+        const expenses = activeProject.expenses || [];
 
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
-                {/* Explanation Card */}
-                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/60 rounded-xl">
-                    <h3 className="text-xs font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                        <HelpCircle className="w-4 h-4 text-blue-600" /> ¿Para qué sirve la Bandeja del Proyecto?
-                    </h3>
-                    <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
-                        Es la central de notificaciones e información oficial. Agrupa <strong>anuncios del líder</strong>, notificaciones automáticas de tareas, alertas urgentes e ideas capturadas, manteniendo a todo el equipo informado sin saturar el chat diario.
-                    </p>
-                </div>
-
                 <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Bandeja de Entrada</h2>
-                    <button onClick={() => setAnnouncementModal(true)} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm">
-                        <Megaphone className="w-3.5 h-3.5" /> Nuevo Anuncio
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Registro de Gastos</h2>
+                        <p className="text-xs text-gray-500">Controla el presupuesto y gastos asociados al proyecto o sprints.</p>
+                    </div>
+                    <button onClick={() => {
+                        const desc = prompt("Descripción del gasto:");
+                        const amountStr = prompt("Monto ($):");
+                        const cat = prompt("Categoría (Software, Hardware, Marketing, Services, Travel, Other):");
+                        if (desc && amountStr && !isNaN(Number(amountStr))) {
+                            const newExp = {
+                                id: crypto.randomUUID(),
+                                project_id: activeProject.id,
+                                description: desc,
+                                amount: Number(amountStr),
+                                date: new Date().toISOString().split('T')[0],
+                                category: (cat || 'Other') as any,
+                                created_at: new Date().toISOString(),
+                                created_by: 'Tú'
+                            };
+                            onUpdateProject(activeProject.id, { expenses: [newExp, ...expenses] });
+                        }
+                    }} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm">
+                        <Plus className="w-3.5 h-3.5" /> Registrar Gasto
                     </button>
                 </div>
 
-                {/* Quick Capture */}
-                <input 
-                    type="text" 
-                    placeholder="Captura rápida para la bandeja (Presiona Enter)..." 
-                    className="w-full bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-3 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-sm"
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                            const newItem: ProjectInboxItem = {
-                                id: crypto.randomUUID(),
-                                project_id: activeProject.id,
-                                title: 'Nota Rápida',
-                                text: e.currentTarget.value.trim(),
-                                type: 'note',
-                                created_at: new Date().toISOString()
-                            };
-                            onUpdateProject(activeProject.id, { inbox: [newItem, ...inbox] });
-                            e.currentTarget.value = '';
-                        }
-                    }}
-                />
-
-                {/* Inbox List */}
-                {inbox.length === 0 ? renderEmptyState('Bandeja limpia', 'No tienes notificaciones ni anuncios pendientes.') : (
-                    <div className="space-y-3">
-                        {inbox.map(item => (
-                            <div key={item.id} className="p-4 bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-start justify-between gap-4">
+                {expenses.length === 0 ? renderEmptyState('No hay gastos', 'No has registrado ningún gasto para este proyecto aún.') : (
+                    <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+                        {expenses.map(exp => (
+                            <div key={exp.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xs font-bold text-gray-900 dark:text-white">{item.title || 'Mensaje de la Bandeja'}</span>
-                                        <span className="text-[10px] text-gray-400">{format(parseISO(item.created_at), 'd MMM, HH:mm', { locale: es })}</span>
+                                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">{exp.description}</h4>
+                                    <div className="flex items-center gap-3 mt-1">
+                                        <span className="text-[10px] text-gray-400">{exp.date}</span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{exp.category}</span>
                                     </div>
-                                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{item.text}</p>
                                 </div>
-                                <button 
-                                    onClick={() => {
-                                        addTodo(item.text, { projectId: activeProject.id });
-                                        onUpdateProject(activeProject.id, { inbox: inbox.filter(i => i.id !== item.id) });
-                                    }}
-                                    className="px-2.5 py-1 text-[11px] bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 rounded font-semibold shrink-0"
-                                >
-                                    + Crear Tarea
-                                </button>
+                                <div className="text-right">
+                                    <span className="text-base font-bold text-gray-900 dark:text-white">${exp.amount.toFixed(2)}</span>
+                                </div>
                             </div>
                         ))}
+                        <div className="p-4 bg-gray-50 dark:bg-black flex justify-between font-bold text-sm">
+                            <span className="text-gray-700 dark:text-gray-300">Total Gastado</span>
+                            <span className="text-blue-600 dark:text-blue-400">${expenses.reduce((acc, curr) => acc + curr.amount, 0).toFixed(2)}</span>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // TIME TRACKING TAB
+    const renderTime = () => {
+        if (!activeProject) return null;
+        const timeEntries = activeProject.time_entries || [];
+
+        return (
+            <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Registro de Tiempo</h2>
+                        <p className="text-xs text-gray-500">Registra horas trabajadas y asócialas a sprints o tareas.</p>
+                    </div>
+                    <button onClick={() => {
+                        const dur = prompt("Duración (minutos):");
+                        const desc = prompt("Descripción:");
+                        if (dur && !isNaN(Number(dur))) {
+                            const newTime = {
+                                id: crypto.randomUUID(),
+                                project_id: activeProject.id,
+                                user_email: 'tu_correo@ejemplo.com',
+                                user_name: 'Tú',
+                                duration_minutes: Number(dur),
+                                date: new Date().toISOString().split('T')[0],
+                                description: desc || '',
+                                created_at: new Date().toISOString()
+                            };
+                            onUpdateProject(activeProject.id, { time_entries: [newTime, ...timeEntries] });
+                        }
+                    }} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm">
+                        <Plus className="w-3.5 h-3.5" /> Registrar Tiempo
+                    </button>
+                </div>
+
+                {timeEntries.length === 0 ? renderEmptyState('No hay registros de tiempo', 'Comienza a registrar las horas dedicadas al proyecto.') : (
+                    <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+                        {timeEntries.map(t => (
+                            <div key={t.id} className="p-4 flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">{t.description || 'Sin descripción'}</h4>
+                                    <div className="flex items-center gap-3 mt-1">
+                                        <span className="text-[10px] text-gray-400">{t.date} • {t.user_name}</span>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">{Math.floor(t.duration_minutes / 60)}h {t.duration_minutes % 60}m</span>
+                                </div>
+                            </div>
+                        ))}
+                        <div className="p-4 bg-gray-50 dark:bg-black flex justify-between font-bold text-sm">
+                            <span className="text-gray-700 dark:text-gray-300">Total Horas</span>
+                            <span className="text-blue-600 dark:text-blue-400">
+                                {Math.floor(timeEntries.reduce((acc, curr) => acc + curr.duration_minutes, 0) / 60)}h {timeEntries.reduce((acc, curr) => acc + curr.duration_minutes, 0) % 60}m
+                            </span>
+                        </div>
                     </div>
                 )}
             </div>
@@ -2778,28 +2865,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // HISTORY TAB
-    const renderActivity = () => {
-        if (!activeProject) return null;
-        const activities = activeProject.activities || [];
-
-        return (
-            <div className="p-6 max-w-3xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-4">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Historial de Cambios</h2>
-                {activities.length === 0 ? renderEmptyState('Sin registros de actividad', 'Las acciones importantes se guardarán aquí.') : (
-                    <div className="relative pl-4 border-l border-gray-200 dark:border-gray-800 space-y-4">
-                        {activities.map(act => (
-                            <div key={act.id} className="relative bg-white dark:bg-[#111] p-3 rounded-lg border border-gray-200 dark:border-gray-800 text-xs">
-                                <strong className="text-gray-900 dark:text-white">{act.author}</strong> {act.action}
-                                {act.details && <p className="text-gray-500 mt-1">{act.details}</p>}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <div className="flex flex-col h-full w-full bg-gray-50/30 dark:bg-[#050505] overflow-hidden font-sans">
             {renderProjectHeader()}
@@ -2813,9 +2878,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {activeTab === 'roadmap' && renderRoadmap()}
                         {activeTab === 'docs' && renderDocs()}
                         {activeTab === 'chat' && renderChat()}
-                        {activeTab === 'inbox' && renderInbox()}
+                        {activeTab === 'expenses' && renderExpenses()}
+                        {activeTab === 'time' && renderTime()}
                         {activeTab === 'team' && renderTeam()}
-                        {activeTab === 'activity' && renderActivity()}
                     </>
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -3108,6 +3173,35 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
                         <button type="button" onClick={() => setIsInviteModalOpen(false)} className="px-3 py-1.5 text-xs text-gray-500">Cerrar</button>
                         <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg">Enviar Invitación</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* CREATE PROJECT MODAL */}
+            <Modal isOpen={isCreateProjectModalOpen} onClose={() => setIsCreateProjectModalOpen(false)} title="Nuevo Proyecto">
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    const name = formData.get('name') as string;
+                    const emoji = formData.get('emoji') as string;
+                    
+                    const newProj = await onAddProject(name, emoji, null);
+                    if (newProj) {
+                        onSelectProject(newProj.id);
+                    }
+                    setIsCreateProjectModalOpen(false);
+                }} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Emoji (opcional)</label>
+                        <input name="emoji" placeholder="🚀" maxLength={2} className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Nombre del Proyecto</label>
+                        <input name="name" required placeholder="Mi Nuevo Proyecto" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button type="button" onClick={() => setIsCreateProjectModalOpen(false)} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
+                        <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Crear Proyecto</button>
                     </div>
                 </form>
             </Modal>

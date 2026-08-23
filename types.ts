@@ -256,6 +256,32 @@ export interface ProjectActivity {
   created_at: string;
 }
 
+export interface ProjectExpense {
+  id: string;
+  project_id: number;
+  description: string;
+  amount: number;
+  date: string;
+  category: 'Software' | 'Hardware' | 'Marketing' | 'Services' | 'Travel' | 'Other';
+  receipt_url?: string;
+  sprint_id?: string;
+  created_at: string;
+  created_by: string;
+}
+
+export interface ProjectTimeEntry {
+  id: string;
+  project_id: number;
+  user_email: string;
+  user_name: string;
+  task_id?: number | string;
+  sprint_id?: string;
+  date: string;
+  duration_minutes: number;
+  description?: string;
+  created_at: string;
+}
+
 export interface Project {
   id: number;
   user_id: string;
@@ -285,6 +311,8 @@ export interface Project {
   channels?: ProjectChannel[];
   polls?: ProjectPoll[];
   huddles?: ProjectHuddle[];
+  expenses?: ProjectExpense[];
+  time_entries?: ProjectTimeEntry[];
 }
 
 export interface Note {
