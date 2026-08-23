@@ -3,7 +3,7 @@ import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, Project
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2
 } from 'lucide-react';
-import { format, parseISO, isPast, isToday } from 'date-fns';
+import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface ProjectsWorkspaceProps {
@@ -98,6 +98,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [activeSprintId, setActiveSprintId] = useState<string | null>(null);
     const [activeMilestoneId, setActiveMilestoneId] = useState<string | null>(null);
     const [inboxCategory, setInboxCategory] = useState<'all' | 'announcements' | 'mentions' | 'updates' | 'alerts'>('all');
+
+    // Expenses & Time Tracking States
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+    const [expenseFilter, setExpenseFilter] = useState<'all' | 'week' | 'month' | 'year'>('all');
+    
+    const [isTimeModalOpen, setIsTimeModalOpen] = useState(false);
+    const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month' | 'year'>('all');
     
     // Chat States
     const [chatText, setChatText] = useState('');
@@ -176,32 +183,51 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         return activeList.length > 0 ? activeList[0] : (projects.length > 0 ? projects[0] : null);
     }, [projects, activeProjectId]);
 
-    const knownUsers = useMemo(() => {
-        const usersMap = new Map<string, {name: string, email: string, avatar?: string}>();
-        projects.forEach(p => {
-            if (p.members) {
-                p.members.forEach(m => {
-                    if (m.email && m.email !== 'tu_correo@ejemplo.com') { // Exclude self
-                        usersMap.set(m.email, { name: m.name, email: m.email, avatar: m.avatar });
-                    }
-                });
-            }
-        });
-        
-        // Mock team if none exist to make search obvious
-        usersMap.set('carlos.dev@ejemplo.com', { name: 'Carlos (Desarrollo)', email: 'carlos.dev@ejemplo.com' });
-        usersMap.set('ana.design@ejemplo.com', { name: 'Ana (Diseño)', email: 'ana.design@ejemplo.com' });
-        usersMap.set('jorge.pm@ejemplo.com', { name: 'Jorge (Producto)', email: 'jorge.pm@ejemplo.com' });
-        usersMap.set('maria.qa@ejemplo.com', { name: 'Maria (QA)', email: 'maria.qa@ejemplo.com' });
-        
-        return Array.from(usersMap.values());
-    }, [projects]);
+    const [searchedUsers, setSearchedUsers] = useState<{name: string, email: string, avatar?: string}[]>([]);
+    const [isSearchingUsers, setIsSearchingUsers] = useState(false);
 
-    const filteredInviteUsers = useMemo(() => {
-        if (!inviteEmail.trim()) return [];
-        const term = inviteEmail.toLowerCase();
-        return knownUsers.filter(u => u.email.toLowerCase().includes(term) || u.name.toLowerCase().includes(term));
-    }, [inviteEmail, knownUsers]);
+    useEffect(() => {
+        const searchForUsers = async () => {
+            const term = inviteEmail.trim().toLowerCase();
+            if (!term) {
+                setSearchedUsers([]);
+                return;
+            }
+            setIsSearchingUsers(true);
+            
+            try {
+                // Fetch real users using the RPC function (requires 'search_users' function in Supabase)
+                const { data, error } = await supabase.rpc('search_users', { search_term: term });
+                if (!error && data && Array.isArray(data)) {
+                    setSearchedUsers(data);
+                    setIsSearchingUsers(false);
+                    return;
+                }
+            } catch (e) {
+                console.warn('RPC search_users not found or failed, using fallback.');
+            }
+
+            // Fallback: search across all known members from projects
+            const usersMap = new Map<string, {name: string, email: string, avatar?: string}>();
+            projects.forEach(p => {
+                if (p.members) {
+                    p.members.forEach(m => {
+                        if (m.email && m.email !== 'tu_correo@ejemplo.com' && (m.email.toLowerCase().includes(term) || m.name.toLowerCase().includes(term))) {
+                            usersMap.set(m.email, { name: m.name, email: m.email, avatar: m.avatar });
+                        }
+                    });
+                }
+            });
+
+            setSearchedUsers(Array.from(usersMap.values()));
+            setIsSearchingUsers(false);
+        };
+
+        const timeout = setTimeout(searchForUsers, 300);
+        return () => clearTimeout(timeout);
+    }, [inviteEmail, projects]);
+
+    const filteredInviteUsers = searchedUsers;
 
     const activeChannels = useMemo(() => {
         if (!activeProject) return [];
@@ -242,7 +268,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     React.useEffect(() => {
         if (activeTab === 'chat') {
             setTimeout(() => {
-                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
             }, 100);
         }
     }, [activeTab, selectedChannelId]);
@@ -2736,49 +2762,96 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
+    const exportCSV = (filename: string, headers: string[], rows: any[][]) => {
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+        
+        const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `${filename}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const filterByDate = (dateString: string, filter: 'all' | 'week' | 'month' | 'year') => {
+        if (filter === 'all') return true;
+        try {
+            const date = parseISO(dateString);
+            if (filter === 'week') return isThisWeek(date, { weekStartsOn: 1 });
+            if (filter === 'month') return isThisMonth(date);
+            if (filter === 'year') return isThisYear(date);
+        } catch(e) {}
+        return true;
+    };
+
     // EXPENSES TAB
     const renderExpenses = () => {
         if (!activeProject) return null;
-        const expenses = activeProject.expenses || [];
+        const allExpenses = activeProject.expenses || [];
+        const expenses = allExpenses.filter(e => filterByDate(e.date, expenseFilter));
+
+        const totalSpent = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+
+        const handleExport = () => {
+            const headers = ['Fecha', 'Descripción', 'Categoría', 'Monto', 'Registrado por'];
+            const rows = expenses.map(e => [e.date, e.description, e.category, e.amount, e.created_by]);
+            exportCSV(`gastos-${activeProject.name}-${expenseFilter}`, headers, rows);
+        };
 
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">Registro de Gastos</h2>
-                        <p className="text-xs text-gray-500">Controla el presupuesto y gastos asociados al proyecto o sprints.</p>
+                        <p className="text-xs text-gray-500">Controla el presupuesto y gastos asociados al proyecto.</p>
                     </div>
-                    <button onClick={() => {
-                        const desc = prompt("Descripción del gasto:");
-                        const amountStr = prompt("Monto ($):");
-                        const cat = prompt("Categoría (Software, Hardware, Marketing, Services, Travel, Other):");
-                        if (desc && amountStr && !isNaN(Number(amountStr))) {
-                            const newExp = {
-                                id: crypto.randomUUID(),
-                                project_id: activeProject.id,
-                                description: desc,
-                                amount: Number(amountStr),
-                                date: new Date().toISOString().split('T')[0],
-                                category: (cat || 'Other') as any,
-                                created_at: new Date().toISOString(),
-                                created_by: 'Tú'
-                            };
-                            onUpdateProject(activeProject.id, { expenses: [newExp, ...expenses] });
-                        }
-                    }} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm">
-                        <Plus className="w-3.5 h-3.5" /> Registrar Gasto
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={expenseFilter}
+                            onChange={(e) => setExpenseFilter(e.target.value as any)}
+                            className="text-xs bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-lg px-2 py-1.5 focus:outline-none"
+                        >
+                            <option value="all">Todo el tiempo</option>
+                            <option value="year">Este año</option>
+                            <option value="month">Este mes</option>
+                            <option value="week">Esta semana</option>
+                        </select>
+                        <button onClick={handleExport} className="px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 text-xs font-semibold rounded-lg hover:bg-gray-200 flex items-center gap-1.5 shadow-sm">
+                            <Download className="w-3.5 h-3.5" /> Excel
+                        </button>
+                        <button onClick={() => setIsExpenseModalOpen(true)} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm">
+                            <Plus className="w-3.5 h-3.5" /> Registrar Gasto
+                        </button>
+                    </div>
                 </div>
 
-                {expenses.length === 0 ? renderEmptyState('No hay gastos', 'No has registrado ningún gasto para este proyecto aún.') : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col justify-center">
+                        <span className="text-xs text-gray-500 font-medium">Total Gastado</span>
+                        <span className="text-2xl font-bold text-gray-900 dark:text-white">${totalSpent.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col justify-center">
+                        <span className="text-xs text-gray-500 font-medium">Transacciones</span>
+                        <span className="text-2xl font-bold text-gray-900 dark:text-white">{expenses.length}</span>
+                    </div>
+                </div>
+
+                {expenses.length === 0 ? renderEmptyState('No hay gastos', 'No hay registros para este periodo.') : (
                     <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
                         {expenses.map(exp => (
-                            <div key={exp.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div key={exp.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-[#151515] transition-colors">
                                 <div>
                                     <h4 className="text-sm font-bold text-gray-900 dark:text-white">{exp.description}</h4>
                                     <div className="flex items-center gap-3 mt-1">
                                         <span className="text-[10px] text-gray-400">{exp.date}</span>
                                         <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{exp.category}</span>
+                                        <span className="text-[10px] text-gray-400 text-ellipsis overflow-hidden">Por: {exp.created_by}</span>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -2786,10 +2859,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 </div>
                             </div>
                         ))}
-                        <div className="p-4 bg-gray-50 dark:bg-black flex justify-between font-bold text-sm">
-                            <span className="text-gray-700 dark:text-gray-300">Total Gastado</span>
-                            <span className="text-blue-600 dark:text-blue-400">${expenses.reduce((acc, curr) => acc + curr.amount, 0).toFixed(2)}</span>
-                        </div>
                     </div>
                 )}
             </div>
@@ -2799,44 +2868,72 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // TIME TRACKING TAB
     const renderTime = () => {
         if (!activeProject) return null;
-        const timeEntries = activeProject.time_entries || [];
+        const allTimeEntries = activeProject.time_entries || [];
+        const timeEntries = allTimeEntries.filter(t => filterByDate(t.date, timeFilter));
+
+        const totalMinutes = timeEntries.reduce((acc, curr) => acc + curr.duration_minutes, 0);
+
+        const handleExport = () => {
+            const headers = ['Fecha', 'Descripción', 'Duración (Mins)', 'Horas Formateadas', 'Registrado por'];
+            const rows = timeEntries.map(t => [
+                t.date, 
+                t.description, 
+                t.duration_minutes, 
+                `${Math.floor(t.duration_minutes / 60)}h ${t.duration_minutes % 60}m`, 
+                t.user_name
+            ]);
+            exportCSV(`tiempo-${activeProject.name}-${timeFilter}`, headers, rows);
+        };
 
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">Registro de Tiempo</h2>
-                        <p className="text-xs text-gray-500">Registra horas trabajadas y asócialas a sprints o tareas.</p>
+                        <p className="text-xs text-gray-500">Registra horas trabajadas y asócialas al proyecto.</p>
                     </div>
-                    <button onClick={() => {
-                        const dur = prompt("Duración (minutos):");
-                        const desc = prompt("Descripción:");
-                        if (dur && !isNaN(Number(dur))) {
-                            const newTime = {
-                                id: crypto.randomUUID(),
-                                project_id: activeProject.id,
-                                user_email: 'tu_correo@ejemplo.com',
-                                user_name: 'Tú',
-                                duration_minutes: Number(dur),
-                                date: new Date().toISOString().split('T')[0],
-                                description: desc || '',
-                                created_at: new Date().toISOString()
-                            };
-                            onUpdateProject(activeProject.id, { time_entries: [newTime, ...timeEntries] });
-                        }
-                    }} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm">
-                        <Plus className="w-3.5 h-3.5" /> Registrar Tiempo
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={timeFilter}
+                            onChange={(e) => setTimeFilter(e.target.value as any)}
+                            className="text-xs bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-lg px-2 py-1.5 focus:outline-none"
+                        >
+                            <option value="all">Todo el tiempo</option>
+                            <option value="year">Este año</option>
+                            <option value="month">Este mes</option>
+                            <option value="week">Esta semana</option>
+                        </select>
+                        <button onClick={handleExport} className="px-3 py-1.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 text-xs font-semibold rounded-lg hover:bg-gray-200 flex items-center gap-1.5 shadow-sm">
+                            <Download className="w-3.5 h-3.5" /> Excel
+                        </button>
+                        <button onClick={() => setIsTimeModalOpen(true)} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm">
+                            <Plus className="w-3.5 h-3.5" /> Registrar Tiempo
+                        </button>
+                    </div>
                 </div>
 
-                {timeEntries.length === 0 ? renderEmptyState('No hay registros de tiempo', 'Comienza a registrar las horas dedicadas al proyecto.') : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col justify-center">
+                        <span className="text-xs text-gray-500 font-medium">Total Horas</span>
+                        <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                            {Math.floor(totalMinutes / 60)}h {totalMinutes % 60}m
+                        </span>
+                    </div>
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col justify-center">
+                        <span className="text-xs text-gray-500 font-medium">Registros</span>
+                        <span className="text-2xl font-bold text-gray-900 dark:text-white">{timeEntries.length}</span>
+                    </div>
+                </div>
+
+                {timeEntries.length === 0 ? renderEmptyState('No hay registros de tiempo', 'No hay registros para este periodo.') : (
                     <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
                         {timeEntries.map(t => (
-                            <div key={t.id} className="p-4 flex items-center justify-between">
+                            <div key={t.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-[#151515] transition-colors">
                                 <div>
                                     <h4 className="text-sm font-bold text-gray-900 dark:text-white">{t.description || 'Sin descripción'}</h4>
                                     <div className="flex items-center gap-3 mt-1">
-                                        <span className="text-[10px] text-gray-400">{t.date} • {t.user_name}</span>
+                                        <span className="text-[10px] text-gray-400">{t.date}</span>
+                                        <span className="text-[10px] text-gray-400 text-ellipsis overflow-hidden">Por: {t.user_name}</span>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -2844,12 +2941,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 </div>
                             </div>
                         ))}
-                        <div className="p-4 bg-gray-50 dark:bg-black flex justify-between font-bold text-sm">
-                            <span className="text-gray-700 dark:text-gray-300">Total Horas</span>
-                            <span className="text-blue-600 dark:text-blue-400">
-                                {Math.floor(timeEntries.reduce((acc, curr) => acc + curr.duration_minutes, 0) / 60)}h {timeEntries.reduce((acc, curr) => acc + curr.duration_minutes, 0) % 60}m
-                            </span>
-                        </div>
                     </div>
                 )}
             </div>
@@ -3177,6 +3268,117 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <button onClick={() => setExportReportModal(false)} className="px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg">Cerrar</button>
                     </div>
                 </div>
+            </Modal>
+
+            {/* EXPENSE MODAL */}
+            <Modal isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} title="Registrar Gasto">
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!activeProject) return;
+                    const formData = new FormData(e.currentTarget);
+                    const desc = formData.get('description') as string;
+                    const amountStr = formData.get('amount') as string;
+                    const cat = formData.get('category') as string;
+                    const date = formData.get('date') as string;
+                    
+                    if (desc && amountStr && !isNaN(Number(amountStr))) {
+                        const newExp = {
+                            id: crypto.randomUUID(),
+                            project_id: activeProject.id,
+                            description: desc,
+                            amount: Number(amountStr),
+                            date: date || new Date().toISOString().split('T')[0],
+                            category: (cat || 'Other') as any,
+                            created_at: new Date().toISOString(),
+                            created_by: 'Tú'
+                        };
+                        onUpdateProject(activeProject.id, { expenses: [newExp, ...(activeProject.expenses || [])] });
+                        setIsExpenseModalOpen(false);
+                    }
+                }} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Descripción del gasto</label>
+                        <input name="description" required placeholder="Ej: Licencia de Software, Vuelo a Madrid..." className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Monto ($)</label>
+                        <input name="amount" type="number" step="0.01" required placeholder="0.00" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Categoría</label>
+                        <select name="category" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white">
+                            <option value="Software">Software</option>
+                            <option value="Hardware">Hardware</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Services">Servicios</option>
+                            <option value="Travel">Viajes</option>
+                            <option value="Other">Otro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Fecha</label>
+                        <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button type="button" onClick={() => setIsExpenseModalOpen(false)} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
+                        <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Registrar</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* TIME TRACKING MODAL */}
+            <Modal isOpen={isTimeModalOpen} onClose={() => setIsTimeModalOpen(false)} title="Registrar Tiempo">
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!activeProject) return;
+                    const formData = new FormData(e.currentTarget);
+                    const desc = formData.get('description') as string;
+                    const hoursStr = formData.get('hours') as string;
+                    const minsStr = formData.get('minutes') as string;
+                    const date = formData.get('date') as string;
+                    
+                    const hours = parseInt(hoursStr) || 0;
+                    const mins = parseInt(minsStr) || 0;
+                    const totalMinutes = (hours * 60) + mins;
+                    
+                    if (totalMinutes > 0) {
+                        const newTime = {
+                            id: crypto.randomUUID(),
+                            project_id: activeProject.id,
+                            user_email: 'tu_correo@ejemplo.com',
+                            user_name: 'Tú',
+                            duration_minutes: totalMinutes,
+                            date: date || new Date().toISOString().split('T')[0],
+                            description: desc || 'Trabajo general',
+                            created_at: new Date().toISOString()
+                        };
+                        onUpdateProject(activeProject.id, { time_entries: [newTime, ...(activeProject.time_entries || [])] });
+                        setIsTimeModalOpen(false);
+                    }
+                }} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Descripción / Tarea</label>
+                        <input name="description" required placeholder="Ej: Desarrollo de API, Diseño de interfaz..." className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Horas</label>
+                            <input name="hours" type="number" min="0" placeholder="0" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Minutos</label>
+                            <input name="minutes" type="number" min="0" max="59" placeholder="0" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Fecha</label>
+                        <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button type="button" onClick={() => setIsTimeModalOpen(false)} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
+                        <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Guardar Tiempo</button>
+                    </div>
+                </form>
             </Modal>
 
             {/* TEAM INVITE MODAL */}
