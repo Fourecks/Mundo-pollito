@@ -1,8 +1,7 @@
-const CACHE_NAME = 'pollito-productivo-cache-v2';
+const CACHE_NAME = 'pollito-productivo-cache-v3';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/index.tsx',
   'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js',
   'https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap',
@@ -15,16 +14,14 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
-        // Non-critical assets, if they fail, the SW will still install.
-        const criticalAssets = urlsToCache.slice(0, 3); // '/', '/index.html', etc.
-        const nonCriticalAssets = urlsToCache.slice(3);
+        const criticalAssets = urlsToCache.slice(0, 2);
+        const nonCriticalAssets = urlsToCache.slice(2);
         
         cache.addAll(nonCriticalAssets).catch(err => console.log("Failed to cache non-critical assets:", err));
-        
         return cache.addAll(criticalAssets);
       })
   );
@@ -36,13 +33,26 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // For Supabase API calls and Google Drive content, always go to the network first.
+    // For Supabase API calls and Google APIs, go to network
     if (event.request.url.includes('supabase.co') || event.request.url.includes('googleapis.com')) {
          event.respondWith(
-            fetch(event.request).catch(() => {
-                // On failure (offline), you could return a generic fallback from cache if you had one.
-                // For now, we just let the request fail.
-            })
+            fetch(event.request).catch(() => {})
+        );
+        return;
+    }
+
+    // Network-first for HTML page navigation to ensure users always get the fresh app
+    if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => {
+                    if (response && response.status === 200) {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+                    }
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
         );
         return;
     }
@@ -51,12 +61,10 @@ self.addEventListener('fetch', (event) => {
         caches.match(event.request)
             .then((response) => {
                 if (response) {
-                    return response; // Return from cache
+                    return response;
                 }
 
-                // Not in cache, fetch from network
                 return fetch(event.request).then((response) => {
-                    // Check for valid response
                     if (!response || response.status !== 200 || (response.type !== 'basic' && response.type !== 'opaque')) {
                         return response;
                     }
@@ -73,18 +81,17 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-
 self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
+      return Promise.all([
+        self.clients.claim(),
+        ...cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
-      );
+      ]);
     })
   );
 });
