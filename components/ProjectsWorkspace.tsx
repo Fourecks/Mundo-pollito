@@ -15,8 +15,6 @@ import {
   UserPlus, Mail, ChevronDown, CheckCircle, ChevronRight, Briefcase, Grid, List,
   TrendingUp, Award, UserCheck, Flame, Zap
 } from 'lucide-react';
-import { format, parseISO, isPast } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 interface ProjectsWorkspaceProps {
     projects: Project[];
@@ -37,6 +35,48 @@ interface ProjectsWorkspaceProps {
     deleteTodo: (id: number) => void;
     onEditTodo?: (todo: Todo) => void;
     onOpenProjectEditor?: (project: Project) => void;
+}
+
+class ProjectsErrorBoundary extends React.Component<
+  { children: React.ReactNode; onReset?: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("Error capturado en ProjectsWorkspace:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center flex flex-col items-center justify-center h-full bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-2xl m-4">
+          <AlertTriangle className="w-12 h-12 text-amber-500 mb-3 animate-bounce" />
+          <h2 className="text-base font-bold text-gray-900 dark:text-white mb-1">Centro de Proyectos Recuperado</h2>
+          <p className="text-xs text-gray-500 max-w-md mb-4 bg-gray-50 dark:bg-black p-3 rounded-xl border border-gray-200 dark:border-gray-800 text-left font-mono text-[11px]">
+            {this.state.error?.message || 'Se produjo una inconsistencia de datos temporal.'}
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              if (this.props.onReset) this.props.onReset();
+            }}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" /> Volver a la Lista de Proyectos
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
@@ -66,9 +106,9 @@ const PRESET_CONTACTS = [
     { name: 'Soporte Cliente', email: 'soporte@empresa.com', role: 'Soporte' }
 ];
 
-export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
-    projects,
-    allTodos,
+const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
+    projects = [],
+    allTodos = [],
     activeProjectId,
     invitations = [],
     currentUserEmail,
@@ -86,6 +126,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     onEditTodo,
     onOpenProjectEditor
 }) => {
+    // Ensure safe array references
+    const safeProjects = Array.isArray(projects) ? projects : [];
+    const safeTodos = Array.isArray(allTodos) ? allTodos : [];
+    const safeInvitations = Array.isArray(invitations) ? invitations : [];
+
     // Navigation view state: true = All Projects Dashboard Grid, false = Inside Active Project
     const [showingAllProjects, setShowingAllProjects] = useState<boolean>(activeProjectId === null);
     const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'risks' | 'budget' | 'time' | 'docs' | 'chat' | 'inbox' | 'team' | 'activity'>('overview');
@@ -98,21 +143,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
     const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
 
-    // Kanban Add & Drag State
-    const [addingToColumn, setAddingToColumn] = useState<string | null>(null);
-    const [newTaskText, setNewTaskText] = useState('');
-    const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
-
     // Modal States
-    const [sprintModal, setSprintModal] = useState<{ isOpen: boolean, sprint: Sprint | null }>({ isOpen: false, sprint: null });
-    const [closeSprintModal, setCloseSprintModal] = useState<{ isOpen: boolean, sprint: Sprint | null }>({ isOpen: false, sprint: null });
-    const [milestoneModal, setMilestoneModal] = useState<{ isOpen: boolean, milestone: Milestone | null }>({ isOpen: false, milestone: null });
-    const [docModal, setDocModal] = useState<{ isOpen: boolean, doc: ProjectDoc | null, initialFolderId?: string }>({ isOpen: false, doc: null });
-    const [folderModal, setFolderModal] = useState<{ isOpen: boolean, folder: ProjectDocFolder | null }>({ isOpen: false, folder: null });
-    const [announcementModal, setAnnouncementModal] = useState(false);
-    const [exportReportModal, setExportReportModal] = useState(false);
-
-    // New Module Modals: Risk, Expense, Time Log
     const [riskModal, setRiskModal] = useState<{ isOpen: boolean, risk: ProjectRisk | null }>({ isOpen: false, risk: null });
     const [expenseModal, setExpenseModal] = useState(false);
     const [timeLogModal, setTimeLogModal] = useState(false);
@@ -123,27 +154,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [inviteSuccessMessage, setInviteSuccessMessage] = useState<string | null>(null);
     const [inviteLoadingEmail, setInviteLoadingEmail] = useState<string | null>(null);
 
-    // Filter & Active States inside Project
-    const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-    const [activeSprintId, setActiveSprintId] = useState<string | null>(null);
-    const [inboxCategory, setInboxCategory] = useState<'all' | 'announcements' | 'mentions' | 'updates' | 'alerts'>('all');
-    
-    // Chat States
-    const [chatText, setChatText] = useState('');
-    const [chatSearch, setChatSearch] = useState('');
-    const [replyingToMessage, setReplyingToMessage] = useState<ProjectChatMessage | null>(null);
-    const [showDocPickerInChat, setShowDocPickerInChat] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
     // Get Active Project
     const activeProject = useMemo(() => {
         if (activeProjectId) {
-            const found = projects.find(p => p.id === activeProjectId);
+            const found = safeProjects.find(p => p && p.id === activeProjectId);
             if (found) return found;
         }
-        const activeList = projects.filter(p => !p.is_archived);
-        return activeList.length > 0 ? activeList[0] : (projects.length > 0 ? projects[0] : null);
-    }, [projects, activeProjectId]);
+        const activeList = safeProjects.filter(p => p && !p.is_archived);
+        return activeList.length > 0 ? activeList[0] : (safeProjects.length > 0 ? safeProjects[0] : null);
+    }, [safeProjects, activeProjectId]);
 
     useEffect(() => {
         if (!activeProjectId && activeProject && !showingAllProjects) {
@@ -151,7 +170,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
     }, [activeProjectId, activeProject, showingAllProjects, onSelectProject]);
 
-    const projectTodos = useMemo(() => activeProject ? allTodos.filter(t => t.project_id === activeProject.id) : [], [allTodos, activeProject]);
+    const projectTodos = useMemo(() => {
+        return activeProject ? safeTodos.filter(t => t && t.project_id === activeProject.id) : [];
+    }, [safeTodos, activeProject]);
 
     // Derived User Search Suggestions for Team Invitations
     const matchingSearchUsers = useMemo(() => {
@@ -170,9 +191,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         });
 
         // 2. Add existing project members from all user projects
-        projects.forEach(p => {
-            (p.members || []).forEach(m => {
-                if (m.email && (m.email.toLowerCase().includes(query) || m.name.toLowerCase().includes(query))) {
+        safeProjects.forEach(p => {
+            if (!p) return;
+            const members = Array.isArray(p.members) ? p.members : [];
+            members.forEach(m => {
+                if (m && m.email && (m.email.toLowerCase().includes(query) || (m.name || '').toLowerCase().includes(query))) {
                     if (!knownEmails.has(m.email.toLowerCase())) {
                         results.push({ name: m.name || m.email.split('@')[0], email: m.email, role: 'Colaborador' });
                         knownEmails.add(m.email.toLowerCase());
@@ -182,7 +205,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         });
 
         // 3. Add existing invitations
-        invitations.forEach(inv => {
+        safeInvitations.forEach(inv => {
+            if (!inv) return;
             const email = inv.receiver_email || inv.invitee_email;
             if (email && email.toLowerCase().includes(query) && !knownEmails.has(email.toLowerCase())) {
                 results.push({ name: email.split('@')[0], email: email, role: 'Invitado' });
@@ -200,29 +224,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
 
         return results;
-    }, [userSearchQuery, projects, invitations]);
-
-    // Handle File Download
-    const handleDownloadFile = (doc: ProjectDoc) => {
-        if (doc.file_url) {
-            const a = document.createElement('a');
-            a.href = doc.file_url;
-            a.download = doc.file_name || doc.title;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } else {
-            const blob = new Blob([doc.content], { type: 'text/markdown;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${doc.title.toLowerCase().replace(/\s+/g, '_')}.md`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    };
+    }, [userSearchQuery, safeProjects, safeInvitations]);
 
     // Helper: Send Invitation to user
     const handleSendInviteToEmail = async (email: string) => {
@@ -241,59 +243,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
     };
 
-    // File Upload Handler
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!activeProject || !e.target.files || e.target.files.length === 0) return;
-        const file = e.target.files[0];
-        const reader = new FileReader();
-
-        reader.onload = (event) => {
-            const base64Url = event.target?.result as string;
-            const ext = file.name.split('.').pop() || '';
-            let category: ProjectDoc['category'] = 'Other';
-            if (['doc', 'docx', 'txt', 'pdf'].includes(ext)) category = 'Requirements';
-            if (['xls', 'xlsx', 'csv'].includes(ext)) category = 'Specifications';
-
-            const newDoc: ProjectDoc = {
-                id: crypto.randomUUID(),
-                project_id: activeProject.id,
-                folder_id: selectedFolderId,
-                title: file.name,
-                content: `Archivo adjunto: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
-                category,
-                file_url: base64Url,
-                file_name: file.name,
-                file_type: file.type || ext,
-                file_size: file.size,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            };
-
-            const updatedDocs = [newDoc, ...(activeProject.docs || [])];
-            onUpdateProject(activeProject.id, { docs: updatedDocs });
-            if (e.target) e.target.value = '';
-        };
-        reader.readAsDataURL(file);
-    };
-
-    // Render Empty State Helper
-    const renderEmptyState = (title: string, description: string, action?: React.ReactNode) => (
-        <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-gray-50 dark:bg-[#161616] rounded-xl border border-gray-200 dark:border-gray-800">
-            <div className="w-12 h-12 bg-white dark:bg-black rounded-full flex items-center justify-center mb-4 border border-gray-200 dark:border-gray-700 shadow-sm">
-                <Sparkles className="w-6 h-6 text-gray-400" />
-            </div>
-            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">{title}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-6">{description}</p>
-            {action}
-        </div>
-    );
-
     // ==========================================
     // RENDER 1: ALL PROJECTS DASHBOARD (GRID VIEW)
     // ==========================================
     const renderAllProjectsDashboard = () => {
-        const filteredProjects = projects.filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(projectSearchQuery.toLowerCase()) || 
+        const filteredProjects = safeProjects.filter(p => {
+            if (!p) return false;
+            const matchesSearch = (p.name || '').toLowerCase().includes(projectSearchQuery.toLowerCase()) || 
                                   (p.description || '').toLowerCase().includes(projectSearchQuery.toLowerCase());
             if (projectStatusFilter === 'archived') return matchesSearch && p.is_archived;
             return matchesSearch && !p.is_archived;
@@ -337,13 +293,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             onClick={() => setProjectStatusFilter('active')}
                             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${projectStatusFilter === 'active' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
                         >
-                            Activos ({projects.filter(p => !p.is_archived).length})
+                            Activos ({safeProjects.filter(p => p && !p.is_archived).length})
                         </button>
                         <button 
                             onClick={() => setProjectStatusFilter('archived')}
                             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${projectStatusFilter === 'archived' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
                         >
-                            Archivados ({projects.filter(p => p.is_archived).length})
+                            Archivados ({safeProjects.filter(p => p && p.is_archived).length})
                         </button>
                     </div>
                 </div>
@@ -363,10 +319,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     {filteredProjects.map(proj => {
-                        const projTasks = allTodos.filter(t => t.project_id === proj.id);
+                        if (!proj) return null;
+                        const projTasks = safeTodos.filter(t => t && t.project_id === proj.id);
                         const completedCount = projTasks.filter(t => t.completed).length;
                         const progressPct = projTasks.length > 0 ? Math.round((completedCount / projTasks.length) * 100) : 0;
-                        const members = proj.members || [];
+                        const members = Array.isArray(proj.members) ? proj.members : [];
 
                         return (
                             <div 
@@ -415,8 +372,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <div className="pt-3 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between gap-2">
                                         <div className="flex items-center -space-x-2">
                                             {members.slice(0, 3).map((m, idx) => (
-                                                <div key={idx} className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center border-2 border-white dark:border-[#111]" title={m.name || m.email}>
-                                                    {(m.name || m.email || 'M').charAt(0).toUpperCase()}
+                                                <div key={idx} className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center border-2 border-white dark:border-[#111]" title={m?.name || m?.email || 'Miembro'}>
+                                                    {(m?.name || m?.email || 'M').charAt(0).toUpperCase()}
                                                 </div>
                                             ))}
                                             {members.length > 3 && (
@@ -486,7 +443,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <div className="absolute left-0 top-full mt-2 w-72 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl z-[900] overflow-hidden p-2 space-y-1">
                                     <div className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tus Proyectos</div>
                                     <div className="max-h-56 overflow-y-auto space-y-0.5">
-                                        {projects.map(p => (
+                                        {safeProjects.map(p => (
                                             <button 
                                                 key={p.id}
                                                 onClick={() => {
@@ -537,12 +494,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <UserPlus className="w-3.5 h-3.5" /> Invitar Equipo
                         </button>
                         <button 
-                            onClick={() => setExportReportModal(true)}
-                            className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
-                        >
-                            <Share2 className="w-3.5 h-3.5" /> Reporte
-                        </button>
-                        <button 
                             onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} 
                             className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
                         >
@@ -556,16 +507,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     {[
                         { id: 'overview', label: 'Resumen', icon: Activity },
                         { id: 'kanban', label: 'Tablero', icon: AlignLeft },
-                        { id: 'sprints', label: 'Sprints', icon: Target },
-                        { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                         { id: 'risks', label: 'Matriz Riesgos', icon: ShieldAlert, badge: activeProject.risks?.length },
                         { id: 'budget', label: 'Presupuesto', icon: DollarSign },
                         { id: 'time', label: 'Registro Horas', icon: Clock, badge: activeProject.time_logs?.length },
-                        { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
-                        { id: 'chat', label: 'Chat Grupal', icon: MessageSquare, badge: activeProject.chat_messages?.length },
-                        { id: 'inbox', label: 'Bandeja', icon: Inbox, badge: activeProject.inbox?.filter(i => !i.is_read).length },
                         { id: 'team', label: 'Equipo', icon: Users, badge: (activeProject.members?.length || 1) },
-                        { id: 'activity', label: 'Historial', icon: Clock },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -597,8 +542,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // ==========================================
     const renderTeam = () => {
         if (!activeProject) return null;
-        const members = activeProject.members || [];
-        const activeProjectInvitations = invitations.filter(i => i.project_id === activeProject.id);
+        const members = Array.isArray(activeProject.members) ? activeProject.members : [];
+        const activeProjectInvitations = safeInvitations.filter(i => i && i.project_id === activeProject.id);
 
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6">
@@ -639,8 +584,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <div className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden bg-gray-50/50 dark:bg-black/40">
                             {matchingSearchUsers.map((u, idx) => {
                                 const cleanEmail = u.email.toLowerCase();
-                                const isMember = members.some(m => (m.email || '').toLowerCase() === cleanEmail);
-                                const isPendingInvite = activeProjectInvitations.some(i => (i.receiver_email || i.invitee_email || '').toLowerCase() === cleanEmail && i.status === 'pending');
+                                const isMember = members.some(m => m && (m.email || '').toLowerCase() === cleanEmail);
+                                const isPendingInvite = activeProjectInvitations.some(i => i && (i.receiver_email || i.invitee_email || '').toLowerCase() === cleanEmail && i.status === 'pending');
 
                                 return (
                                     <div key={idx} className="p-3 flex items-center justify-between hover:bg-white dark:hover:bg-[#161616] transition-colors">
@@ -687,18 +632,18 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
                     <div className="divide-y divide-gray-100 dark:divide-gray-800">
                         {members.map((m, idx) => (
-                            <div key={m.id || idx} className="p-4 flex items-center justify-between">
+                            <div key={m?.id || idx} className="p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                                        {(m.name || m.email || 'M').charAt(0).toUpperCase()}
+                                        {(m?.name || m?.email || 'M').charAt(0).toUpperCase()}
                                     </div>
                                     <div>
-                                        <h4 className="text-xs font-bold text-gray-900 dark:text-white">{m.name || 'Miembro del Equipo'}</h4>
-                                        <span className="text-[11px] text-gray-400">{m.email || 'correo@ejemplo.com'}</span>
+                                        <h4 className="text-xs font-bold text-gray-900 dark:text-white">{m?.name || 'Miembro del Equipo'}</h4>
+                                        <span className="text-[11px] text-gray-400">{m?.email || 'correo@ejemplo.com'}</span>
                                     </div>
                                 </div>
                                 <span className="text-[10px] px-2.5 py-1 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                                    {m.role === 'owner' ? 'Propietario' : m.role === 'lead' ? 'Líder' : 'Colaborador'}
+                                    {m?.role === 'owner' ? 'Propietario' : m?.role === 'lead' ? 'Líder' : 'Colaborador'}
                                 </span>
                             </div>
                         ))}
@@ -712,13 +657,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </div>
 
                 {/* Incoming Received Invitations for Current User */}
-                {currentUserEmail && invitations.some(i => (i.receiver_email || i.invitee_email || '').toLowerCase() === currentUserEmail.toLowerCase() && i.status === 'pending') && (
+                {currentUserEmail && safeInvitations.some(i => i && (i.receiver_email || i.invitee_email || '').toLowerCase() === currentUserEmail.toLowerCase() && i.status === 'pending') && (
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl p-4 border border-blue-200 dark:border-blue-800 space-y-3">
                         <h3 className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-2">
                             <Mail className="w-4 h-4" /> Invitaciones Recibidas Para Ti
                         </h3>
                         <div className="space-y-2">
-                            {invitations.filter(i => (i.receiver_email || i.invitee_email || '').toLowerCase() === currentUserEmail.toLowerCase() && i.status === 'pending').map(inv => (
+                            {safeInvitations.filter(i => i && (i.receiver_email || i.invitee_email || '').toLowerCase() === currentUserEmail.toLowerCase() && i.status === 'pending').map(inv => (
                                 <div key={inv.id} className="bg-white dark:bg-[#111] p-3 rounded-lg border border-blue-100 dark:border-blue-900/60 flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xl">{inv.project_emoji || '📁'}</span>
@@ -755,7 +700,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // ==========================================
     const renderRisks = () => {
         if (!activeProject) return null;
-        const risks = activeProject.risks || [];
+        const risks = Array.isArray(activeProject.risks) ? activeProject.risks : [];
 
         return (
             <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6">
@@ -786,37 +731,37 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {/* Alto Impacto */}
                         <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">Alto</div>
                         <div className="p-3 bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded-lg border border-amber-300 font-extrabold">
-                            {risks.filter(r => r.impact === 'high' && r.probability === 'low').length} Riesgos
+                            {risks.filter(r => r && r.impact === 'high' && r.probability === 'low').length} Riesgos
                         </div>
                         <div className="p-3 bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 rounded-lg border border-orange-400 font-extrabold">
-                            {risks.filter(r => r.impact === 'high' && r.probability === 'medium').length} Riesgos
+                            {risks.filter(r => r && r.impact === 'high' && r.probability === 'medium').length} Riesgos
                         </div>
                         <div className="p-3 bg-red-200 dark:bg-red-950/80 text-red-900 dark:text-red-200 rounded-lg border border-red-500 font-extrabold">
-                            {risks.filter(r => r.impact === 'high' && r.probability === 'high').length} Críticos
+                            {risks.filter(r => r && r.impact === 'high' && r.probability === 'high').length} Críticos
                         </div>
 
                         {/* Medio Impacto */}
                         <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">Medio</div>
                         <div className="p-3 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-lg border border-emerald-300 font-extrabold">
-                            {risks.filter(r => r.impact === 'medium' && r.probability === 'low').length} Riesgos
+                            {risks.filter(r => r && r.impact === 'medium' && r.probability === 'low').length} Riesgos
                         </div>
                         <div className="p-3 bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded-lg border border-amber-300 font-extrabold">
-                            {risks.filter(r => r.impact === 'medium' && r.probability === 'medium').length} Riesgos
+                            {risks.filter(r => r && r.impact === 'medium' && r.probability === 'medium').length} Riesgos
                         </div>
                         <div className="p-3 bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 rounded-lg border border-orange-400 font-extrabold">
-                            {risks.filter(r => r.impact === 'medium' && r.probability === 'high').length} Riesgos
+                            {risks.filter(r => r && r.impact === 'medium' && r.probability === 'high').length} Riesgos
                         </div>
 
                         {/* Bajo Impacto */}
                         <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">Bajo</div>
                         <div className="p-3 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-lg border border-emerald-300 font-extrabold">
-                            {risks.filter(r => r.impact === 'low' && r.probability === 'low').length} Riesgos
+                            {risks.filter(r => r && r.impact === 'low' && r.probability === 'low').length} Riesgos
                         </div>
                         <div className="p-3 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-lg border border-emerald-300 font-extrabold">
-                            {risks.filter(r => r.impact === 'low' && r.probability === 'medium').length} Riesgos
+                            {risks.filter(r => r && r.impact === 'low' && r.probability === 'medium').length} Riesgos
                         </div>
                         <div className="p-3 bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded-lg border border-amber-300 font-extrabold">
-                            {risks.filter(r => r.impact === 'low' && r.probability === 'high').length} Riesgos
+                            {risks.filter(r => r && r.impact === 'low' && r.probability === 'high').length} Riesgos
                         </div>
                     </div>
                 </div>
@@ -867,8 +812,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const renderBudget = () => {
         if (!activeProject) return null;
         const budget = activeProject.budget || 0;
-        const expenses = activeProject.expenses || [];
-        const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+        const expenses = Array.isArray(activeProject.expenses) ? activeProject.expenses : [];
+        const totalExpenses = expenses.reduce((acc, curr) => acc + (curr?.amount || 0), 0);
         const remaining = budget - totalExpenses;
         const spentPct = budget > 0 ? Math.min(Math.round((totalExpenses / budget) * 100), 100) : 0;
 
@@ -935,7 +880,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <tr key={exp.id}>
                                     <td className="p-3 font-bold text-gray-900 dark:text-white">{exp.title}</td>
                                     <td className="p-3 text-gray-500">{exp.category}</td>
-                                    <td className="p-3 font-bold text-red-600">${exp.amount.toLocaleString()} USD</td>
+                                    <td className="p-3 font-bold text-red-600">${(exp.amount || 0).toLocaleString()} USD</td>
                                     <td className="p-3 text-gray-400">{exp.date}</td>
                                 </tr>
                             ))}
@@ -956,8 +901,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // ==========================================
     const renderTimeLogs = () => {
         if (!activeProject) return null;
-        const timeLogs = activeProject.time_logs || [];
-        const totalHours = timeLogs.reduce((acc, curr) => acc + curr.hours, 0);
+        const timeLogs = Array.isArray(activeProject.time_logs) ? activeProject.time_logs : [];
+        const totalHours = timeLogs.reduce((acc, curr) => acc + (curr?.hours || 0), 0);
 
         return (
             <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6">
@@ -1016,11 +961,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // Placeholder renderings for existing tabs
     const renderOverview = () => (
         <div className="p-6 max-w-5xl mx-auto space-y-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Resumen Ejecutivo de {activeProject?.name}</h2>
-            <p className="text-xs text-gray-500">{activeProject?.description || 'Sin descripción detallada.'}</p>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Resumen Ejecutivo de {activeProject?.name || 'Proyecto'}</h2>
+            <p className="text-xs text-gray-500">{activeProject?.description || 'Sin descripción detallada registrada.'}</p>
         </div>
     );
 
@@ -1028,7 +972,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         <div className="p-6 max-w-6xl mx-auto space-y-4">
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">Tablero de Tareas</h2>
-                <button onClick={() => addTodo("Nueva tarea de proyecto", { project_id: activeProject?.id })} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg">+ Agregar Tarea</button>
+                <button onClick={() => addTodo && addTodo("Nueva tarea de proyecto", { project_id: activeProject?.id })} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg">+ Agregar Tarea</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {['Por Hacer', 'En Proceso', 'Completado'].map((col, idx) => (
@@ -1038,7 +982,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             {projectTodos.filter(t => idx === 2 ? t.completed : !t.completed).map(t => (
                                 <div key={t.id} className="bg-white dark:bg-black p-3 rounded-lg border border-gray-200 dark:border-gray-800 text-xs font-semibold flex items-center justify-between">
                                     <span>{t.text}</span>
-                                    <button onClick={() => updateTodo(t.id, { completed: !t.completed })} className="text-blue-600">
+                                    <button onClick={() => updateTodo && updateTodo(t.id, { completed: !t.completed })} className="text-blue-600">
                                         {t.completed ? <CheckCircle className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
                                     </button>
                                 </div>
@@ -1054,22 +998,27 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         <div className="flex flex-col h-full w-full bg-gray-50/30 dark:bg-[#050505] overflow-hidden font-sans">
             {showingAllProjects ? (
                 renderAllProjectsDashboard()
+            ) : !activeProject ? (
+                <div className="p-8 text-center flex flex-col items-center justify-center h-full space-y-3">
+                    <Briefcase className="w-10 h-10 text-gray-400" />
+                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">No hay ningún proyecto activo seleccionado</p>
+                    <button 
+                        onClick={() => setShowingAllProjects(true)}
+                        className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-blue-700"
+                    >
+                        Ver Centro de Proyectos
+                    </button>
+                </div>
             ) : (
                 <>
                     {renderProjectHeader()}
                     <div className="flex-1 overflow-hidden relative">
                         {activeTab === 'overview' && renderOverview()}
                         {activeTab === 'kanban' && renderKanban()}
-                        {activeTab === 'sprints' && renderOverview()}
-                        {activeTab === 'roadmap' && renderOverview()}
                         {activeTab === 'risks' && renderRisks()}
                         {activeTab === 'budget' && renderBudget()}
                         {activeTab === 'time' && renderTimeLogs()}
-                        {activeTab === 'docs' && renderOverview()}
-                        {activeTab === 'chat' && renderOverview()}
-                        {activeTab === 'inbox' && renderOverview()}
                         {activeTab === 'team' && renderTeam()}
-                        {activeTab === 'activity' && renderOverview()}
                     </div>
                 </>
             )}
@@ -1212,7 +1161,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         created_at: new Date().toISOString()
                     };
 
-                    onUpdateProject(activeProject.id, { risks: [newRisk, ...(activeProject.risks || [])] });
+                    onUpdateProject(activeProject.id, { risks: [newRisk, ...(Array.isArray(activeProject.risks) ? activeProject.risks : [])] });
                     setRiskModal({ isOpen: false, risk: null });
                 }} className="space-y-4">
                     <div>
@@ -1269,7 +1218,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         created_at: new Date().toISOString()
                     };
 
-                    onUpdateProject(activeProject.id, { expenses: [newExpense, ...(activeProject.expenses || [])] });
+                    onUpdateProject(activeProject.id, { expenses: [newExpense, ...(Array.isArray(activeProject.expenses) ? activeProject.expenses : [])] });
                     setExpenseModal(false);
                 }} className="space-y-4">
                     <div>
@@ -1325,7 +1274,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         created_at: new Date().toISOString()
                     };
 
-                    onUpdateProject(activeProject.id, { time_logs: [newLog, ...(activeProject.time_logs || [])] });
+                    onUpdateProject(activeProject.id, { time_logs: [newLog, ...(Array.isArray(activeProject.time_logs) ? activeProject.time_logs : [])] });
                     setTimeLogModal(false);
                 }} className="space-y-4">
                     <div>
@@ -1353,6 +1302,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </form>
             </Modal>
         </div>
+    );
+};
+
+export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = (props) => {
+    return (
+        <ProjectsErrorBoundary onReset={() => props.onSelectProject && props.onSelectProject(null)}>
+            <ProjectsWorkspaceInner {...props} />
+        </ProjectsErrorBoundary>
     );
 };
 

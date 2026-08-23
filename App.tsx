@@ -822,9 +822,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         enableBatterySaver={uiSettings?.enableBatterySaver || false}
         setEnableBatterySaver={(enabled) => setUiSettings((s: any) => ({ ...s, enableBatterySaver: enabled }))}
         batteryStatus={batteryStatus}
+        dailyEncouragementHour={uiSettings?.dailyEncouragementLocalHour}
+        onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
+        dailySummaryHour={uiSettings?.dailySummaryHour}
+        onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
+        onSendTestNotification={handleNotificationAction}
       />
       
-
 
       <NotificationsPanel
         isOpen={isNotificationsPanelOpen}
@@ -832,11 +836,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         invitations={projectInvitations}
         onAcceptInvitation={onAcceptInvitation}
         onDeclineInvitation={onDeclineInvitation}
-        dailyEncouragementHour={uiSettings.dailyEncouragementLocalHour}
-        onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
-        dailySummaryHour={uiSettings.dailySummaryHour}
-        onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
-        onSendTestNotification={handleNotificationAction}
       />
       
       <div className="fixed top-0 bottom-0 left-0 w-4 z-[70000] app-left-sidebar-trigger-area hidden md:block"></div>
@@ -1595,6 +1594,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               enableBatterySaver={uiSettings?.enableBatterySaver || false}
               setEnableBatterySaver={(enabled) => setUiSettings((s: any) => ({ ...s, enableBatterySaver: enabled }))}
               batteryStatus={batteryStatus}
+              dailyEncouragementHour={uiSettings?.dailyEncouragementLocalHour}
+              onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
+              dailySummaryHour={uiSettings?.dailySummaryHour}
+              onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
+              onSendTestNotification={handleNotificationAction}
             />
 
             <NotificationsPanel
@@ -1604,11 +1608,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 invitations={projectInvitations}
                 onAcceptInvitation={onAcceptInvitation}
                 onDeclineInvitation={onDeclineInvitation}
-                dailyEncouragementHour={uiSettings.dailyEncouragementLocalHour}
-                onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
-                dailySummaryHour={uiSettings.dailySummaryHour}
-                onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
-                onSendTestNotification={handleNotificationAction}
             />
             <AddTaskModal
                 isOpen={isAddTaskModalOpen}
