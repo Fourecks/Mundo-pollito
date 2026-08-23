@@ -353,7 +353,28 @@ export const HuddleProvider: React.FC<{ children: React.ReactNode; onHuddleState
 export const useHuddle = () => {
   const context = useContext(HuddleContext);
   if (!context) {
-    throw new Error('useHuddle must be used within a HuddleProvider');
+    return {
+      activeHuddle: null,
+      isHuddleActive: false,
+      isMicOn: true,
+      isVideoOn: false,
+      isScreenSharing: false,
+      localStream: null,
+      screenStream: null,
+      localVolume: 0,
+      speakingParticipants: {},
+      huddleParticipants: [],
+      isHuddleFullScreen: false,
+      isFloatingMinimized: false,
+      startHuddle: async () => {},
+      leaveHuddle: () => {},
+      toggleMic: () => {},
+      toggleVideo: async () => {},
+      toggleScreenShare: async () => {},
+      setIsHuddleFullScreen: () => {},
+      setIsFloatingMinimized: () => {},
+      currentSpeaker: { name: 'Tú', isLocal: true, hasVideo: false, stream: null },
+    };
   }
   return context;
 };

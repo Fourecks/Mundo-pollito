@@ -51,6 +51,7 @@ import HabitTracker from './components/HabitTracker';
 import HabitEditorPanel from './components/HabitEditorPanel';
 import ProgressView from './components/ProgressView';
 import { ProjectsWorkspace } from './components/ProjectsWorkspace';
+import { GlobalHuddleFloatingWidget } from './components/GlobalHuddleFloatingWidget';
 import ChevronLeftIcon from './components/icons/ChevronLeftIcon';
 import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
@@ -1052,6 +1053,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           onSave={handleSaveProject}
           projectToEdit={projectToEdit}
         />
+        <GlobalHuddleFloatingWidget
+          onOpenProjectsWorkspace={(projectId) => {
+            setViewingProjectId(projectId);
+            if (!openWindows.includes('projects')) {
+              setOpenWindows(prev => [...prev, 'projects']);
+            }
+            bringToFront('projects');
+          }}
+        />
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 h-4 z-[70000] app-dock-trigger-area"></div>
@@ -1300,56 +1310,53 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const renderContent = () => {
         return (
             <>
+                <div className={activeTab === 'home' ? 'h-full flex flex-col' : 'hidden'}>
+                    <header className="sticky top-0 p-4 z-30 flex items-center justify-between">
+                        <Greeting name={capitalizedUserName} />
+                        <button onClick={() => setActiveTab('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800">
+                            Progreso
+                        </button>
+                    </header>
+                    <div className="w-[90%] max-w-sm mx-auto py-3 space-y-3">
+                         <BibleVerse />
+                         <MobilePomodoroWidget 
+                            timeLeft={pomodoroState.timeLeft} 
+                            isActive={pomodoroState.isActive} 
+                            mode={pomodoroState.mode} 
+                            onToggle={handlePomodoroToggle} 
+                            onOpenModal={() => setIsPomodoroModalOpen(true)} 
+                            onSwitchMode={handleSwitchMode}
+                            onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
+                         />
+                        <TodaysAgenda 
+                            tasks={todayAgendaTasks} 
+                            calendarEvents={calendarEvents} 
+                            onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} 
+                            onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} 
+                            quickNotes={quickNotes} 
+                            onAddQuickNote={handleAddQuickNote} 
+                            onDeleteQuickNote={handleDeleteQuickNote} 
+                            onClearAllQuickNotes={handleClearAllQuickNotes} 
+                            activeFocusTaskId={pomodoroState.activeFocusTaskId}
+                            onSelectFocusTask={handleSelectFocusTask}
+                            focusSessions={focusSessions}
+                            isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
+                            mainDailyGoal={todayMainGoal}
+                            onUpdateMainDailyGoal={handleUpdateMainDailyGoal}
+                        />
+                    </div>
+                </div>
 
-            <div className={activeTab === 'home' ? 'h-full flex flex-col' : 'hidden'}>
-                    <>
-                        <header className="sticky top-0 p-4 z-30 flex items-center justify-between">
-                            <Greeting name={capitalizedUserName} />
-                            <button onClick={() => setActiveTab('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800">
-                                Progreso
-                            </button>
-                        </header>
-                        <div className="w-[90%] max-w-sm mx-auto py-3 space-y-3">
-                             <BibleVerse />
-                             <MobilePomodoroWidget 
-                                timeLeft={pomodoroState.timeLeft} 
-                                isActive={pomodoroState.isActive} 
-                                mode={pomodoroState.mode} 
-                                onToggle={handlePomodoroToggle} 
-                                onOpenModal={() => setIsPomodoroModalOpen(true)} 
-                                onSwitchMode={handleSwitchMode}
-                                onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
-                             />
-                            <TodaysAgenda 
-                                tasks={todayAgendaTasks} 
-                                calendarEvents={calendarEvents} 
-                                onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} 
-                                onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} 
-                                quickNotes={quickNotes} 
-                                onAddQuickNote={handleAddQuickNote} 
-                                onDeleteQuickNote={handleDeleteQuickNote} 
-                                onClearAllQuickNotes={handleClearAllQuickNotes} 
-                                activeFocusTaskId={pomodoroState.activeFocusTaskId}
-                                onSelectFocusTask={handleSelectFocusTask}
-                                focusSessions={focusSessions}
-                                isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
-                                mainDailyGoal={todayMainGoal}
-                                onUpdateMainDailyGoal={handleUpdateMainDailyGoal}
-                            />
-                        </div>
-                    </>
-</div>
-<div className={activeTab === 'tasks' ? 'h-full flex flex-col' : 'hidden'}>
-                return (
+                <div className={activeTab === 'tasks' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="flex flex-col h-full">
                         <TodoListModule progressEmoji={uiSettings?.progressEmoji} 
                             currentUser={currentUser}
-              onLogout={onLogout}
-              isMobile={true} 
+                            onLogout={onLogout}
+                            isMobile={true} 
                             allTodos={allTodos} 
                             addTodo={handleAddTodo} 
-                            toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
-                            toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
+                            toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)} 
+                            toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} 
                             deleteTodo={handleDeleteTodo} 
                             updateTodo={handleUpdateTodo} 
                             onEditTodo={setTaskToEdit} 
@@ -1377,9 +1384,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             <PlusIcon />
                         </button>
                     </div>
-</div>
-<div className={activeTab === 'projects' ? 'h-full flex flex-col' : 'hidden'}>
-                return (
+                </div>
+
+                <div className={activeTab === 'projects' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full">
                         <ProjectsWorkspace
                             projects={projects}
@@ -1409,9 +1416,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onOpenProjectEditor={handleOpenProjectEditor}
                         />
                     </div>
-</div>
-<div className={activeTab === 'calendar' ? 'h-full flex flex-col' : 'hidden'}>
-                return (
+                </div>
+
+                <div className={activeTab === 'calendar' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full pt-4 px-2">
                         <CalendarModule
                             isMobile={true}
@@ -1437,9 +1444,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onSyncNotion={onSyncNotion}
                         />
                     </div>
-</div>
-<div className={activeTab === 'habits' ? 'h-full flex flex-col' : 'hidden'}>
-                return (
+                </div>
+
+                <div className={activeTab === 'habits' ? 'h-full flex flex-col' : 'hidden'}>
                      <div className="h-full pt-8">
                         <HabitTracker 
                             habits={habits} 
@@ -1450,15 +1457,15 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onToggleRecord={handleToggleHabitRecord}
                         />
                     </div>
-</div>
-<div className={activeTab === 'notes' ? 'h-full flex flex-col' : 'hidden'}>
-                return (
+                </div>
+
+                <div className={activeTab === 'notes' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full pt-8">
                       <NotesSection isMobile={true} folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
                     </div>
-                );
-             case 'progreso':
-                return (
+                </div>
+
+                <div className={activeTab === 'progreso' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="flex flex-col h-full">
                         <ProgressView 
                             allTodos={allTodos} 
@@ -1469,57 +1476,53 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onBack={() => setActiveTab('home')}
                         />
                     </div>
-                );
-            case 'more':
-                return (
-                     <>
-                        <div className="p-4 pt-8">
-                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden">
-                                <div className="divide-y divide-black/5 dark:divide-white/10">
+                </div>
 
-                                    <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                                        <div className="flex items-center gap-3">
-                                            <Settings className="w-5 h-5 text-primary" />
-                                            <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Configuración</h3>
-                                        </div>
-                                        <ChevronRightIcon />
-                                    </button>
+                <div className={activeTab === 'more' ? 'h-full flex flex-col' : 'hidden'}>
+                    <div className="p-4 pt-8">
+                        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden">
+                            <div className="divide-y divide-black/5 dark:divide-white/10">
 
-                                    <div className="p-4 flex justify-between items-center">
-                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Tema</h3>
-                                        <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+                                <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <Settings className="w-5 h-5 text-primary" />
+                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Configuración</h3>
                                     </div>
+                                    <ChevronRightIcon />
+                                </button>
 
-                                    <button onClick={() => setIsQuickCaptureSetupOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Captura Rápida</h3>
-                                        <ChevronRightIcon />
-                                    </button>
-                                    
-                                    <button onClick={() => setIsNotificationsPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5" disabled={isPermissionBlocked}>
-                                        <div className="flex items-center gap-2">
-                                            <h3 className={`font-bold text-lg transition-colors ${ isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary' }`}>
-                                                Notificaciones
-                                            </h3>
-                                            {projectInvitations.filter(i => i.status === 'pending').length > 0 && (
-                                                <span className="px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
-                                                    {projectInvitations.filter(i => i.status === 'pending').length}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {!isPermissionBlocked && <ChevronRightIcon />}
-                                    </button>
-
+                                <div className="p-4 flex justify-between items-center">
+                                    <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Tema</h3>
+                                    <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
                                 </div>
-                            </div>
-                             <button onClick={onLogout} className="w-full mt-6 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
-                                <LogoutIcon />
-                                Cerrar Sesión
-                            </button>
-                        </div>
-                    </>
-</div>
-{/* default */}
 
+                                <button onClick={() => setIsQuickCaptureSetupOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                                    <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Captura Rápida</h3>
+                                    <ChevronRightIcon />
+                                </button>
+                                
+                                <button onClick={() => setIsNotificationsPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5" disabled={isPermissionBlocked}>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className={`font-bold text-lg transition-colors ${ isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary' }`}>
+                                            Notificaciones
+                                        </h3>
+                                        {projectInvitations.filter(i => i.status === 'pending').length > 0 && (
+                                            <span className="px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                                                {projectInvitations.filter(i => i.status === 'pending').length}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {!isPermissionBlocked && <ChevronRightIcon />}
+                                </button>
+
+                            </div>
+                        </div>
+                         <button onClick={onLogout} className="w-full mt-6 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
+                            <LogoutIcon />
+                            Cerrar Sesión
+                        </button>
+                    </div>
+                </div>
             </>
         );
     };
@@ -1564,6 +1567,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             )}
 
             <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
+            
+            <GlobalHuddleFloatingWidget
+              onOpenProjectsWorkspace={(projectId) => {
+                setViewingProjectId(projectId);
+                setActiveTab('projects');
+              }}
+            />
             
             <CustomizationPanel
               isOpen={isCustomizationPanelOpen}
