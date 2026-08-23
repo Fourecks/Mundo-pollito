@@ -15,7 +15,6 @@ import {
   UserPlus, Mail, ChevronDown, CheckCircle, ChevronRight, Briefcase, Grid, List,
   TrendingUp, Award, UserCheck, Flame, Zap
 } from 'lucide-react';
-import { ProjectChannels } from './ProjectChannels';
 
 interface ProjectsWorkspaceProps {
     projects: Project[];
@@ -134,7 +133,7 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
 
     // Navigation view state: true = All Projects Dashboard Grid, false = Inside Active Project
     const [showingAllProjects, setShowingAllProjects] = useState<boolean>(activeProjectId === null);
-    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'risks' | 'budget' | 'time' | 'docs' | 'chat' | 'inbox' | 'team' | 'activity' | 'channels'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'risks' | 'budget' | 'time' | 'docs' | 'chat' | 'inbox' | 'team' | 'activity'>('overview');
     
     // Project Search & Filter on Grid
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
@@ -508,7 +507,6 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
                     {[
                         { id: 'overview', label: 'Resumen', icon: Activity },
                         { id: 'kanban', label: 'Tablero', icon: AlignLeft },
-                        { id: 'channels', label: 'Canales', icon: MessageSquare },
                         { id: 'risks', label: 'Matriz Riesgos', icon: ShieldAlert, badge: activeProject.risks?.length },
                         { id: 'budget', label: 'Presupuesto', icon: DollarSign },
                         { id: 'time', label: 'Registro Horas', icon: Clock, badge: activeProject.time_logs?.length },
@@ -1017,15 +1015,6 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
                     <div className="flex-1 overflow-hidden relative">
                         {activeTab === 'overview' && renderOverview()}
                         {activeTab === 'kanban' && renderKanban()}
-                        {activeTab === 'channels' && (
-                            <div className="p-4 h-full w-full overflow-hidden">
-                                <ProjectChannels 
-                                    project={activeProject}
-                                    currentUserEmail={currentUserEmail || ''}
-                                    onUpdateProject={onUpdateProject}
-                                />
-                            </div>
-                        )}
                         {activeTab === 'risks' && renderRisks()}
                         {activeTab === 'budget' && renderBudget()}
                         {activeTab === 'time' && renderTimeLogs()}
