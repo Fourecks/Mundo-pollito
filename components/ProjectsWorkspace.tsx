@@ -2,7 +2,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, 
   ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation,
-  ProjectRisk, ProjectExpense, ProjectTimeLog
+  ProjectRisk, ProjectExpense, ProjectTimeLog, ProjectChannel, ProjectPoll,
+  ProjectHuddle, ProjectMemberStatus, ProjectCanvas, ProjectThreadReply
 } from '../types';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, 
@@ -13,7 +14,8 @@ import {
   FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, 
   AlertTriangle, RefreshCw, Flag, Filter, DollarSign, PieChart, ShieldAlert, 
   UserPlus, Mail, ChevronDown, CheckCircle, ChevronRight, Briefcase, Grid, List,
-  TrendingUp, Award, UserCheck, Flame, Zap
+  TrendingUp, Award, UserCheck, Flame, Zap, Hash, Volume2, Mic, MicOff, Video, 
+  VideoOff, Monitor, Smile, Reply, Play, Square, Lock, Globe, Radio, Tv
 } from 'lucide-react';
 
 interface ProjectsWorkspaceProps {
@@ -154,6 +156,63 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
     const [inviteSuccessMessage, setInviteSuccessMessage] = useState<string | null>(null);
     const [inviteLoadingEmail, setInviteLoadingEmail] = useState<string | null>(null);
 
+    // ==========================================
+    // SLACK COLLABORATION WORKSPACE STATES
+    // ==========================================
+    const [activeChannelId, setActiveChannelId] = useState<string>('general');
+    const [chatInputText, setChatInputText] = useState('');
+    const [chatSearchQuery, setChatSearchQuery] = useState('');
+    
+    // Thread Drawer State
+    const [activeThreadMsgId, setActiveThreadMsgId] = useState<string | null>(null);
+    const [threadInputText, setThreadInputText] = useState('');
+
+    // Create Channel Modal State
+    const [isCreateChannelModalOpen, setIsCreateChannelModalOpen] = useState(false);
+    const [newChanName, setNewChanName] = useState('');
+    const [newChanDesc, setNewChanDesc] = useState('');
+    const [newChanEmoji, setNewChanEmoji] = useState('💬');
+    const [newChanPrivate, setNewChanPrivate] = useState(false);
+
+    // Create Poll Modal State
+    const [isCreatePollModalOpen, setIsCreatePollModalOpen] = useState(false);
+    const [pollQuestion, setPollQuestion] = useState('');
+    const [pollOptions, setPollOptions] = useState<string[]>(['Opción A', 'Opción B']);
+    const [pollAllowMultiple, setPollAllowMultiple] = useState(false);
+
+    // Voice Clip Recording Simulation State
+    const [isRecordingAudioClip, setIsRecordingAudioClip] = useState(false);
+    const [audioClipTimer, setAudioClipTimer] = useState(0);
+
+    // Member Slack Status Modal State
+    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+    const [customStatusEmoji, setCustomStatusEmoji] = useState('🟢');
+    const [customStatusText, setCustomStatusText] = useState('Disponible');
+    const [customPresenceMode, setCustomPresenceMode] = useState<'online' | 'away' | 'dnd'>('online');
+
+    // Slack Canvas Editor State
+    const [newCanvasTaskText, setNewCanvasTaskText] = useState('');
+    const [newCanvasResourceLabel, setNewCanvasResourceLabel] = useState('');
+    const [newCanvasResourceUrl, setNewCanvasResourceUrl] = useState('');
+
+    // Huddle Recording / Screen Share Toggle
+    const [huddleMicMuted, setHuddleMicMuted] = useState(false);
+    const [huddleVideoOn, setHuddleVideoOn] = useState(true);
+    const [huddleScreenShareOn, setHuddleScreenShareOn] = useState(false);
+    const [huddleNotesText, setHuddleNotesText] = useState('');
+
+    useEffect(() => {
+        let interval: any = null;
+        if (isRecordingAudioClip) {
+            interval = setInterval(() => {
+                setAudioClipTimer(prev => prev + 1);
+            }, 1000);
+        } else {
+            setAudioClipTimer(0);
+        }
+        return () => { if (interval) clearInterval(interval); };
+    }, [isRecordingAudioClip]);
+
     // Get Active Project
     const activeProject = useMemo(() => {
         if (activeProjectId) {
@@ -173,6 +232,302 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
     const projectTodos = useMemo(() => {
         return activeProject ? safeTodos.filter(t => t && t.project_id === activeProject.id) : [];
     }, [safeTodos, activeProject]);
+
+    // Slack Channels Resolution
+    const projectChannels = useMemo(() => {
+        if (!activeProject) return [];
+        if (Array.isArray(activeProject.channels) && activeProject.channels.length > 0) {
+            return activeProject.channels;
+        }
+        return [
+            { id: 'general', project_id: activeProject.id, name: 'general', emoji: '💬', description: 'Anuncios y conversación general del proyecto', is_default: true, created_at: new Date().toISOString() },
+            { id: 'desarrollo', project_id: activeProject.id, name: 'desarrollo', emoji: '💻', description: 'Código, arquitectura y tareas técnicas', created_at: new Date().toISOString() },
+            { id: 'diseño-ui', project_id: activeProject.id, name: 'diseño-ui', emoji: '🎨', description: 'Prototipos, mockups y guías de estilo', created_at: new Date().toISOString() },
+            { id: 'standup-huddles', project_id: activeProject.id, name: 'standup-huddles', emoji: '🎧', description: 'Llamadas rápidas, audio huddles y sync diario', created_at: new Date().toISOString() },
+        ];
+    }, [activeProject]);
+
+    const currentChannel = useMemo(() => {
+        return projectChannels.find(c => c.id === activeChannelId) || projectChannels[0] || { id: 'general', name: 'general', emoji: '💬', description: 'Canal principal' };
+    }, [projectChannels, activeChannelId]);
+
+    const activeHuddles = useMemo(() => {
+        return Array.isArray(activeProject?.huddles) ? activeProject.huddles : [];
+    }, [activeProject]);
+
+    const currentChannelHuddle = useMemo(() => {
+        return activeHuddles.find(h => h.channel_id === currentChannel.id && h.is_active);
+    }, [activeHuddles, currentChannel]);
+
+    const projectCanvases = useMemo(() => {
+        if (!activeProject) return [];
+        if (Array.isArray(activeProject.canvases) && activeProject.canvases.length > 0) {
+            return activeProject.canvases;
+        }
+        return [
+            {
+                id: 'canvas_default',
+                project_id: activeProject.id,
+                title: `Slack Canvas de ${activeProject.name}`,
+                content: `### 🚀 Especificaciones y Documentación del Proyecto\n\nEste es el **Slack Canvas** colaborativo. Utiliza este espacio para centralizar los requerimientos clave, enlaces importantes y checklist de entregables.\n\n- **Estado del Proyecto:** ${activeProject.status || 'En progreso'}\n- **Líder Técnico:** ${activeProject.lead || 'Por asignar'}\n- **Presupuesto Registrado:** $${activeProject.budget || 0}`,
+                pinned_links: [
+                    { label: 'Repositorio de Código (GitHub)', url: 'https://github.com' },
+                    { label: 'Diseños y Prototipos (Figma)', url: 'https://figma.com' }
+                ],
+                action_items: [
+                    { id: 'act_1', text: 'Revisar requisitos de integración y base de datos', done: true, assignee: 'PM' },
+                    { id: 'act_2', text: 'Sincronizar modelos con la base de datos', done: false, assignee: 'Tech Lead' }
+                ],
+                updated_at: new Date().toISOString(),
+                updated_by: currentUserEmail || 'usuario@empresa.com'
+            }
+        ];
+    }, [activeProject, currentUserEmail]);
+
+    const currentCanvas = useMemo(() => {
+        return projectCanvases[0];
+    }, [projectCanvases]);
+
+    // Slack Handlers
+    const handleCreateChannel = async () => {
+        if (!activeProject || !newChanName.trim()) return;
+        const cleanName = newChanName.toLowerCase().replace(/\s+/g, '-');
+        const newChan: ProjectChannel = {
+            id: `chan_${Date.now()}`,
+            project_id: activeProject.id,
+            name: cleanName,
+            description: newChanDesc || 'Canal de conversación del proyecto',
+            emoji: newChanEmoji || '💬',
+            is_private: newChanPrivate,
+            created_at: new Date().toISOString()
+        };
+        const updatedChannels = [...projectChannels, newChan];
+        await onUpdateProject(activeProject.id, { channels: updatedChannels });
+        setActiveChannelId(newChan.id);
+        setIsCreateChannelModalOpen(false);
+        setNewChanName('');
+        setNewChanDesc('');
+    };
+
+    const handleSendMessage = async (extraPayload?: Partial<ProjectChatMessage>) => {
+        if (!activeProject) return;
+        if (!chatInputText.trim() && !extraPayload) return;
+
+        const existingMsgs = Array.isArray(activeProject.chat_messages) ? activeProject.chat_messages : [];
+        const userEmail = currentUserEmail || 'usuario@empresa.com';
+        const newMsg: ProjectChatMessage = {
+            id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            project_id: activeProject.id,
+            channel_id: currentChannel.id,
+            sender_name: userEmail.split('@')[0],
+            sender_email: userEmail,
+            text: extraPayload?.text || chatInputText.trim(),
+            created_at: new Date().toISOString(),
+            reactions: {},
+            thread_count: 0,
+            thread_replies: [],
+            ...extraPayload
+        };
+
+        const updatedMsgs = [...existingMsgs, newMsg];
+        await onUpdateProject(activeProject.id, { chat_messages: updatedMsgs });
+        setChatInputText('');
+    };
+
+    const handleAddThreadReply = async (parentMsgId: string) => {
+        if (!activeProject || !threadInputText.trim()) return;
+        const existingMsgs = Array.isArray(activeProject.chat_messages) ? activeProject.chat_messages : [];
+        const userEmail = currentUserEmail || 'usuario@empresa.com';
+
+        const replyObj: ProjectThreadReply = {
+            id: `reply_${Date.now()}`,
+            sender_name: userEmail.split('@')[0],
+            sender_email: userEmail,
+            text: threadInputText.trim(),
+            created_at: new Date().toISOString()
+        };
+
+        const updatedMsgs = existingMsgs.map(m => {
+            if (m.id === parentMsgId) {
+                const replies = Array.isArray(m.thread_replies) ? m.thread_replies : [];
+                return {
+                    ...m,
+                    thread_count: (m.thread_count || replies.length) + 1,
+                    thread_replies: [...replies, replyObj]
+                };
+            }
+            return m;
+        });
+
+        await onUpdateProject(activeProject.id, { chat_messages: updatedMsgs });
+        setThreadInputText('');
+    };
+
+    const handleToggleReaction = async (msgId: string, emoji: string) => {
+        if (!activeProject) return;
+        const existingMsgs = Array.isArray(activeProject.chat_messages) ? activeProject.chat_messages : [];
+        const userEmail = currentUserEmail || 'usuario@empresa.com';
+
+        const updatedMsgs = existingMsgs.map(m => {
+            if (m.id === msgId) {
+                const currentReactions = { ...(m.reactions || {}) };
+                const users = currentReactions[emoji] ? [...currentReactions[emoji]] : [];
+                if (users.includes(userEmail)) {
+                    currentReactions[emoji] = users.filter(u => u !== userEmail);
+                    if (currentReactions[emoji].length === 0) delete currentReactions[emoji];
+                } else {
+                    currentReactions[emoji] = [...users, userEmail];
+                }
+                return { ...m, reactions: currentReactions };
+            }
+            return m;
+        });
+
+        await onUpdateProject(activeProject.id, { chat_messages: updatedMsgs });
+    };
+
+    const handleTogglePinMessage = async (msgId: string) => {
+        if (!activeProject) return;
+        const existingMsgs = Array.isArray(activeProject.chat_messages) ? activeProject.chat_messages : [];
+        const updatedMsgs = existingMsgs.map(m => m.id === msgId ? { ...m, is_pinned: !m.is_pinned } : m);
+        await onUpdateProject(activeProject.id, { chat_messages: updatedMsgs });
+    };
+
+    const handleCreatePoll = async () => {
+        if (!activeProject || !pollQuestion.trim()) return;
+        const validOptions = pollOptions.filter(o => o.trim().length > 0);
+        if (validOptions.length < 2) return;
+
+        const pollId = `poll_${Date.now()}`;
+        const newPoll: ProjectPoll = {
+            id: pollId,
+            project_id: activeProject.id,
+            channel_id: currentChannel.id,
+            question: pollQuestion.trim(),
+            options: validOptions.map((opt, i) => ({ id: `opt_${i}`, text: opt.trim(), voters: [] })),
+            author_email: currentUserEmail || 'usuario@empresa.com',
+            author_name: currentUserEmail ? currentUserEmail.split('@')[0] : 'Colaborador',
+            created_at: new Date().toISOString(),
+            allow_multiple: pollAllowMultiple
+        };
+
+        const existingPolls = Array.isArray(activeProject.polls) ? activeProject.polls : [];
+        const updatedPolls = [...existingPolls, newPoll];
+
+        await handleSendMessage({
+            text: `📊 Encuesta: ${pollQuestion.trim()}`,
+            poll_id: pollId,
+            poll: newPoll
+        });
+
+        await onUpdateProject(activeProject.id, { polls: updatedPolls });
+        setIsCreatePollModalOpen(false);
+        setPollQuestion('');
+        setPollOptions(['Opción A', 'Opción B']);
+    };
+
+    const handleVotePoll = async (pollId: string, optionId: string) => {
+        if (!activeProject) return;
+        const userEmail = currentUserEmail || 'usuario@empresa.com';
+        const existingPolls = Array.isArray(activeProject.polls) ? activeProject.polls : [];
+
+        const updatedPolls = existingPolls.map(p => {
+            if (p.id === pollId) {
+                const updatedOpts = p.options.map(o => {
+                    if (o.id === optionId) {
+                        const hasVoted = o.voters.includes(userEmail);
+                        return {
+                            ...o,
+                            voters: hasVoted ? o.voters.filter(v => v !== userEmail) : [...o.voters, userEmail]
+                        };
+                    } else if (!p.allow_multiple) {
+                        return { ...o, voters: o.voters.filter(v => v !== userEmail) };
+                    }
+                    return o;
+                });
+                return { ...p, options: updatedOpts };
+            }
+            return p;
+        });
+
+        const existingMsgs = Array.isArray(activeProject.chat_messages) ? activeProject.chat_messages : [];
+        const updatedMsgs = existingMsgs.map(m => {
+            if (m.poll_id === pollId || m.poll?.id === pollId) {
+                const matchedPoll = updatedPolls.find(p => p.id === pollId);
+                return { ...m, poll: matchedPoll };
+            }
+            return m;
+        });
+
+        await onUpdateProject(activeProject.id, { polls: updatedPolls, chat_messages: updatedMsgs });
+    };
+
+    const handleToggleHuddle = async () => {
+        if (!activeProject) return;
+        const userEmail = currentUserEmail || 'usuario@empresa.com';
+        const userName = userEmail.split('@')[0];
+
+        if (currentChannelHuddle) {
+            const otherParticipants = currentChannelHuddle.participants.filter(p => p.email !== userEmail);
+            if (otherParticipants.length === 0) {
+                const updatedHuddles = activeHuddles.map(h => h.id === currentChannelHuddle.id ? { ...h, is_active: false } : h);
+                await onUpdateProject(activeProject.id, { huddles: updatedHuddles });
+            } else {
+                const updatedHuddles = activeHuddles.map(h => h.id === currentChannelHuddle.id ? { ...h, participants: otherParticipants } : h);
+                await onUpdateProject(activeProject.id, { huddles: updatedHuddles });
+            }
+        } else {
+            const newHuddle: ProjectHuddle = {
+                id: `huddle_${Date.now()}`,
+                project_id: activeProject.id,
+                channel_id: currentChannel.id,
+                title: `Slack Huddle en #${currentChannel.name}`,
+                is_active: true,
+                started_at: new Date().toISOString(),
+                participants: [{
+                    email: userEmail,
+                    name: userName,
+                    is_muted: huddleMicMuted,
+                    is_video_on: huddleVideoOn,
+                    is_screen_sharing: huddleScreenShareOn,
+                    joined_at: new Date().toISOString()
+                }]
+            };
+            const updatedHuddles = [...activeHuddles.filter(h => h.channel_id !== currentChannel.id), newHuddle];
+            await onUpdateProject(activeProject.id, { huddles: updatedHuddles });
+        }
+    };
+
+    const handleSendVoiceClip = async () => {
+        const durationStr = `0:${audioClipTimer < 10 ? '0' : ''}${audioClipTimer}`;
+        await handleSendMessage({
+            text: `🎙️ Clip de voz de audio en #${currentChannel.name}`,
+            is_audio_clip: true,
+            audio_duration: durationStr
+        });
+        setIsRecordingAudioClip(false);
+    };
+
+    const handleSaveMemberStatus = async () => {
+        if (!activeProject) return;
+        const userEmail = currentUserEmail || 'usuario@empresa.com';
+        const existingStatuses = activeProject.member_statuses || {};
+
+        const updatedStatuses: Record<string, ProjectMemberStatus> = {
+            ...existingStatuses,
+            [userEmail]: {
+                email: userEmail,
+                name: userEmail.split('@')[0],
+                status_emoji: customStatusEmoji,
+                status_text: customStatusText,
+                presence: customPresenceMode,
+                updated_at: new Date().toISOString()
+            }
+        };
+
+        await onUpdateProject(activeProject.id, { member_statuses: updatedStatuses });
+        setIsStatusModalOpen(false);
+    };
 
     // Derived User Search Suggestions for Team Invitations
     const matchingSearchUsers = useMemo(() => {
@@ -507,10 +862,12 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
                     {[
                         { id: 'overview', label: 'Resumen', icon: Activity },
                         { id: 'kanban', label: 'Tablero', icon: AlignLeft },
+                        { id: 'chat', label: 'Canales Slack', icon: MessageSquare, badge: activeProject.chat_messages?.length },
+                        { id: 'canvas', label: 'Slack Canvas', icon: FileText },
                         { id: 'risks', label: 'Matriz Riesgos', icon: ShieldAlert, badge: activeProject.risks?.length },
                         { id: 'budget', label: 'Presupuesto', icon: DollarSign },
                         { id: 'time', label: 'Registro Horas', icon: Clock, badge: activeProject.time_logs?.length },
-                        { id: 'team', label: 'Equipo', icon: Users, badge: (activeProject.members?.length || 1) },
+                        { id: 'team', label: 'Equipo & Presencia', icon: Users, badge: (activeProject.members?.length || 1) },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -532,6 +889,718 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
                             )}
                         </button>
                     ))}
+                </div>
+            </div>
+        );
+    };
+
+    // ==========================================
+    // RENDER: SLACK CHANNELS & HUDDLES WORKSPACE
+    // ==========================================
+    const renderSlackChat = () => {
+        if (!activeProject) return null;
+        const messages = Array.isArray(activeProject.chat_messages) ? activeProject.chat_messages : [];
+        const channelMessages = messages.filter(m => 
+            (m.channel_id === currentChannel.id || (!m.channel_id && currentChannel.id === 'general')) &&
+            (!chatSearchQuery || m.text.toLowerCase().includes(chatSearchQuery.toLowerCase()))
+        );
+
+        const threadParentMsg = activeThreadMsgId ? messages.find(m => m.id === activeThreadMsgId) : null;
+        const members = Array.isArray(activeProject.members) ? activeProject.members : [];
+        const memberStatuses = activeProject.member_statuses || {};
+        const currentUserEmailVal = currentUserEmail || 'usuario@empresa.com';
+        const myStatus = memberStatuses[currentUserEmailVal] || { status_emoji: '🟢', status_text: 'Disponible', presence: 'online' };
+
+        return (
+            <div className="flex h-full w-full bg-white dark:bg-[#0d0d0d] overflow-hidden relative">
+                {/* 1. SLACK LEFT SIDEBAR (CHANNELS & DIRECT MESSAGES) */}
+                <div className="w-64 border-r border-gray-200 dark:border-gray-800 bg-gray-50/90 dark:bg-[#080808] flex flex-col shrink-0 h-full select-none">
+                    {/* Project & User Status Header */}
+                    <div className="p-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                            <span className="text-base">{activeProject.emoji || '📁'}</span>
+                            <div className="truncate">
+                                <h3 className="text-xs font-bold text-gray-900 dark:text-white truncate">{activeProject.name}</h3>
+                                <p className="text-[10px] text-gray-500 truncate">Espacio Slack de Proyecto</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setIsStatusModalOpen(true)}
+                            className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg text-xs flex items-center gap-1 transition-colors"
+                            title="Cambiar Mi Estado de Slack"
+                        >
+                            <span>{myStatus.status_emoji || '🟢'}</span>
+                            <ChevronDown className="w-3 h-3 text-gray-400" />
+                        </button>
+                    </div>
+
+                    {/* Channels Navigation */}
+                    <div className="flex-1 overflow-y-auto p-3 space-y-4">
+                        <div>
+                            <div className="flex items-center justify-between px-2 mb-1.5">
+                                <span className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Canales de Equipo</span>
+                                <button
+                                    onClick={() => setIsCreateChannelModalOpen(true)}
+                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                    title="Crear Nuevo Canal"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                            <div className="space-y-0.5">
+                                {projectChannels.map(chan => {
+                                    const isCurrent = chan.id === currentChannel.id;
+                                    const isHuddleRunning = activeHuddles.some(h => h.channel_id === chan.id && h.is_active);
+                                    const unreadCount = messages.filter(m => (m.channel_id === chan.id || (!m.channel_id && chan.id === 'general'))).length;
+
+                                    return (
+                                        <button
+                                            key={chan.id}
+                                            onClick={() => {
+                                                setActiveChannelId(chan.id);
+                                                setActiveThreadMsgId(null);
+                                            }}
+                                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between group transition-all ${
+                                                isCurrent 
+                                                    ? 'bg-blue-600 text-white shadow-sm font-bold' 
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-gray-800/60'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 truncate">
+                                                {chan.is_private ? (
+                                                    <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                ) : (
+                                                    <span className="text-xs shrink-0">{chan.emoji || '#'}</span>
+                                                )}
+                                                <span className="truncate">#{chan.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                {isHuddleRunning && (
+                                                    <span className="flex items-center gap-1 text-[9px] bg-purple-500 text-white font-extrabold px-1.5 py-0.5 rounded-full animate-pulse">
+                                                        <Radio className="w-2.5 h-2.5" /> HUDDLE
+                                                    </span>
+                                                )}
+                                                {unreadCount > 0 && !isCurrent && (
+                                                    <span className="text-[9px] bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold px-1.5 py-0.2 rounded-full">
+                                                        {unreadCount}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Team Members Direct Message List */}
+                        <div>
+                            <div className="px-2 mb-1.5 flex items-center justify-between">
+                                <span className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Miembros ({members.length || 1})</span>
+                            </div>
+                            <div className="space-y-1">
+                                {members.length === 0 ? (
+                                    <div className="px-2 py-1 text-[11px] text-gray-400 flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                        <span>{currentUserEmailVal.split('@')[0]} (Tú)</span>
+                                    </div>
+                                ) : (
+                                    members.map((mem, idx) => {
+                                        const status = memberStatuses[mem.email] || { status_emoji: '🟢', status_text: 'Disponible', presence: 'online' };
+                                        return (
+                                            <div key={idx} className="px-2.5 py-1 rounded-lg text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-gray-800/40 flex items-center justify-between group">
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <div className="relative shrink-0">
+                                                        <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px]">
+                                                            {(mem.name || mem.email)[0].toUpperCase()}
+                                                        </div>
+                                                        <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white dark:border-black ${
+                                                            status.presence === 'dnd' ? 'bg-red-500' : status.presence === 'away' ? 'bg-amber-500' : 'bg-emerald-500'
+                                                        }`} />
+                                                    </div>
+                                                    <span className="truncate font-medium">{mem.name || mem.email.split('@')[0]}</span>
+                                                </div>
+                                                <span className="text-[10px] text-gray-400 opacity-75 group-hover:opacity-100">{status.status_emoji || '💬'}</span>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* My Presence Footer */}
+                    <div className="p-3 border-t border-gray-200 dark:border-gray-800 bg-gray-100/50 dark:bg-[#0d0d0d] flex items-center justify-between">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{currentUserEmailVal.split('@')[0]}</span>
+                        </div>
+                        <span className="text-xs bg-gray-200 dark:bg-gray-800 px-2 py-0.5 rounded text-gray-600 dark:text-gray-400 font-medium">
+                            {myStatus.status_emoji} {myStatus.status_text}
+                        </span>
+                    </div>
+                </div>
+
+                {/* 2. MAIN CHAT AREA */}
+                <div className="flex-1 flex flex-col h-full bg-white dark:bg-[#0d0d0d] overflow-hidden relative">
+                    {/* Channel Header Bar */}
+                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-[#0d0d0d] shrink-0 z-10 shadow-xs">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-base font-bold">
+                                {currentChannel.emoji || '#'}
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                    #{currentChannel.name}
+                                    {currentChannel.is_private && <Lock className="w-3.5 h-3.5 text-amber-500" />}
+                                </h2>
+                                <p className="text-[11px] text-gray-500">{currentChannel.description}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {/* Slack Huddle Button */}
+                            <button
+                                onClick={handleToggleHuddle}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+                                    currentChannelHuddle 
+                                        ? 'bg-purple-600 text-white hover:bg-purple-700 animate-pulse' 
+                                        : 'bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800'
+                                }`}
+                            >
+                                <Radio className="w-3.5 h-3.5" />
+                                <span>{currentChannelHuddle ? 'En Huddle (Salir)' : 'Iniciar Huddle'}</span>
+                            </button>
+
+                            {/* Create Poll Button */}
+                            <button
+                                onClick={() => setIsCreatePollModalOpen(true)}
+                                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
+                            >
+                                <BarChart2 className="w-3.5 h-3.5 text-emerald-500" />
+                                <span className="hidden sm:inline">Encuesta</span>
+                            </button>
+
+                            {/* Slack Canvas Quick Access */}
+                            <button
+                                onClick={() => setActiveTab('canvas')}
+                                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
+                            >
+                                <FileText className="w-3.5 h-3.5 text-blue-500" />
+                                <span className="hidden sm:inline">Canvas</span>
+                            </button>
+
+                            {/* Search Filter */}
+                            <div className="relative w-36 sm:w-48">
+                                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                                <input
+                                    type="text"
+                                    value={chatSearchQuery}
+                                    onChange={(e) => setChatSearchQuery(e.target.value)}
+                                    placeholder="Buscar..."
+                                    className="w-full pl-8 pr-2 py-1.5 text-xs bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Active Huddle Floating Top Banner */}
+                    {currentChannelHuddle && (
+                        <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-3 border-b border-purple-500/30 flex items-center justify-between shadow-md shrink-0 animate-in slide-in-from-top-2">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 animate-pulse">
+                                    <Radio className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">Slack Huddle En Vivo</span>
+                                        <span className="text-[10px] bg-purple-500 text-white px-2 py-0.2 rounded-full font-extrabold">AUDIO Y VIDEO</span>
+                                    </div>
+                                    <p className="text-xs text-gray-300">
+                                        Participantes: {currentChannelHuddle.participants.map(p => p.name).join(', ') || 'Tú'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setHuddleMicMuted(!huddleMicMuted)}
+                                    className={`p-2 rounded-xl text-xs font-bold transition-all ${
+                                        huddleMicMuted ? 'bg-red-500 text-white' : 'bg-gray-800 text-emerald-400 hover:bg-gray-700'
+                                    }`}
+                                    title={huddleMicMuted ? 'Micrófono Silenciado' : 'Micrófono Activo'}
+                                >
+                                    {huddleMicMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                                </button>
+
+                                <button
+                                    onClick={() => setHuddleVideoOn(!huddleVideoOn)}
+                                    className={`p-2 rounded-xl text-xs font-bold transition-all ${
+                                        !huddleVideoOn ? 'bg-red-500 text-white' : 'bg-gray-800 text-blue-400 hover:bg-gray-700'
+                                    }`}
+                                    title={huddleVideoOn ? 'Cámara Encendida' : 'Cámara Apagada'}
+                                >
+                                    {huddleVideoOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                                </button>
+
+                                <button
+                                    onClick={() => setHuddleScreenShareOn(!huddleScreenShareOn)}
+                                    className={`p-2 rounded-xl text-xs font-bold transition-all ${
+                                        huddleScreenShareOn ? 'bg-amber-500 text-black' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                    title="Compartir Pantalla"
+                                >
+                                    <Monitor className="w-4 h-4" />
+                                </button>
+
+                                <button
+                                    onClick={handleToggleHuddle}
+                                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+                                >
+                                    Salir del Huddle
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Messages Feed */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {channelMessages.length === 0 ? (
+                            <div className="p-8 text-center flex flex-col items-center justify-center h-full text-gray-400 space-y-2">
+                                <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-2xl">
+                                    {currentChannel.emoji || '#'}
+                                </div>
+                                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300">¡Bienvenido al canal #{currentChannel.name}!</h3>
+                                <p className="text-xs text-gray-500 max-w-sm">Este es el inicio de la conversación. Envía mensajes, inicia huddles de voz o crea encuestas para el equipo.</p>
+                            </div>
+                        ) : (
+                            channelMessages.map(msg => {
+                                const reactions = msg.reactions || {};
+                                const isPinned = msg.is_pinned;
+                                const threadCount = msg.thread_count || (msg.thread_replies?.length || 0);
+
+                                return (
+                                    <div 
+                                        key={msg.id} 
+                                        className={`group relative flex items-start gap-3 p-3 rounded-2xl transition-all ${
+                                            isPinned ? 'bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30' : 'hover:bg-gray-50 dark:hover:bg-gray-900/40'
+                                        }`}
+                                    >
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                                            {(msg.sender_name || 'C')[0].toUpperCase()}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0 space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-gray-900 dark:text-white">{msg.sender_name}</span>
+                                                <span className="text-[10px] text-gray-400">
+                                                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                                {isPinned && (
+                                                    <span className="text-[9px] bg-amber-500 text-black font-extrabold px-1.5 py-0.2 rounded-full flex items-center gap-0.5">
+                                                        <Pin className="w-2.5 h-2.5" /> Fijado
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Text Content */}
+                                            <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                                                {msg.text}
+                                            </p>
+
+                                            {/* Audio Clip Player Widget */}
+                                            {msg.is_audio_clip && (
+                                                <div className="my-2 p-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/50 rounded-xl flex items-center gap-3 max-w-xs">
+                                                    <button className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                                                        <Play className="w-4 h-4 ml-0.5" />
+                                                    </button>
+                                                    <div className="flex-1 space-y-1">
+                                                        <div className="h-1.5 w-full bg-purple-200 dark:bg-purple-900 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-purple-600 w-2/3 rounded-full" />
+                                                        </div>
+                                                        <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                                                            Clip de audio • {msg.audio_duration || '0:05'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Poll Widget */}
+                                            {msg.poll && (
+                                                <div className="my-2 p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl max-w-md space-y-3 shadow-xs">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                                            <BarChart2 className="w-4 h-4 text-emerald-500" />
+                                                            {msg.poll.question}
+                                                        </h4>
+                                                        <span className="text-[10px] text-gray-400 font-medium">Encuesta Slack</span>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        {msg.poll.options.map((opt) => {
+                                                            const totalVotes = msg.poll?.options.reduce((sum, o) => sum + o.voters.length, 0) || 1;
+                                                            const optVotes = opt.voters.length;
+                                                            const pct = Math.round((optVotes / Math.max(totalVotes, 1)) * 100);
+                                                            const hasUserVoted = opt.voters.includes(currentUserEmailVal);
+
+                                                            return (
+                                                                <button
+                                                                    key={opt.id}
+                                                                    onClick={() => handleVotePoll(msg.poll!.id, opt.id)}
+                                                                    className={`w-full text-left p-2.5 rounded-xl text-xs transition-all relative overflow-hidden border ${
+                                                                        hasUserVoted 
+                                                                            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200 font-bold' 
+                                                                            : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-black text-gray-800 dark:text-gray-200 hover:border-gray-300'
+                                                                    }`}
+                                                                >
+                                                                    <div 
+                                                                        className="absolute left-0 top-0 bottom-0 bg-blue-500/10 dark:bg-blue-500/20 transition-all"
+                                                                        style={{ width: `${pct}%` }}
+                                                                    />
+                                                                    <div className="relative z-10 flex items-center justify-between">
+                                                                        <span>{opt.text}</span>
+                                                                        <span className="font-extrabold text-[11px] text-blue-600 dark:text-blue-400">{pct}% ({optVotes})</span>
+                                                                    </div>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Reactions Bar */}
+                                            {Object.keys(reactions).length > 0 && (
+                                                <div className="flex flex-wrap items-center gap-1 pt-1">
+                                                    {Object.entries(reactions).map(([emo, voters]) => (
+                                                        <button
+                                                            key={emo}
+                                                            onClick={() => handleToggleReaction(msg.id, emo)}
+                                                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border transition-colors flex items-center gap-1 ${
+                                                                voters.includes(currentUserEmailVal)
+                                                                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 text-blue-600 dark:text-blue-400'
+                                                                    : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                                                            }`}
+                                                        >
+                                                            <span>{emo}</span>
+                                                            <span>{voters.length}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Thread Footer Button */}
+                                            {threadCount > 0 && (
+                                                <button
+                                                    onClick={() => setActiveThreadMsgId(msg.id)}
+                                                    className="mt-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                                >
+                                                    <Reply className="w-3.5 h-3.5" />
+                                                    <span>{threadCount} {threadCount === 1 ? 'respuesta en hilo' : 'respuestas en hilo'}</span>
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Quick Actions Hover Toolbar */}
+                                        <div className="absolute right-3 top-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-1 shadow-md flex items-center gap-1">
+                                            {['👍', '❤️', '🔥', '🎉'].map(emo => (
+                                                <button
+                                                    key={emo}
+                                                    onClick={() => handleToggleReaction(msg.id, emo)}
+                                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-xs"
+                                                >
+                                                    {emo}
+                                                </button>
+                                            ))}
+                                            <button
+                                                onClick={() => setActiveThreadMsgId(msg.id)}
+                                                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-gray-500 hover:text-blue-600"
+                                                title="Responder en Hilo"
+                                            >
+                                                <Reply className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleTogglePinMessage(msg.id)}
+                                                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-gray-500 hover:text-amber-500"
+                                                title="Fijar Mensaje"
+                                            >
+                                                <Pin className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {/* Chat Input Bar */}
+                    <div className="p-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0d0d0d] shrink-0">
+                        {isRecordingAudioClip ? (
+                            <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl flex items-center justify-between animate-pulse">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
+                                    <span className="text-xs font-bold text-purple-900 dark:text-purple-200">
+                                        Grabando clip de voz de Slack... 0:{audioClipTimer < 10 ? '0' : ''}{audioClipTimer}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setIsRecordingAudioClip(false)}
+                                        className="px-3 py-1 bg-gray-200 dark:bg-gray-800 text-xs font-bold rounded-lg text-gray-700 dark:text-gray-300"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleSendVoiceClip}
+                                        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow-sm"
+                                    >
+                                        Enviar Audio
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-2.5 focus-within:border-blue-500 transition-colors space-y-2">
+                                <textarea
+                                    value={chatInputText}
+                                    onChange={(e) => setChatInputText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendMessage();
+                                        }
+                                    }}
+                                    placeholder={`Enviar mensaje a #${currentChannel.name}... (Presiona Enter para enviar)`}
+                                    className="w-full bg-transparent text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none resize-none min-h-[42px]"
+                                />
+
+                                <div className="flex items-center justify-between pt-1 border-t border-gray-200/50 dark:border-gray-800/50">
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => setIsRecordingAudioClip(true)}
+                                            className="p-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-600 dark:text-purple-400 rounded-lg text-xs flex items-center gap-1 transition-colors"
+                                            title="Grabar Clip de Voz"
+                                        >
+                                            <Mic className="w-3.5 h-3.5" />
+                                            <span className="text-[11px] font-bold">Clip de Voz</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => setIsCreatePollModalOpen(true)}
+                                            className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg text-xs flex items-center gap-1 transition-colors"
+                                            title="Crear Encuesta"
+                                        >
+                                            <BarChart2 className="w-3.5 h-3.5 text-emerald-500" />
+                                        </button>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleSendMessage()}
+                                        disabled={!chatInputText.trim()}
+                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+                                    >
+                                        <Send className="w-3.5 h-3.5" />
+                                        <span>Enviar</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 3. THREAD SLIDE-OVER DRAWER */}
+                {threadParentMsg && (
+                    <div className="w-80 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111] flex flex-col h-full shrink-0 shadow-2xl z-20 animate-in slide-in-from-right duration-200">
+                        <div className="p-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                <Reply className="w-4 h-4 text-blue-500" />
+                                Hilo en #{currentChannel.name}
+                            </h3>
+                            <button
+                                onClick={() => setActiveThreadMsgId(null)}
+                                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Thread Parent Message */}
+                        <div className="p-4 bg-gray-50/70 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-800 space-y-1">
+                            <span className="text-xs font-bold text-gray-900 dark:text-white">{threadParentMsg.sender_name}</span>
+                            <p className="text-xs text-gray-700 dark:text-gray-300">{threadParentMsg.text}</p>
+                        </div>
+
+                        {/* Replies List */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {(threadParentMsg.thread_replies || []).length === 0 ? (
+                                <p className="text-xs text-gray-400 text-center py-6">Aún no hay respuestas en este hilo. ¡Sé el primero en responder!</p>
+                            ) : (
+                                (threadParentMsg.thread_replies || []).map(rep => (
+                                    <div key={rep.id} className="bg-gray-50 dark:bg-gray-900 p-2.5 rounded-xl space-y-1 border border-gray-200/60 dark:border-gray-800/60">
+                                        <div className="flex items-center justify-between text-[11px]">
+                                            <span className="font-bold text-gray-900 dark:text-white">{rep.sender_name}</span>
+                                            <span className="text-gray-400 text-[10px]">{new Date(rep.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-800 dark:text-gray-200">{rep.text}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Reply Input Bar */}
+                        <div className="p-3 border-t border-gray-200 dark:border-gray-800">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={threadInputText}
+                                    onChange={(e) => setThreadInputText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddThreadReply(threadParentMsg.id);
+                                        }
+                                    }}
+                                    placeholder="Responder en el hilo..."
+                                    className="flex-1 px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                                <button
+                                    onClick={() => handleAddThreadReply(threadParentMsg.id)}
+                                    disabled={!threadInputText.trim()}
+                                    className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-40"
+                                >
+                                    <Send className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // ==========================================
+    // RENDER: SLACK CANVAS (PROJECT DOCS & CHECKLIST)
+    // ==========================================
+    const renderSlackCanvas = () => {
+        if (!activeProject) return null;
+
+        return (
+            <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-4">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-blue-600" /> Slack Canvas del Proyecto
+                        </h2>
+                        <p className="text-xs text-gray-500">
+                            Documento vivo persistido en base de datos.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-[11px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Sincronizado en BD
+                        </span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Main Canvas Editor (Left 2 cols) */}
+                    <div className="lg:col-span-2 bg-white dark:bg-[#111] p-5 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-amber-500" />
+                                {currentCanvas.title}
+                            </h3>
+                            <span className="text-[10px] text-gray-400">Última edición: {new Date(currentCanvas.updated_at).toLocaleDateString()}</span>
+                        </div>
+
+                        <textarea
+                            value={currentCanvas.content}
+                            onChange={async (e) => {
+                                const newText = e.target.value;
+                                const updatedCanvas: ProjectCanvas = {
+                                    ...currentCanvas,
+                                    content: newText,
+                                    updated_at: new Date().toISOString()
+                                };
+                                await onUpdateProject(activeProject.id, { canvases: [updatedCanvas] });
+                            }}
+                            rows={14}
+                            className="w-full p-4 text-xs font-mono bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:border-blue-500 leading-relaxed"
+                            placeholder="Escribe las especificaciones o notas del lienzo aquí..."
+                        />
+                    </div>
+
+                    {/* Right Widgets Column */}
+                    <div className="space-y-6">
+                        {/* Action Items Widget */}
+                        <div className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xs space-y-3">
+                            <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center justify-between">
+                                <span className="flex items-center gap-1.5"><CheckSquare className="w-4 h-4 text-blue-500" /> Checklist Canvas</span>
+                                <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-bold px-1.5 py-0.2 rounded-full">
+                                    {(currentCanvas.action_items || []).filter(i => i.done).length}/{(currentCanvas.action_items || []).length}
+                                </span>
+                            </h4>
+
+                            <div className="space-y-2">
+                                {(currentCanvas.action_items || []).map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={async () => {
+                                            const updatedItems = (currentCanvas.action_items || []).map(i => i.id === item.id ? { ...i, done: !i.done } : i);
+                                            const updatedCanvas = { ...currentCanvas, action_items: updatedItems, updated_at: new Date().toISOString() };
+                                            await onUpdateProject(activeProject.id, { canvases: [updatedCanvas] });
+                                        }}
+                                        className="w-full text-left p-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800/60 text-xs font-medium flex items-center justify-between hover:border-gray-300 transition-colors"
+                                    >
+                                        <span className={item.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}>{item.text}</span>
+                                        {item.done ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Circle className="w-4 h-4 text-gray-400" />}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                                <input
+                                    type="text"
+                                    value={newCanvasTaskText}
+                                    onChange={(e) => setNewCanvasTaskText(e.target.value)}
+                                    placeholder="Nueva tarea de canvas..."
+                                    className="flex-1 px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white focus:outline-none"
+                                />
+                                <button
+                                    onClick={async () => {
+                                        if (!newCanvasTaskText.trim()) return;
+                                        const newItem = { id: `act_${Date.now()}`, text: newCanvasTaskText.trim(), done: false, assignee: 'Equipo' };
+                                        const updatedCanvas = { ...currentCanvas, action_items: [...(currentCanvas.action_items || []), newItem], updated_at: new Date().toISOString() };
+                                        await onUpdateProject(activeProject.id, { canvases: [updatedCanvas] });
+                                        setNewCanvasTaskText('');
+                                    }}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Pinned Links Widget */}
+                        <div className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xs space-y-3">
+                            <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                <Pin className="w-4 h-4 text-amber-500" /> Enlaces Fijados
+                            </h4>
+
+                            <div className="space-y-2">
+                                {(currentCanvas.pinned_links || []).map((link, i) => (
+                                    <a
+                                        key={i}
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800/60 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-between"
+                                    >
+                                        <span className="truncate">{link.label}</span>
+                                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -1015,6 +2084,8 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
                     <div className="flex-1 overflow-hidden relative">
                         {activeTab === 'overview' && renderOverview()}
                         {activeTab === 'kanban' && renderKanban()}
+                        {activeTab === 'chat' && renderSlackChat()}
+                        {activeTab === 'canvas' && renderSlackCanvas()}
                         {activeTab === 'risks' && renderRisks()}
                         {activeTab === 'budget' && renderBudget()}
                         {activeTab === 'time' && renderTimeLogs()}
@@ -1298,6 +2369,112 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
                     <div className="pt-3 flex justify-end gap-2 border-t border-gray-200">
                         <button type="button" onClick={() => setTimeLogModal(false)} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
                         <button type="submit" className="px-4 py-1.5 text-xs bg-indigo-600 text-white font-bold rounded-lg">Guardar Registro</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* CREATE SLACK CHANNEL MODAL */}
+            <Modal isOpen={isCreateChannelModalOpen} onClose={() => setIsCreateChannelModalOpen(false)} title="Crear Canal de Slack">
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    const name = formData.get('name') as string;
+                    const description = formData.get('description') as string;
+                    const emoji = formData.get('emoji') as string || '💬';
+                    const isPrivate = formData.get('is_private') === 'on';
+
+                    handleCreateChannel(name, description, emoji, isPrivate);
+                    setIsCreateChannelModalOpen(false);
+                }} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Nombre del Canal</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-2 text-xs font-bold text-gray-400">#</span>
+                            <input name="name" required placeholder="anuncios-equipo" className="w-full pl-7 bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Emoji / Icono</label>
+                            <input name="emoji" defaultValue="💬" placeholder="💬" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white text-center" />
+                        </div>
+                        <div className="flex items-center pt-5">
+                            <label className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input name="is_private" type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                <span>Canal Privado (Solo invitados)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Propósito / Descripción</label>
+                        <textarea name="description" rows={2} placeholder="De qué se trata este canal..." className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button type="button" onClick={() => setIsCreateChannelModalOpen(false)} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
+                        <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-bold rounded-lg shadow-sm">Crear Canal</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* USER SLACK STATUS MODAL */}
+            <Modal isOpen={isStatusModalOpen} onClose={() => setIsStatusModalOpen(false)} title="Actualizar Mi Estado de Slack">
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                        {[
+                            { emoji: '🟢', text: 'Disponible', presence: 'online' },
+                            { emoji: '💻', text: 'En Reunión', presence: 'online' },
+                            { emoji: '🎧', text: 'Concentrado / Música', presence: 'dnd' },
+                            { emoji: '🌴', text: 'De Vacaciones', presence: 'away' },
+                            { emoji: '🚗', text: 'En Trayecto', presence: 'away' },
+                            { emoji: '🍔', text: 'Almorzando', presence: 'away' }
+                        ].map((st, i) => (
+                            <button
+                                key={i}
+                                onClick={() => handleUpdateMemberStatus(st.emoji, st.text, st.presence as any)}
+                                className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-blue-500 rounded-xl text-left text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 transition-colors"
+                            >
+                                <span className="text-base">{st.emoji}</span>
+                                <span>{st.text}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </Modal>
+
+            {/* CREATE POLL MODAL */}
+            <Modal isOpen={isCreatePollModalOpen} onClose={() => setIsCreatePollModalOpen(false)} title="Crear Encuesta de Equipo">
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    const question = formData.get('question') as string;
+                    const opt1 = formData.get('opt1') as string;
+                    const opt2 = formData.get('opt2') as string;
+                    const opt3 = formData.get('opt3') as string;
+
+                    const options = [opt1, opt2, opt3].filter(o => Boolean(o?.trim()));
+                    if (question && options.length >= 2) {
+                        handleCreatePoll(question, options);
+                        setIsCreatePollModalOpen(false);
+                    }
+                }} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Pregunta de la Encuesta</label>
+                        <input name="question" required placeholder="¿Cuándo hacemos el despliegue a producción?" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Opciones de Respuesta</label>
+                        <input name="opt1" required placeholder="Opción 1: Hoy a las 5 PM" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                        <input name="opt2" required placeholder="Opción 2: Mañana en la mañana" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                        <input name="opt3" placeholder="Opción 3: Próximo Lunes (Opcional)" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                    </div>
+
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button type="button" onClick={() => setIsCreatePollModalOpen(false)} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
+                        <button type="submit" className="px-4 py-1.5 text-xs bg-emerald-600 text-white font-bold rounded-lg shadow-sm">Lanzar Encuesta</button>
                     </div>
                 </form>
             </Modal>
