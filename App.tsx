@@ -346,7 +346,10 @@ interface AppComponentProps {
   // Notifications
   isSubscribed: boolean;
   isPermissionBlocked: boolean;
-  handleNotificationAction: () => void;
+  handleNotificationAction: (eventType?: NotificationEventType) => void;
+  pushPreferences: PushNotificationPreferences;
+  onUpdatePushPreferences: (newPrefs: PushNotificationPreferences) => Promise<void>;
+  onToggleSubscription: () => Promise<void>;
   isPowerSavingActive: boolean;
   batteryStatus: any;
   focusSessions: FocusSession[];
@@ -378,6 +381,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     loadAndValidateCalendarData, onRemoveFromCalendar, onSyncToCalendar,
     onSyncNotion,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
+    pushPreferences, onUpdatePushPreferences, onToggleSubscription,
     isPowerSavingActive, batteryStatus,
     focusSessions, onLogFocusSession,
     projectInvitations, onSendInvitation, onAcceptInvitation, onDeclineInvitation
@@ -833,11 +837,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         invitations={projectInvitations}
         onAcceptInvitation={onAcceptInvitation}
         onDeclineInvitation={onDeclineInvitation}
-        pushPreferences={uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES}
-        onUpdatePushPreferences={handleUpdatePushPreferences}
+        pushPreferences={pushPreferences}
+        onUpdatePushPreferences={onUpdatePushPreferences}
         isSubscribed={isSubscribed}
         isPermissionBlocked={isPermissionBlocked}
-        onToggleSubscription={handleToggleSubscription}
+        onToggleSubscription={onToggleSubscription}
         dailyEncouragementHour={uiSettings?.dailyEncouragementLocalHour ?? null}
         onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
         dailySummaryHour={uiSettings?.dailySummaryHour ?? null}
@@ -1000,7 +1004,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       activeProjectId={viewingProjectId}
                       invitations={projectInvitations}
                       onSendInvitation={onSendInvitation}
-                      pushPreferences={uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES}
+                      pushPreferences={pushPreferences}
                       onSelectProject={(id) => setViewingProjectId(id)}
                       onAddProject={async (name, emoji, color) => {
                           const p = await handleAddProject(name, emoji, color);
@@ -1080,6 +1084,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       loadAndValidateCalendarData, onRemoveFromCalendar, onSyncToCalendar,
       onSyncNotion,
       isSubscribed, isPermissionBlocked, handleNotificationAction,
+      pushPreferences, onUpdatePushPreferences, onToggleSubscription,
       isPowerSavingActive, batteryStatus,
       focusSessions, onLogFocusSession,
       projectInvitations, onSendInvitation, onAcceptInvitation, onDeclineInvitation
@@ -1382,7 +1387,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             activeProjectId={viewingProjectId}
                             invitations={projectInvitations}
                             onSendInvitation={onSendInvitation}
-                            pushPreferences={uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES}
+                            pushPreferences={pushPreferences}
                             onSelectProject={(id) => setViewingProjectId(id)}
                             onAddProject={async (name, emoji, color) => {
                                 const p = await handleAddProject(name, emoji, color);
@@ -1609,11 +1614,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 invitations={projectInvitations}
                 onAcceptInvitation={onAcceptInvitation}
                 onDeclineInvitation={onDeclineInvitation}
-                pushPreferences={uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES}
-                onUpdatePushPreferences={handleUpdatePushPreferences}
+                pushPreferences={pushPreferences}
+                onUpdatePushPreferences={onUpdatePushPreferences}
                 isSubscribed={isSubscribed}
                 isPermissionBlocked={isPermissionBlocked}
-                onToggleSubscription={handleToggleSubscription}
+                onToggleSubscription={onToggleSubscription}
                 dailyEncouragementHour={uiSettings?.dailyEncouragementLocalHour ?? null}
                 onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
                 dailySummaryHour={uiSettings?.dailySummaryHour ?? null}
@@ -4477,6 +4482,9 @@ const App: React.FC = () => {
     handleAddBackground, handleDeleteBackground,
     handleToggleFavoriteBackground, gapiReady,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
+    pushPreferences: uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES,
+    onUpdatePushPreferences: handleUpdatePushPreferences,
+    onToggleSubscription: handleToggleSubscription,
     gcalSettings, onGCalSettingsChange: handleGCalSettingsChange, userCalendars, calendarEvents,
     loadAndValidateCalendarData, onRemoveFromCalendar: handleRemoveFromCalendar, onSyncToCalendar: handleSyncToCalendar,
     onSyncNotion: handleSyncNotion,
