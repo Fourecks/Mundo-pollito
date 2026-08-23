@@ -1708,13 +1708,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="text-gray-400 font-bold uppercase text-[10px]">Fecha</span>
-                    <div className="font-semibold">
-                      {typeof selectedEventDetails.task.due_date === 'string' 
-                        ? selectedEventDetails.task.due_date 
-                        : (selectedEventDetails.task.due_date && typeof selectedEventDetails.task.due_date === 'object' && 'year' in selectedEventDetails.task.due_date
-                          ? `${(selectedEventDetails.task.due_date as any).year}-${String((selectedEventDetails.task.due_date as any).month).padStart(2,'0')}-${String((selectedEventDetails.task.due_date as any).day).padStart(2,'0')}`
-                          : 'Sin fecha')}
-                    </div>
+                    <div className="font-semibold">{selectedEventDetails.task.due_date || 'Sin fecha'}</div>
                   </div>
                   <div>
                     <span className="text-gray-400 font-bold uppercase text-[10px]">Horario</span>
