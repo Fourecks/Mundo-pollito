@@ -987,35 +987,48 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
           {openWindows.includes('projects') && (
               <ModalWindow isOpen onClose={() => toggleWindow('projects')} title="Espacio de Proyectos" isDraggable isResizable zIndex={getWindowZIndex('projects')} onFocus={() => bringToFront('projects')} className="w-full max-w-6xl h-[88vh]" windowState={windowStatesRef.current.projects} onStateChange={s => handleWindowStateChange('projects', s)} allowFullscreen>
-                  <ProjectsWorkspace
-                      projects={projects}
-                      allTodos={flatAllTodos}
-                      activeProjectId={viewingProjectId}
-                      invitations={projectInvitations}
-                      currentUserEmail={user?.email}
-                      onSendInvitation={onSendInvitation}
-                      onAcceptInvitation={handleAcceptInvitation}
-                      onDeclineInvitation={handleDeclineInvitation}
-                      onSelectProject={(id) => setViewingProjectId(id)}
-                      onAddProject={async (name, emoji, color, extraData) => {
-                          const p = await handleAddProject(name, emoji, color, extraData);
-                          return p || null;
-                      }}
-                      onUpdateProject={async (id, updates) => {
-                          await handleUpdateProject(id, updates);
-                      }}
-                      onDeleteProject={handleDeleteProject}
-                      onArchiveProject={async (id, isArchived) => {
-                          await handleArchiveProject(id, isArchived);
-                      }}
-                      addTodo={async (text, options) => {
-                          await handleAddTodo(text, options);
-                      }}
-                      updateTodo={handleUpdateTodo}
-                      deleteTodo={handleDeleteTodo}
-                      onEditTodo={setTaskToEdit}
-                      onOpenProjectEditor={handleOpenProjectEditor}
-                  />
+                  {currentUser ? (
+                      <ProjectsWorkspace
+                          projects={projects}
+                          allTodos={flatAllTodos}
+                          activeProjectId={viewingProjectId}
+                          invitations={projectInvitations}
+                          currentUserEmail={currentUser?.email}
+                          onSendInvitation={onSendInvitation}
+                          onAcceptInvitation={handleAcceptInvitation}
+                          onDeclineInvitation={handleDeclineInvitation}
+                          onSelectProject={(id) => setViewingProjectId(id)}
+                          onAddProject={async (name, emoji, color, extraData) => {
+                              const p = await handleAddProject(name, emoji, color, extraData);
+                              return p || null;
+                          }}
+                          onUpdateProject={async (id, updates) => {
+                              await handleUpdateProject(id, updates);
+                          }}
+                          onDeleteProject={handleDeleteProject}
+                          onArchiveProject={async (id, isArchived) => {
+                              await handleArchiveProject(id, isArchived);
+                          }}
+                          addTodo={async (text, options) => {
+                              await handleAddTodo(text, options);
+                          }}
+                          updateTodo={handleUpdateTodo}
+                          deleteTodo={handleDeleteTodo}
+                          onEditTodo={setTaskToEdit}
+                          onOpenProjectEditor={handleOpenProjectEditor}
+                      />
+                  ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-4">
+                          <div className="relative w-24 h-20">
+                              <div className="animate-walk-cycle w-16 h-16 mx-auto">
+                                  <ChickenIcon className="w-full h-full text-pink-400" />
+                              </div>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 animate-pulse">
+                              Cargando espacio de trabajo...
+                          </p>
+                      </div>
+                  )}
               </ModalWindow>
           )}
         </main>
@@ -1370,35 +1383,48 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             case 'projects':
                 return (
                     <div className="h-full">
-                        <ProjectsWorkspace
-                            projects={projects}
-                            allTodos={flatAllTodos}
-                            activeProjectId={viewingProjectId}
-                            invitations={projectInvitations}
-                            currentUserEmail={user?.email}
-                            onSendInvitation={onSendInvitation}
-                            onAcceptInvitation={handleAcceptInvitation}
-                            onDeclineInvitation={handleDeclineInvitation}
-                            onSelectProject={(id) => setViewingProjectId(id)}
-                            onAddProject={async (name, emoji, color, extraData) => {
-                                const p = await handleAddProject(name, emoji, color, extraData);
-                                return p || null;
-                            }}
-                            onUpdateProject={async (id, updates) => {
-                                await handleUpdateProject(id, updates);
-                            }}
-                            onDeleteProject={handleDeleteProject}
-                            onArchiveProject={async (id, isArchived) => {
-                                await handleArchiveProject(id, isArchived);
-                            }}
-                            addTodo={async (text, options) => {
-                                await handleAddTodo(text, options);
-                            }}
-                            updateTodo={handleUpdateTodo}
-                            deleteTodo={handleDeleteTodo}
-                            onEditTodo={setTaskToEdit}
-                            onOpenProjectEditor={handleOpenProjectEditor}
-                        />
+                        {currentUser ? (
+                            <ProjectsWorkspace
+                                projects={projects}
+                                allTodos={flatAllTodos}
+                                activeProjectId={viewingProjectId}
+                                invitations={projectInvitations}
+                                currentUserEmail={currentUser?.email}
+                                onSendInvitation={onSendInvitation}
+                                onAcceptInvitation={handleAcceptInvitation}
+                                onDeclineInvitation={handleDeclineInvitation}
+                                onSelectProject={(id) => setViewingProjectId(id)}
+                                onAddProject={async (name, emoji, color, extraData) => {
+                                    const p = await handleAddProject(name, emoji, color, extraData);
+                                    return p || null;
+                                }}
+                                onUpdateProject={async (id, updates) => {
+                                    await handleUpdateProject(id, updates);
+                                }}
+                                onDeleteProject={handleDeleteProject}
+                                onArchiveProject={async (id, isArchived) => {
+                                    await handleArchiveProject(id, isArchived);
+                                }}
+                                addTodo={async (text, options) => {
+                                    await handleAddTodo(text, options);
+                                }}
+                                updateTodo={handleUpdateTodo}
+                                deleteTodo={handleDeleteTodo}
+                                onEditTodo={setTaskToEdit}
+                                onOpenProjectEditor={handleOpenProjectEditor}
+                            />
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-4">
+                                <div className="relative w-24 h-20">
+                                    <div className="animate-walk-cycle w-16 h-16 mx-auto">
+                                        <ChickenIcon className="w-full h-full text-pink-400" />
+                                    </div>
+                                </div>
+                                <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 animate-pulse">
+                                    Cargando espacio de trabajo...
+                                </p>
+                            </div>
+                        )}
                     </div>
                 );
             case 'calendar':
