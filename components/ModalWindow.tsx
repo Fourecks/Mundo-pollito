@@ -93,6 +93,16 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
         }
       }, 50);
     }
+    
+    return () => {
+      if (isFullscreen) {
+        setTimeout(() => {
+          if (!document.querySelector('.is-fullscreen-window')) {
+            document.body.removeAttribute('data-fullscreen-window');
+          }
+        }, 50);
+      }
+    };
   }, [isFullscreen]);
 
   // Refs for tracking live coordinates without causing component re-renders

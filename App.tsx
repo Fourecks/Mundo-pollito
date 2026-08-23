@@ -1286,9 +1286,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     }, [currentUser.email]);
 
     const renderContent = () => {
-        switch (activeTab) {
-            case 'home':
-                return (
+        return (
+            <>
+
+            <div className={activeTab === 'home' ? 'h-full flex flex-col' : 'hidden'}>
                     <>
                         <header className="sticky top-0 p-4 z-30 flex items-center justify-between">
                             <Greeting name={capitalizedUserName} />
@@ -1325,8 +1326,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             />
                         </div>
                     </>
-                );
-            case 'tasks':
+</div>
+<div className={activeTab === 'tasks' ? 'h-full flex flex-col' : 'hidden'}>
                 return (
                     <div className="flex flex-col h-full">
                         <TodoListModule progressEmoji={uiSettings?.progressEmoji} 
@@ -1364,8 +1365,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             <PlusIcon />
                         </button>
                     </div>
-                );
-            case 'projects':
+</div>
+<div className={activeTab === 'projects' ? 'h-full flex flex-col' : 'hidden'}>
                 return (
                     <div className="h-full">
                         <ProjectsWorkspace
@@ -1395,8 +1396,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onOpenProjectEditor={handleOpenProjectEditor}
                         />
                     </div>
-                );
-            case 'calendar':
+</div>
+<div className={activeTab === 'calendar' ? 'h-full flex flex-col' : 'hidden'}>
                 return (
                     <div className="h-full pt-4 px-2">
                         <CalendarModule
@@ -1423,8 +1424,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onSyncNotion={onSyncNotion}
                         />
                     </div>
-                );
-            case 'habits':
+</div>
+<div className={activeTab === 'habits' ? 'h-full flex flex-col' : 'hidden'}>
                 return (
                      <div className="h-full pt-8">
                         <HabitTracker 
@@ -1436,8 +1437,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onToggleRecord={handleToggleHabitRecord}
                         />
                     </div>
-                );
-            case 'notes':
+</div>
+<div className={activeTab === 'notes' ? 'h-full flex flex-col' : 'hidden'}>
                 return (
                     <div className="h-full pt-8">
                       <NotesSection isMobile={true} folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
@@ -1503,9 +1504,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             </button>
                         </div>
                     </>
-                );
-            default: return null;
-        }
+</div>
+{/* default */}
+
+            </>
+        );
     };
 
     return (

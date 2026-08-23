@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle } from '../types';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -159,6 +159,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [unlockedChannels, setUnlockedChannels] = useState<Record<string, boolean>>({});
     const [passwordPromptChannel, setPasswordPromptChannel] = useState<ProjectChannel | null>(null);
     const [inputPassword, setInputPassword] = useState<string>('');
+
+    // Document View, Preview & Channel Share States
+    const [docViewMode, setDocViewMode] = useState<'grid' | 'table'>('grid');
+    const [docSearchText, setDocSearchText] = useState<string>('');
+    const [shareDocModal, setShareDocModal] = useState<{ isOpen: boolean; doc: ProjectDoc | null }>({ isOpen: false, doc: null });
+    const [shareTargetChannelId, setShareTargetChannelId] = useState<string>('general');
+    const [shareChannelPassword, setShareChannelPassword] = useState<string>('');
+    const [shareComment, setShareComment] = useState<string>('');
+    const [shareError, setShareError] = useState<string | null>(null);
+    const [previewDocModal, setPreviewDocModal] = useState<ProjectDoc | null>(null);
+
+    // Team Search State
+    const [memberSearchText, setMemberSearchText] = useState<string>('');
 
     // Live WebRTC and Audio Capture/Analyze States
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -427,7 +440,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         initMedia();
 
-        return () => {};
+        return () => {
+            if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach(track => track.stop());
+                localStreamRef.current = null;
+            }
+            if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach(track => track.stop());
+                screenStreamRef.current = null;
+            }
+        };
     }, [isHuddleActive, isVideoOn]);
 
     // Handle Mic toggle separately to avoid starting/stopping video tracks
@@ -512,18 +534,43 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
     };
 
-    // Helper: Reference Document in Chat
-    const handleReferenceDocInChat = (doc: ProjectDoc) => {
-        if (!activeProject) return;
+    // Helper: Open Share Document in Channel Modal
+    const handleOpenShareDoc = (doc: ProjectDoc) => {
+        setShareDocModal({ isOpen: true, doc });
+        setShareTargetChannelId(selectedChannelId || 'general');
+        setShareChannelPassword('');
+        setShareComment('');
+        setShareError(null);
+    };
+
+    // Helper: Execute Share Document into Channel
+    const handleConfirmShareDoc = () => {
+        if (!activeProject || !shareDocModal.doc) return;
+        const targetChannel = (activeProject.channels || []).find(c => c.id === shareTargetChannelId);
+        
+        // Password verification for private channel
+        if (targetChannel && targetChannel.is_private && targetChannel.password && !unlockedChannels[targetChannel.id]) {
+            if (shareChannelPassword !== targetChannel.password) {
+                setShareError('Contraseña incorrecta para acceder a este canal privado.');
+                return;
+            }
+            // Unlock channel
+            setUnlockedChannels(prev => ({ ...prev, [targetChannel.id]: true }));
+        }
+
+        const doc = shareDocModal.doc;
         const folder = (activeProject.doc_folders || []).find(f => f.id === doc.folder_id);
         const formattedSize = doc.file_size ? `${(doc.file_size / (1024 * 1024)).toFixed(2)} MB` : 'Nota de Texto';
-        
+
         const newMessage: ProjectChatMessage = {
             id: crypto.randomUUID(),
             project_id: activeProject.id,
+            channel_id: shareTargetChannelId,
             sender_name: 'Tú',
             sender_email: 'tu_correo@ejemplo.com',
-            text: `Ha compartido una referencia del documento: **${doc.title}**`,
+            text: shareComment.trim() 
+                ? `${shareComment.trim()}\n\n📄 **Documento compartido:** [${doc.title}]`
+                : `Ha compartido una referencia del documento: **${doc.title}**`,
             created_at: new Date().toISOString(),
             doc_reference: {
                 id: doc.id,
@@ -538,7 +585,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         const updatedChat = [...(activeProject.chat_messages || []), newMessage];
         onUpdateProject(activeProject.id, { chat_messages: updatedChat });
+        setShareDocModal({ isOpen: false, doc: null });
+        setSelectedChannelId(shareTargetChannelId);
         setActiveTab('chat');
+    };
+
+    // Helper: Reference Document in Chat (Direct Shortcut)
+    const handleReferenceDocInChat = (doc: ProjectDoc) => {
+        handleOpenShareDoc(doc);
     };
 
     // Helper: File Upload to Docs
@@ -607,8 +661,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject) {
             return (
                 <div className="px-6 py-4 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between">
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Proyectos</h1>
-                    <button onClick={() => setIsCreateProjectModalOpen(true)} className="px-3 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg flex items-center gap-1.5 hover:bg-blue-700">
+                    <h1 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Proyectos</h1>
+                    <button onClick={() => setIsCreateProjectModalOpen(true)} className="px-3 py-1.5 text-xs bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg flex items-center gap-1.5 hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors shadow-sm">
                         <Plus className="w-3.5 h-3.5" /> Nuevo Proyecto
                     </button>
                 </div>
@@ -616,35 +670,51 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
 
         return (
-            <div className="px-6 py-4 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
-                    <div className="flex items-center gap-3">
-                        <span className="text-2xl">{activeProject.emoji || '📁'}</span>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <select 
-                                    className="text-xl font-bold text-gray-900 dark:text-white bg-transparent border-none appearance-none focus:ring-0 cursor-pointer pr-4 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg p-1 -ml-1 transition-colors"
-                                    value={activeProject.id}
-                                    onChange={(e) => onSelectProject(Number(e.target.value))}
-                                >
-                                    {projects.map(p => (
-                                        <option key={p.id} value={p.id} className="text-base text-black">{p.emoji || '📁'} {p.name}</option>
-                                    ))}
-                                </select>
-                                <button 
-                                    onClick={() => setIsCreateProjectModalOpen(true)} 
-                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-gray-500" 
-                                    title="Nuevo Proyecto"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                </button>
+            <div className="bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 shadow-sm">
+                {/* 1. TOP BROWSER-STYLE TABS */}
+                <div className="flex items-center gap-1 px-4 pt-2 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/70 dark:bg-[#080808] overflow-x-auto scrollbar-hide">
+                    {projects.map(p => {
+                        const isActive = p.id === activeProject.id;
+                        return (
+                            <button
+                                key={p.id}
+                                onClick={() => onSelectProject(p.id)}
+                                className={`group relative flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-t-lg transition-all border-t border-x shrink-0 max-w-[200px] ${
+                                    isActive
+                                        ? 'bg-white dark:bg-[#0c0c0c] text-gray-900 dark:text-white border-gray-200 dark:border-gray-800 border-b-transparent shadow-[0_-1px_3px_rgba(0,0,0,0.03)] z-10'
+                                        : 'bg-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 border-transparent hover:bg-gray-100/70 dark:hover:bg-gray-800/40'
+                                }`}
+                                title={p.name}
+                            >
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-blue-600 dark:bg-blue-400' : 'bg-gray-300 dark:bg-gray-700'}`} />
+                                <span className="truncate">{p.name}</span>
+                            </button>
+                        );
+                    })}
+                    <button
+                        onClick={() => setIsCreateProjectModalOpen(true)}
+                        className="p-1.5 mb-0.5 hover:bg-gray-200/60 dark:hover:bg-gray-800 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors shrink-0"
+                        title="Crear nuevo proyecto"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+
+                {/* 2. PROJECT SUBHEADER */}
+                <div className="px-6 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-2.5">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2.5">
+                                <h1 className="text-base font-bold text-gray-900 dark:text-white tracking-tight truncate">
+                                    {activeProject.name}
+                                </h1>
                                 {activeProject.priority && (
-                                    <span className={`px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded border ${
+                                    <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
                                         activeProject.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60' :
                                         activeProject.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-800/60' :
                                         'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60'
                                     }`}>
-                                        {activeProject.priority === 'high' ? 'Alta Prioridad' : activeProject.priority === 'low' ? 'Baja Prioridad' : 'Media'}
+                                        {activeProject.priority === 'high' ? 'Alta' : activeProject.priority === 'low' ? 'Baja' : 'Media'}
                                     </span>
                                 )}
                             </div>
@@ -652,75 +722,75 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <p className="text-xs text-gray-500 dark:text-gray-400 max-w-2xl line-clamp-1 mt-0.5">{activeProject.description}</p>
                             )}
                         </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button 
+                                onClick={() => setExportReportModal(true)}
+                                className="px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
+                                title="Generar e imprimir resumen del proyecto"
+                            >
+                                <Share2 className="w-3.5 h-3.5" /> Reporte
+                            </button>
+                            <button 
+                                onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} 
+                                className="px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
+                            >
+                                <Settings className="w-3.5 h-3.5" /> Ajustes
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"?`)) {
+                                        onDeleteProject(activeProject.id);
+                                        onSelectProject(null);
+                                    }
+                                }}
+                                className="p-1.5 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center justify-center font-medium shadow-sm"
+                                title="Eliminar Proyecto"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => {
-                                if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"?`)) {
-                                    onDeleteProject(activeProject.id);
-                                    onSelectProject(null);
-                                }
-                            }}
-                            className="px-3 py-1.5 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
-                            title="Eliminar Proyecto"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button 
-                            onClick={() => setExportReportModal(true)}
-                            className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
-                            title="Generar e imprimir resumen del proyecto"
-                        >
-                            <Share2 className="w-3.5 h-3.5" /> Reporte
-                        </button>
-                        <button 
-                            onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} 
-                            className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
-                        >
-                            <Settings className="w-3.5 h-3.5" /> Ajustes
-                        </button>
+                    <div className="flex items-center gap-1 overflow-x-auto pb-0.5 -mx-1 px-1 scrollbar-hide">
+                        {[
+                            { id: 'overview', label: 'Resumen', icon: Activity },
+                            { id: 'kanban', label: 'Tablero', icon: AlignLeft },
+                            { id: 'sprints', label: 'Sprints', icon: Target },
+                            { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
+                            { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
+                            { id: 'chat', label: 'Canales', icon: MessageSquare, badge: activeProject.chat_messages?.length, isHuddle: isHuddleActive || (activeProject.huddles || []).some(h => h.active) },
+                            { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: activeProject.expenses?.length },
+                            { id: 'time', label: 'Tiempo', icon: Clock, badge: activeProject.time_entries?.length },
+                            { id: 'team', label: 'Equipo', icon: Users, badge: (activeProject.members?.length || 1) },
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as any)}
+                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap relative ${
+                                    activeTab === tab.id 
+                                        ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' 
+                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/60 hover:text-gray-900 dark:hover:text-gray-200'
+                                }`}
+                            >
+                                <tab.icon className="w-3.5 h-3.5" />
+                                {tab.label}
+                                {tab.isHuddle && (
+                                    <span className="absolute -top-0.5 right-0 flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                )}
+                                {tab.badge ? (
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        activeTab === tab.id ? 'bg-white/20 dark:bg-black/20' : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                                    }`}>
+                                        {tab.badge}
+                                    </span>
+                                ) : null}
+                            </button>
+                        ))}
                     </div>
-                </div>
-
-                <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-2 px-2 scrollbar-hide">
-                    {[
-                        { id: 'overview', label: 'Resumen', icon: Activity },
-                        { id: 'kanban', label: 'Tablero', icon: AlignLeft },
-                        { id: 'sprints', label: 'Sprints', icon: Target },
-                        { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
-                        { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
-                        { id: 'chat', label: 'Canales', icon: MessageSquare, badge: activeProject.chat_messages?.length, isHuddle: isHuddleActive || (activeProject.huddles || []).some(h => h.active) },
-                        { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: activeProject.expenses?.length },
-                        { id: 'time', label: 'Tiempo', icon: Clock, badge: activeProject.time_entries?.length },
-                        { id: 'team', label: 'Equipo', icon: Users, badge: (activeProject.members?.length || 1) },
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap relative ${
-                                activeTab === tab.id 
-                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' 
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/60 hover:text-gray-900 dark:hover:text-gray-200'
-                            }`}
-                        >
-                            <tab.icon className="w-3.5 h-3.5" />
-                            {tab.label}
-                            {tab.isHuddle && (
-                                <span className="absolute -top-0.5 right-0 flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                </span>
-                            )}
-                            {tab.badge ? (
-                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                                    activeTab === tab.id ? 'bg-white/20 dark:bg-black/20' : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                                }`}>
-                                    {tab.badge}
-                                </span>
-                            ) : null}
-                        </button>
-                    ))}
                 </div>
             </div>
         );
@@ -1137,38 +1207,82 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject) return null;
         const folders = activeProject.doc_folders || [];
         const docs = activeProject.docs || [];
-        const filteredDocs = selectedFolderId ? docs.filter(d => d.folder_id === selectedFolderId) : docs;
+        
+        let filteredDocs = selectedFolderId ? docs.filter(d => d.folder_id === selectedFolderId) : docs;
+        if (docSearchText.trim()) {
+            const query = docSearchText.toLowerCase();
+            filteredDocs = filteredDocs.filter(d => 
+                d.title.toLowerCase().includes(query) || 
+                (d.content && d.content.toLowerCase().includes(query)) ||
+                (d.file_name && d.file_name.toLowerCase().includes(query))
+            );
+        }
 
         return (
             <div className="p-6 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-20">
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Documentos y Archivos</h2>
-                        <p className="text-xs text-gray-500">Sube archivos reales (Word, Excel, PDF), organiza carpetas y compártelos en el chat grupal.</p>
+                        <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Documentos y Archivos</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Sube archivos, organiza carpetas, previsualiza y comparte en cualquier canal.</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setFolderModal({ isOpen: true, folder: null })} className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5">
-                            <FolderPlus className="w-4 h-4 text-amber-500" /> Nueva Carpeta
+                        {/* Search Bar */}
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+                            <input 
+                                type="text"
+                                placeholder="Buscar archivos..."
+                                value={docSearchText}
+                                onChange={e => setDocSearchText(e.target.value)}
+                                className="pl-8 pr-3 py-1.5 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white w-40 sm:w-52"
+                            />
+                            {docSearchText && (
+                                <button onClick={() => setDocSearchText('')} className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600">
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* View Mode Toggle */}
+                        <div className="flex items-center bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <button
+                                onClick={() => setDocViewMode('grid')}
+                                className={`p-1.5 rounded-md transition-colors ${docViewMode === 'grid' ? 'bg-white dark:bg-[#111] text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                title="Vista en cuadrícula"
+                            >
+                                <Grid className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={() => setDocViewMode('table')}
+                                className={`p-1.5 rounded-md transition-colors ${docViewMode === 'table' ? 'bg-white dark:bg-[#111] text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                title="Vista en tabla"
+                            >
+                                <List className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        <button onClick={() => setFolderModal({ isOpen: true, folder: null })} className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors">
+                            <FolderPlus className="w-3.5 h-3.5 text-amber-500" /> Nueva Carpeta
                         </button>
-                        <button onClick={() => setDocModal({ isOpen: true, doc: null, initialFolderId: selectedFolderId || undefined })} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 flex items-center gap-1.5">
-                            <Plus className="w-4 h-4" /> Nueva Nota
+                        <button onClick={() => setDocModal({ isOpen: true, doc: null, initialFolderId: selectedFolderId || undefined })} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 flex items-center gap-1.5 transition-colors shadow-sm">
+                            <Plus className="w-3.5 h-3.5" /> Nueva Nota
                         </button>
-                        <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm">
-                            <Paperclip className="w-4 h-4" /> Subir Archivo
+                        <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm transition-colors">
+                            <Paperclip className="w-3.5 h-3.5" /> Subir
                         </button>
                         <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                     </div>
                 </div>
 
                 {/* Folders Bar */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 border-b border-gray-200 dark:border-gray-800 scrollbar-hide">
                     <button 
                         onClick={() => setSelectedFolderId(null)} 
-                        className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
-                            selectedFolderId === null ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+                            selectedFolderId === null ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                     >
-                        <Folder className="w-4 h-4" /> Todos los Archivos ({docs.length})
+                        <Folder className="w-3.5 h-3.5" /> Todos ({docs.length})
                     </button>
 
                     {folders.map(f => {
@@ -1177,19 +1291,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <div key={f.id} className="relative group shrink-0">
                                 <button
                                     onClick={() => setSelectedFolderId(f.id)}
-                                    className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-                                        selectedFolderId === f.id ? 'bg-amber-500 text-white shadow-sm' : 'bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800/50'
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                                        selectedFolderId === f.id ? 'bg-amber-500 text-white shadow-sm' : 'bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800/50 hover:bg-amber-100'
                                     }`}
                                 >
-                                    <FolderOpen className="w-4 h-4" /> {f.name} ({count})
+                                    <FolderOpen className="w-3.5 h-3.5" /> {f.name} ({count})
                                 </button>
                             </div>
                         );
                     })}
                 </div>
 
-                {/* Docs Grid */}
-                {filteredDocs.length === 0 ? renderEmptyState('No hay archivos ni documentos', 'Sube tus archivos de Word, Excel o PDF o crea una nueva nota.') : (
+                {/* Empty State */}
+                {filteredDocs.length === 0 ? renderEmptyState('No hay archivos ni documentos', 'Sube tus archivos o crea una nueva nota para comenzar.') : docViewMode === 'grid' ? (
+                    /* Grid View */
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredDocs.map(doc => {
                             const folder = folders.find(f => f.id === doc.folder_id);
@@ -1199,7 +1314,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         <div className="flex items-start justify-between gap-2 mb-2">
                                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                                 {getFileIcon(doc.file_type, doc.file_name)}
-                                                <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">{doc.title}</h3>
+                                                <h3 className="text-xs font-bold text-gray-900 dark:text-white truncate" title={doc.title}>{doc.title}</h3>
                                             </div>
                                             {folder && (
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800/50 shrink-0">
@@ -1207,33 +1322,108 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed mb-3">{doc.content}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed mb-3">{doc.content || 'Sin contenido de vista previa'}</p>
                                     </div>
 
                                     <div className="pt-3 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between">
-                                        <span className="text-[10px] text-gray-400">
+                                        <span className="text-[10px] text-gray-400 font-mono">
                                             {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
                                         </span>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1.5">
                                             <button 
-                                                onClick={() => handleReferenceDocInChat(doc)}
-                                                title="Referenciar en Chat Grupal"
-                                                className="px-2 py-1 text-[11px] bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 font-medium flex items-center gap-1"
+                                                onClick={() => setPreviewDocModal(doc)}
+                                                title="Previsualizar documento"
+                                                className="p-1.5 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
                                             >
-                                                <MessageSquare className="w-3 h-3" /> Chat
+                                                <Eye className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleOpenShareDoc(doc)}
+                                                title="Compartir en canal de chat"
+                                                className="px-2 py-1 text-[11px] bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 font-medium flex items-center gap-1 transition-colors"
+                                            >
+                                                <MessageSquare className="w-3 h-3" /> Compartir
                                             </button>
                                             <button 
                                                 onClick={() => handleDownloadFile(doc)}
                                                 title="Descargar Archivo"
-                                                className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded"
+                                                className="p-1.5 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
                                             >
-                                                <Download className="w-4 h-4" />
+                                                <Download className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </div>
                                 </div>
                             );
                         })}
+                    </div>
+                ) : (
+                    /* Table View */
+                    <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                        <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 text-gray-400 font-medium uppercase tracking-wider text-[10px]">
+                                    <th className="py-2.5 px-4">Documento</th>
+                                    <th className="py-2.5 px-4">Carpeta</th>
+                                    <th className="py-2.5 px-4">Tamaño</th>
+                                    <th className="py-2.5 px-4">Fecha</th>
+                                    <th className="py-2.5 px-4 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
+                                {filteredDocs.map(doc => {
+                                    const folder = folders.find(f => f.id === doc.folder_id);
+                                    return (
+                                        <tr key={doc.id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
+                                            <td className="py-2.5 px-4">
+                                                <div className="flex items-center gap-2">
+                                                    {getFileIcon(doc.file_type, doc.file_name)}
+                                                    <span className="font-semibold text-gray-900 dark:text-white truncate max-w-xs">{doc.title}</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-2.5 px-4">
+                                                {folder ? (
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800/50">
+                                                        {folder.name}
+                                                    </span>
+                                                ) : <span className="text-gray-400">-</span>}
+                                            </td>
+                                            <td className="py-2.5 px-4 font-mono text-[11px] text-gray-500">
+                                                {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
+                                            </td>
+                                            <td className="py-2.5 px-4 text-gray-500 text-[11px]">
+                                                {doc.created_at ? format(parseISO(doc.created_at), 'dd/MM/yyyy') : '-'}
+                                            </td>
+                                            <td className="py-2.5 px-4 text-right">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    <button 
+                                                        onClick={() => setPreviewDocModal(doc)}
+                                                        title="Previsualizar"
+                                                        className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded"
+                                                    >
+                                                        <Eye className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleOpenShareDoc(doc)}
+                                                        title="Compartir en canal"
+                                                        className="px-2 py-0.5 text-[10px] bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded font-medium hover:bg-blue-100"
+                                                    >
+                                                        Compartir
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDownloadFile(doc)}
+                                                        title="Descargar"
+                                                        className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>
@@ -1678,9 +1868,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 {/* 2. CHAT WORKSPACE AREA & THREAD SIDEBAR CONTAINER */}
                 <div className="flex-1 flex h-full overflow-hidden relative">
                     
+                    
                     {/* FULLSCREEN HUDDLE VIEW */}
-                    {isHuddleActive && isHuddleFullScreen && (
-                        <div className="fixed inset-0 bg-slate-950 text-white z-[9999] flex flex-col p-6 select-none animate-in fade-in zoom-in-95 duration-200">
+                    {isHuddleActive && isHuddleFullScreen && typeof document !== 'undefined' && createPortal(
+                        <div className="fixed inset-0 bg-slate-950 text-white z-[100000] flex flex-col p-6 select-none animate-in fade-in zoom-in-95 duration-200">
                             {/* Header */}
                             <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6 shrink-0">
                                 <div className="flex items-center gap-3">
@@ -1899,10 +2090,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         ) : (
                             <>
-                                {/* 3. HUDDLE ACTIVE AUDIO/VIDEO BAR */}
-                                {isHuddleActive && (
-                                    <div className="bg-gradient-to-r from-slate-900 via-[#1e293b] to-slate-900 text-white p-4 shrink-0 shadow-lg border-b border-slate-800">
-                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                
+                                {/* 3. HUDDLE ACTIVE AUDIO/VIDEO BAR (PiP mode) */}
+                                {isHuddleActive && !isHuddleFullScreen && typeof document !== 'undefined' && createPortal(
+                                    <div className="fixed bottom-24 right-4 z-[90000] w-[400px] max-w-[90vw] rounded-2xl shadow-2xl border border-slate-700 bg-gradient-to-r from-slate-900 via-[#1e293b] to-slate-900 text-white p-4 animate-in fade-in slide-in-from-bottom-8">
+                                        <div className="flex flex-col gap-4">
                                             
                                             <div className="flex items-center gap-3">
                                                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
@@ -2952,40 +3144,66 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const renderTeam = () => {
         if (!activeProject) return null;
         const members = activeProject.members || [];
+        const filteredMembers = memberSearchText.trim()
+            ? members.filter(m => 
+                (m.name && m.name.toLowerCase().includes(memberSearchText.toLowerCase())) ||
+                (m.email && m.email.toLowerCase().includes(memberSearchText.toLowerCase()))
+              )
+            : members;
 
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Miembros del Equipo</h2>
-                        <p className="text-xs text-gray-500">Administra los roles, permisos y colaboradores de este espacio.</p>
+                        <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Miembros del Equipo</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Administra los roles, permisos y colaboradores de este espacio.</p>
                     </div>
-                    <button onClick={() => setIsInviteModalOpen(true)} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 flex items-center gap-1.5 shadow-sm">
-                        <Users className="w-3.5 h-3.5" /> Invitar Miembro
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+                            <input 
+                                type="text"
+                                placeholder="Filtrar miembros..."
+                                value={memberSearchText}
+                                onChange={e => setMemberSearchText(e.target.value)}
+                                className="pl-8 pr-3 py-1.5 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white w-44"
+                            />
+                        </div>
+                        <button onClick={() => setIsInviteModalOpen(true)} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 flex items-center gap-1.5 shadow-sm transition-colors">
+                            <Users className="w-3.5 h-3.5" /> Invitar Miembro
+                        </button>
+                    </div>
                 </div>
 
-                <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
-                    {members.map((m, idx) => (
-                        <div key={m.id || idx} className="p-4 flex items-center justify-between">
+                <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden shadow-sm">
+                    {filteredMembers.map((m, idx) => (
+                        <div key={m.id || idx} className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
                                     {(m.name || m.email || 'M').charAt(0).toUpperCase()}
                                 </div>
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-900 dark:text-white">{m.name || 'Miembro del Equipo'}</h4>
-                                    <span className="text-[10px] text-gray-400">{m.email || 'correo@ejemplo.com'}</span>
+                                    <span className="text-[10px] text-gray-400 font-mono">{m.email || 'correo@ejemplo.com'}</span>
                                 </div>
                             </div>
-                            <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                            <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
                                 {m.role === 'owner' ? 'Propietario' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
                             </span>
                         </div>
                     ))}
-                    {members.length === 0 && (
+                    {filteredMembers.length === 0 && members.length === 0 && (
                         <div className="p-4 flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-900 dark:text-white">Tú (Propietario)</span>
-                            <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-blue-50 text-blue-700">Propietario</span>
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                    T
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-gray-900 dark:text-white">Tú (Propietario)</span>
+                                    <p className="text-[10px] text-gray-400">tu_correo@ejemplo.com</p>
+                                </div>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60">Propietario</span>
                         </div>
                     )}
                 </div>
@@ -3455,32 +3673,171 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             </Modal>
 
             {/* CREATE PROJECT MODAL */}
-            <Modal isOpen={isCreateProjectModalOpen} onClose={() => setIsCreateProjectModalOpen(false)} title="Nuevo Proyecto">
+            <Modal isOpen={isCreateProjectModalOpen} onClose={() => setIsCreateProjectModalOpen(false)} title="Crear Nuevo Proyecto">
                 <form onSubmit={async (e) => {
                     e.preventDefault();
                     const formData = new FormData(e.currentTarget);
                     const name = formData.get('name') as string;
-                    const emoji = formData.get('emoji') as string;
+                    if (!name?.trim()) return;
                     
-                    const newProj = await onAddProject(name, emoji, null);
+                    const newProj = await onAddProject(name.trim(), '', null);
                     if (newProj) {
                         onSelectProject(newProj.id);
                     }
                     setIsCreateProjectModalOpen(false);
                 }} className="space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Emoji (opcional)</label>
-                        <input name="emoji" placeholder="🚀" maxLength={2} className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Nombre del Proyecto</label>
-                        <input name="name" required placeholder="Mi Nuevo Proyecto" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Nombre del Proyecto *</label>
+                        <input 
+                            name="name" 
+                            required 
+                            autoFocus
+                            placeholder="Ej. Rediseño de Plataforma, Campaña Q3..." 
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500" 
+                        />
                     </div>
                     <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
-                        <button type="button" onClick={() => setIsCreateProjectModalOpen(false)} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
-                        <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Crear Proyecto</button>
+                        <button type="button" onClick={() => setIsCreateProjectModalOpen(false)} className="px-3.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Cancelar</button>
+                        <button type="submit" className="px-4 py-1.5 text-xs bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors shadow-sm">Crear Proyecto</button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* SHARE DOCUMENT MODAL */}
+            <Modal 
+                isOpen={shareDocModal.isOpen} 
+                onClose={() => setShareDocModal({ isOpen: false, doc: null, targetChannelId: '', passwordInput: '', error: '' })} 
+                title="Compartir Documento en Canal"
+            >
+                <div className="space-y-4">
+                    {shareDocModal.doc && (
+                        <div className="p-3 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg flex items-center gap-3">
+                            {getFileIcon(shareDocModal.doc.file_type, shareDocModal.doc.file_name)}
+                            <div className="min-w-0 flex-1">
+                                <h4 className="text-xs font-bold text-gray-900 dark:text-white truncate">{shareDocModal.doc.title}</h4>
+                                <p className="text-[10px] text-gray-400 font-mono">
+                                    {shareDocModal.doc.file_size ? `${(shareDocModal.doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Seleccionar Canal Destino</label>
+                        <select
+                            value={shareDocModal.targetChannelId}
+                            onChange={e => setShareDocModal(prev => ({ ...prev, targetChannelId: e.target.value, error: '', passwordInput: '' }))}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        >
+                            {(activeProject?.chat_channels || []).map(ch => (
+                                <option key={ch.id} value={ch.id}>
+                                    {ch.is_private ? '🔒 ' : '# '}{ch.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Password input if target channel is private and locked */}
+                    {(() => {
+                        const targetChan = activeProject?.chat_channels?.find(c => c.id === shareDocModal.targetChannelId);
+                        const isLocked = targetChan?.is_private && targetChan.password && !unlockedChannels[targetChan.id];
+                        if (!isLocked) return null;
+                        return (
+                            <div>
+                                <label className="block text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1.5">
+                                    <Lock className="w-3 h-3" /> Contraseña del Canal Privado
+                                </label>
+                                <input
+                                    type="password"
+                                    placeholder="Introduce la clave de acceso..."
+                                    value={shareDocModal.passwordInput}
+                                    onChange={e => setShareDocModal(prev => ({ ...prev, passwordInput: e.target.value, error: '' }))}
+                                    className="w-full bg-gray-50 dark:bg-black border border-amber-300 dark:border-amber-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+                        );
+                    })()}
+
+                    {shareDocModal.error && (
+                        <p className="text-xs text-red-500 font-medium">{shareDocModal.error}</p>
+                    )}
+
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button 
+                            type="button" 
+                            onClick={() => setShareDocModal({ isOpen: false, doc: null, targetChannelId: '', passwordInput: '', error: '' })} 
+                            className="px-3.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="button" 
+                            onClick={handleConfirmShareDoc}
+                            className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                        >
+                            Enviar al Canal
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* PREVIEW DOCUMENT MODAL */}
+            <Modal
+                isOpen={!!previewDocModal}
+                onClose={() => setPreviewDocModal(null)}
+                title={previewDocModal ? previewDocModal.title : 'Vista Previa'}
+            >
+                {previewDocModal && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between text-xs text-gray-400 pb-2 border-b border-gray-100 dark:border-gray-800">
+                            <span>Tipo: {previewDocModal.file_name?.split('.').pop()?.toUpperCase() || 'Nota'}</span>
+                            <span>{previewDocModal.file_size ? `${(previewDocModal.file_size / 1024).toFixed(0)} KB` : 'Texto'}</span>
+                        </div>
+
+                        {previewDocModal.file_url ? (
+                            <div className="space-y-3">
+                                {previewDocModal.file_type?.startsWith('image/') || previewDocModal.file_url.startsWith('data:image/') ? (
+                                    <div className="max-h-80 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 flex items-center justify-center bg-gray-50 dark:bg-black">
+                                        <img src={previewDocModal.file_url} alt={previewDocModal.title} className="max-h-80 object-contain" />
+                                    </div>
+                                ) : (
+                                    <div className="p-4 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg text-center">
+                                        <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                                        <p className="text-xs text-gray-600 dark:text-gray-300 mb-1 font-semibold">{previewDocModal.file_name || previewDocModal.title}</p>
+                                        <p className="text-[10px] text-gray-400">Archivo listo para descargar o compartir</p>
+                                    </div>
+                                )}
+                            </div>
+                        ) : null}
+
+                        {previewDocModal.content && (
+                            <div className="bg-gray-50 dark:bg-black/50 p-4 rounded-lg border border-gray-200 dark:border-gray-800 max-h-60 overflow-y-auto font-sans text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+                                {previewDocModal.content}
+                            </div>
+                        )}
+
+                        <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const doc = previewDocModal;
+                                    setPreviewDocModal(null);
+                                    handleOpenShareDoc(doc);
+                                }}
+                                className="px-3.5 py-1.5 text-xs bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-semibold rounded-lg hover:bg-blue-100 flex items-center gap-1.5"
+                            >
+                                <MessageSquare className="w-3.5 h-3.5" /> Compartir en Canal
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDownloadFile(previewDocModal)}
+                                className="px-3.5 py-1.5 text-xs bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 flex items-center gap-1.5"
+                            >
+                                <Download className="w-3.5 h-3.5" /> Descargar
+                            </button>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

@@ -313,7 +313,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                         })}
                         {!showArchived && (
                             <div className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-secondary-light dark:border-gray-600 rounded-2xl p-4 flex flex-col items-center justify-center gap-2 aspect-square">
-                                <button onClick={onOpenProjectCreator || (() => onAddProject('Nuevo Proyecto', null, null))} className="text-center text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary transition-colors">
+                                <button onClick={onOpenProjectCreator || (() => {})} className="text-center text-gray-500 dark:text-gray-400 hover:text-primary-dark dark:hover:text-primary transition-colors">
                                     <PlusIcon />
                                     <span className="text-sm font-semibold mt-1 block">Nuevo Proyecto</span>
                                 </button>
