@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle } from '../types';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2
@@ -582,7 +583,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const name = (fileName || fileType || '').toLowerCase();
         if (name.includes('pdf')) return <FileText className="w-5 h-5 text-red-500" />;
         if (name.includes('xls') || name.includes('sheet') || name.includes('csv')) return <FileSpreadsheet className="w-5 h-5 text-emerald-500" />;
-        if (name.includes('doc') || name.includes('word')) return <FileWord className="w-5 h-5 text-blue-500" />;
+        if (name.includes('doc') || name.includes('word')) return <FileText className="w-5 h-5 text-blue-500" />;
         if (name.includes('png') || name.includes('jpg') || name.includes('image')) return <FileImage className="w-5 h-5 text-purple-500" />;
         if (name.includes('zip') || name.includes('rar') || name.includes('tar')) return <FileArchive className="w-5 h-5 text-amber-500" />;
         if (name.includes('js') || name.includes('json') || name.includes('code')) return <FileCode className="w-5 h-5 text-indigo-500" />;
