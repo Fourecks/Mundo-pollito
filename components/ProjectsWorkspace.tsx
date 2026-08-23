@@ -554,7 +554,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             { id: 'sprints', label: 'Sprints', icon: Target },
                             { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                             { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
-                            { id: 'chat', label: 'Canales', icon: MessageSquare, badge: activeProject.chat_messages?.length, isHuddle: isHuddleActive || (activeProject.huddles || []).some(h => h.active) },
+                            { id: 'chat', label: 'Canales', icon: MessageSquare, badge: activeProject.chat_messages?.length, isHuddle: isGlobalHuddleActive || (activeProject.huddles || []).some(h => h.active) },
                             { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: activeProject.expenses?.length },
                             { id: 'time', label: 'Tiempo', icon: Clock, badge: activeProject.time_entries?.length },
                             { id: 'team', label: 'Equipo', icon: Users, badge: (activeProject.members?.length || 1) },
@@ -3283,7 +3283,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             {/* SHARE DOCUMENT MODAL */}
             <Modal 
                 isOpen={shareDocModal.isOpen} 
-                onClose={() => setShareDocModal({ isOpen: false, doc: null, targetChannelId: '', passwordInput: '', error: '' })} 
+                onClose={() => setShareDocModal({ isOpen: false, doc: null })} 
                 title="Compartir Documento en Canal"
             >
                 <div className="space-y-4">
@@ -3302,11 +3302,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <div>
                         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Seleccionar Canal Destino</label>
                         <select
-                            value={shareDocModal.targetChannelId}
-                            onChange={e => setShareDocModal(prev => ({ ...prev, targetChannelId: e.target.value, error: '', passwordInput: '' }))}
+                            value={shareTargetChannelId}
+                            onChange={e => {
+                                setShareTargetChannelId(e.target.value);
+                                setShareError(null);
+                                setShareChannelPassword('');
+                            }}
                             className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                         >
-                            {(activeProject?.chat_channels || []).map(ch => (
+                            {activeChannels.map(ch => (
                                 <option key={ch.id} value={ch.id}>
                                     {ch.is_private ? '🔒 ' : '# '}{ch.name}
                                 </option>
@@ -3314,9 +3318,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </select>
                     </div>
 
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Comentario Opcional</label>
+                        <input
+                            type="text"
+                            placeholder="Añade un mensaje para el equipo..."
+                            value={shareComment}
+                            onChange={e => setShareComment(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+
                     {/* Password input if target channel is private and locked */}
                     {(() => {
-                        const targetChan = activeProject?.chat_channels?.find(c => c.id === shareDocModal.targetChannelId);
+                        const targetChan = activeChannels.find(c => c.id === shareTargetChannelId);
                         const isLocked = targetChan?.is_private && targetChan.password && !unlockedChannels[targetChan.id];
                         if (!isLocked) return null;
                         return (
@@ -3327,22 +3342,25 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <input
                                     type="password"
                                     placeholder="Introduce la clave de acceso..."
-                                    value={shareDocModal.passwordInput}
-                                    onChange={e => setShareDocModal(prev => ({ ...prev, passwordInput: e.target.value, error: '' }))}
+                                    value={shareChannelPassword}
+                                    onChange={e => {
+                                        setShareChannelPassword(e.target.value);
+                                        setShareError(null);
+                                    }}
                                     className="w-full bg-gray-50 dark:bg-black border border-amber-300 dark:border-amber-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-amber-500"
                                 />
                             </div>
                         );
                     })()}
 
-                    {shareDocModal.error && (
-                        <p className="text-xs text-red-500 font-medium">{shareDocModal.error}</p>
+                    {shareError && (
+                        <p className="text-xs text-red-500 font-medium">{shareError}</p>
                     )}
 
                     <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
                         <button 
                             type="button" 
-                            onClick={() => setShareDocModal({ isOpen: false, doc: null, targetChannelId: '', passwordInput: '', error: '' })} 
+                            onClick={() => setShareDocModal({ isOpen: false, doc: null })} 
                             className="px-3.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                         >
                             Cancelar

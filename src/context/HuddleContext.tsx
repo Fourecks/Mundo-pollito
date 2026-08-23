@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ProjectHuddleParticipant } from '../types';
+import { ProjectHuddleParticipant } from '../../types';
 
 export interface ActiveHuddleSession {
   projectId: number;
