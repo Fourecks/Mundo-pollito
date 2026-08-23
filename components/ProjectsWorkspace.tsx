@@ -176,6 +176,33 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         return activeList.length > 0 ? activeList[0] : (projects.length > 0 ? projects[0] : null);
     }, [projects, activeProjectId]);
 
+    const knownUsers = useMemo(() => {
+        const usersMap = new Map<string, {name: string, email: string, avatar?: string}>();
+        projects.forEach(p => {
+            if (p.members) {
+                p.members.forEach(m => {
+                    if (m.email && m.email !== 'tu_correo@ejemplo.com') { // Exclude self
+                        usersMap.set(m.email, { name: m.name, email: m.email, avatar: m.avatar });
+                    }
+                });
+            }
+        });
+        
+        // Mock team if none exist to make search obvious
+        usersMap.set('carlos.dev@ejemplo.com', { name: 'Carlos (Desarrollo)', email: 'carlos.dev@ejemplo.com' });
+        usersMap.set('ana.design@ejemplo.com', { name: 'Ana (Diseño)', email: 'ana.design@ejemplo.com' });
+        usersMap.set('jorge.pm@ejemplo.com', { name: 'Jorge (Producto)', email: 'jorge.pm@ejemplo.com' });
+        usersMap.set('maria.qa@ejemplo.com', { name: 'Maria (QA)', email: 'maria.qa@ejemplo.com' });
+        
+        return Array.from(usersMap.values());
+    }, [projects]);
+
+    const filteredInviteUsers = useMemo(() => {
+        if (!inviteEmail.trim()) return [];
+        const term = inviteEmail.toLowerCase();
+        return knownUsers.filter(u => u.email.toLowerCase().includes(term) || u.name.toLowerCase().includes(term));
+    }, [inviteEmail, knownUsers]);
+
     const activeChannels = useMemo(() => {
         if (!activeProject) return [];
         if (!activeProject.channels || activeProject.channels.length === 0) {
@@ -210,6 +237,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             setSelectedChannelId('general');
         }
     }, [activeProject, activeChannels]);
+
+    // Scroll to bottom when opening chat or changing channel
+    React.useEffect(() => {
+        if (activeTab === 'chat') {
+            setTimeout(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+    }, [activeTab, selectedChannelId]);
 
     // Typing effect simulation (disabled to keep it real)
     React.useEffect(() => {
@@ -3145,36 +3181,74 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
             {/* TEAM INVITE MODAL */}
             <Modal isOpen={isInviteModalOpen} onClose={() => { setIsInviteModalOpen(false); setInviteEmail(''); setInviteSuccessMessage(null); }} title="Invitar al Equipo">
-                <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!activeProject || !inviteEmail.trim()) return;
-                    if (onSendInvitation) {
-                        await onSendInvitation(activeProject, inviteEmail.trim());
-                        setInviteSuccessMessage(`Invitación enviada exitosamente a ${inviteEmail.trim()}`);
-                        setInviteEmail('');
-                    }
-                }} className="space-y-4">
+                <div className="space-y-4">
                     {inviteSuccessMessage && (
                         <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 text-emerald-800 dark:text-emerald-300 text-xs rounded-lg">
                             {inviteSuccessMessage}
                         </div>
                     )}
                     <div>
-                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Correo Electrónico</label>
-                        <input 
-                            type="email" 
-                            required 
-                            value={inviteEmail} 
-                            onChange={e => setInviteEmail(e.target.value)} 
-                            placeholder="usuario@ejemplo.com" 
-                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" 
-                        />
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Buscar y Seleccionar Correo Electrónico</label>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!activeProject || !inviteEmail.trim()) return;
+                            if (onSendInvitation) {
+                                await onSendInvitation(activeProject, inviteEmail.trim());
+                                setInviteSuccessMessage(`Invitación enviada exitosamente a ${inviteEmail.trim()}`);
+                                setInviteEmail('');
+                            }
+                        }} className="flex gap-2">
+                            <input 
+                                type="email" 
+                                required 
+                                value={inviteEmail} 
+                                onChange={e => setInviteEmail(e.target.value)} 
+                                placeholder="Escribe el correo..." 
+                                className="flex-1 bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" 
+                            />
+                            <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg shrink-0">Invitar</button>
+                        </form>
                     </div>
-                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+
+                    {filteredInviteUsers.length > 0 && (
+                        <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden divide-y divide-gray-100 dark:divide-gray-800">
+                            {filteredInviteUsers.map(user => (
+                                <div key={user.email} className="flex items-center justify-between p-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-xs shrink-0">
+                                            {user.name.substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{user.name}</p>
+                                            <p className="text-xs text-gray-500">{user.email}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!activeProject || !onSendInvitation) return;
+                                            await onSendInvitation(activeProject, user.email);
+                                            setInviteSuccessMessage(`Invitación enviada exitosamente a ${user.email}`);
+                                            setInviteEmail('');
+                                        }}
+                                        className="px-3 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-blue-600 hover:text-white text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg transition-colors"
+                                    >
+                                        Invitar
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {inviteEmail.trim() && filteredInviteUsers.length === 0 && (
+                        <p className="text-xs text-gray-500 italic mt-2">
+                            Presiona "Invitar" para enviar la invitación al correo escrito.
+                        </p>
+                    )}
+
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800 mt-4">
                         <button type="button" onClick={() => setIsInviteModalOpen(false)} className="px-3 py-1.5 text-xs text-gray-500">Cerrar</button>
-                        <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg">Enviar Invitación</button>
                     </div>
-                </form>
+                </div>
             </Modal>
 
             {/* CREATE PROJECT MODAL */}
