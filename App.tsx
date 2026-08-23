@@ -2126,17 +2126,17 @@ const App: React.FC = () => {
         { data: profileData },
         { data: invitationsData }
       ] = await Promise.all([
-        supabase.from('todos').select('*, subtasks(*)').order('created_at'),
-        supabase.from('folders').select('*').order('created_at'),
-        supabase.from('notes').select('*').order('created_at'),
-        supabase.from('playlists').select('*').order('created_at'),
-        supabase.from('quick_notes').select('*').order('created_at'),
-        supabase.from('projects').select('*').order('name'),
-        supabase.from('habits').select('*').order('created_at'),
-        supabase.from('habit_records').select('*').order('created_at'),
-        supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).maybeSingle(),
+        supabase.from('todos').select('*, subtasks(*)').order('created_at').catch(() => ({ data: null })),
+        supabase.from('folders').select('*').order('created_at').catch(() => ({ data: null })),
+        supabase.from('notes').select('*').order('created_at').catch(() => ({ data: null })),
+        supabase.from('playlists').select('*').order('created_at').catch(() => ({ data: null })),
+        supabase.from('quick_notes').select('*').order('created_at').catch(() => ({ data: null })),
+        supabase.from('projects').select('*').order('name').catch(() => ({ data: null })),
+        supabase.from('habits').select('*').order('created_at').catch(() => ({ data: null })),
+        supabase.from('habit_records').select('*').order('created_at').catch(() => ({ data: null })),
+        supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).maybeSingle().catch(() => ({ data: null })),
         user?.email
-          ? supabase.from('project_invitations').select('*').or(`receiver_email.eq.${user.email},sender_email.eq.${user.email},invitee_email.eq.${user.email},inviter_email.eq.${user.email}`).order('created_at', { ascending: false })
+          ? supabase.from('project_invitations').select('*').or(`receiver_email.eq.${user.email},sender_email.eq.${user.email},invitee_email.eq.${user.email},inviter_email.eq.${user.email}`).order('created_at', { ascending: false }).catch(() => ({ data: null }))
           : Promise.resolve({ data: null, error: null })
       ]);
       
