@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
+import { useHuddle } from '../src/context/HuddleContext';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List
 } from 'lucide-react';
@@ -143,14 +144,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // Pinned Filter State
     const [showPinnedOnly, setShowPinnedOnly] = useState(false);
 
-    // Huddle States
-    const [isHuddleActive, setIsHuddleActive] = useState(false);
-    const [isMicOn, setIsMicOn] = useState(true);
-    const [isVideoOn, setIsVideoOn] = useState(false);
-    const [isScreenSharing, setIsScreenSharing] = useState(false);
-    const [huddleParticipants, setHuddleParticipants] = useState<any[]>([]);
+    // Global Huddle Integration from Context
+    const {
+        activeHuddle,
+        isHuddleActive: isGlobalHuddleActive,
+        startHuddle,
+        leaveHuddle,
+        isMicOn,
+        isVideoOn,
+        isScreenSharing,
+        toggleMic,
+        toggleVideo,
+        toggleScreenShare,
+        localStream,
+        screenStream,
+        localVolume,
+        speakingParticipants,
+        huddleParticipants,
+        isHuddleFullScreen,
+        setIsHuddleFullScreen,
+    } = useHuddle();
+
     const [showHuddleParticipants, setShowHuddleParticipants] = useState(false);
-    const [isHuddleFullScreen, setIsHuddleFullScreen] = useState(false);
 
     // Thread (Hilo) States
     const [activeThreadMessage, setActiveThreadMessage] = useState<ProjectChatMessage | null>(null);
@@ -175,17 +190,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     // Team Search State
     const [memberSearchText, setMemberSearchText] = useState<string>('');
-
-    // Live WebRTC and Audio Capture/Analyze States
-    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-    const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-    const localStreamRef = useRef<MediaStream | null>(null);
-    const screenStreamRef = useRef<MediaStream | null>(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const analyserRef = useRef<AnalyserNode | null>(null);
-    const [localVolume, setLocalVolume] = useState<number>(0);
-    const volumeIntervalRef = useRef<any>(null);
-    const [speakingParticipants, setSpeakingParticipants] = useState<Record<string, boolean>>({});
 
     // Simulated Typing Statuses
     const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
@@ -294,218 +298,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     React.useEffect(() => {
         // Typing simulation disabled as requested
     }, []);
-
-    // Simulated active speaking for other participants
-    React.useEffect(() => {
-        if (!isHuddleActive) {
-            setSpeakingParticipants({});
-            return;
-        }
-        const sInterval = setInterval(() => {
-            const speaking: Record<string, boolean> = {};
-            huddleParticipants.forEach(p => {
-                if (p.name === 'Tú') {
-                    speaking['Tú'] = localVolume > 10;
-                } else if (p.has_mic && Math.random() > 0.65) {
-                    speaking[p.name] = true;
-                }
-            });
-            setSpeakingParticipants(speaking);
-        }, 1200);
-
-        return () => clearInterval(sInterval);
-    }, [isHuddleActive, huddleParticipants, localVolume]);
-
-    // Setup visual audio analysis using Web Audio API
-    const setUpAudioAnalysis = (stream: MediaStream) => {
-        try {
-            if (volumeIntervalRef.current) {
-                clearInterval(volumeIntervalRef.current);
-                volumeIntervalRef.current = null;
-            }
-            if (audioContextRef.current) {
-                audioContextRef.current.close().catch(() => {});
-            }
-
-            const audioTracks = stream.getAudioTracks();
-            if (audioTracks.length === 0) return;
-
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            audioContextRef.current = audioContext;
-
-            const analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            analyserRef.current = analyser;
-
-            const source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyser);
-
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            
-            volumeIntervalRef.current = setInterval(() => {
-                if (!analyserRef.current) return;
-                analyserRef.current.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    sum += dataArray[i];
-                }
-                const average = sum / dataArray.length;
-                setLocalVolume(Math.min(100, Math.round((average / 128) * 100)));
-            }, 100);
-
-        } catch (e) {
-            console.warn("Audio Context setup not supported or failed:", e);
-        }
-    };
-
-    const stopLocalStream = () => {
-        if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => track.stop());
-            localStreamRef.current = null;
-        }
-        setLocalStream(null);
-        
-        if (volumeIntervalRef.current) {
-            clearInterval(volumeIntervalRef.current);
-            volumeIntervalRef.current = null;
-        }
-        if (audioContextRef.current) {
-            audioContextRef.current.close().catch(() => {});
-            audioContextRef.current = null;
-        }
-        analyserRef.current = null;
-        setLocalVolume(0);
-        setIsMicOn(false);
-        setIsVideoOn(false);
-    };
-
-    const stopScreenStream = () => {
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(track => track.stop());
-            screenStreamRef.current = null;
-        }
-        setScreenStream(null);
-        setIsScreenSharing(false);
-    };
-
-    // Simulated background huddle joiners
-    React.useEffect(() => {
-        if (!isHuddleActive) {
-            setHuddleParticipants([]);
-            return;
-        }
-
-        // Add user immediately (only the real user, no mock joiners)
-        setHuddleParticipants([{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }]);
-    }, [isHuddleActive]);
-
-    // Handle initial streams & camera toggle
-    React.useEffect(() => {
-        if (!isHuddleActive) {
-            stopLocalStream();
-            stopScreenStream();
-            setIsHuddleFullScreen(false);
-            return;
-        }
-
-        const initMedia = async () => {
-            try {
-                if (localStreamRef.current) {
-                    localStreamRef.current.getTracks().forEach(track => track.stop());
-                }
-
-                const constraints = {
-                    audio: true, 
-                    video: isVideoOn ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 60 } } : false
-                };
-
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                localStreamRef.current = stream;
-                setLocalStream(stream);
-
-                stream.getAudioTracks().forEach(track => {
-                    track.enabled = isMicOn;
-                });
-
-                if (isMicOn) {
-                    setUpAudioAnalysis(stream);
-                } else {
-                    setLocalVolume(0);
-                }
-
-            } catch (err) {
-                console.error("Error securing user media permissions:", err);
-                alert("No se pudo acceder al micrófono o la cámara. Verifica los permisos de tu navegador.");
-                setIsMicOn(false);
-                setIsVideoOn(false);
-            }
-        };
-
-        initMedia();
-
-        return () => {
-            if (localStreamRef.current) {
-                localStreamRef.current.getTracks().forEach(track => track.stop());
-                localStreamRef.current = null;
-            }
-            if (screenStreamRef.current) {
-                screenStreamRef.current.getTracks().forEach(track => track.stop());
-                screenStreamRef.current = null;
-            }
-        };
-    }, [isHuddleActive, isVideoOn]);
-
-    // Handle Mic toggle separately to avoid starting/stopping video tracks
-    React.useEffect(() => {
-        if (localStreamRef.current) {
-            localStreamRef.current.getAudioTracks().forEach(track => {
-                track.enabled = isMicOn;
-            });
-            if (isMicOn) {
-                setUpAudioAnalysis(localStreamRef.current);
-            } else {
-                setLocalVolume(0);
-                if (volumeIntervalRef.current) {
-                    clearInterval(volumeIntervalRef.current);
-                    volumeIntervalRef.current = null;
-                }
-            }
-        }
-    }, [isMicOn]);
-
-    // Handle Screen Sharing toggle
-    React.useEffect(() => {
-        if (!isHuddleActive) return;
-
-        const toggleScreen = async () => {
-            if (isScreenSharing) {
-                try {
-                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                    screenStreamRef.current = stream;
-                    setScreenStream(stream);
-
-                    stream.getVideoTracks()[0].onended = () => {
-                        stopScreenStream();
-                    };
-
-                } catch (err) {
-                    console.error("Error requesting screen share:", err);
-                    setIsScreenSharing(false);
-                }
-            } else {
-                stopScreenStream();
-            }
-        };
-
-        toggleScreen();
-    }, [isScreenSharing, isHuddleActive]);
-
-    // Update user's media states in active huddle participants list
-    React.useEffect(() => {
-        if (isHuddleActive) {
-            setHuddleParticipants(prev => prev.map(p => p.name === 'Tú' ? { ...p, has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing } : p));
-        }
-    }, [isMicOn, isVideoOn, isScreenSharing, isHuddleActive]);
 
     React.useEffect(() => {
         if (!activeProjectId && activeProject) {
@@ -1734,13 +1526,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             onUpdateProject(activeProject.id, { chat_messages: updatedMessages });
         };
 
+        const isCurrentChannelHuddleActive = isGlobalHuddleActive && activeHuddle?.projectId === activeProject.id && activeHuddle?.channelId === currentChannel.id;
+
         const handleToggleHuddle = () => {
-            if (isHuddleActive) {
-                setIsHuddleActive(false);
+            if (isCurrentChannelHuddleActive) {
+                leaveHuddle();
                 const updatedHuddles = activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: false, participants: [] } : h);
                 onUpdateProject(activeProject.id, { huddles: updatedHuddles });
             } else {
-                setIsHuddleActive(true);
+                startHuddle(activeProject.id, activeProject.name, currentChannel.id, currentChannel.name, activeProject.emoji);
                 const updatedHuddles = activeHuddles.some(h => h.channel_id === currentChannel.id)
                     ? activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: true, started_at: new Date().toISOString(), participants: [{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] } : h)
                     : [...activeHuddles, { id: crypto.randomUUID(), project_id: activeProject.id, channel_id: currentChannel.id, active: true, started_at: new Date().toISOString(), participants: [{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] }];
@@ -1769,7 +1563,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
 
                         {/* Active Global Huddle Banner */}
-                        {(isHuddleActive || activeHuddles.some(h => h.active)) && (
+                        {(isGlobalHuddleActive || activeHuddles.some(h => h.active)) && (
                             <div className="mx-3 my-2 p-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
                                 <div className="flex items-center gap-1.5 mb-1.5">
                                     <span className="relative flex h-2 w-2">
@@ -1780,13 +1574,17 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 </div>
                                 <button 
                                     onClick={() => {
-                                        const runningHuddle = activeHuddles.find(h => h.active) || { channel_id: 'general' };
-                                        setSelectedChannelId(runningHuddle.channel_id);
-                                        setIsHuddleActive(true);
+                                        if (isGlobalHuddleActive && activeHuddle) {
+                                            setSelectedChannelId(activeHuddle.channelId);
+                                        } else {
+                                            const runningHuddle = activeHuddles.find(h => h.active) || { channel_id: 'general' };
+                                            setSelectedChannelId(runningHuddle.channel_id);
+                                            startHuddle(activeProject.id, activeProject.name, runningHuddle.channel_id, runningHuddle.channel_id, activeProject.emoji);
+                                        }
                                     }}
                                     className="w-full text-center py-1 text-[11px] bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 transition-colors"
                                 >
-                                    Unirse al Huddle 🎙️
+                                    {isCurrentChannelHuddleActive ? 'Huddle Activo 🎙️' : 'Unirse al Huddle 🎙️'}
                                 </button>
                             </div>
                         )}
@@ -1795,7 +1593,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <div className="p-2 space-y-0.5">
                             {activeChannels.map(chan => {
                                 const isSelected = chan.id === currentChannel.id;
-                                const isChanHuddleActive = (activeHuddles.find(h => h.channel_id === chan.id)?.active) || (isHuddleActive && chan.id === currentChannel.id);
+                                const isChanHuddleActive = (activeHuddles.find(h => h.channel_id === chan.id)?.active) || (isGlobalHuddleActive && activeHuddle?.projectId === activeProject.id && activeHuddle?.channelId === chan.id);
                                 
                                 // Simulation: unread notifications for non-selected channels (e.g. general usually has some history)
                                 const hasUnread = !isSelected && chan.id === 'ideas';
@@ -1880,116 +1678,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                 {/* 2. CHAT WORKSPACE AREA & THREAD SIDEBAR CONTAINER */}
                 <div className="flex-1 flex h-full overflow-hidden relative">
-                    
-                    
-                    {/* FULLSCREEN HUDDLE VIEW */}
-                    {isHuddleActive && isHuddleFullScreen && typeof document !== 'undefined' && createPortal(
-                        <div className="fixed inset-0 bg-slate-950 text-white z-[100000] flex flex-col p-6 select-none animate-in fade-in zoom-in-95 duration-200">
-                            {/* Header */}
-                            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6 shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-                                    <div>
-                                        <h2 className="text-sm font-bold tracking-wide text-white">Huddle Activo: #{currentChannel.name} (Pantalla Completa)</h2>
-                                        <p className="text-[10px] text-gray-400 mt-0.5">{huddleParticipants.length} participantes • Conexión Activa</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button 
-                                        onClick={() => setIsHuddleFullScreen(false)}
-                                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-white/10 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors text-white"
-                                    >
-                                        <Minimize2 className="w-4 h-4" /> Salir
-                                    </button>
-                                    <button 
-                                        onClick={handleToggleHuddle}
-                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-750 text-xs font-bold rounded-lg text-white transition-colors"
-                                    >
-                                        Colgar 📞
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Streams Grid */}
-                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 overflow-y-auto pb-4">
-                                {huddleParticipants.map((p, idx) => {
-                                    const isSpeaking = p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name];
-                                    return (
-                                        <div 
-                                            key={p.email || idx} 
-                                            className={`bg-slate-900/80 rounded-2xl p-4 border relative overflow-hidden flex flex-col justify-between min-h-[220px] transition-all duration-300 ${
-                                                isSpeaking 
-                                                    ? 'border-emerald-500 shadow-[0_0_24px_rgba(16,185,129,0.3)] ring-2 ring-emerald-500/20' 
-                                                    : 'border-white/5 shadow-md'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between z-10 bg-gradient-to-b from-black/60 to-transparent p-2 absolute inset-x-0 top-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-gray-200">{p.name}</span>
-                                                    {p.name === 'Tú' && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Tú</span>}
-                                                </div>
-                                                <div className="flex items-center gap-1.5">
-                                                    {p.has_mic ? <Mic className="w-3.5 h-3.5 text-emerald-400" /> : <MicOff className="w-3.5 h-3.5 text-red-500" />}
-                                                    {p.has_screen && <span className="text-[9px] bg-blue-600/30 text-blue-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Compartiendo</span>}
-                                                </div>
-                                            </div>
-
-                                            {/* Video Stream / Avatar container */}
-                                            <div className="absolute inset-0 bg-slate-950 overflow-hidden flex items-center justify-center">
-                                                {p.has_screen && p.name === 'Tú' && screenStream ? (
-                                                    <VideoStream stream={screenStream} />
-                                                ) : p.has_video ? (
-                                                    p.name === 'Tú' && localStream ? (
-                                                        <VideoStream stream={localStream} />
-                                                    ) : (
-                                                        <div className="w-full h-full flex flex-col items-center justify-center relative bg-slate-900">
-                                                            <span className="text-[32px] animate-bounce">🐣</span>
-                                                            <span className="text-[10px] tracking-widest text-emerald-400 uppercase font-bold mt-2">Cámara de {p.name} activa</span>
-                                                        </div>
-                                                    )
-                                                ) : (
-                                                    <div className="w-20 h-20 rounded-full bg-slate-800 border border-slate-700 text-gray-300 font-bold text-2xl flex items-center justify-center transition-all">
-                                                        {p.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Footer inside video block */}
-                                            <div className="mt-auto z-10 bg-black/60 p-2 absolute inset-x-0 bottom-0 flex items-center justify-between text-[10px] text-gray-300">
-                                                <span>Estado: {p.has_mic ? 'Hablando' : 'Mutado'}</span>
-                                                <span className="truncate max-w-[120px]">{p.email}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Controllers */}
-                            <div className="border-t border-white/10 pt-4 mt-auto shrink-0 flex items-center justify-center gap-4 bg-slate-900/60 p-4 rounded-2xl border border-white/5 max-w-xl mx-auto w-full">
-                                <button 
-                                    onClick={() => setIsMicOn(prev => !prev)}
-                                    className={`p-3.5 rounded-xl transition-all ${isMicOn ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                                    title={isMicOn ? 'Silenciar Micrófono' : 'Activar Micrófono'}
-                                >
-                                    {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                                </button>
-                                <button 
-                                    onClick={() => setIsVideoOn(prev => !prev)}
-                                    className={`p-3.5 rounded-xl transition-all ${isVideoOn ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
-                                    title={isVideoOn ? 'Desactivar Cámara' : 'Activar Cámara'}
-                                >
-                                    {isVideoOn ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
-                                </button>
-                                <button 
-                                    onClick={() => setIsScreenSharing(prev => !prev)}
-                                    className={`p-3.5 rounded-xl transition-all ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
-                                    title={isScreenSharing ? 'Detener Compartir Pantalla' : 'Compartir Pantalla'}
-                                >
-                                    <Monitor className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
 
                     {/* MAIN CHAT WORKSPACE AREA */}
                     <div className="flex-1 flex flex-col h-full bg-white dark:bg-[#050505] overflow-hidden relative">
@@ -2041,20 +1729,50 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <button 
                                         onClick={handleToggleHuddle}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
-                                            isHuddleActive 
+                                            isCurrentChannelHuddleActive 
                                                 ? 'bg-red-600 hover:bg-red-700 text-white' 
-                                                : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active)
+                                                : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active || (isGlobalHuddleActive && activeHuddle?.projectId === activeProject.id && activeHuddle?.channelId === currentChannel.id))
                                                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
                                                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                                         }`}
                                     >
                                         <Video className="w-3.5 h-3.5" />
-                                        {isHuddleActive ? 'Salir del Huddle' : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active) ? 'Unirse' : 'Iniciar Huddle'}
+                                        {isCurrentChannelHuddleActive ? 'Salir del Huddle' : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active) ? 'Unirse' : 'Iniciar Huddle'}
                                     </button>
                                 )}
 
                             </div>
                         </div>
+
+                        {/* In-channel live active call banner */}
+                        {isCurrentChannelHuddleActive && (
+                            <div className="mx-6 my-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-900/30 via-slate-900/50 to-emerald-950/30 border border-emerald-500/40 flex items-center justify-between text-xs text-white shadow-sm shrink-0">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                    </span>
+                                    <div>
+                                        <p className="font-bold text-emerald-300">Llamada Huddle en curso en este canal</p>
+                                        <p className="text-[11px] text-gray-300">Puedes moverte a cualquier sección y la llamada permanecerá en el recuadro flotante interactivo.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setIsHuddleFullScreen(true)}
+                                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold border border-white/10 flex items-center gap-1 transition-colors"
+                                    >
+                                        <Maximize2 className="w-3.5 h-3.5" /> Pantalla Completa
+                                    </button>
+                                    <button
+                                        onClick={handleToggleHuddle}
+                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors"
+                                    >
+                                        Colgar 📞
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* CONDITIONAL LOCK VIEW OR ACTIVE CONVERSATION VIEW */}
                         {currentChannel.is_private && currentChannel.password && !unlockedChannels[currentChannel.id] ? (
@@ -2103,160 +1821,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         ) : (
                             <>
-                                
-                                {/* 3. HUDDLE ACTIVE AUDIO/VIDEO BAR (PiP mode) */}
-                                {isHuddleActive && !isHuddleFullScreen && typeof document !== 'undefined' && createPortal(
-                                    <div className="fixed bottom-24 right-4 z-[90000] w-[400px] max-w-[90vw] rounded-2xl shadow-2xl border border-slate-700 bg-gradient-to-r from-slate-900 via-[#1e293b] to-slate-900 text-white p-4 animate-in fade-in slide-in-from-bottom-8">
-                                        <div className="flex flex-col gap-4">
-                                            
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                                                <div>
-                                                    <p className="text-xs font-bold text-white flex items-center gap-2">
-                                                        Huddle Activo en #{currentChannel.name}
-                                                    </p>
-                                                    <p className="text-[10px] text-gray-400 mt-0.5">
-                                                        {huddleParticipants.length} participantes • Conexión Real
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {/* Live Participants Avatars */}
-                                            <div className="flex items-center gap-3 bg-black/30 px-3 py-1.5 rounded-lg border border-white/5">
-                                                <span className="text-[10px] uppercase font-bold text-gray-400">En Llamada:</span>
-                                                <div className="flex -space-x-2 overflow-hidden">
-                                                    {huddleParticipants.map((p, idx) => (
-                                                        <div 
-                                                            key={p.email || idx} 
-                                                            className={`w-6 h-6 rounded-full bg-blue-600 border border-slate-900 text-[10px] font-bold flex items-center justify-center transition-all ${
-                                                                (p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name]) 
-                                                                    ? 'ring-2 ring-emerald-400 scale-105' 
-                                                                    : ''
-                                                            }`}
-                                                            title={`${p.name} (${p.email}) ${p.has_mic ? '🎙️' : '🔇'} ${p.has_video ? '📹' : ''}`}
-                                                        >
-                                                            {p.name.charAt(0).toUpperCase()}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <button 
-                                                    onClick={() => setShowHuddleParticipants(prev => !prev)}
-                                                    className="text-[10px] underline text-blue-400 hover:text-blue-300 font-bold"
-                                                >
-                                                    {showHuddleParticipants ? 'Ocultar' : 'Ver Detalles'}
-                                                </button>
-                                            </div>
-
-                                            {/* Integrated Call Controllers */}
-                                            <div className="flex items-center gap-2">
-                                                {/* Full-Screen Toggle */}
-                                                <button 
-                                                    onClick={() => setIsHuddleFullScreen(true)}
-                                                    className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-all"
-                                                    title="Pantalla Completa"
-                                                >
-                                                    <Maximize2 className="w-4 h-4" />
-                                                </button>
-
-                                                {/* Mic Mute/Unmute */}
-                                                <button 
-                                                    onClick={() => setIsMicOn(prev => !prev)}
-                                                    className={`p-2 rounded-lg transition-all ${isMicOn ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-red-500/90 hover:bg-red-600 text-white'}`}
-                                                    title={isMicOn ? 'Silenciar Micrófono' : 'Activar Micrófono'}
-                                                >
-                                                    {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                                                </button>
-
-                                                {/* Video Camera Toggle */}
-                                                <button 
-                                                    onClick={() => setIsVideoOn(prev => !prev)}
-                                                    className={`p-2 rounded-lg transition-all ${isVideoOn ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
-                                                    title={isVideoOn ? 'Desactivar Cámara' : 'Activar Cámara'}
-                                                >
-                                                    {isVideoOn ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
-                                                </button>
-
-                                                {/* Screen Sharing Toggle */}
-                                                <button 
-                                                    onClick={() => setIsScreenSharing(prev => !prev)}
-                                                    className={`p-2 rounded-lg transition-all ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
-                                                    title={isScreenSharing ? 'Detener Compartir Pantalla' : 'Compartir Pantalla'}
-                                                >
-                                                    <Monitor className="w-4 h-4" />
-                                                </button>
-
-                                                <button 
-                                                    onClick={handleToggleHuddle}
-                                                    className="px-2.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all"
-                                                    title="Finalizar llamada"
-                                                >
-                                                    Colgar 📞
-                                                </button>
-                                            </div>
-
-                                        </div>
-
-                                        {/* Expanded Participant Control & Camera Streams List */}
-                                        {(showHuddleParticipants || isVideoOn) && (
-                                            <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                                {huddleParticipants.map((p, idx) => {
-                                                    const isSpeaking = p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name];
-                                                    return (
-                                                        <div 
-                                                            key={p.email || idx} 
-                                                            className={`bg-black/40 rounded-lg p-2.5 border relative overflow-hidden flex flex-col justify-between min-h-[110px] transition-all duration-200 ${
-                                                                isSpeaking 
-                                                                    ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.35)]' 
-                                                                    : 'border-white/5'
-                                                            }`}
-                                                        >
-                                                            <div className="flex items-center justify-between z-10">
-                                                                <span className="text-[11px] font-bold text-gray-200 truncate">{p.name}</span>
-                                                                <span className="text-[10px] text-gray-500">{p.name === 'Tú' ? '(Tú)' : ''}</span>
-                                                            </div>
-
-                                                            {/* Video Stream / Static Avatar view */}
-                                                            {p.has_screen && p.name === 'Tú' && screenStream ? (
-                                                                <div className="absolute inset-0 bg-slate-900 mt-6 overflow-hidden">
-                                                                    <VideoStream stream={screenStream} />
-                                                                </div>
-                                                            ) : p.has_video ? (
-                                                                <div className="absolute inset-0 bg-slate-900 mt-6 overflow-hidden">
-                                                                    {p.name === 'Tú' && localStream ? (
-                                                                        <VideoStream stream={localStream} />
-                                                                    ) : (
-                                                                        <div className="w-full h-full flex flex-col items-center justify-center relative">
-                                                                            <span className="text-[20px] animate-pulse">🐣</span>
-                                                                            <span className="text-[8px] tracking-widest text-emerald-400 uppercase font-bold">Cámara Activa</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex-1 flex items-center justify-center my-1.5 z-10">
-                                                                    <div className={`w-8 h-8 rounded-full bg-slate-800 border text-gray-300 font-bold text-xs flex items-center justify-center transition-all ${
-                                                                        isSpeaking ? 'border-emerald-400 bg-slate-800 ring-2 ring-emerald-500/20' : 'border-slate-700'
-                                                                    }`}>
-                                                                        {p.name.charAt(0).toUpperCase()}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            <div className="flex items-center justify-between z-10 bg-black/50 p-1 rounded mt-auto text-[9px] text-gray-400">
-                                                                <span className="flex items-center gap-1">
-                                                                    {p.has_mic ? <Mic className="w-2.5 h-2.5 text-emerald-400" /> : <MicOff className="w-2.5 h-2.5 text-red-400" />}
-                                                                    {p.has_mic ? 'Audio' : 'Mute'}
-                                                                </span>
-                                                                {p.has_screen && <span className="text-blue-400">Compartiendo</span>}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-
-                                    </div>
-                                )}
-
                                 {/* Messages Search Bar Inside Main Chat Workspace */}
                                 <div className="px-6 py-2 bg-gray-50 dark:bg-black/30 border-b border-gray-100 dark:border-gray-800/80 flex items-center justify-between gap-4 shrink-0">
                                     <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
