@@ -994,8 +994,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       invitations={projectInvitations}
                       currentUserEmail={currentUser?.email}
                       onSendInvitation={onSendInvitation}
-                      onAcceptInvitation={handleAcceptInvitation}
-                      onDeclineInvitation={handleDeclineInvitation}
+                      onAcceptInvitation={onAcceptInvitation}
+                      onDeclineInvitation={onDeclineInvitation}
                       onSelectProject={(id) => setViewingProjectId(id)}
                       onAddProject={async (name, emoji, color, extraData) => {
                           const p = await handleAddProject(name, emoji, color, extraData);
@@ -1377,8 +1377,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             invitations={projectInvitations}
                             currentUserEmail={currentUser?.email}
                             onSendInvitation={onSendInvitation}
-                            onAcceptInvitation={handleAcceptInvitation}
-                            onDeclineInvitation={handleDeclineInvitation}
+                            onAcceptInvitation={onAcceptInvitation}
+                            onDeclineInvitation={onDeclineInvitation}
                             onSelectProject={(id) => setViewingProjectId(id)}
                             onAddProject={async (name, emoji, color, extraData) => {
                                 const p = await handleAddProject(name, emoji, color, extraData);
