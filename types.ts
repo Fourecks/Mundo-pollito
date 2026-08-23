@@ -170,92 +170,9 @@ export interface ProjectInboxItem {
   created_at: string;
 }
 
-export interface ProjectChannel {
-  id: string;
-  project_id: number;
-  name: string;
-  description?: string;
-  is_private?: boolean;
-  emoji?: string;
-  created_at: string;
-  topic?: string;
-  is_default?: boolean;
-}
-
-export interface ProjectPollOption {
-  id: string;
-  text: string;
-  voters: string[]; // member emails
-}
-
-export interface ProjectPoll {
-  id: string;
-  project_id: number;
-  channel_id?: string;
-  question: string;
-  options: ProjectPollOption[];
-  author_email: string;
-  author_name: string;
-  created_at: string;
-  is_closed?: boolean;
-  allow_multiple?: boolean;
-}
-
-export interface ProjectHuddleParticipant {
-  email: string;
-  name: string;
-  avatar?: string;
-  is_muted: boolean;
-  is_video_on: boolean;
-  is_screen_sharing: boolean;
-  joined_at: string;
-}
-
-export interface ProjectHuddle {
-  id: string;
-  project_id: number;
-  channel_id: string;
-  title: string;
-  is_active: boolean;
-  participants: ProjectHuddleParticipant[];
-  started_at: string;
-  notes?: string;
-}
-
-export interface ProjectMemberStatus {
-  email: string;
-  name?: string;
-  status_emoji?: string;
-  status_text?: string;
-  presence?: 'online' | 'away' | 'dnd' | 'offline';
-  updated_at?: string;
-}
-
-export interface ProjectCanvas {
-  id: string;
-  project_id: number;
-  channel_id?: string;
-  title: string;
-  content: string;
-  pinned_links?: { label: string; url: string }[];
-  action_items?: { id: string; text: string; done: boolean; assignee?: string }[];
-  updated_at: string;
-  updated_by: string;
-}
-
-export interface ProjectThreadReply {
-  id: string;
-  sender_name: string;
-  sender_email: string;
-  text: string;
-  created_at: string;
-  reactions?: Record<string, string[]>;
-}
-
 export interface ProjectChatMessage {
   id: string;
   project_id: number;
-  channel_id?: string;
   sender_id?: string;
   sender_name: string;
   sender_email: string;
@@ -277,12 +194,6 @@ export interface ProjectChatMessage {
     sender_name: string;
     text: string;
   };
-  thread_count?: number;
-  thread_replies?: ProjectThreadReply[];
-  is_audio_clip?: boolean;
-  audio_duration?: string;
-  poll_id?: string;
-  poll?: ProjectPoll;
 }
 
 export interface ProjectRisk {
@@ -364,11 +275,6 @@ export interface Project {
   risks?: ProjectRisk[];
   expenses?: ProjectExpense[];
   time_logs?: ProjectTimeLog[];
-  channels?: ProjectChannel[];
-  polls?: ProjectPoll[];
-  huddles?: ProjectHuddle[];
-  canvases?: ProjectCanvas[];
-  member_statuses?: Record<string, ProjectMemberStatus>;
 }
 
 export interface Note {

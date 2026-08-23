@@ -992,10 +992,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       allTodos={flatAllTodos}
                       activeProjectId={viewingProjectId}
                       invitations={projectInvitations}
-                      currentUserEmail={currentUser?.email}
+                      currentUserEmail={user?.email}
                       onSendInvitation={onSendInvitation}
-                      onAcceptInvitation={onAcceptInvitation}
-                      onDeclineInvitation={onDeclineInvitation}
+                      onAcceptInvitation={handleAcceptInvitation}
+                      onDeclineInvitation={handleDeclineInvitation}
                       onSelectProject={(id) => setViewingProjectId(id)}
                       onAddProject={async (name, emoji, color, extraData) => {
                           const p = await handleAddProject(name, emoji, color, extraData);
@@ -1375,10 +1375,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             allTodos={flatAllTodos}
                             activeProjectId={viewingProjectId}
                             invitations={projectInvitations}
-                            currentUserEmail={currentUser?.email}
+                            currentUserEmail={user?.email}
                             onSendInvitation={onSendInvitation}
-                            onAcceptInvitation={onAcceptInvitation}
-                            onDeclineInvitation={onDeclineInvitation}
+                            onAcceptInvitation={handleAcceptInvitation}
+                            onDeclineInvitation={handleDeclineInvitation}
                             onSelectProject={(id) => setViewingProjectId(id)}
                             onAddProject={async (name, emoji, color, extraData) => {
                                 const p = await handleAddProject(name, emoji, color, extraData);
@@ -2126,17 +2126,17 @@ const App: React.FC = () => {
         { data: profileData },
         { data: invitationsData }
       ] = await Promise.all([
-        supabase.from('todos').select('*, subtasks(*)').order('created_at').catch(() => ({ data: null })),
-        supabase.from('folders').select('*').order('created_at').catch(() => ({ data: null })),
-        supabase.from('notes').select('*').order('created_at').catch(() => ({ data: null })),
-        supabase.from('playlists').select('*').order('created_at').catch(() => ({ data: null })),
-        supabase.from('quick_notes').select('*').order('created_at').catch(() => ({ data: null })),
-        supabase.from('projects').select('*').order('name').catch(() => ({ data: null })),
-        supabase.from('habits').select('*').order('created_at').catch(() => ({ data: null })),
-        supabase.from('habit_records').select('*').order('created_at').catch(() => ({ data: null })),
-        supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).maybeSingle().catch(() => ({ data: null })),
+        supabase.from('todos').select('*, subtasks(*)').order('created_at'),
+        supabase.from('folders').select('*').order('created_at'),
+        supabase.from('notes').select('*').order('created_at'),
+        supabase.from('playlists').select('*').order('created_at'),
+        supabase.from('quick_notes').select('*').order('created_at'),
+        supabase.from('projects').select('*').order('name'),
+        supabase.from('habits').select('*').order('created_at'),
+        supabase.from('habit_records').select('*').order('created_at'),
+        supabase.from('profiles').select('pomodoro_settings, gcal_settings, ui_settings, timezone_offset').eq('id', user.id).maybeSingle(),
         user?.email
-          ? supabase.from('project_invitations').select('*').or(`receiver_email.eq.${user.email},sender_email.eq.${user.email},invitee_email.eq.${user.email},inviter_email.eq.${user.email}`).order('created_at', { ascending: false }).catch(() => ({ data: null }))
+          ? supabase.from('project_invitations').select('*').or(`receiver_email.eq.${user.email},sender_email.eq.${user.email},invitee_email.eq.${user.email},inviter_email.eq.${user.email}`).order('created_at', { ascending: false })
           : Promise.resolve({ data: null, error: null })
       ]);
       
