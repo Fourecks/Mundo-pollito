@@ -993,10 +993,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       allTodos={flatAllTodos}
                       activeProjectId={viewingProjectId}
                       invitations={projectInvitations}
+                      currentUserEmail={user?.email}
                       onSendInvitation={onSendInvitation}
+                      onAcceptInvitation={handleAcceptInvitation}
+                      onDeclineInvitation={handleDeclineInvitation}
                       onSelectProject={(id) => setViewingProjectId(id)}
-                      onAddProject={async (name, emoji, color) => {
-                          const p = await handleAddProject(name, emoji, color);
+                      onAddProject={async (name, emoji, color, extraData) => {
+                          const p = await handleAddProject(name, emoji, color, extraData);
                           return p || null;
                       }}
                       onUpdateProject={async (id, updates) => {
@@ -1373,10 +1376,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             allTodos={flatAllTodos}
                             activeProjectId={viewingProjectId}
                             invitations={projectInvitations}
+                            currentUserEmail={user?.email}
                             onSendInvitation={onSendInvitation}
+                            onAcceptInvitation={handleAcceptInvitation}
+                            onDeclineInvitation={handleDeclineInvitation}
                             onSelectProject={(id) => setViewingProjectId(id)}
-                            onAddProject={async (name, emoji, color) => {
-                                const p = await handleAddProject(name, emoji, color);
+                            onAddProject={async (name, emoji, color, extraData) => {
+                                const p = await handleAddProject(name, emoji, color, extraData);
                                 return p || null;
                             }}
                             onUpdateProject={async (id, updates) => {
