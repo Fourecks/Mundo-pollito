@@ -25,6 +25,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
   onDeletePlaylist,
   onClose
 }) => {
+  const { startInteraction } = useContext(ModalWindowContext);
   const [view, setView] = useState<'all' | 'favorites'>('all');
   const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -169,7 +170,11 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
       </aside>
 
       <main className="flex flex-col flex-grow min-w-0 relative h-full">
-        <header className="relative h-40 sm:h-48 w-full flex-shrink-0 overflow-hidden drag-handle cursor-move bg-gradient-to-r from-emerald-950 via-green-900 to-gray-900">
+        <header 
+          className="relative h-40 sm:h-48 w-full flex-shrink-0 overflow-hidden drag-handle cursor-move bg-gradient-to-r from-emerald-950 via-green-900 to-gray-900"
+          onMouseDown={(e) => startInteraction?.(e, 'drag')}
+          onTouchStart={(e) => startInteraction?.(e, 'drag')}
+        >
           <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-gray-900 via-black/20 to-black/40 flex flex-col justify-end p-4 md:p-6">
             <div className="flex items-center gap-2 mb-1">
               <svg className="w-5 h-5 text-[#1DB954]" viewBox="0 0 24 24" fill="currentColor">

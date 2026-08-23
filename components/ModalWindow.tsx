@@ -3,6 +3,10 @@ import CloseIcon from './icons/CloseIcon';
 import ExpandIcon from './icons/ExpandIcon';
 import { WindowState } from '../types';
 
+export const ModalWindowContext = React.createContext<{
+  startInteraction?: (e: React.MouseEvent | React.TouchEvent, type: 'drag' | 'resize') => void;
+}>({});
+
 interface ModalWindowProps {
   isOpen: boolean;
   onClose: () => void;
@@ -306,6 +310,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
   // Fullscreen Mode
   if (isFullscreen) {
     return (
+    <ModalWindowContext.Provider value={{ startInteraction }}>
       <div
         ref={modalRef}
         onClick={onFocus}
@@ -365,6 +370,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
           {children}
         </main>
       </div>
+    </ModalWindowContext.Provider>
     );
   }
 
@@ -406,6 +412,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
   };
 
   return (
+    <ModalWindowContext.Provider value={{ startInteraction }}>
     <>
       {/* Invisible backdrop during active drag/resize so iframes & inputs don't intercept pointer events */}
       {isInteracting && (
@@ -436,16 +443,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
       >
         {frameless ? (
           <>
-            {isDraggable && (
-              <div 
-                className="absolute top-0 left-0 right-8 h-8 cursor-move z-[9999] touch-none flex items-start justify-center pt-1"
-                onMouseDown={(e) => startInteraction(e, 'drag')}
-                onTouchStart={(e) => startInteraction(e, 'drag')}
-                title="Arrastrar ventana"
-              >
-                <div className="w-12 h-1.5 bg-white/30 rounded-full backdrop-blur-sm pointer-events-none" />
-              </div>
-            )}
+
             {children}
           </>
         ) : (
@@ -517,6 +515,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
         {isResizable && <Resizer />}
       </div>
     </>
+    </ModalWindowContext.Provider>
   );
 };
 

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { GripHorizontal } from 'lucide-react';
+import { ModalWindowContext } from './ModalWindow';
 import { Playlist } from '../types';
 import CloseIcon from './icons/CloseIcon';
 
@@ -32,6 +34,8 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
         setSessionConfirmed(true);
     };
 
+    const { startInteraction } = useContext(ModalWindowContext);
+
     const handleRequireLogin = () => {
         localStorage.removeItem('spotify_session_active');
         setSessionConfirmed(false);
@@ -41,6 +45,14 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
         return (
             <div className="w-full h-full bg-[#121212] border border-white/10 text-white rounded-2xl p-5 shadow-2xl flex flex-col justify-center">
                 <div className="relative">
+                    <div 
+                        className="absolute -top-3 -left-3 p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-move z-50"
+                        onMouseDown={(e) => startInteraction?.(e, 'drag')}
+                        onTouchStart={(e) => startInteraction?.(e, 'drag')}
+                        title="Mover reproductor"
+                    >
+                        <GripHorizontal className="w-4 h-4" />
+                    </div>
                     <button
                         onClick={onClose}
                         className="absolute -top-3 -right-3 p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer z-50"
@@ -101,7 +113,18 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
                 loading="lazy"
                 className="rounded-2xl shadow-2xl"
             ></iframe>
-            <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                <div 
+                    className="p-1 text-white/80 hover:text-white transition-all bg-black/60 rounded-full backdrop-blur-sm cursor-move flex items-center justify-center"
+                    onMouseDown={(e) => startInteraction?.(e, 'drag')}
+                    onTouchStart={(e) => startInteraction?.(e, 'drag')}
+                    style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8))' }}
+                    title="Mover reproductor"
+                >
+                    <GripHorizontal className="w-4 h-4" />
+                </div>
+            </div>
+            <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-50">
                 <button
                     onClick={handleRequireLogin}
                     title="Iniciar sesión en Spotify en nueva ventana"
