@@ -196,6 +196,9 @@ export interface ProjectChatMessage {
     text: string;
   };
   poll_id?: string;
+  thread_id?: string;
+  replies_count?: number;
+  replies?: ProjectChatMessage[];
 }
 
 export interface ProjectChannel {
@@ -205,6 +208,7 @@ export interface ProjectChannel {
   description?: string;
   emoji: string;
   is_private: boolean;
+  password?: string;
   created_at: string;
 }
 

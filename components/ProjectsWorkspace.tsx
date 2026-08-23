@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle } from '../types';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -139,6 +139,18 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [huddleParticipants, setHuddleParticipants] = useState<any[]>([]);
     const [showHuddleParticipants, setShowHuddleParticipants] = useState(false);
+    const [isHuddleFullScreen, setIsHuddleFullScreen] = useState(false);
+
+    // Thread (Hilo) States
+    const [activeThreadMessage, setActiveThreadMessage] = useState<ProjectChatMessage | null>(null);
+    const [threadInputText, setThreadInputText] = useState<string>('');
+
+    // Private Channel Password States
+    const [newChannelPassword, setNewChannelPassword] = useState<string>('');
+    const [editingChannelPassword, setEditingChannelPassword] = useState<string>('');
+    const [unlockedChannels, setUnlockedChannels] = useState<Record<string, boolean>>({});
+    const [passwordPromptChannel, setPasswordPromptChannel] = useState<ProjectChannel | null>(null);
+    const [inputPassword, setInputPassword] = useState<string>('');
 
     // Live WebRTC and Audio Capture/Analyze States
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -199,49 +211,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
     }, [activeProject, activeChannels]);
 
-    // Typing effect simulation
+    // Typing effect simulation (disabled to keep it real)
     React.useEffect(() => {
-        if (!activeProject || activeTab !== 'chat') return;
-        
-        const interval = setInterval(() => {
-            const members = activeProject.members || [];
-            if (members.length <= 1) {
-                // If only user exists, simulate other team members
-                const mockNames = ['Carlos 🐣', 'Ana 🐤', 'Sofía 🐣'];
-                const randomName = mockNames[Math.floor(Math.random() * mockNames.length)];
-                setTypingUsers(prev => ({ ...prev, [selectedChannelId]: randomName }));
-                setTimeout(() => {
-                    setTypingUsers(prev => {
-                        const copy = { ...prev };
-                        delete copy[selectedChannelId];
-                        return copy;
-                    });
-                }, 3000);
-                return;
-            }
-            
-            const randomMember = members[Math.floor(Math.random() * members.length)];
-            if (randomMember.name === 'Tú') return;
-
-            const name = randomMember.name || 'Pollito 🐣';
-            
-            setTypingUsers(prev => ({
-                ...prev,
-                [selectedChannelId]: name
-            }));
-
-            setTimeout(() => {
-                setTypingUsers(prev => {
-                    const copy = { ...prev };
-                    delete copy[selectedChannelId];
-                    return copy;
-                });
-            }, 3500);
-
-        }, 12000);
-
-        return () => clearInterval(interval);
-    }, [activeProject, selectedChannelId, activeTab]);
+        // Typing simulation disabled as requested
+    }, []);
 
     // Simulated active speaking for other participants
     React.useEffect(() => {
@@ -341,29 +314,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             return;
         }
 
-        // Add user immediately
+        // Add user immediately (only the real user, no mock joiners)
         setHuddleParticipants([{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }]);
-
-        // Carlos joins
-        const t1 = setTimeout(() => {
-            setHuddleParticipants(prev => [
-                ...prev,
-                { name: 'Carlos 🐣', email: 'carlos@pollito.com', has_mic: true, has_video: false, has_screen: false }
-            ]);
-        }, 2000);
-
-        // Ana joins
-        const t2 = setTimeout(() => {
-            setHuddleParticipants(prev => [
-                ...prev,
-                { name: 'Ana 🐤', email: 'ana@pollito.com', has_mic: true, has_video: true, has_screen: false }
-            ]);
-        }, 4500);
-
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-        };
     }, [isHuddleActive]);
 
     // Handle initial streams & camera toggle
@@ -1191,10 +1143,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const messages = activeProject.chat_messages || [];
         const currentChannel = activeChannels.find(c => c.id === selectedChannelId) || activeChannels[0] || { id: 'general', name: 'general', emoji: '💬', description: 'Canal principal' };
 
-        // Filter messages by channel (handling legacy messages without channel_id as 'general')
+        // Filter messages by channel (handling legacy messages without channel_id as 'general') and exclude thread replies
         let channelMessages = messages.filter(m => {
             const mChanId = m.channel_id || 'general';
-            return mChanId === currentChannel.id;
+            return mChanId === currentChannel.id && !m.thread_id;
         });
 
         // Filter messages by search if specified
@@ -1232,6 +1184,25 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         };
 
+        const handleSendThreadReply = (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!threadInputText.trim() || !activeThreadMessage) return;
+
+            const newReply: ProjectChatMessage = {
+                id: crypto.randomUUID(),
+                project_id: activeProject.id,
+                channel_id: currentChannel.id,
+                sender_name: 'Tú',
+                sender_email: 'tu_correo@ejemplo.com',
+                text: threadInputText.trim(),
+                created_at: new Date().toISOString(),
+                thread_id: activeThreadMessage.id
+            };
+
+            onUpdateProject(activeProject.id, { chat_messages: [...messages, newReply] });
+            setThreadInputText('');
+        };
+
         const handleCreateChannel = (e: React.FormEvent) => {
             e.preventDefault();
             if (!newChannelName.trim()) return;
@@ -1256,6 +1227,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 description: newChannelDescription.trim() || undefined,
                 emoji: '#',
                 is_private: newChannelIsPrivate,
+                password: newChannelIsPrivate ? newChannelPassword : undefined,
                 created_at: new Date().toISOString()
             };
 
@@ -1277,11 +1249,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 chat_messages: [...messages, systemMsg]
             });
 
+            // Auto-unlock for the creator
+            setUnlockedChannels(prev => ({ ...prev, [cleanName]: true }));
+
             setSelectedChannelId(newChan.id);
             setNewChannelName('');
             setNewChannelDescription('');
             setNewChannelEmoji('#');
             setNewChannelIsPrivate(false);
+            setNewChannelPassword('');
             setIsCreateChannelOpen(false);
         };
 
@@ -1302,7 +1278,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 name: updatedChanId,
                 description: editingChannelDescription.trim() || undefined,
                 emoji: '#',
-                is_private: editingChannelIsPrivate
+                is_private: editingChannelIsPrivate,
+                password: editingChannelIsPrivate ? editingChannelPassword : undefined
             };
 
             const updatedChannels = activeChannels.map(c => c.id === editingChannel.id ? updatedChan : c);
@@ -1557,6 +1534,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                             setEditingChannelDescription(chan.description || '');
                                                             setEditingChannelEmoji(chan.emoji);
                                                             setEditingChannelIsPrivate(chan.is_private);
+                                                            setEditingChannelPassword(chan.password || '');
                                                         }}
                                                         className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white"
                                                     >
@@ -1591,507 +1569,789 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         </div>
                     </div>
-
                 </div>
 
-                {/* 2. CHAT WORKSPACE AREA */}
-                <div className="flex-1 flex flex-col h-full bg-white dark:bg-[#050505] overflow-hidden relative">
+                {/* 2. CHAT WORKSPACE AREA & THREAD SIDEBAR CONTAINER */}
+                <div className="flex-1 flex h-full overflow-hidden relative">
                     
-                    {/* Channel Main Header */}
-                    <div className="px-6 py-3.5 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-4 shrink-0">
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-gray-400 dark:text-gray-500 shrink-0">
-                                    {currentChannel.is_private ? <Lock className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
-                                </span>
-                                <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">{currentChannel.name}</h2>
-                            </div>
-                            {currentChannel.description && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{currentChannel.description}</p>
-                            )}
-                        </div>
-
-                        {/* Channel Header Actions */}
-                        <div className="flex items-center gap-2">
-                            
-                            {/* Toggle Pin Filter Button */}
-                            <button 
-                                onClick={() => setShowPinnedOnly(prev => !prev)}
-                                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-all ${
-                                    showPinnedOnly 
-                                        ? 'bg-amber-500 border-amber-600 text-white shadow-sm' 
-                                        : 'bg-white dark:bg-[#111] border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                                }`}
-                                title="Filtrar por mensajes fijados"
-                            >
-                                <Pin className="w-3.5 h-3.5" /> 
-                                <span className="hidden sm:inline">Pines ({messages.filter(m => m.channel_id === currentChannel.id && m.is_pinned).length})</span>
-                            </button>
-
-                            {/* Create Poll Trigger */}
-                            <button 
-                                onClick={() => setIsCreatePollOpen(true)}
-                                className="px-2.5 py-1.5 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                            >
-                                <BarChart2 className="w-3.5 h-3.5 text-blue-500" />
-                                <span className="hidden sm:inline">Nueva Encuesta</span>
-                            </button>
-
-                            {/* Huddle Live Meet Button */}
-                            <button 
-                                onClick={handleToggleHuddle}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
-                                    isHuddleActive 
-                                        ? 'bg-red-600 hover:bg-red-700 text-white' 
-                                        : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active)
-                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
-                                            : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                }`}
-                            >
-                                <Video className="w-3.5 h-3.5" />
-                                {isHuddleActive ? 'Salir del Huddle' : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active) ? 'Unirse al Huddle' : 'Iniciar Huddle'}
-                            </button>
-
-                        </div>
-                    </div>
-
-                    {/* 3. HUDDLE ACTIVE AUDIO/VIDEO BAR */}
-                    {isHuddleActive && (
-                        <div className="bg-gradient-to-r from-slate-900 via-[#1e293b] to-slate-900 text-white p-4 shrink-0 shadow-lg border-b border-slate-800">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                
+                    {/* FULLSCREEN HUDDLE VIEW */}
+                    {isHuddleActive && isHuddleFullScreen && (
+                        <div className="absolute inset-0 bg-slate-950 text-white z-[45] flex flex-col p-6 select-none animate-in fade-in zoom-in-95 duration-200">
+                            {/* Header */}
+                            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6 shrink-0">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                    <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
                                     <div>
-                                        <p className="text-xs font-bold text-white flex items-center gap-2">
-                                            Huddle Activo en #{currentChannel.name}
-                                        </p>
-                                        <p className="text-[10px] text-gray-400 mt-0.5">
-                                            {huddleParticipants.length} participantes • Audio & Video conectados
-                                        </p>
+                                        <h2 className="text-sm font-bold tracking-wide text-white">Huddle Activo: #{currentChannel.name} (Pantalla Completa)</h2>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">{huddleParticipants.length} participantes • Conexión Activa</p>
                                     </div>
                                 </div>
-
-                                {/* Live Participants Avatars */}
-                                <div className="flex items-center gap-3 bg-black/30 px-3 py-1.5 rounded-lg border border-white/5">
-                                    <span className="text-[10px] uppercase font-bold text-gray-400">En Llamada:</span>
-                                    <div className="flex -space-x-2 overflow-hidden">
-                                        {huddleParticipants.map((p, idx) => (
-                                            <div 
-                                                key={p.email || idx} 
-                                                className={`w-6 h-6 rounded-full bg-blue-600 border border-slate-900 text-[10px] font-bold flex items-center justify-center transition-all ${
-                                                    (p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name]) 
-                                                        ? 'ring-2 ring-emerald-400 scale-105' 
-                                                        : ''
-                                                }`}
-                                                title={`${p.name} (${p.email}) ${p.has_mic ? '🎙️' : '🔇'} ${p.has_video ? '📹' : ''}`}
-                                            >
-                                                {p.name.charAt(0).toUpperCase()}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <button 
-                                        onClick={() => setShowHuddleParticipants(prev => !prev)}
-                                        className="text-[10px] underline text-blue-400 hover:text-blue-300 font-bold"
-                                    >
-                                        {showHuddleParticipants ? 'Ocultar' : 'Ver Detalles'}
-                                    </button>
-                                </div>
-
-                                {/* Integrated Call Controllers */}
                                 <div className="flex items-center gap-2">
-                                    {/* Mic Mute/Unmute */}
                                     <button 
-                                        onClick={() => setIsMicOn(prev => !prev)}
-                                        className={`p-2 rounded-lg transition-all ${isMicOn ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-red-500/90 hover:bg-red-600 text-white'}`}
-                                        title={isMicOn ? 'Silenciar Micrófono' : 'Activar Micrófono'}
+                                        onClick={() => setIsHuddleFullScreen(false)}
+                                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-white/10 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors text-white"
                                     >
-                                        {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                                        <Minimize2 className="w-4 h-4" /> Salir
                                     </button>
-
-                                    {/* Video Camera Toggle */}
-                                    <button 
-                                        onClick={() => setIsVideoOn(prev => !prev)}
-                                        className={`p-2 rounded-lg transition-all ${isVideoOn ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
-                                        title={isVideoOn ? 'Desactivar Cámara' : 'Activar Cámara'}
-                                    >
-                                        {isVideoOn ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
-                                    </button>
-
-                                    {/* Screen Sharing Toggle */}
-                                    <button 
-                                        onClick={() => setIsScreenSharing(prev => !prev)}
-                                        className={`p-2 rounded-lg transition-all ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
-                                        title={isScreenSharing ? 'Detener Compartir Pantalla' : 'Compartir Pantalla'}
-                                    >
-                                        <Monitor className="w-4 h-4" />
-                                    </button>
-
                                     <button 
                                         onClick={handleToggleHuddle}
-                                        className="px-2.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all"
-                                        title="Finalizar llamada"
+                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-750 text-xs font-bold rounded-lg text-white transition-colors"
                                     >
                                         Colgar 📞
                                     </button>
                                 </div>
-
                             </div>
 
-                            {/* Expanded Participant Control & Camera Streams List */}
-                            {(showHuddleParticipants || isVideoOn) && (
-                                <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                    {huddleParticipants.map((p, idx) => {
-                                        const isSpeaking = p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name];
-                                        return (
-                                            <div 
-                                                key={p.email || idx} 
-                                                className={`bg-black/40 rounded-lg p-2.5 border relative overflow-hidden flex flex-col justify-between min-h-[110px] transition-all duration-200 ${
-                                                    isSpeaking 
-                                                        ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.35)]' 
-                                                        : 'border-white/5'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between z-10">
-                                                    <span className="text-[11px] font-bold text-gray-200 truncate">{p.name}</span>
-                                                    <span className="text-[10px] text-gray-500">{p.name === 'Tú' ? '(Tú)' : ''}</span>
+                            {/* Streams Grid */}
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 overflow-y-auto pb-4">
+                                {huddleParticipants.map((p, idx) => {
+                                    const isSpeaking = p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name];
+                                    return (
+                                        <div 
+                                            key={p.email || idx} 
+                                            className={`bg-slate-900/80 rounded-2xl p-4 border relative overflow-hidden flex flex-col justify-between min-h-[220px] transition-all duration-300 ${
+                                                isSpeaking 
+                                                    ? 'border-emerald-500 shadow-[0_0_24px_rgba(16,185,129,0.3)] ring-2 ring-emerald-500/20' 
+                                                    : 'border-white/5 shadow-md'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between z-10 bg-gradient-to-b from-black/60 to-transparent p-2 absolute inset-x-0 top-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-gray-200">{p.name}</span>
+                                                    {p.name === 'Tú' && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Tú</span>}
                                                 </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    {p.has_mic ? <Mic className="w-3.5 h-3.5 text-emerald-400" /> : <MicOff className="w-3.5 h-3.5 text-red-500" />}
+                                                    {p.has_screen && <span className="text-[9px] bg-blue-600/30 text-blue-300 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Compartiendo</span>}
+                                                </div>
+                                            </div>
 
-                                                {/* Video Stream / Static Avatar view */}
+                                            {/* Video Stream / Avatar container */}
+                                            <div className="absolute inset-0 bg-slate-950 overflow-hidden flex items-center justify-center">
                                                 {p.has_screen && p.name === 'Tú' && screenStream ? (
-                                                    <div className="absolute inset-0 bg-slate-900 mt-6 overflow-hidden">
-                                                        <VideoStream stream={screenStream} />
-                                                    </div>
+                                                    <VideoStream stream={screenStream} />
                                                 ) : p.has_video ? (
-                                                    <div className="absolute inset-0 bg-slate-900 mt-6 overflow-hidden">
-                                                        {p.name === 'Tú' && localStream ? (
-                                                            <VideoStream stream={localStream} />
-                                                        ) : (
-                                                            <div className="w-full h-full flex flex-col items-center justify-center relative">
-                                                                <span className="text-[20px] animate-pulse">🐣</span>
-                                                                <span className="text-[8px] tracking-widest text-emerald-400 uppercase font-bold">Cámara Activa</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex-1 flex items-center justify-center my-1.5 z-10">
-                                                        <div className={`w-8 h-8 rounded-full bg-slate-800 border text-gray-300 font-bold text-xs flex items-center justify-center transition-all ${
-                                                            isSpeaking ? 'border-emerald-400 bg-slate-800 ring-2 ring-emerald-500/20' : 'border-slate-700'
-                                                        }`}>
-                                                            {p.name.charAt(0).toUpperCase()}
+                                                    p.name === 'Tú' && localStream ? (
+                                                        <VideoStream stream={localStream} />
+                                                    ) : (
+                                                        <div className="w-full h-full flex flex-col items-center justify-center relative bg-slate-900">
+                                                            <span className="text-[32px] animate-bounce">🐣</span>
+                                                            <span className="text-[10px] tracking-widest text-emerald-400 uppercase font-bold mt-2">Cámara de {p.name} activa</span>
                                                         </div>
+                                                    )
+                                                ) : (
+                                                    <div className="w-20 h-20 rounded-full bg-slate-800 border border-slate-700 text-gray-300 font-bold text-2xl flex items-center justify-center transition-all">
+                                                        {p.name.charAt(0).toUpperCase()}
                                                     </div>
                                                 )}
+                                            </div>
 
-                                                <div className="flex items-center justify-between z-10 bg-black/50 p-1 rounded mt-auto text-[9px] text-gray-400">
-                                                    <span className="flex items-center gap-1">
-                                                        {p.has_mic ? <Mic className="w-2.5 h-2.5 text-emerald-400" /> : <MicOff className="w-2.5 h-2.5 text-red-400" />}
-                                                        {p.has_mic ? 'Audio' : 'Mute'}
-                                                    </span>
-                                                    {p.has_screen && <span className="text-blue-400">Compartiendo</span>}
+                                            {/* Footer inside video block */}
+                                            <div className="mt-auto z-10 bg-black/60 p-2 absolute inset-x-0 bottom-0 flex items-center justify-between text-[10px] text-gray-300">
+                                                <span>Estado: {p.has_mic ? 'Hablando' : 'Mutado'}</span>
+                                                <span className="truncate max-w-[120px]">{p.email}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Controllers */}
+                            <div className="border-t border-white/10 pt-4 mt-auto shrink-0 flex items-center justify-center gap-4 bg-slate-900/60 p-4 rounded-2xl border border-white/5 max-w-xl mx-auto w-full">
+                                <button 
+                                    onClick={() => setIsMicOn(prev => !prev)}
+                                    className={`p-3.5 rounded-xl transition-all ${isMicOn ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                                    title={isMicOn ? 'Silenciar Micrófono' : 'Activar Micrófono'}
+                                >
+                                    {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                                </button>
+                                <button 
+                                    onClick={() => setIsVideoOn(prev => !prev)}
+                                    className={`p-3.5 rounded-xl transition-all ${isVideoOn ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                                    title={isVideoOn ? 'Desactivar Cámara' : 'Activar Cámara'}
+                                >
+                                    {isVideoOn ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
+                                </button>
+                                <button 
+                                    onClick={() => setIsScreenSharing(prev => !prev)}
+                                    className={`p-3.5 rounded-xl transition-all ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                                    title={isScreenSharing ? 'Detener Compartir Pantalla' : 'Compartir Pantalla'}
+                                >
+                                    <Monitor className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MAIN CHAT WORKSPACE AREA */}
+                    <div className="flex-1 flex flex-col h-full bg-white dark:bg-[#050505] overflow-hidden relative">
+                        
+                        {/* Channel Main Header */}
+                        <div className="px-6 py-3.5 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-4 shrink-0">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-gray-400 dark:text-gray-500 shrink-0">
+                                        {currentChannel.is_private ? <Lock className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
+                                    </span>
+                                    <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">{currentChannel.name}</h2>
+                                </div>
+                                {currentChannel.description && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{currentChannel.description}</p>
+                                )}
+                            </div>
+
+                            {/* Channel Header Actions */}
+                            <div className="flex items-center gap-2">
+                                
+                                {/* Toggle Pin Filter Button */}
+                                <button 
+                                    onClick={() => setShowPinnedOnly(prev => !prev)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-all ${
+                                        showPinnedOnly 
+                                            ? 'bg-amber-500 border-amber-600 text-white shadow-sm' 
+                                            : 'bg-white dark:bg-[#111] border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    }`}
+                                    title="Filtrar por mensajes fijados"
+                                >
+                                    <Pin className="w-3.5 h-3.5" /> 
+                                    <span className="hidden sm:inline">Pines ({messages.filter(m => m.channel_id === currentChannel.id && m.is_pinned).length})</span>
+                                </button>
+
+                                {/* Create Poll Trigger - hidden if locked */}
+                                {!(currentChannel.is_private && currentChannel.password && !unlockedChannels[currentChannel.id]) && (
+                                    <button 
+                                        onClick={() => setIsCreatePollOpen(true)}
+                                        className="px-2.5 py-1.5 bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                                    >
+                                        <BarChart2 className="w-3.5 h-3.5 text-blue-500" />
+                                        <span className="hidden sm:inline">Nueva Encuesta</span>
+                                    </button>
+                                )}
+
+                                {/* Huddle Live Meet Button - hidden if locked */}
+                                {!(currentChannel.is_private && currentChannel.password && !unlockedChannels[currentChannel.id]) && (
+                                    <button 
+                                        onClick={handleToggleHuddle}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
+                                            isHuddleActive 
+                                                ? 'bg-red-600 hover:bg-red-700 text-white' 
+                                                : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active)
+                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
+                                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                        }`}
+                                    >
+                                        <Video className="w-3.5 h-3.5" />
+                                        {isHuddleActive ? 'Salir del Huddle' : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active) ? 'Unirse' : 'Iniciar Huddle'}
+                                    </button>
+                                )}
+
+                            </div>
+                        </div>
+
+                        {/* CONDITIONAL LOCK VIEW OR ACTIVE CONVERSATION VIEW */}
+                        {currentChannel.is_private && currentChannel.password && !unlockedChannels[currentChannel.id] ? (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/40 dark:bg-black/10">
+                                <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-950/20 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4 shadow-sm">
+                                    <Lock className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-2">
+                                    Canal Privado Protegido
+                                </h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs leading-relaxed mb-6">
+                                    Este canal está protegido con contraseña. Por favor, ingresa la clave de acceso para ver las conversaciones y participar.
+                                </p>
+                                <div className="w-full max-w-xs space-y-3">
+                                    <input 
+                                        type="password"
+                                        placeholder="Ingresar contraseña..."
+                                        value={inputPassword}
+                                        onChange={e => setInputPassword(e.target.value)}
+                                        className="w-full px-3.5 py-2 text-xs text-center bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white font-mono"
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                if (inputPassword === currentChannel.password) {
+                                                    setUnlockedChannels(prev => ({ ...prev, [currentChannel.id]: true }));
+                                                    setInputPassword('');
+                                                } else {
+                                                    alert('Contraseña incorrecta. Inténtalo de nuevo.');
+                                                }
+                                            }
+                                        }}
+                                    />
+                                    <button 
+                                        onClick={() => {
+                                            if (inputPassword === currentChannel.password) {
+                                                setUnlockedChannels(prev => ({ ...prev, [currentChannel.id]: true }));
+                                                setInputPassword('');
+                                            } else {
+                                                alert('Contraseña incorrecta. Inténtalo de nuevo.');
+                                            }
+                                        }}
+                                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-sm transition-colors"
+                                    >
+                                        Desbloquear Canal 🔓
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {/* 3. HUDDLE ACTIVE AUDIO/VIDEO BAR */}
+                                {isHuddleActive && (
+                                    <div className="bg-gradient-to-r from-slate-900 via-[#1e293b] to-slate-900 text-white p-4 shrink-0 shadow-lg border-b border-slate-800">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                                <div>
+                                                    <p className="text-xs font-bold text-white flex items-center gap-2">
+                                                        Huddle Activo en #{currentChannel.name}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                                        {huddleParticipants.length} participantes • Conexión Real
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Live Participants Avatars */}
+                                            <div className="flex items-center gap-3 bg-black/30 px-3 py-1.5 rounded-lg border border-white/5">
+                                                <span className="text-[10px] uppercase font-bold text-gray-400">En Llamada:</span>
+                                                <div className="flex -space-x-2 overflow-hidden">
+                                                    {huddleParticipants.map((p, idx) => (
+                                                        <div 
+                                                            key={p.email || idx} 
+                                                            className={`w-6 h-6 rounded-full bg-blue-600 border border-slate-900 text-[10px] font-bold flex items-center justify-center transition-all ${
+                                                                (p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name]) 
+                                                                    ? 'ring-2 ring-emerald-400 scale-105' 
+                                                                    : ''
+                                                            }`}
+                                                            title={`${p.name} (${p.email}) ${p.has_mic ? '🎙️' : '🔇'} ${p.has_video ? '📹' : ''}`}
+                                                        >
+                                                            {p.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <button 
+                                                    onClick={() => setShowHuddleParticipants(prev => !prev)}
+                                                    className="text-[10px] underline text-blue-400 hover:text-blue-300 font-bold"
+                                                >
+                                                    {showHuddleParticipants ? 'Ocultar' : 'Ver Detalles'}
+                                                </button>
+                                            </div>
+
+                                            {/* Integrated Call Controllers */}
+                                            <div className="flex items-center gap-2">
+                                                {/* Full-Screen Toggle */}
+                                                <button 
+                                                    onClick={() => setIsHuddleFullScreen(true)}
+                                                    className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-all"
+                                                    title="Pantalla Completa"
+                                                >
+                                                    <Maximize2 className="w-4 h-4" />
+                                                </button>
+
+                                                {/* Mic Mute/Unmute */}
+                                                <button 
+                                                    onClick={() => setIsMicOn(prev => !prev)}
+                                                    className={`p-2 rounded-lg transition-all ${isMicOn ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-red-500/90 hover:bg-red-600 text-white'}`}
+                                                    title={isMicOn ? 'Silenciar Micrófono' : 'Activar Micrófono'}
+                                                >
+                                                    {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                                                </button>
+
+                                                {/* Video Camera Toggle */}
+                                                <button 
+                                                    onClick={() => setIsVideoOn(prev => !prev)}
+                                                    className={`p-2 rounded-lg transition-all ${isVideoOn ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                                                    title={isVideoOn ? 'Desactivar Cámara' : 'Activar Cámara'}
+                                                >
+                                                    {isVideoOn ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
+                                                </button>
+
+                                                {/* Screen Sharing Toggle */}
+                                                <button 
+                                                    onClick={() => setIsScreenSharing(prev => !prev)}
+                                                    className={`p-2 rounded-lg transition-all ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                                                    title={isScreenSharing ? 'Detener Compartir Pantalla' : 'Compartir Pantalla'}
+                                                >
+                                                    <Monitor className="w-4 h-4" />
+                                                </button>
+
+                                                <button 
+                                                    onClick={handleToggleHuddle}
+                                                    className="px-2.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all"
+                                                    title="Finalizar llamada"
+                                                >
+                                                    Colgar 📞
+                                                </button>
+                                            </div>
+
+                                        </div>
+
+                                        {/* Expanded Participant Control & Camera Streams List */}
+                                        {(showHuddleParticipants || isVideoOn) && (
+                                            <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                                {huddleParticipants.map((p, idx) => {
+                                                    const isSpeaking = p.name === 'Tú' ? localVolume > 10 : !!speakingParticipants[p.name];
+                                                    return (
+                                                        <div 
+                                                            key={p.email || idx} 
+                                                            className={`bg-black/40 rounded-lg p-2.5 border relative overflow-hidden flex flex-col justify-between min-h-[110px] transition-all duration-200 ${
+                                                                isSpeaking 
+                                                                    ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.35)]' 
+                                                                    : 'border-white/5'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center justify-between z-10">
+                                                                <span className="text-[11px] font-bold text-gray-200 truncate">{p.name}</span>
+                                                                <span className="text-[10px] text-gray-500">{p.name === 'Tú' ? '(Tú)' : ''}</span>
+                                                            </div>
+
+                                                            {/* Video Stream / Static Avatar view */}
+                                                            {p.has_screen && p.name === 'Tú' && screenStream ? (
+                                                                <div className="absolute inset-0 bg-slate-900 mt-6 overflow-hidden">
+                                                                    <VideoStream stream={screenStream} />
+                                                                </div>
+                                                            ) : p.has_video ? (
+                                                                <div className="absolute inset-0 bg-slate-900 mt-6 overflow-hidden">
+                                                                    {p.name === 'Tú' && localStream ? (
+                                                                        <VideoStream stream={localStream} />
+                                                                    ) : (
+                                                                        <div className="w-full h-full flex flex-col items-center justify-center relative">
+                                                                            <span className="text-[20px] animate-pulse">🐣</span>
+                                                                            <span className="text-[8px] tracking-widest text-emerald-400 uppercase font-bold">Cámara Activa</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex-1 flex items-center justify-center my-1.5 z-10">
+                                                                    <div className={`w-8 h-8 rounded-full bg-slate-800 border text-gray-300 font-bold text-xs flex items-center justify-center transition-all ${
+                                                                        isSpeaking ? 'border-emerald-400 bg-slate-800 ring-2 ring-emerald-500/20' : 'border-slate-700'
+                                                                    }`}>
+                                                                        {p.name.charAt(0).toUpperCase()}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            <div className="flex items-center justify-between z-10 bg-black/50 p-1 rounded mt-auto text-[9px] text-gray-400">
+                                                                <span className="flex items-center gap-1">
+                                                                    {p.has_mic ? <Mic className="w-2.5 h-2.5 text-emerald-400" /> : <MicOff className="w-2.5 h-2.5 text-red-400" />}
+                                                                    {p.has_mic ? 'Audio' : 'Mute'}
+                                                                </span>
+                                                                {p.has_screen && <span className="text-blue-400">Compartiendo</span>}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                    </div>
+                                )}
+
+                                {/* Messages Search Bar Inside Main Chat Workspace */}
+                                <div className="px-6 py-2 bg-gray-50 dark:bg-black/30 border-b border-gray-100 dark:border-gray-800/80 flex items-center justify-between gap-4 shrink-0">
+                                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                                        <span className="font-semibold text-gray-700 dark:text-gray-300">Mensajes en este canal:</span> 
+                                        {channelMessages.length} total
+                                    </div>
+                                    <div className="relative w-64">
+                                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Buscar en este canal..." 
+                                            value={chatSearch} 
+                                            onChange={e => setChatSearch(e.target.value)} 
+                                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* 4. MESSAGES STREAM */}
+                                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                                    
+                                    {channelMessages.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto">
+                                            <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 mb-3">
+                                                <MessageSquare className="w-6 h-6" />
+                                            </div>
+                                            <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-1">
+                                                Inicio del canal #{currentChannel.name}
+                                            </h3>
+                                            <p className="text-xs text-gray-500 leading-relaxed">
+                                                {currentChannel.description || 'Este es el inicio de la conversación de este canal. ¡Saluda a tu equipo!'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        channelMessages.map(msg => {
+                                            const isSystem = msg.sender_name.includes('Sistema');
+                                            const isUser = msg.sender_email === 'tu_correo@ejemplo.com';
+                                            const reactions = msg.reactions || {};
+                                            const isPinned = msg.is_pinned;
+
+                                            // Determine thread replies count
+                                            const repliesCount = messages.filter(m => m.thread_id === msg.id).length;
+
+                                            // If message has a poll_id, locate the poll
+                                            const poll = msg.poll_id ? activePolls.find(p => p.id === msg.poll_id) : null;
+
+                                            return (
+                                                <div 
+                                                    key={msg.id} 
+                                                    className={`flex items-start gap-3 group relative p-3 rounded-xl transition-all ${
+                                                        isPinned 
+                                                            ? 'bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/50 dark:border-amber-900/30' 
+                                                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/10'
+                                                    }`}
+                                                >
+                                                    
+                                                    {/* Sender Avatar */}
+                                                    <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 shadow-sm text-white ${
+                                                        isSystem ? 'bg-amber-500' : isUser ? 'bg-blue-600' : 'bg-indigo-600'
+                                                    }`}>
+                                                        {msg.sender_name.charAt(0).toUpperCase()}
+                                                    </div>
+
+                                                    <div className="flex-1 min-w-0">
+                                                        
+                                                        {/* Sender Metadata */}
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-xs font-bold text-gray-900 dark:text-white">{msg.sender_name}</span>
+                                                            <span className="text-[10px] text-gray-400">{format(parseISO(msg.created_at), 'HH:mm', { locale: es })}</span>
+                                                            {isPinned && (
+                                                                <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 uppercase tracking-wider bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.2 rounded border border-amber-200/40">
+                                                                    📌 Fijado
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Replying Context Bar */}
+                                                        {msg.reply_to && (
+                                                            <div className="p-2 mb-1.5 bg-gray-100 dark:bg-gray-800/60 rounded border-l-2 border-blue-500 text-[11px] text-gray-600 dark:text-gray-300">
+                                                                <strong className="block text-[10px] text-blue-500">Respondiendo a {msg.reply_to.sender_name}:</strong>
+                                                                {msg.reply_to.text}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Message Bubble/Content */}
+                                                        <div className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
+                                                            {msg.text}
+                                                        </div>
+
+                                                        {/* 5. INTERACTIVE TEAM POLL CARD (If Poll is attached) */}
+                                                        {poll && (
+                                                            <div className="mt-3 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl p-4 max-w-md shadow-sm">
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <BarChart2 className="w-4 h-4 text-blue-500" />
+                                                                    <span className="text-xs font-bold text-gray-900 dark:text-white">{poll.question}</span>
+                                                                </div>
+                                                                
+                                                                <p className="text-[10px] text-gray-400 mb-3">
+                                                                    {poll.allow_multiple ? '● Opción Múltiple Permitida' : '● Opción Única'}
+                                                                </p>
+
+                                                                <div className="space-y-2.5">
+                                                                    {poll.options.map(opt => {
+                                                                        const totalPollVotes = poll.options.reduce((sum, o) => sum + o.voters.length, 0);
+                                                                        const percentage = totalPollVotes > 0 ? Math.round((opt.voters.length / totalPollVotes) * 100) : 0;
+                                                                        const userVoted = opt.voters.includes('tu_correo@ejemplo.com');
+
+                                                                        return (
+                                                                            <div 
+                                                                                key={opt.id}
+                                                                                onClick={() => handleVoteOption(poll.id, opt.id)}
+                                                                                className={`p-2.5 rounded-lg border text-xs cursor-pointer transition-all relative overflow-hidden group ${
+                                                                                    userVoted 
+                                                                                        ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-950/10' 
+                                                                                        : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111] hover:border-gray-300'
+                                                                                }`}
+                                                                            >
+                                                                                {/* Voting Progress Fill */}
+                                                                                <div 
+                                                                                    className={`absolute inset-y-0 left-0 transition-all duration-500 -z-0 ${
+                                                                                        userVoted ? 'bg-blue-500/10' : 'bg-gray-100 dark:bg-gray-800/40'
+                                                                                    }`} 
+                                                                                    style={{ width: `${percentage}%` }} 
+                                                                                />
+
+                                                                                <div className="relative flex items-center justify-between z-10">
+                                                                                    <span className={`font-semibold ${userVoted ? 'text-blue-600 dark:text-blue-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                                                                                        {opt.text}
+                                                                                    </span>
+                                                                                    <span className="text-[10px] text-gray-400 font-bold">{opt.voters.length} votos ({percentage}%)</span>
+                                                                                </div>
+
+                                                                                {/* Voter List Detail Tooltip-like Info */}
+                                                                                {opt.voters.length > 0 && (
+                                                                                    <div className="relative z-10 text-[9px] text-gray-400 mt-1 flex flex-wrap gap-1 items-center">
+                                                                                        <span className="font-semibold text-gray-500">Votado por:</span>
+                                                                                        {opt.voters.map((v, i) => (
+                                                                                            <span key={i} className="px-1 py-0.2 bg-gray-100 dark:bg-gray-800 rounded">{v === 'tu_correo@ejemplo.com' ? 'Tú' : v.split('@')[0]}</span>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Referenced Documentation attachment card */}
+                                                        {msg.doc_reference && (
+                                                            <div className="mt-2.5 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-lg flex items-center justify-between gap-3 max-w-sm">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    {getFileIcon(msg.doc_reference.file_type, msg.doc_reference.file_name)}
+                                                                    <div className="truncate">
+                                                                        <h4 className="text-xs font-bold text-blue-900 dark:text-blue-200 truncate">{msg.doc_reference.title}</h4>
+                                                                        <span className="text-[10px] text-blue-600 dark:text-blue-400">{msg.doc_reference.folder_name} • {msg.doc_reference.file_size_formatted}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => { setSelectedFolderId(null); setActiveTab('docs'); }}
+                                                                    className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 shrink-0"
+                                                                >
+                                                                    Abrir
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Thread Replies Trigger Button */}
+                                                        {repliesCount > 0 && (
+                                                            <button 
+                                                                onClick={() => setActiveThreadMessage(msg)}
+                                                                className="mt-2.5 flex items-center gap-1.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100/40 dark:border-blue-900/10 px-2.5 py-1 rounded-full w-fit transition-all"
+                                                            >
+                                                                <MessageSquare className="w-3 h-3" />
+                                                                <span>{repliesCount} {repliesCount === 1 ? 'respuesta' : 'respuestas'}</span>
+                                                            </button>
+                                                        )}
+
+                                                        {/* 6. REAL-TIME EMOJI REACTIONS BAR UNDER THE MESSAGE */}
+                                                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                                            {/* Map and alternate interactive reactions */}
+                                                            {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
+                                                                const voters = reactions[emoji] || [];
+                                                                const hasReacted = voters.includes('tu_correo@ejemplo.com');
+                                                                if (voters.length === 0) return null;
+
+                                                                return (
+                                                                    <button
+                                                                        key={emoji}
+                                                                        onClick={() => handleReactToMessage(msg.id, emoji)}
+                                                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all flex items-center gap-1 ${
+                                                                            hasReacted 
+                                                                                ? 'bg-blue-50 border-blue-300 text-blue-800 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200' 
+                                                                                : 'bg-gray-50 border-gray-200 dark:bg-gray-800/30 dark:border-gray-800/60 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
+                                                                        }`}
+                                                                        title={`Reaccionado por: ${voters.join(', ')}`}
+                                                                    >
+                                                                        <span>{emoji}</span>
+                                                                        <span>{voters.length}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                    </div>
+
+                                                    {/* 7. FLOATING ACTIONS & REACTION PICKER OVERLAY (SLACK STYLE) */}
+                                                    <div className="absolute right-4 -top-3 hidden group-hover:flex items-center gap-1 bg-white dark:bg-[#161616] border border-gray-200 dark:border-gray-800 rounded-lg p-1 shadow-md z-20">
+                                                        {/* Quick Reactions Selector */}
+                                                        <div className="flex items-center gap-0.5 border-r border-gray-100 dark:border-gray-800/80 pr-1.5 mr-1">
+                                                            {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
+                                                                const voters = reactions[emoji] || [];
+                                                                const hasReacted = voters.includes('tu_correo@ejemplo.com');
+                                                                return (
+                                                                    <button
+                                                                        key={emoji}
+                                                                        onClick={() => handleReactToMessage(msg.id, emoji)}
+                                                                        className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all text-xs ${hasReacted ? 'grayscale-0 scale-110' : 'grayscale hover:grayscale-0 hover:scale-110'}`}
+                                                                        title={`Reaccionar con ${emoji}`}
+                                                                    >
+                                                                        {emoji}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        <button 
+                                                            onClick={() => handleTogglePinMessage(msg.id)}
+                                                            className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-all ${isPinned ? 'text-amber-500' : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                                                            title={isPinned ? 'Desfijar Mensaje' : 'Fijar Mensaje'}
+                                                        >
+                                                            <Pin className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        
+                                                        {/* Thread Reply Button */}
+                                                        <button 
+                                                            onClick={() => setActiveThreadMessage(msg)}
+                                                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 transition-all"
+                                                            title="Responder en hilo (Thread)"
+                                                        >
+                                                            <MessageSquare className="w-3.5 h-3.5" />
+                                                        </button>
+
+                                                        <button 
+                                                            onClick={() => setReplyingToMessage(msg)}
+                                                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-500 transition-all"
+                                                            title="Responder"
+                                                        >
+                                                            <Share2 className="w-3.5 h-3.5 rotate-180" />
+                                                        </button>
+                                                    </div>
+
+                                                </div>
+                                            );
+                                        })
+                                    )}
+
+                                    <div ref={chatEndRef} />
+                                </div>
+
+                                {/* 8. TYPING STATUS INDICATOR */}
+                                {typingUsers[currentChannel.id] && (
+                                    <div className="px-6 py-1 bg-white dark:bg-black/30 text-[10px] text-gray-500 dark:text-gray-400 italic flex items-center gap-1.5 shrink-0 select-none">
+                                        <span className="relative flex h-1.5 w-1.5">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"></span>
+                                        </span>
+                                        <span>{typingUsers[currentChannel.id]} está escribiendo...</span>
+                                    </div>
+                                )}
+
+                                {/* 9. MESSAGE INPUT COMPONENT */}
+                                <div className="p-4 bg-white dark:bg-[#0c0c0c] border-t border-gray-200 dark:border-gray-800 shrink-0">
+                                    
+                                    {/* Replying Context Bar */}
+                                    {replyingToMessage && (
+                                        <div className="mb-2 p-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg text-xs flex items-center justify-between">
+                                            <div className="truncate">
+                                                <span className="font-semibold text-gray-500">Respondiendo a: </span>
+                                                <span className="font-bold text-gray-800 dark:text-gray-200">{replyingToMessage.sender_name}</span>
+                                                <p className="text-gray-500 truncate mt-0.5">{replyingToMessage.text}</p>
+                                            </div>
+                                            <button onClick={() => setReplyingToMessage(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                                        
+                                        {/* Insert note attachment quickpicker */}
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setActiveTab('docs')} 
+                                            title="Referenciar un documento o nota" 
+                                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all"
+                                        >
+                                            <Paperclip className="w-5 h-5" />
+                                        </button>
+
+                                        <input 
+                                            type="text" 
+                                            placeholder={`Enviar un mensaje a #${currentChannel.name}...`} 
+                                            value={chatText} 
+                                            onChange={e => setChatText(e.target.value)} 
+                                            className="flex-1 bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-[#111] transition-all"
+                                        />
+
+                                        <button 
+                                            type="submit" 
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
+                                        >
+                                            <Send className="w-3.5 h-3.5" /> Enviar
+                                        </button>
+
+                                    </form>
+                                </div>
+                            </>
+                        )}
+
+                    </div>
+
+                    {/* THREAD SIDEBAR (LATERAL SLACK-STYLE PANEL) */}
+                    {activeThreadMessage && (
+                        <div className="w-80 sm:w-96 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0c0c0c] flex flex-col h-full z-30 shrink-0 relative animate-in slide-in-from-right duration-200 shadow-xl">
+                            {/* Thread Header */}
+                            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0 bg-gray-50/50 dark:bg-black/10">
+                                <div className="min-w-0">
+                                    <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Hilo de conversación</h3>
+                                    <span className="text-[10px] text-gray-400 font-semibold">#{currentChannel.name}</span>
+                                </div>
+                                <button 
+                                    onClick={() => setActiveThreadMessage(null)}
+                                    className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Scrollable replies feed & original message */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {/* Original Message Card */}
+                                <div className="p-3 bg-blue-50/10 dark:bg-blue-950/5 border border-blue-100/50 dark:border-blue-900/10 rounded-xl relative">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                                            {activeThreadMessage.sender_name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[11px] font-bold text-gray-900 dark:text-white truncate">{activeThreadMessage.sender_name}</p>
+                                            <p className="text-[8px] text-gray-400">{format(parseISO(activeThreadMessage.created_at), 'HH:mm', { locale: es })}</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap pl-1">{activeThreadMessage.text}</p>
+                                </div>
+
+                                <div className="relative flex py-1 items-center">
+                                    <div className="flex-grow border-t border-gray-100 dark:border-gray-800/60"></div>
+                                    <span className="flex-shrink mx-3 text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                                        {messages.filter(m => m.thread_id === activeThreadMessage.id).length} Respuestas
+                                    </span>
+                                    <div className="flex-grow border-t border-gray-100 dark:border-gray-800/60"></div>
+                                </div>
+
+                                {/* Thread replies stream */}
+                                <div className="space-y-3">
+                                    {messages.filter(m => m.thread_id === activeThreadMessage.id).map(reply => {
+                                        return (
+                                            <div key={reply.id} className="flex items-start gap-2.5 p-2 hover:bg-gray-50 dark:hover:bg-gray-800/10 rounded-lg transition-all">
+                                                <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-sm">
+                                                    {reply.sender_name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                                        <span className="text-[11px] font-bold text-gray-900 dark:text-white">{reply.sender_name}</span>
+                                                        <span className="text-[8px] text-gray-400">{format(parseISO(reply.created_at), 'HH:mm', { locale: es })}</span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{reply.text}</p>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                            )}
-
-                        </div>
-                    )}
-
-                    {/* Messages Search Bar Inside Main Chat Workspace */}
-                    <div className="px-6 py-2 bg-gray-50 dark:bg-black/30 border-b border-gray-100 dark:border-gray-800/80 flex items-center justify-between gap-4 shrink-0">
-                        <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">Mensajes en este canal:</span> 
-                            {channelMessages.length} total
-                        </div>
-                        <div className="relative w-64">
-                            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
-                            <input 
-                                type="text" 
-                                placeholder="Buscar en este canal..." 
-                                value={chatSearch} 
-                                onChange={e => setChatSearch(e.target.value)} 
-                                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none"
-                            />
-                        </div>
-                    </div>
-
-                    {/* 4. MESSAGES STREAM */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                        
-                        {channelMessages.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto">
-                                <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 mb-3">
-                                    <MessageSquare className="w-6 h-6" />
-                                </div>
-                                <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-1">
-                                    Inicio del canal #{currentChannel.name}
-                                </h3>
-                                <p className="text-xs text-gray-500 leading-relaxed">
-                                    {currentChannel.description || 'Este es el inicio de la conversación de este canal. ¡Saluda a tu equipo!'}
-                                </p>
                             </div>
-                        ) : (
-                            channelMessages.map(msg => {
-                                const isSystem = msg.sender_name.includes('Sistema');
-                                const isUser = msg.sender_email === 'tu_correo@ejemplo.com';
-                                const reactions = msg.reactions || {};
-                                const isPinned = msg.is_pinned;
 
-                                // If message has a poll_id, locate the poll
-                                const poll = msg.poll_id ? activePolls.find(p => p.id === msg.poll_id) : null;
-
-                                return (
-                                    <div 
-                                        key={msg.id} 
-                                        className={`flex items-start gap-3 group relative p-3 rounded-xl transition-all ${
-                                            isPinned 
-                                                ? 'bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/50 dark:border-amber-900/30' 
-                                                : 'hover:bg-gray-50 dark:hover:bg-gray-800/10'
-                                        }`}
+                            {/* Thread reply input */}
+                            <div className="p-3 bg-gray-50 dark:bg-black/30 border-t border-gray-200 dark:border-gray-800 shrink-0">
+                                <form onSubmit={handleSendThreadReply} className="flex items-center gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Responder en este hilo..." 
+                                        value={threadInputText} 
+                                        onChange={e => setThreadInputText(e.target.value)} 
+                                        className="flex-1 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-[#111] transition-all"
+                                    />
+                                    <button 
+                                        type="submit" 
+                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                                     >
-                                        
-                                        {/* Sender Avatar */}
-                                        <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 shadow-sm text-white ${
-                                            isSystem ? 'bg-amber-500' : isUser ? 'bg-blue-600' : 'bg-indigo-600'
-                                        }`}>
-                                            {msg.sender_name.charAt(0).toUpperCase()}
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            
-                                            {/* Sender Metadata */}
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-xs font-bold text-gray-900 dark:text-white">{msg.sender_name}</span>
-                                                <span className="text-[10px] text-gray-400">{format(parseISO(msg.created_at), 'HH:mm', { locale: es })}</span>
-                                                {isPinned && (
-                                                    <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 uppercase tracking-wider bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.2 rounded border border-amber-200/40">
-                                                        📌 Fijado
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* Replying Context Bar */}
-                                            {msg.reply_to && (
-                                                <div className="p-2 mb-1.5 bg-gray-100 dark:bg-gray-800/60 rounded border-l-2 border-blue-500 text-[11px] text-gray-600 dark:text-gray-300">
-                                                    <strong className="block text-[10px] text-blue-500">Respondiendo a {msg.reply_to.sender_name}:</strong>
-                                                    {msg.reply_to.text}
-                                                </div>
-                                            )}
-
-                                            {/* Message Bubble/Content */}
-                                            <div className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
-                                                {msg.text}
-                                            </div>
-
-                                            {/* 5. INTERACTIVE TEAM POLL CARD (If Poll is attached) */}
-                                            {poll && (
-                                                <div className="mt-3 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl p-4 max-w-md shadow-sm">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <BarChart2 className="w-4 h-4 text-blue-500" />
-                                                        <span className="text-xs font-bold text-gray-900 dark:text-white">{poll.question}</span>
-                                                    </div>
-                                                    
-                                                    <p className="text-[10px] text-gray-400 mb-3">
-                                                        {poll.allow_multiple ? '● Opción Múltiple Permitida' : '● Opción Única'}
-                                                    </p>
-
-                                                    <div className="space-y-2.5">
-                                                        {poll.options.map(opt => {
-                                                            const totalPollVotes = poll.options.reduce((sum, o) => sum + o.voters.length, 0);
-                                                            const percentage = totalPollVotes > 0 ? Math.round((opt.voters.length / totalPollVotes) * 100) : 0;
-                                                            const userVoted = opt.voters.includes('tu_correo@ejemplo.com');
-
-                                                            return (
-                                                                <div 
-                                                                    key={opt.id}
-                                                                    onClick={() => handleVoteOption(poll.id, opt.id)}
-                                                                    className={`p-2.5 rounded-lg border text-xs cursor-pointer transition-all relative overflow-hidden group ${
-                                                                        userVoted 
-                                                                            ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-950/10' 
-                                                                            : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111] hover:border-gray-300'
-                                                                    }`}
-                                                                >
-                                                                    {/* Voting Progress Fill */}
-                                                                    <div 
-                                                                        className={`absolute inset-y-0 left-0 transition-all duration-500 -z-0 ${
-                                                                            userVoted ? 'bg-blue-500/10' : 'bg-gray-100 dark:bg-gray-800/40'
-                                                                        }`} 
-                                                                        style={{ width: `${percentage}%` }} 
-                                                                    />
-
-                                                                    <div className="relative flex items-center justify-between z-10">
-                                                                        <span className={`font-semibold ${userVoted ? 'text-blue-600 dark:text-blue-400' : 'text-gray-800 dark:text-gray-200'}`}>
-                                                                            {opt.text}
-                                                                        </span>
-                                                                        <span className="text-[10px] text-gray-400 font-bold">{opt.voters.length} votos ({percentage}%)</span>
-                                                                    </div>
-
-                                                                    {/* Voter List Detail Tooltip-like Info */}
-                                                                    {opt.voters.length > 0 && (
-                                                                        <div className="relative z-10 text-[9px] text-gray-400 mt-1 flex flex-wrap gap-1 items-center">
-                                                                            <span className="font-semibold text-gray-500">Votado por:</span>
-                                                                            {opt.voters.map((v, i) => (
-                                                                                <span key={i} className="px-1 py-0.2 bg-gray-100 dark:bg-gray-800 rounded">{v === 'tu_correo@ejemplo.com' ? 'Tú' : v.split('@')[0]}</span>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Referenced Documentation attachment card */}
-                                            {msg.doc_reference && (
-                                                <div className="mt-2.5 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-lg flex items-center justify-between gap-3 max-w-sm">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        {getFileIcon(msg.doc_reference.file_type, msg.doc_reference.file_name)}
-                                                        <div className="truncate">
-                                                            <h4 className="text-xs font-bold text-blue-900 dark:text-blue-200 truncate">{msg.doc_reference.title}</h4>
-                                                            <span className="text-[10px] text-blue-600 dark:text-blue-400">{msg.doc_reference.folder_name} • {msg.doc_reference.file_size_formatted}</span>
-                                                        </div>
-                                                    </div>
-                                                    <button 
-                                                        onClick={() => { setSelectedFolderId(null); setActiveTab('docs'); }}
-                                                        className="px-2 py-1 text-[10px] bg-blue-600 text-white rounded font-semibold hover:bg-blue-700 shrink-0"
-                                                    >
-                                                        Abrir
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {/* 6. REAL-TIME EMOJI REACTIONS BAR UNDER THE MESSAGE */}
-                                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                                {/* Map and alternate interactive reactions */}
-                                                {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
-                                                    const voters = reactions[emoji] || [];
-                                                    const hasReacted = voters.includes('tu_correo@ejemplo.com');
-                                                    if (voters.length === 0) return null;
-
-                                                    return (
-                                                        <button
-                                                            key={emoji}
-                                                            onClick={() => handleReactToMessage(msg.id, emoji)}
-                                                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all flex items-center gap-1 ${
-                                                                hasReacted 
-                                                                    ? 'bg-blue-50 border-blue-300 text-blue-800 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200' 
-                                                                    : 'bg-gray-50 border-gray-200 dark:bg-gray-800/30 dark:border-gray-800/60 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
-                                                            }`}
-                                                            title={`Reaccionado por: ${voters.join(', ')}`}
-                                                        >
-                                                            <span>{emoji}</span>
-                                                            <span>{voters.length}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-
-                                        </div>
-
-                                        {/* 7. FLOATING ACTIONS & REACTION PICKER OVERLAY (SLACK STYLE) */}
-                                        <div className="absolute right-4 -top-3 hidden group-hover:flex items-center gap-1 bg-white dark:bg-[#161616] border border-gray-200 dark:border-gray-800 rounded-lg p-1 shadow-md z-20">
-                                            {/* Quick Reactions Selector */}
-                                            <div className="flex items-center gap-0.5 border-r border-gray-100 dark:border-gray-800/80 pr-1.5 mr-1">
-                                                {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
-                                                    const voters = reactions[emoji] || [];
-                                                    const hasReacted = voters.includes('tu_correo@ejemplo.com');
-                                                    return (
-                                                        <button
-                                                            key={emoji}
-                                                            onClick={() => handleReactToMessage(msg.id, emoji)}
-                                                            className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all text-xs ${hasReacted ? 'grayscale-0 scale-110' : 'grayscale hover:grayscale-0 hover:scale-110'}`}
-                                                            title={`Reaccionar con ${emoji}`}
-                                                        >
-                                                            {emoji}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            <button 
-                                                onClick={() => handleTogglePinMessage(msg.id)}
-                                                className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-all ${isPinned ? 'text-amber-500' : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
-                                                title={isPinned ? 'Desfijar Mensaje' : 'Fijar Mensaje'}
-                                            >
-                                                <Pin className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button 
-                                                onClick={() => setReplyingToMessage(msg)}
-                                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-500 transition-all"
-                                                title="Responder"
-                                            >
-                                                <Share2 className="w-3.5 h-3.5 rotate-180" />
-                                            </button>
-                                        </div>
-
-                                    </div>
-                                );
-                            })
-                        )}
-
-                        <div ref={chatEndRef} />
-                    </div>
-
-                    {/* 8. TYPING STATUS INDICATOR */}
-                    {typingUsers[currentChannel.id] && (
-                        <div className="px-6 py-1 bg-white dark:bg-black/30 text-[10px] text-gray-500 dark:text-gray-400 italic flex items-center gap-1.5 shrink-0 select-none">
-                            <span className="relative flex h-1.5 w-1.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"></span>
-                            </span>
-                            <span>{typingUsers[currentChannel.id]} está escribiendo...</span>
+                                        <Send className="w-3 h-3" />
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     )}
-
-                    {/* 9. MESSAGE INPUT COMPONENT */}
-                    <div className="p-4 bg-white dark:bg-[#0c0c0c] border-t border-gray-200 dark:border-gray-800 shrink-0">
-                        
-                        {/* Replying Context Bar */}
-                        {replyingToMessage && (
-                            <div className="mb-2 p-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg text-xs flex items-center justify-between">
-                                <div className="truncate">
-                                    <span className="font-semibold text-gray-500">Respondiendo a: </span>
-                                    <span className="font-bold text-gray-800 dark:text-gray-200">{replyingToMessage.sender_name}</span>
-                                    <p className="text-gray-500 truncate mt-0.5">{replyingToMessage.text}</p>
-                                </div>
-                                <button onClick={() => setReplyingToMessage(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400">
-                                    <X className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                            
-                            {/* Insert note attachment quickpicker */}
-                            <button 
-                                type="button" 
-                                onClick={() => setActiveTab('docs')} 
-                                title="Referenciar un documento o nota" 
-                                className="p-2 text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all"
-                            >
-                                <Paperclip className="w-5 h-5" />
-                            </button>
-
-                            <input 
-                                type="text" 
-                                placeholder={`Enviar un mensaje a #${currentChannel.name}...`} 
-                                value={chatText} 
-                                onChange={e => setChatText(e.target.value)} 
-                                className="flex-1 bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-[#111] transition-all"
-                            />
-
-                            <button 
-                                type="submit" 
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
-                            >
-                                <Send className="w-3.5 h-3.5" /> Enviar
-                            </button>
-
-                        </form>
-                    </div>
 
                 </div>
 
@@ -2136,7 +2396,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     />
                                 </div>
 
-                                <div className="flex items-center pt-1">
+                                <div className="space-y-3 pt-1">
                                     <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
                                         <input 
                                             type="checkbox"
@@ -2146,6 +2406,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         />
                                         <span>Canal Privado 🔒</span>
                                     </label>
+
+                                    {newChannelIsPrivate && (
+                                        <div className="pt-1">
+                                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Contraseña de Acceso (Opcional)</label>
+                                            <input 
+                                                type="password" 
+                                                placeholder="ej. secreto123"
+                                                value={newChannelPassword}
+                                                onChange={e => setNewChannelPassword(e.target.value)}
+                                                className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                                            />
+                                            <p className="text-[10px] text-gray-500 mt-1">Los demás miembros necesitarán esta contraseña para unirse al canal privado.</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="pt-2 flex justify-end gap-2">
@@ -2209,7 +2483,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     />
                                 </div>
 
-                                <div className="flex items-center pt-1">
+                                <div className="space-y-3 pt-1">
                                     <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
                                         <input 
                                             type="checkbox"
@@ -2219,6 +2493,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         />
                                         <span>Canal Privado 🔒</span>
                                     </label>
+
+                                    {editingChannelIsPrivate && (
+                                        <div className="pt-1">
+                                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Contraseña de Acceso (Opcional)</label>
+                                            <input 
+                                                type="password" 
+                                                placeholder="ej. secreto123"
+                                                value={editingChannelPassword}
+                                                onChange={e => setEditingChannelPassword(e.target.value)}
+                                                className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+                                            />
+                                            <p className="text-[10px] text-gray-500 mt-1">Los demás miembros necesitarán esta contraseña para unirse al canal privado.</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="pt-2 flex justify-end gap-2">
