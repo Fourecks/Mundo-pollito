@@ -137,12 +137,12 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
     const [showingAllProjects, setShowingAllProjects] = useState<boolean>(activeProjectId === null);
 
     useEffect(() => {
-        if (activeProjectId === null) {
-            setShowingAllProjects(true);
-        } else {
+        if (activeProjectId !== null && activeProjectId !== undefined) {
             setShowingAllProjects(false);
+        } else if (activeProjectId === null && safeProjects.length === 0) {
+            setShowingAllProjects(true);
         }
-    }, [activeProjectId]);
+    }, [activeProjectId, safeProjects.length]);
 
     const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'risks' | 'budget' | 'time' | 'docs' | 'chat' | 'inbox' | 'team' | 'activity'>('overview');
     
@@ -2121,15 +2121,28 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
             {showingAllProjects ? (
                 renderAllProjectsDashboard()
             ) : !activeProject ? (
-                <div className="p-8 text-center flex flex-col items-center justify-center h-full space-y-3">
-                    <Briefcase className="w-10 h-10 text-gray-400" />
-                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">No hay ningún proyecto activo seleccionado</p>
-                    <button 
-                        onClick={() => setShowingAllProjects(true)}
-                        className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-blue-700"
-                    >
-                        Ver Centro de Proyectos
-                    </button>
+                <div className="p-8 text-center flex flex-col items-center justify-center h-full space-y-4 bg-white dark:bg-[#111] rounded-2xl m-6 border border-gray-200 dark:border-gray-800 shadow-sm">
+                    <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                        <Briefcase className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-1">
+                        <h2 className="text-base font-bold text-gray-900 dark:text-white">Selecciona o Crea un Proyecto</h2>
+                        <p className="text-xs text-gray-500 max-w-sm">No hay ningún proyecto activo seleccionado en este momento. Explora tu centro de proyectos o crea uno nuevo.</p>
+                    </div>
+                    <div className="flex items-center gap-3 pt-2">
+                        <button 
+                            onClick={() => setShowingAllProjects(true)}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
+                        >
+                            <Grid className="w-4 h-4" /> Ver Centro de Proyectos
+                        </button>
+                        <button 
+                            onClick={() => setIsCreateProjectModalOpen(true)}
+                            className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl transition-all"
+                        >
+                            + Crear Proyecto
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <>
