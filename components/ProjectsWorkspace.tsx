@@ -850,6 +850,23 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
+    // Helper to broadcast announcements directly into chat channels
+    const broadcastToChannel = (messageText: string) => {
+        if (!activeProject) return;
+        const targetChan = selectedChannelId || 'general';
+        const newMsg: ProjectChatMessage = {
+            id: crypto.randomUUID(),
+            project_id: activeProject.id,
+            channel_id: targetChan,
+            sender_name: 'Sistema',
+            sender_email: 'sistema@workspace.local',
+            text: messageText,
+            created_at: new Date().toISOString()
+        };
+        const currentMsgs = activeProject.chat_messages || [];
+        onUpdateProject(activeProject.id, { chat_messages: [...currentMsgs, newMsg] });
+    };
+
     // SPRINTS TAB
     const renderSprints = () => {
         if (!activeProject) return null;
@@ -857,84 +874,139 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         return (
             <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto pb-20">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Planificación de Sprints</h2>
-                        <p className="text-xs text-gray-500">Gestión ágil de iteraciones con capacidad y retrospectivas de equipo.</p>
+                        <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Planificación de Sprints</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Iteraciones ágiles, asignación de tareas, capacidad de equipo y seguimiento en tiempo real.</p>
                     </div>
-                    <button onClick={() => setSprintModal({ isOpen: true, sprint: null })} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-2 shadow-sm">
-                        <Plus className="w-4 h-4" /> Crear Sprint
+                    <button onClick={() => setSprintModal({ isOpen: true, sprint: null })} className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-2 shadow-sm">
+                        <Plus className="w-3.5 h-3.5" /> Crear Sprint
                     </button>
                 </div>
 
-                {sprints.length === 0 ? renderEmptyState('No hay Sprints configurados', 'Organiza el trabajo en iteraciones de 1 o 2 semanas.') : (
+                {sprints.length === 0 ? renderEmptyState('No hay Sprints configurados', 'Organiza el trabajo del equipo en iteraciones de 1 o 2 semanas.') : (
                     <div className="space-y-6">
                         {sprints.map(sprint => {
                             const sprintTasks = projectTodos.filter(t => t.sprint_id === sprint.id);
                             const totalSP = sprintTasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
                             const completedSP = sprintTasks.filter(t => t.completed).reduce((sum, t) => sum + (t.story_points || 0), 0);
-                            const progress = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : 0;
+                            const progress = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : (sprintTasks.length > 0 ? Math.round((sprintTasks.filter(t => t.completed).length / sprintTasks.length) * 100) : 0);
+
+                            const handleShareSprintProgress = () => {
+                                const text = `📌 **Actualización de Sprint: ${sprint.name}**\n• Estado: ${sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'En Planificación'}\n• Puntos de Historia: ${completedSP}/${totalSP} SP (${progress}%)\n• Tareas Completadas: ${sprintTasks.filter(t => t.completed).length} de ${sprintTasks.length}`;
+                                broadcastToChannel(text);
+                                alert('Progreso del Sprint compartido en el canal de chat.');
+                            };
 
                             return (
-                                <div key={sprint.id} className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
-                                    <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
+                                <div key={sprint.id} className="bg-white dark:bg-[#0a0a0a] rounded-xl border border-gray-200 dark:border-gray-800/80 p-5 shadow-sm space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-4">
                                         <div className="flex items-center gap-3">
-                                            <h3 className="text-base font-bold text-gray-900 dark:text-white">{sprint.name}</h3>
-                                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
-                                                sprint.status === 'active' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300' :
-                                                sprint.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300' :
-                                                'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400'
+                                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">{sprint.name}</h3>
+                                            <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${
+                                                sprint.status === 'active' ? 'bg-zinc-100 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700' :
+                                                sprint.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' :
+                                                'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-800'
                                             }`}>
-                                                {sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'En Planificación'}
+                                                {sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'Planificación'}
                                             </span>
                                         </div>
+
                                         <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={handleShareSprintProgress}
+                                                className="px-2.5 py-1 text-xs border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md font-medium flex items-center gap-1.5 transition-colors"
+                                                title="Publicar actualización en el canal de chat"
+                                            >
+                                                <MessageSquare className="w-3.5 h-3.5 text-blue-500" /> Compartir en Chat
+                                            </button>
+
                                             {sprint.status === 'planning' && (
                                                 <button 
                                                     onClick={() => {
                                                         const updated = sprints.map(s => s.id === sprint.id ? { ...s, status: 'active' as const } : s);
                                                         onUpdateProject(activeProject.id, { sprints: updated });
                                                     }}
-                                                    className="px-2.5 py-1 text-xs bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700"
+                                                    className="px-2.5 py-1 text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-md font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
                                                 >
-                                                    Iniciar Sprint
+                                                    Iniciar
                                                 </button>
                                             )}
                                             {sprint.status === 'active' && (
                                                 <button 
                                                     onClick={() => setCloseSprintModal({ isOpen: true, sprint })}
-                                                    className="px-2.5 py-1 text-xs bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700"
+                                                    className="px-2.5 py-1 text-xs bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition-colors"
                                                 >
-                                                    Cerrar Sprint
+                                                    Cerrar
                                                 </button>
                                             )}
                                             <button onClick={() => setSprintModal({ isOpen: true, sprint })} className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md">
-                                                <Edit2 className="w-4 h-4" />
+                                                <Edit2 className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </div>
 
-                                    {sprint.goal && <p className="text-xs text-gray-600 dark:text-gray-300 mb-4">{sprint.goal}</p>}
+                                    {sprint.goal && <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{sprint.goal}</p>}
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-gray-50 dark:bg-black/50 rounded-lg border border-gray-100 dark:border-gray-800 mb-4">
-                                        <div>
-                                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Progreso SP</span>
-                                            <span className="text-sm font-bold text-gray-900 dark:text-white">{completedSP} / {totalSP} SP ({progress}%)</span>
+                                    {/* Progress Bar & Key Metrics */}
+                                    <div className="space-y-1.5">
+                                        <div className="flex justify-between text-[11px] font-medium text-gray-500">
+                                            <span>Progreso Story Points ({completedSP} / {totalSP} SP)</span>
+                                            <span>{progress}%</span>
                                         </div>
-                                        <div>
-                                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Fechas</span>
-                                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{sprint.start_date || '?'} al {sprint.end_date || '?'}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] uppercase font-bold text-gray-400 block">Tareas</span>
-                                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{sprintTasks.filter(t => t.completed).length} completadas de {sprintTasks.length}</span>
+                                        <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                            <div className="h-full bg-gray-900 dark:bg-white transition-all duration-300" style={{ width: `${progress}%` }} />
                                         </div>
                                     </div>
 
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-gray-50 dark:bg-zinc-900/40 rounded-lg border border-gray-100 dark:border-gray-800/80 text-xs">
+                                        <div>
+                                            <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 block">Fechas</span>
+                                            <span className="font-medium text-gray-700 dark:text-gray-300">{sprint.start_date || 'Sin fecha'} - {sprint.end_date || 'Sin fecha'}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 block">Tareas Vinculadas</span>
+                                            <span className="font-medium text-gray-700 dark:text-gray-300">{sprintTasks.filter(t => t.completed).length} / {sprintTasks.length} completadas</span>
+                                        </div>
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 block">Puntos de Historia</span>
+                                            <span className="font-medium text-gray-700 dark:text-gray-300">{totalSP} SP acumulados</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Sprint Linked Tasks Accordion */}
+                                    {sprintTasks.length > 0 && (
+                                        <div className="pt-2 border-t border-gray-100 dark:border-gray-800/80 space-y-2">
+                                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Tareas del Sprint</span>
+                                            <div className="space-y-1 max-h-40 overflow-y-auto">
+                                                {sprintTasks.map(task => (
+                                                    <div key={task.id} className="flex items-center justify-between p-2 rounded bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-800 text-xs">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={task.completed}
+                                                                onChange={() => onToggleTodo(task.id)}
+                                                                className="rounded border-gray-300 text-gray-900 focus:ring-0 cursor-pointer"
+                                                            />
+                                                            <span className={`truncate ${task.completed ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200 font-medium'}`}>
+                                                                {task.text}
+                                                            </span>
+                                                        </div>
+                                                        {task.story_points ? (
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-mono shrink-0">
+                                                                {task.story_points} SP
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Retrospective */}
                                     {sprint.retrospective && (
-                                        <div className="mt-3 p-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-xs text-amber-900 dark:text-amber-200">
-                                            <strong className="block mb-1 font-bold">📝 Retrospectiva del Sprint:</strong>
+                                        <div className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+                                            <strong className="block mb-1 font-bold text-gray-900 dark:text-white">📝 Retrospectiva:</strong>
                                             {sprint.retrospective}
                                         </div>
                                     )}
@@ -954,50 +1026,99 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         return (
             <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto pb-20">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Hoja de Ruta y Entregables</h2>
-                        <p className="text-xs text-gray-500">Cronograma visual de hitos clave, lanzamientos y dependencias del proyecto.</p>
+                        <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Hoja de Ruta y Entregables</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Hitos estratégicos del proyecto, entregables clave y notificaciones en canales.</p>
                     </div>
-                    <button onClick={() => setMilestoneModal({ isOpen: true, milestone: null })} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-2 shadow-sm">
-                        <Plus className="w-4 h-4" /> Nuevo Hito
+                    <button onClick={() => setMilestoneModal({ isOpen: true, milestone: null })} className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-2 shadow-sm">
+                        <Plus className="w-3.5 h-3.5" /> Nuevo Hito
                     </button>
                 </div>
 
-                {milestones.length === 0 ? renderEmptyState('Hoja de ruta sin hitos', 'Establece los objetivos clave del proyecto.') : (
-                    <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-800 space-y-6">
-                        {milestones.map(ms => (
-                            <div key={ms.id} className="relative group">
-                                <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-4 border-white dark:border-[#050505] mt-1 ${
-                                    ms.status === 'completed' ? 'bg-emerald-500' : ms.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
-                                }`} />
-                                <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="text-base font-bold text-gray-900 dark:text-white">{ms.name}</h3>
-                                            <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                                                {ms.category || 'General'}
-                                            </span>
+                {milestones.length === 0 ? renderEmptyState('Hoja de ruta sin hitos', 'Establece los objetivos clave y entregables del proyecto.') : (
+                    <div className="relative pl-6 border-l border-gray-200 dark:border-gray-800 space-y-6">
+                        {milestones.map(ms => {
+                            const handleShareMilestone = () => {
+                                const text = `🚩 **Hito del Proyecto: ${ms.name}**\n• Categoría: ${ms.category || 'General'}\n• Estado: ${ms.status === 'completed' ? '✓ Completado' : ms.status === 'in_progress' ? '● En Progreso' : 'Planificado'}\n• Fecha Límite: ${ms.target_date || 'Por definir'}${ms.description ? `\n• Detalle: ${ms.description}` : ''}`;
+                                broadcastToChannel(text);
+                                alert('Hito compartido en el canal de chat.');
+                            };
+
+                            const handleStatusChange = (newStatus: 'pending' | 'in_progress' | 'completed') => {
+                                const updated = milestones.map(m => m.id === ms.id ? { ...m, status: newStatus } : m);
+                                onUpdateProject(activeProject.id, { milestones: updated });
+                            };
+
+                            return (
+                                <div key={ms.id} className="relative group">
+                                    <div className={`absolute -left-[31px] w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#050505] mt-1.5 ${
+                                        ms.status === 'completed' ? 'bg-emerald-500' : ms.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-600'
+                                    }`} />
+
+                                    <div className="bg-white dark:bg-[#0a0a0a] p-4 rounded-xl border border-gray-200 dark:border-gray-800/80 shadow-sm flex flex-col gap-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">{ms.name}</h3>
+                                                <span className="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                                    {ms.category || 'General'}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {/* Status Selector Pills */}
+                                                <div className="flex items-center bg-gray-100 dark:bg-gray-900 p-0.5 rounded-lg border border-gray-200 dark:border-gray-800">
+                                                    <button
+                                                        onClick={() => handleStatusChange('pending')}
+                                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded ${ms.status === 'pending' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-xs' : 'text-gray-400 hover:text-gray-700'}`}
+                                                    >
+                                                        Pendiente
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleStatusChange('in_progress')}
+                                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded ${ms.status === 'in_progress' ? 'bg-blue-600 text-white shadow-xs' : 'text-gray-400 hover:text-gray-700'}`}
+                                                    >
+                                                        En Progreso
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleStatusChange('completed')}
+                                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded ${ms.status === 'completed' ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-400 hover:text-gray-700'}`}
+                                                    >
+                                                        Completado
+                                                    </button>
+                                                </div>
+
+                                                <button
+                                                    onClick={handleShareMilestone}
+                                                    className="p-1.5 text-gray-400 hover:text-blue-500 rounded-md transition-colors"
+                                                    title="Notificar hito en el canal de chat"
+                                                >
+                                                    <MessageSquare className="w-3.5 h-3.5" />
+                                                </button>
+
+                                                <button onClick={() => setMilestoneModal({ isOpen: true, milestone: ms })} className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md">
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <button onClick={() => setMilestoneModal({ isOpen: true, milestone: ms })} className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white">
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                    {ms.description && <p className="text-xs text-gray-600 dark:text-gray-300">{ms.description}</p>}
-                                    <div className="flex items-center gap-4 text-xs text-gray-500 mt-2 font-medium">
-                                        <span className="flex items-center gap-1"><CalendarIcon className="w-3.5 h-3.5" /> Límite: {ms.target_date}</span>
-                                        {ms.owner_email && <span>Resp: {ms.owner_email}</span>}
+
+                                        {ms.description && <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{ms.description}</p>}
+
+                                        <div className="flex items-center gap-4 text-xs text-gray-500 font-medium pt-1">
+                                            <span className="flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5" /> Fecha límite: {ms.target_date || 'Por definir'}</span>
+                                            {ms.owner_email && <span>Responsable: {ms.owner_email}</span>}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
         );
     };
 
-    // DOCUMENTATION & FILES TAB
+    // DOCUMENTATION & FILES TAB (MINIMALIST & ELEGANT DESIGN)
     const renderDocs = () => {
         if (!activeProject) return null;
         const folders = activeProject.doc_folders || [];
@@ -1018,7 +1139,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                     <div>
                         <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Documentos y Archivos</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">Sube archivos, organiza carpetas, previsualiza y comparte en cualquier canal.</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Repositorio limpio de archivos, especificaciones y notas del proyecto.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Search Bar */}
@@ -1026,10 +1147,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
                             <input 
                                 type="text"
-                                placeholder="Buscar archivos..."
+                                placeholder="Buscar documentos..."
                                 value={docSearchText}
                                 onChange={e => setDocSearchText(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white w-40 sm:w-52"
+                                className="pl-8 pr-3 py-1.5 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-gray-400 text-gray-900 dark:text-white w-40 sm:w-52"
                             />
                             {docSearchText && (
                                 <button onClick={() => setDocSearchText('')} className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600">
@@ -1039,30 +1160,30 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
 
                         {/* View Mode Toggle */}
-                        <div className="flex items-center bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center bg-gray-100 dark:bg-gray-900 p-0.5 rounded-lg border border-gray-200 dark:border-gray-800">
                             <button
                                 onClick={() => setDocViewMode('grid')}
-                                className={`p-1.5 rounded-md transition-colors ${docViewMode === 'grid' ? 'bg-white dark:bg-[#111] text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                className={`p-1.5 rounded-md transition-colors ${docViewMode === 'grid' ? 'bg-white dark:bg-[#111] text-gray-900 dark:text-white shadow-xs' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                                 title="Vista en cuadrícula"
                             >
                                 <Grid className="w-3.5 h-3.5" />
                             </button>
                             <button
                                 onClick={() => setDocViewMode('table')}
-                                className={`p-1.5 rounded-md transition-colors ${docViewMode === 'table' ? 'bg-white dark:bg-[#111] text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                                className={`p-1.5 rounded-md transition-colors ${docViewMode === 'table' ? 'bg-white dark:bg-[#111] text-gray-900 dark:text-white shadow-xs' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
                                 title="Vista en tabla"
                             >
                                 <List className="w-3.5 h-3.5" />
                             </button>
                         </div>
 
-                        <button onClick={() => setFolderModal({ isOpen: true, folder: null })} className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors">
-                            <FolderPlus className="w-3.5 h-3.5 text-amber-500" /> Nueva Carpeta
+                        <button onClick={() => setFolderModal({ isOpen: true, folder: null })} className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors">
+                            <FolderPlus className="w-3.5 h-3.5" /> Nueva Carpeta
                         </button>
                         <button onClick={() => setDocModal({ isOpen: true, doc: null, initialFolderId: selectedFolderId || undefined })} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 flex items-center gap-1.5 transition-colors shadow-sm">
                             <Plus className="w-3.5 h-3.5" /> Nueva Nota
                         </button>
-                        <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-1.5 shadow-sm transition-colors">
+                        <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors">
                             <Paperclip className="w-3.5 h-3.5" /> Subir
                         </button>
                         <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
@@ -1074,7 +1195,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <button 
                         onClick={() => setSelectedFolderId(null)} 
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
-                            selectedFolderId === null ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            selectedFolderId === null ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs' : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
                         }`}
                     >
                         <Folder className="w-3.5 h-3.5" /> Todos ({docs.length})
@@ -1087,7 +1208,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <button
                                     onClick={() => setSelectedFolderId(f.id)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                                        selectedFolderId === f.id ? 'bg-amber-500 text-white shadow-sm' : 'bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800/50 hover:bg-amber-100'
+                                        selectedFolderId === f.id ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs' : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800 hover:bg-gray-200 dark:hover:bg-gray-800'
                                     }`}
                                 >
                                     <FolderOpen className="w-3.5 h-3.5" /> {f.name} ({count})
@@ -1104,7 +1225,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {filteredDocs.map(doc => {
                             const folder = folders.find(f => f.id === doc.folder_id);
                             return (
-                                <div key={doc.id} className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-all group">
+                                <div key={doc.id} className="bg-white dark:bg-[#0a0a0a] p-4 rounded-xl border border-gray-200 dark:border-gray-800/80 shadow-xs flex flex-col justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-all group">
                                     <div>
                                         <div className="flex items-start justify-between gap-2 mb-2">
                                             <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1112,7 +1233,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 <h3 className="text-xs font-bold text-gray-900 dark:text-white truncate" title={doc.title}>{doc.title}</h3>
                                             </div>
                                             {folder && (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800/50 shrink-0">
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-semibold border border-gray-200 dark:border-gray-700 shrink-0">
                                                     {folder.name}
                                                 </span>
                                             )}
@@ -1135,9 +1256,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             <button 
                                                 onClick={() => handleOpenShareDoc(doc)}
                                                 title="Compartir en canal de chat"
-                                                className="px-2 py-1 text-[11px] bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 font-medium flex items-center gap-1 transition-colors"
+                                                className="px-2 py-1 text-[11px] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-800 font-medium flex items-center gap-1 transition-colors"
                                             >
-                                                <MessageSquare className="w-3 h-3" /> Compartir
+                                                <MessageSquare className="w-3 h-3 text-blue-500" /> Compartir
                                             </button>
                                             <button 
                                                 onClick={() => handleDownloadFile(doc)}
@@ -1154,7 +1275,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
                 ) : (
                     /* Table View */
-                    <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                    <div className="bg-white dark:bg-[#0a0a0a] rounded-xl border border-gray-200 dark:border-gray-800/80 overflow-hidden shadow-xs">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 text-gray-400 font-medium uppercase tracking-wider text-[10px]">
@@ -1165,7 +1286,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <th className="py-2.5 px-4 text-right">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
                                 {filteredDocs.map(doc => {
                                     const folder = folders.find(f => f.id === doc.folder_id);
                                     return (
@@ -1178,7 +1299,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             </td>
                                             <td className="py-2.5 px-4">
                                                 {folder ? (
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800/50">
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-semibold border border-gray-200 dark:border-gray-700">
                                                         {folder.name}
                                                     </span>
                                                 ) : <span className="text-gray-400">-</span>}
@@ -1201,7 +1322,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                     <button 
                                                         onClick={() => handleOpenShareDoc(doc)}
                                                         title="Compartir en canal"
-                                                        className="px-2 py-0.5 text-[10px] bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded font-medium hover:bg-blue-100"
+                                                        className="px-2 py-0.5 text-[10px] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
                                                     >
                                                         Compartir
                                                     </button>
@@ -3419,14 +3540,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     setPreviewDocModal(null);
                                     handleOpenShareDoc(doc);
                                 }}
-                                className="px-3.5 py-1.5 text-xs bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-semibold rounded-lg hover:bg-blue-100 flex items-center gap-1.5"
+                                className="px-3.5 py-1.5 text-xs border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors"
                             >
-                                <MessageSquare className="w-3.5 h-3.5" /> Compartir en Canal
+                                <MessageSquare className="w-3.5 h-3.5 text-blue-500" /> Compartir en Canal
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleDownloadFile(previewDocModal)}
-                                className="px-3.5 py-1.5 text-xs bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 flex items-center gap-1.5"
+                                className="px-3.5 py-1.5 text-xs bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 flex items-center gap-1.5 transition-colors shadow-xs"
                             >
                                 <Download className="w-3.5 h-3.5" /> Descargar
                             </button>

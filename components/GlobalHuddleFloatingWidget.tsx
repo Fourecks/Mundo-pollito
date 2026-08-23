@@ -71,14 +71,33 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
     initialPos.current = { ...position };
   };
 
+  const handleExpandWidget = () => {
+    setIsFloatingMinimized(false);
+    // Shift position upward if expanding offscreen
+    if (typeof window !== 'undefined') {
+      const expandedHeight = 380;
+      const expandedWidth = 320;
+      setPosition((prev) => {
+        const maxY = Math.max(10, window.innerHeight - expandedHeight - 16);
+        const maxX = Math.max(10, window.innerWidth - expandedWidth - 16);
+        return {
+          x: Math.min(prev.x, maxX),
+          y: Math.min(prev.y, maxY),
+        };
+      });
+    }
+  };
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
       const dx = e.clientX - dragStartPos.current.x;
       const dy = e.clientY - dragStartPos.current.y;
 
-      const maxX = typeof window !== 'undefined' ? window.innerWidth - 300 : 800;
-      const maxY = typeof window !== 'undefined' ? window.innerHeight - 300 : 600;
+      const widgetHeight = isFloatingMinimized ? 52 : 380;
+      const widgetWidth = isFloatingMinimized ? 220 : 320;
+      const maxX = typeof window !== 'undefined' ? Math.max(10, window.innerWidth - widgetWidth - 10) : 800;
+      const maxY = typeof window !== 'undefined' ? Math.max(10, window.innerHeight - widgetHeight - 10) : 600;
 
       setPosition({
         x: Math.max(10, Math.min(maxX, initialPos.current.x + dx)),
@@ -98,7 +117,7 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, isFloatingMinimized]);
 
   if (!isHuddleActive || !activeHuddle) return null;
 
@@ -346,7 +365,7 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsFloatingMinimized(false);
+                  handleExpandWidget();
                 }}
                 className="p-1 text-gray-400 hover:text-white transition-colors"
                 title="Expandir Cuadrado de Video"
