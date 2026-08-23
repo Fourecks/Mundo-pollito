@@ -71,7 +71,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     } = props;
     // Common State
     const containerRef = useRef<HTMLDivElement>(null);
-    const activeTab = 'tasks';
+    const [activeTab, setActiveTab] = useState<'tasks' | 'projects'>('tasks');
 
     // State for 'Tasks' tab
     const [sortBy, setSortBy] = useState<'default' | 'priority' | 'dueDate'>('default');
@@ -329,8 +329,35 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
 
     return (
         <div ref={containerRef} className="flex flex-col h-full overflow-hidden">
+            {/* Top Navigation Tabs */}
+            <div className="flex-shrink-0 px-4 pt-2.5 pb-2 border-b border-secondary-light/30 dark:border-gray-700/50 bg-secondary-lighter/40 dark:bg-gray-800/40 flex items-center justify-between">
+                <div className="flex items-center gap-1 bg-black/5 dark:bg-black/20 p-0.5 rounded-lg">
+                    <button
+                        onClick={() => { setActiveTab('tasks'); setViewingProject(null); }}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                            activeTab === 'tasks'
+                                ? 'bg-white dark:bg-gray-800 text-primary-dark dark:text-primary shadow-xs'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                        }`}
+                    >
+                        Tareas
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('projects')}
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                            activeTab === 'projects'
+                                ? 'bg-white dark:bg-gray-800 text-primary-dark dark:text-primary shadow-xs'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                        }`}
+                    >
+                        Mis Proyectos ({projects.filter(p => !p.is_archived).length})
+                    </button>
+                </div>
+            </div>
+
             <div className="flex-grow overflow-hidden">
-                <div className="flex flex-col md:flex-row h-full">
+                {activeTab === 'tasks' && (
+                     <div className="flex flex-col md:flex-row h-full">
                         <div className={`hidden md:flex flex-col flex-shrink-0 border-r border-secondary-light/30 dark:border-gray-700 transition-all duration-300 ease-in-out ${isCalendarPanelVisible ? 'w-full md:w-[260px] p-2' : 'w-0 p-0 overflow-hidden'}`}>
                             <Calendar selectedDate={selectedDate} setDate={setSelectedDate} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} calendarEvents={calendarEvents} />
                         </div>
@@ -402,6 +429,9 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                             {calendarVisible && (<div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCalendarVisible(false)}><div className="bg-secondary-lighter dark:bg-gray-800 rounded-2xl shadow-xl p-4 w-full max-w-xs animate-pop-in" onClick={e => e.stopPropagation()}><Calendar selectedDate={selectedDate} setDate={(date) => { setSelectedDate(date); setCalendarVisible(false); }} datesWithTasks={datesWithTasks} datesWithAllTasksCompleted={datesWithAllTasksCompleted} calendarEvents={calendarEvents}/></div></div>)}
                         </div>
                     </div>
+                )}
+                
+                {activeTab === 'projects' && renderProjectsView()}
             </div>
             
             <ConfirmationModalWithOptions

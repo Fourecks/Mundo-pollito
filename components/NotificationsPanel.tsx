@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import CloseIcon from './icons/CloseIcon';
+import BellIcon from './icons/BellIcon';
 import { ProjectInvitation } from '../types';
 import { 
-  Check, X, Users, Mail, Clock, Megaphone, 
-  CheckCheck, Trash2, Bell, ShieldAlert, ChevronRight
+  Check, X, Users, Mail, Clock, Sparkles, Megaphone, 
+  ShieldCheck, CheckCheck, Trash2, Info, ArrowRight, Bell 
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,6 +18,7 @@ interface NotificationsPanelProps {
   onAcceptInvitation?: (invitationId: string) => Promise<void>;
   onDeclineInvitation?: (invitationId: string) => Promise<void>;
 
+  // Optional backward compatibility
   dailyEncouragementHour?: number | null;
   onSetDailyEncouragement?: (hour: number | null) => void;
   dailySummaryHour?: number | null;
@@ -65,10 +67,9 @@ const DEFAULT_ANNOUNCEMENTS: SystemAnnouncement[] = [
 ];
 
 const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
-  const { isOpen, onClose, invitations = [], onAcceptInvitation, onDeclineInvitation } = props;
+  const { isOpen, onClose, isMobile, invitations = [], onAcceptInvitation, onDeclineInvitation } = props;
+  const [activeTab, setActiveTab] = useState<'all' | 'invitations' | 'announcements'>('all');
   
-  const [activeTab, setActiveTab] = useState<'notifications' | 'invitations'>('notifications');
-
   // Local state for read status of announcements
   const [announcements, setAnnouncements] = useState<SystemAnnouncement[]>(() => {
     try {
@@ -84,8 +85,12 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
     } catch (e) {}
   }, [announcements]);
 
+  if (!isOpen) return null;
+
   const pendingInvitations = invitations.filter(inv => inv.status === 'pending');
+  const pastInvitations = invitations.filter(inv => inv.status !== 'pending');
   const unreadAnnouncementsCount = announcements.filter(a => !a.read).length;
+  const totalUnread = pendingInvitations.length + unreadAnnouncementsCount;
 
   const handleMarkAllAsRead = () => {
     setAnnouncements(prev => prev.map(a => ({ ...a, read: true })));
@@ -99,221 +104,301 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
     setAnnouncements(prev => prev.filter(a => a.id !== id));
   };
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop overlay */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[90000]"
-          />
-
-          {/* Sliding lateral panel */}
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 260 }}
-            className="fixed right-0 top-0 bottom-0 h-full w-full max-w-md bg-[#fafafa] dark:bg-[#0c0d0e] shadow-2xl z-[90001] border-l border-gray-200/80 dark:border-gray-800/80 flex flex-col overflow-hidden"
+  const panelContent = (
+    <div className="flex flex-col h-full max-h-[85vh] w-full bg-white dark:bg-[#1a1b1e] rounded-2xl overflow-hidden shadow-2xl border border-gray-100 dark:border-gray-800">
+      
+      {/* Header */}
+      <header className="flex-shrink-0 p-4 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-[#151618] flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Bell className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                Centro de Notificaciones
+              </h3>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                Invitaciones y novedades del sistema
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="p-2 rounded-xl hover:bg-gray-200/60 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           >
-            {/* Drawer Header */}
-            <header className="flex-shrink-0 px-6 py-5 bg-white dark:bg-[#111213] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-xs tracking-wider text-gray-900 dark:text-gray-100 uppercase">
-                  Buzón de Actividad
-                </h3>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  Alertas e invitaciones de equipo
-                </p>
-              </div>
-              <button 
-                onClick={onClose} 
-                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800/80 text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
-                aria-label="Cerrar panel"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </header>
+            <CloseIcon />
+          </button>
+        </div>
 
-            {/* Segment Selector / Tabs Next to Each Other (A la par) */}
-            <div className="flex-shrink-0 px-6 pb-4 bg-white dark:bg-[#111213] border-b border-gray-150 dark:border-gray-800/80 flex gap-2">
-              <button
-                onClick={() => setActiveTab('notifications')}
-                className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 border ${
-                  activeTab === 'notifications'
-                    ? 'bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-black'
-                    : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
-                }`}
-              >
-                Notificaciones
-                {unreadAnnouncementsCount > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('invitations')}
-                className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 border ${
-                  activeTab === 'invitations'
-                    ? 'bg-gray-900 border-gray-900 text-white dark:bg-white dark:border-white dark:text-black'
-                    : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
-                }`}
-              >
-                Solicitudes
+        {/* Action bar & Sub-tabs */}
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <div className="flex bg-gray-200/70 dark:bg-gray-800/80 p-1 rounded-xl text-xs font-medium flex-1">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === 'all'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm font-semibold'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              <span>Todas</span>
+              {totalUnread > 0 && (
+                <span className="bg-blue-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                  {totalUnread}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('invitations')}
+              className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === 'invitations'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm font-semibold'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Proyectos</span>
+              {pendingInvitations.length > 0 && (
+                <span className="bg-pink-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                  {pendingInvitations.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('announcements')}
+              className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === 'announcements'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm font-semibold'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              <Megaphone className="w-3.5 h-3.5" />
+              <span>Novedades</span>
+              {unreadAnnouncementsCount > 0 && (
+                <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                  {unreadAnnouncementsCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {unreadAnnouncementsCount > 0 && (
+            <button
+              onClick={handleMarkAllAsRead}
+              title="Marcar todas como leídas"
+              className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-xs flex items-center gap-1 shrink-0"
+            >
+              <CheckCheck className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Main Body */}
+      <main className="flex-grow p-4 overflow-y-auto custom-scrollbar bg-white dark:bg-[#1a1b1e]">
+        <div className="w-full space-y-4">
+          
+          {/* SECTION 1: PROJECT INVITATIONS */}
+          {(activeTab === 'all' || activeTab === 'invitations') && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" /> Invitaciones a Proyectos
+                </h4>
                 {pendingInvitations.length > 0 && (
-                  <span className={`text-[9px] px-1.5 py-0.2 font-black rounded ${
-                    activeTab === 'invitations'
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                  }`}>
-                    {pendingInvitations.length}
+                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    {pendingInvitations.length} pendiente{pendingInvitations.length > 1 ? 's' : ''}
                   </span>
                 )}
-              </button>
-            </div>
+              </div>
 
-            {/* Main scrollable body */}
-            <div className="flex-grow p-6 overflow-y-auto custom-scrollbar">
-              {activeTab === 'notifications' ? (
-                /* TAB 1: SYSTEM ANNOUNCEMENTS */
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-800/40">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">
-                      Alertas Recientes ({announcements.length})
-                    </span>
-                    {unreadAnnouncementsCount > 0 && (
-                      <button
-                        onClick={handleMarkAllAsRead}
-                        className="text-[9px] font-bold text-gray-900 hover:text-gray-600 dark:text-gray-200 dark:hover:text-gray-400 flex items-center gap-1 transition-colors"
-                      >
-                        <CheckCheck className="w-3 h-3" /> Todo leído
-                      </button>
-                    )}
+              {pendingInvitations.length === 0 ? (
+                activeTab === 'invitations' && (
+                  <div className="text-center py-10 px-4 bg-gray-50/50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
+                    <Mail className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Sin invitaciones pendientes</p>
+                    <p className="text-xs text-gray-400 mt-1">Las invitaciones a proyectos compartidos llegarán aquí.</p>
                   </div>
-
-                  <div className="space-y-4 divide-y divide-gray-100 dark:divide-gray-800/50">
-                    {announcements.length === 0 ? (
-                      <div className="text-center py-12 text-gray-400 text-xs font-medium">
-                        Sin notificaciones pendientes.
-                      </div>
-                    ) : (
-                      announcements.map((ann, idx) => (
-                        <div
-                          key={ann.id}
-                          onClick={() => handleToggleAnnouncementRead(ann.id)}
-                          className={`pt-4 first:pt-0 group cursor-pointer relative transition-all ${
-                            !ann.read ? 'opacity-100' : 'opacity-60 hover:opacity-100'
-                          }`}
-                        >
-                          {!ann.read && (
-                            <span className="absolute top-4 right-1 w-1.5 h-1.5 rounded-full bg-gray-900 dark:bg-white animate-pulse" />
-                          )}
-
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 px-1.5 py-0.2 rounded uppercase tracking-wider">
-                              {ann.tag}
-                            </span>
-                            <span className="text-[10px] text-gray-400 font-medium">
-                              {ann.author}
-                            </span>
-                          </div>
-
-                          <h5 className="font-bold text-xs text-gray-900 dark:text-gray-100 leading-snug">
-                            {ann.title}
-                          </h5>
-
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                            {ann.content}
-                          </p>
-
-                          <div className="flex items-center justify-between mt-2 text-[9px] text-gray-400">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-gray-400" />
-                              {format(parseISO(ann.date), "d 'de' MMMM", { locale: es })}
-                            </span>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteAnnouncement(ann.id);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-red-500 rounded"
-                              title="Eliminar notificación"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                )
               ) : (
-                /* TAB 2: INVITATIONS */
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-800/40">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">
-                      Invitaciones Pendientes ({pendingInvitations.length})
-                    </span>
-                  </div>
-
-                  <div className="space-y-4">
-                    {pendingInvitations.length === 0 ? (
-                      <div className="text-center py-16 px-4">
-                        <Mail className="w-6 h-6 text-gray-300 dark:text-gray-700 mx-auto mb-2" />
-                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">No hay solicitudes pendientes</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">Las invitaciones a tableros compartidos aparecerán en esta sección.</p>
+                pendingInvitations.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="bg-blue-50/40 dark:bg-blue-950/20 p-4 rounded-2xl border border-blue-200/80 dark:border-blue-800/40 shadow-sm flex flex-col gap-3 transition-all hover:border-blue-300 dark:hover:border-blue-700"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-sm"
+                        style={{ backgroundColor: inv.project_color || '#3B82F6' }}
+                      >
+                        {inv.project_emoji || '📁'}
                       </div>
-                    ) : (
-                      pendingInvitations.map((inv) => (
-                        <div
-                          key={inv.id}
-                          className="p-4 rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111213] flex flex-col gap-3 transition-all"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div
-                              className="w-8 h-8 rounded text-sm flex items-center justify-center font-bold text-gray-800 dark:text-gray-150 bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-800 shrink-0 shadow-xs"
-                            >
-                              {inv.project_emoji || '📁'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h5 className="font-bold text-xs text-gray-900 dark:text-white truncate">
-                                {inv.project_name}
-                              </h5>
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                                Colaborador: <span className="font-semibold text-gray-700 dark:text-gray-300">{inv.inviter_name || inv.inviter_email || 'Invitado'}</span>
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-800/60">
-                            <button
-                              onClick={() => onAcceptInvitation && onAcceptInvitation(inv.id)}
-                              className="flex-1 py-1.5 px-3 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-black rounded text-[11px] font-bold transition-all flex items-center justify-center gap-1"
-                            >
-                              Aceptar
-                            </button>
-                            <button
-                              onClick={() => onDeclineInvitation && onDeclineInvitation(inv.id)}
-                              className="flex-1 py-1.5 px-3 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/60 rounded text-[11px] font-semibold transition-all flex items-center justify-center gap-1"
-                            >
-                              Rechazar
-                            </button>
-                          </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 uppercase tracking-wide">
+                            Invitación
+                          </span>
                         </div>
-                      ))
-                    )}
+                        <h5 className="font-bold text-sm text-gray-900 dark:text-white truncate mt-1">
+                          {inv.project_name}
+                        </h5>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+                          Invitado por: <span className="font-semibold text-gray-900 dark:text-white">{inv.inviter_name || inv.inviter_email || inv.sender_email || 'Usuario'}</span>
+                        </p>
+                        <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-1">
+                          <Clock className="w-3 h-3" />
+                          {format(parseISO(inv.created_at), "d 'de' MMMM, HH:mm", { locale: es })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2 border-t border-blue-100 dark:border-blue-900/40">
+                      <button
+                        onClick={() => onAcceptInvitation && onAcceptInvitation(inv.id)}
+                        className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Aceptar
+                      </button>
+                      <button
+                        onClick={() => onDeclineInvitation && onDeclineInvitation(inv.id)}
+                        className="flex-1 py-2 px-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                      >
+                        <X className="w-3.5 h-3.5" /> Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {/* Past Invitations */}
+              {pastInvitations.length > 0 && activeTab === 'invitations' && (
+                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                    Historial de Invitaciones
+                  </h5>
+                  <div className="space-y-2">
+                    {pastInvitations.map(inv => (
+                      <div key={inv.id} className="p-3 bg-gray-50 dark:bg-gray-800/40 rounded-xl flex items-center justify-between text-xs">
+                        <div className="truncate pr-2">
+                          <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{inv.project_name}</p>
+                          <p className="text-[10px] text-gray-400">De: {inv.inviter_email || inv.sender_email || 'Desconocido'}</p>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          inv.status === 'accepted' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                        }`}>
+                          {inv.status === 'accepted' ? 'Aceptada' : 'Rechazada'}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+          )}
+
+          {/* SECTION 2: SYSTEM ANNOUNCEMENTS & CREATOR NEWS */}
+          {(activeTab === 'all' || activeTab === 'announcements') && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                  <Megaphone className="w-3.5 h-3.5" /> Actualizaciones y Novedades
+                </h4>
+              </div>
+
+              {announcements.length === 0 ? (
+                <div className="text-center py-8 px-4 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
+                  <Sparkles className="w-7 h-7 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">No hay más novedades del sistema</p>
+                </div>
+              ) : (
+                announcements.map((ann) => (
+                  <div
+                    key={ann.id}
+                    onClick={() => handleToggleAnnouncementRead(ann.id)}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer relative group ${
+                      !ann.read
+                        ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200/70 dark:border-amber-800/40 shadow-sm'
+                        : 'bg-gray-50/70 dark:bg-gray-800/40 border-gray-100 dark:border-gray-800 opacity-90'
+                    }`}
+                  >
+                    {!ann.read && (
+                      <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-amber-500" />
+                    )}
+
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide ${
+                        ann.tag === 'Actualización'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                          : ann.tag === 'Novedad'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
+                          : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'
+                      }`}>
+                        {ann.tag}
+                      </span>
+                      <span className="text-[11px] text-gray-400 font-medium">
+                        • {ann.author}
+                      </span>
+                    </div>
+
+                    <h5 className="font-semibold text-sm text-gray-900 dark:text-white leading-snug">
+                      {ann.title}
+                    </h5>
+
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1.5 leading-relaxed">
+                      {ann.content}
+                    </p>
+
+                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200/50 dark:border-gray-700/50 text-[10px] text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {format(parseISO(ann.date), "d 'de' MMMM", { locale: es })}
+                      </span>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAnnouncement(ann.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-red-500 rounded"
+                        title="Eliminar notificación"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+        </div>
+      </main>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90000] animate-fade-in" onClick={onClose}></div>
+        <div className="fixed bottom-0 left-0 right-0 max-h-[90vh] bg-white dark:bg-[#1a1b1e] rounded-t-3xl shadow-2xl flex flex-col z-[90001] animate-slide-up" onClick={e => e.stopPropagation()}>
+          {panelContent}
+        </div>
+      </>
+    );
+  }
+  
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[90000]" onClick={onClose}>
+      <div
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-auto w-full max-w-md bg-white dark:bg-[#1a1b1e] shadow-2xl rounded-2xl flex flex-col transition-transform duration-300 transform animate-pop-in border border-gray-100 dark:border-gray-800"
+        onClick={e => e.stopPropagation()}
+      >
+        {panelContent}
+      </div>
+    </div>
   );
 };
 
