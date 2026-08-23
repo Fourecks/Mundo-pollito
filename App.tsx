@@ -1000,6 +1000,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           {openWindows.includes('projects') && (
               <ModalWindow isOpen onClose={() => toggleWindow('projects')} title="Espacio de Proyectos" isDraggable isResizable zIndex={getWindowZIndex('projects')} onFocus={() => bringToFront('projects')} className="w-full max-w-6xl h-[88vh]" windowState={windowStatesRef.current.projects} onStateChange={s => handleWindowStateChange('projects', s)} allowFullscreen>
                   <ProjectsWorkspace
+                      currentUser={currentUser}
                       projects={projects}
                       allTodos={flatAllTodos}
                       activeProjectId={viewingProjectId}
@@ -1389,6 +1390,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 <div className={activeTab === 'projects' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full">
                         <ProjectsWorkspace
+                            currentUser={currentUser}
                             projects={projects}
                             allTodos={flatAllTodos}
                             activeProjectId={viewingProjectId}

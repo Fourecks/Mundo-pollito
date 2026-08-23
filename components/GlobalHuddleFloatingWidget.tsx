@@ -62,18 +62,25 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
 
   const isLocalSpeaking = isMicOn && localVolume > 10;
 
-  // Handle Dragging
+  // Handle Dragging (Mouse & Touch)
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only drag from header or grip handle
     if ((e.target as HTMLElement).closest('button')) return;
     setIsDragging(true);
     dragStartPos.current = { x: e.clientX, y: e.clientY };
     initialPos.current = { ...position };
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      dragStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      initialPos.current = { ...position };
+    }
+  };
+
   const handleExpandWidget = () => {
     setIsFloatingMinimized(false);
-    // Shift position upward if expanding offscreen
     if (typeof window !== 'undefined') {
       const expandedHeight = 380;
       const expandedWidth = 320;
@@ -81,8 +88,8 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
         const maxY = Math.max(10, window.innerHeight - expandedHeight - 16);
         const maxX = Math.max(10, window.innerWidth - expandedWidth - 16);
         return {
-          x: Math.min(prev.x, maxX),
-          y: Math.min(prev.y, maxY),
+          x: Math.max(10, Math.min(prev.x, maxX)),
+          y: Math.max(10, Math.min(prev.y, maxY)),
         };
       });
     }
@@ -105,17 +112,37 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
       });
     };
 
-    const handleMouseUp = () => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDragging || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - dragStartPos.current.x;
+      const dy = e.touches[0].clientY - dragStartPos.current.y;
+
+      const widgetHeight = isFloatingMinimized ? 52 : 380;
+      const widgetWidth = isFloatingMinimized ? 220 : 320;
+      const maxX = typeof window !== 'undefined' ? Math.max(10, window.innerWidth - widgetWidth - 10) : 800;
+      const maxY = typeof window !== 'undefined' ? Math.max(10, window.innerHeight - widgetHeight - 10) : 600;
+
+      setPosition({
+        x: Math.max(10, Math.min(maxX, initialPos.current.x + dx)),
+        y: Math.max(10, Math.min(maxY, initialPos.current.y + dy)),
+      });
+    };
+
+    const handleDragEnd = () => {
       setIsDragging(false);
     };
 
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mouseup', handleDragEnd);
+      window.addEventListener('touchmove', handleTouchMove);
+      window.addEventListener('touchend', handleDragEnd);
     }
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleDragEnd);
     };
   }, [isDragging, isFloatingMinimized]);
 
@@ -319,6 +346,7 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
             isDragging ? 'cursor-grabbing scale-[1.02]' : 'cursor-grab'
           }`}
           onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
         >
           {isFloatingMinimized ? (
             /* MINIMIZED PILL VIEW */

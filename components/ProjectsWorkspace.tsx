@@ -1,15 +1,16 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences } from '../types';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
 import { useHuddle } from '../src/context/HuddleContext';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface ProjectsWorkspaceProps {
+    currentUser?: any;
     projects: Project[];
     allTodos: Todo[];
     activeProjectId: number | null;
@@ -59,6 +60,7 @@ const VideoStream = ({ stream }: { stream: MediaStream | null }) => {
 };
 
 export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
+    currentUser,
     projects,
     allTodos,
     activeProjectId,
@@ -76,7 +78,40 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     onOpenProjectEditor,
     pushPreferences
 }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team' | 'listas'>('overview');
+    
+    // Sprint Detail & Task Management
+    const [sprintDetailModal, setSprintDetailModal] = useState<Sprint | null>(null);
+    const [sprintTaskText, setSprintTaskText] = useState('');
+    const [sprintTaskSP, setSprintTaskSP] = useState<number>(3);
+    const [sprintTaskPriority, setSprintTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+    const [sprintTaskAssignee, setSprintTaskAssignee] = useState<string>('');
+
+    // Share Sprint/Roadmap Update to Channel Modal
+    const [shareToChannelModal, setShareToChannelModal] = useState<{ isOpen: boolean; title: string; content: string } | null>(null);
+    const [shareChannelId, setShareChannelId] = useState<string>('general');
+    const [shareChannelPassword, setShareChannelPassword] = useState<string>('');
+    const [shareChannelError, setShareChannelError] = useState<string | null>(null);
+
+    // Listas Section States
+    const [listasSubTab, setListasSubTab] = useState<'admin' | 'quarterly'>('admin');
+    const [listasFilter, setListasFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+    const [listasSearch, setListasSearch] = useState('');
+    const [selectedQuarter, setSelectedQuarter] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4'>('Q1');
+    const [quarterlyModal, setQuarterlyModal] = useState<{ isOpen: boolean; item: ProjectQuarterlyPriority | null }>({ isOpen: false, item: null });
+    const [qTitle, setQTitle] = useState('');
+    const [qDesc, setQDesc] = useState('');
+    const [qQuarter, setQQuarter] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4'>('Q1');
+    const [qPriority, setQPriority] = useState<'P1' | 'P2' | 'P3' | 'P4'>('P1');
+    const [qImpact, setQImpact] = useState<'Alto' | 'Medio' | 'Bajo'>('Alto');
+    const [qOwner, setQOwner] = useState('');
+    const [qStatus, setQStatus] = useState<'planning' | 'in_progress' | 'completed' | 'on_hold'>('planning');
+
+    // Inline Task Creation for Listas Admin
+    const [inlineTaskText, setInlineTaskText] = useState('');
+    const [inlineTaskSP, setInlineTaskSP] = useState<number>(3);
+    const [inlineTaskPriority, setInlineTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+    const [inlineTaskAssignee, setInlineTaskAssignee] = useState('');
     
     // Kanban Add State
     const [addingToColumn, setAddingToColumn] = useState<string | null>(null);
@@ -183,7 +218,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [docSearchText, setDocSearchText] = useState<string>('');
     const [shareDocModal, setShareDocModal] = useState<{ isOpen: boolean; doc: ProjectDoc | null }>({ isOpen: false, doc: null });
     const [shareTargetChannelId, setShareTargetChannelId] = useState<string>('general');
-    const [shareChannelPassword, setShareChannelPassword] = useState<string>('');
     const [shareComment, setShareComment] = useState<string>('');
     const [shareError, setShareError] = useState<string | null>(null);
     const [previewDocModal, setPreviewDocModal] = useState<ProjectDoc | null>(null);
@@ -249,6 +283,36 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     }, [inviteEmail, projects]);
 
     const filteredInviteUsers = searchedUsers;
+
+    const currentUserEmail = currentUser?.email || 'usuario@local.com';
+    const currentUserName = currentUser?.user_metadata?.full_name || currentUserEmail.split('@')[0] || 'Tú';
+    const projectOwnerEmail = activeProject?.owner_email || activeProject?.user_id || currentUserEmail;
+    const isProjectCreator = !activeProject || !activeProject.owner_email || activeProject.owner_email.toLowerCase() === currentUserEmail.toLowerCase();
+
+    const realMembers = useMemo(() => {
+        if (!activeProject) return [];
+        const rawMembers = activeProject.members || [];
+        const map = new Map<string, ProjectMember>();
+
+        const isOwnerCurrent = projectOwnerEmail.toLowerCase() === currentUserEmail.toLowerCase();
+        map.set(projectOwnerEmail.toLowerCase(), {
+            id: 'owner',
+            name: isOwnerCurrent ? `${currentUserName} (Creador)` : projectOwnerEmail.split('@')[0] + ' (Creador)',
+            email: projectOwnerEmail,
+            role: 'owner'
+        });
+
+        rawMembers.forEach(m => {
+            if (m.email && m.email !== 'tu_correo@ejemplo.com' && m.email !== 'colaborador_prueba@ejemplo.com' && m.email !== 'correo@ejemplo.com') {
+                const key = m.email.toLowerCase();
+                if (!map.has(key)) {
+                    map.set(key, m);
+                }
+            }
+        });
+
+        return Array.from(map.values());
+    }, [activeProject, currentUserEmail, currentUserName, projectOwnerEmail]);
 
     const activeChannels = useMemo(() => {
         if (!activeProject) return [];
@@ -381,6 +445,42 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const updatedChat = [...(activeProject.chat_messages || []), newMessage];
         onUpdateProject(activeProject.id, { chat_messages: updatedChat });
         setShareDocModal({ isOpen: false, doc: null });
+        setSelectedChannelId(shareTargetChannelId);
+        setActiveTab('chat');
+    };
+
+    // Helper: Execute Share Sprint / Roadmap Update into Channel
+    const handleConfirmShareUpdate = () => {
+        if (!activeProject || !shareUpdateModal) return;
+        const targetChannel = (activeProject.channels || []).find(c => c.id === shareTargetChannelId);
+        
+        // Password verification for private channel
+        if (targetChannel && targetChannel.is_private && targetChannel.password && !unlockedChannels[targetChannel.id]) {
+            if (shareChannelPassword !== targetChannel.password) {
+                setShareError('Contraseña incorrecta para acceder a este canal privado.');
+                return;
+            }
+            // Unlock channel
+            setUnlockedChannels(prev => ({ ...prev, [targetChannel.id]: true }));
+        }
+
+        const newMessage: ProjectChatMessage = {
+            id: crypto.randomUUID(),
+            project_id: activeProject.id,
+            channel_id: shareTargetChannelId,
+            sender_name: currentUser?.name || 'Usuario',
+            sender_email: currentUserEmail,
+            text: shareComment.trim() 
+                ? `${shareComment.trim()}\n\n${shareUpdateModal.updateText}`
+                : shareUpdateModal.updateText,
+            created_at: new Date().toISOString()
+        };
+
+        const updatedChat = [...(activeProject.chat_messages || []), newMessage];
+        onUpdateProject(activeProject.id, { chat_messages: updatedChat });
+        setShareUpdateModal(null);
+        setShareComment('');
+        setShareError(null);
         setSelectedChannelId(shareTargetChannelId);
         setActiveTab('chat');
     };
@@ -532,18 +632,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             >
                                 <Settings className="w-3.5 h-3.5" /> Ajustes
                             </button>
-                            <button 
-                                onClick={() => {
-                                    if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"?`)) {
-                                        onDeleteProject(activeProject.id);
-                                        onSelectProject(null);
-                                    }
-                                }}
-                                className="p-1.5 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center justify-center font-medium shadow-sm"
-                                title="Eliminar Proyecto"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {isProjectCreator ? (
+                                <button 
+                                    onClick={() => {
+                                        if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"? Solo el creador puede realizar esta acción.`)) {
+                                            onDeleteProject(activeProject.id);
+                                            onSelectProject(null);
+                                        }
+                                    }}
+                                    className="p-1.5 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center justify-center font-medium shadow-sm"
+                                    title="Eliminar Proyecto (Solo Creador)"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            ) : (
+                                <span 
+                                    className="px-2 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/80 rounded-lg flex items-center gap-1 border border-gray-200 dark:border-gray-700 cursor-not-allowed"
+                                    title="Solo el creador del proyecto puede eliminarlo"
+                                >
+                                    <Lock className="w-3 h-3" />
+                                    <span>Colaborador</span>
+                                </span>
+                            )}
                         </div>
                     </div>
 
@@ -551,13 +661,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {[
                             { id: 'overview', label: 'Resumen', icon: Activity },
                             { id: 'kanban', label: 'Tablero', icon: AlignLeft },
+                            { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: (projectTodos.length || 0) },
                             { id: 'sprints', label: 'Sprints', icon: Target },
                             { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                             { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
                             { id: 'chat', label: 'Canales', icon: MessageSquare, badge: activeProject.chat_messages?.length, isHuddle: isGlobalHuddleActive || (activeProject.huddles || []).some(h => h.active) },
                             { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: activeProject.expenses?.length },
                             { id: 'time', label: 'Tiempo', icon: Clock, badge: activeProject.time_entries?.length },
-                            { id: 'team', label: 'Equipo', icon: Users, badge: (activeProject.members?.length || 1) },
+                            { id: 'team', label: 'Equipo', icon: Users, badge: realMembers.length },
                         ].map(tab => (
                             <button
                                 key={tab.id}
@@ -894,8 +1005,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                             const handleShareSprintProgress = () => {
                                 const text = `📌 **Actualización de Sprint: ${sprint.name}**\n• Estado: ${sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'En Planificación'}\n• Puntos de Historia: ${completedSP}/${totalSP} SP (${progress}%)\n• Tareas Completadas: ${sprintTasks.filter(t => t.completed).length} de ${sprintTasks.length}`;
-                                broadcastToChannel(text);
-                                alert('Progreso del Sprint compartido en el canal de chat.');
+                                setShareTargetChannelId(selectedChannelId || 'general');
+                                setShareChannelPassword('');
+                                setShareComment('');
+                                setShareError(null);
+                                setShareUpdateModal({
+                                    isOpen: true,
+                                    title: `Compartir Sprint: ${sprint.name}`,
+                                    updateText: text
+                                });
                             };
 
                             return (
@@ -914,11 +1032,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                                         <div className="flex items-center gap-2">
                                             <button
+                                                onClick={() => setViewSprintModal(sprint)}
+                                                className="px-2.5 py-1 text-xs bg-gray-900 dark:bg-white text-white dark:text-black rounded-md font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1 shadow-xs"
+                                                title="Entrar para ver, crear y editar tareas con Story Points"
+                                            >
+                                                <Layers className="w-3.5 h-3.5" /> Entrar al Sprint ({sprintTasks.length})
+                                            </button>
+
+                                            <button
                                                 onClick={handleShareSprintProgress}
                                                 className="px-2.5 py-1 text-xs border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md font-medium flex items-center gap-1.5 transition-colors"
                                                 title="Publicar actualización en el canal de chat"
                                             >
-                                                <MessageSquare className="w-3.5 h-3.5 text-blue-500" /> Compartir en Chat
+                                                <MessageSquare className="w-3.5 h-3.5 text-blue-500" /> Compartir
                                             </button>
 
                                             {sprint.status === 'planning' && (
@@ -1041,8 +1167,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {milestones.map(ms => {
                             const handleShareMilestone = () => {
                                 const text = `🚩 **Hito del Proyecto: ${ms.name}**\n• Categoría: ${ms.category || 'General'}\n• Estado: ${ms.status === 'completed' ? '✓ Completado' : ms.status === 'in_progress' ? '● En Progreso' : 'Planificado'}\n• Fecha Límite: ${ms.target_date || 'Por definir'}${ms.description ? `\n• Detalle: ${ms.description}` : ''}`;
-                                broadcastToChannel(text);
-                                alert('Hito compartido en el canal de chat.');
+                                setShareTargetChannelId(selectedChannelId || 'general');
+                                setShareChannelPassword('');
+                                setShareComment('');
+                                setShareError(null);
+                                setShareUpdateModal({
+                                    isOpen: true,
+                                    title: `Compartir Hito: ${ms.name}`,
+                                    updateText: text
+                                });
                             };
 
                             const handleStatusChange = (newStatus: 'pending' | 'in_progress' | 'completed') => {
@@ -2841,13 +2974,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // TEAM TAB
     const renderTeam = () => {
         if (!activeProject) return null;
-        const members = activeProject.members || [];
-        const filteredMembers = memberSearchText.trim()
-            ? members.filter(m => 
+        const membersList = memberSearchText.trim()
+            ? realMembers.filter(m => 
                 (m.name && m.name.toLowerCase().includes(memberSearchText.toLowerCase())) ||
                 (m.email && m.email.toLowerCase().includes(memberSearchText.toLowerCase()))
               )
-            : members;
+            : realMembers;
 
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
@@ -2874,7 +3006,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </div>
 
                 <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden shadow-sm">
-                    {filteredMembers.map((m, idx) => (
+                    {membersList.map((m, idx) => (
                         <div key={m.id || idx} className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
@@ -2882,29 +3014,303 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 </div>
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-900 dark:text-white">{m.name || 'Miembro del Equipo'}</h4>
-                                    <span className="text-[10px] text-gray-400 font-mono">{m.email || 'correo@ejemplo.com'}</span>
+                                    <span className="text-[10px] text-gray-400 font-mono">{m.email}</span>
                                 </div>
                             </div>
                             <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
-                                {m.role === 'owner' ? 'Propietario' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
+                                {m.role === 'owner' ? 'Propietario / Creador' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
                             </span>
                         </div>
                     ))}
-                    {filteredMembers.length === 0 && members.length === 0 && (
-                        <div className="p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                                    T
-                                </div>
-                                <div>
-                                    <span className="text-xs font-bold text-gray-900 dark:text-white">Tú (Propietario)</span>
-                                    <p className="text-[10px] text-gray-400">tu_correo@ejemplo.com</p>
-                                </div>
-                            </div>
-                            <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60">Propietario</span>
-                        </div>
-                    )}
                 </div>
+            </div>
+        );
+    };
+
+    // LISTAS TAB (Administrar Proyecto & Prioridades Trimestrales)
+    const renderListas = () => {
+        if (!activeProject) return null;
+
+        const filteredTodos = projectTodos.filter(t => {
+            if (listasFilter === 'pending') return !t.completed && t.kanban_column !== 'Completado';
+            if (listasFilter === 'in_progress') return !t.completed && t.kanban_column === 'En progreso';
+            if (listasFilter === 'completed') return t.completed || t.kanban_column === 'Completado';
+            return true;
+        }).filter(t => {
+            if (!listasSearch.trim()) return true;
+            return t.text.toLowerCase().includes(listasSearch.toLowerCase());
+        });
+
+        const quarterlyPriorities = (activeProject.quarterly_priorities || []).filter(q => q.quarter === selectedQuarter);
+
+        const handleAddInlineTask = async (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!inlineTaskText.trim()) return;
+            await addTodo(inlineTaskText.trim(), {
+                project_id: activeProject.id,
+                story_points: inlineTaskSP,
+                priority: inlineTaskPriority,
+                assigned_to: inlineTaskAssignee || undefined,
+                kanban_column: 'Por hacer'
+            });
+            setInlineTaskText('');
+        };
+
+        return (
+            <div className="p-6 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6">
+                {/* Subnav */}
+                <div className="bg-white dark:bg-[#111] p-1.5 rounded-xl border border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2 shadow-xs">
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setListasSubTab('admin')}
+                            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 ${
+                                listasSubTab === 'admin' 
+                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs' 
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <CheckSquare className="w-3.5 h-3.5" /> 1. Administrar un proyecto
+                        </button>
+                        <button
+                            onClick={() => setListasSubTab('quarterly')}
+                            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 ${
+                                listasSubTab === 'quarterly' 
+                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs' 
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <Target className="w-3.5 h-3.5 text-amber-500" /> 2. Prioridades Trimestrales
+                        </button>
+                    </div>
+                </div>
+
+                {/* Subtab 1: Administrar un proyecto */}
+                {listasSubTab === 'admin' && (
+                    <div className="space-y-4">
+                        <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Lista Compartida del Proyecto</h3>
+                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                                Planifica y asigna tareas, luego realiza un seguimiento de sus estados en una lista compartida con tu equipo del proyecto.
+                            </p>
+
+                            <form onSubmit={handleAddInlineTask} className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Nueva tarea para la lista del proyecto..."
+                                    value={inlineTaskText}
+                                    onChange={e => setInlineTaskText(e.target.value)}
+                                    className="flex-1 min-w-[200px] px-3 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                                <select
+                                    value={inlineTaskSP}
+                                    onChange={e => setInlineTaskSP(Number(e.target.value))}
+                                    className="px-2.5 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none font-mono"
+                                >
+                                    <option value={1}>1 SP</option>
+                                    <option value={2}>2 SP</option>
+                                    <option value={3}>3 SP</option>
+                                    <option value={5}>5 SP</option>
+                                    <option value={8}>8 SP</option>
+                                    <option value={13}>13 SP</option>
+                                </select>
+                                <select
+                                    value={inlineTaskPriority}
+                                    onChange={e => setInlineTaskPriority(e.target.value as any)}
+                                    className="px-2.5 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none"
+                                >
+                                    <option value="low">Prioridad Baja</option>
+                                    <option value="medium">Prioridad Media</option>
+                                    <option value="high">Prioridad Alta</option>
+                                </select>
+                                <select
+                                    value={inlineTaskAssignee}
+                                    onChange={e => setInlineTaskAssignee(e.target.value)}
+                                    className="px-2.5 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none max-w-[150px]"
+                                >
+                                    <option value="">Sin Asignar</option>
+                                    {realMembers.map(m => (
+                                        <option key={m.email} value={m.email}>{m.name || m.email}</option>
+                                    ))}
+                                </select>
+                                <button type="submit" className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-xs">
+                                    <Plus className="w-3.5 h-3.5" /> Agregar Tarea
+                                </button>
+                            </form>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg border border-gray-200 dark:border-gray-800">
+                                {[
+                                    { id: 'all', label: 'Todas' },
+                                    { id: 'pending', label: 'Por Hacer' },
+                                    { id: 'in_progress', label: 'En Progreso' },
+                                    { id: 'completed', label: 'Completadas' },
+                                ].map(f => (
+                                    <button
+                                        key={f.id}
+                                        onClick={() => setListasFilter(f.id as any)}
+                                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                                            listasFilter === f.id ? 'bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
+                                        }`}
+                                    >
+                                        {f.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="relative">
+                                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar en la lista..."
+                                    value={listasSearch}
+                                    onChange={e => setListasSearch(e.target.value)}
+                                    className="pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 w-52"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800/60 overflow-hidden shadow-sm">
+                            {filteredTodos.map(todo => (
+                                <div key={todo.id} className="p-3.5 flex items-center justify-between gap-4 hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <button onClick={() => updateTodo(todo.id, { completed: !todo.completed })} className="shrink-0">
+                                            {todo.completed ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Circle className="w-4 h-4 text-gray-400 hover:text-gray-600" />}
+                                        </button>
+                                        <span className={`text-xs flex-1 ${todo.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-gray-100 font-medium'}`}>
+                                            {todo.text}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {todo.story_points ? (
+                                            <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-mono border border-gray-200 dark:border-gray-700">
+                                                {todo.story_points} SP
+                                            </span>
+                                        ) : null}
+
+                                        {todo.priority && (
+                                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${
+                                                todo.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300' :
+                                                todo.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300' :
+                                                'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
+                                            }`}>
+                                                {todo.priority === 'high' ? 'Alta' : todo.priority === 'low' ? 'Baja' : 'Media'}
+                                            </span>
+                                        )}
+
+                                        {todo.assigned_to && (
+                                            <span className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1 bg-gray-50 dark:bg-black px-2 py-0.5 rounded border border-gray-200 dark:border-gray-800">
+                                                <Users className="w-3 h-3 text-blue-500" />
+                                                {todo.assigned_to.split('@')[0]}
+                                            </span>
+                                        )}
+
+                                        <button onClick={() => deleteTodo(todo.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {filteredTodos.length === 0 && (
+                                <div className="p-8 text-center text-xs text-gray-500">No hay tareas registradas en esta vista.</div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Subtab 2: Prioridades Trimestrales */}
+                {listasSubTab === 'quarterly' && (
+                    <div className="space-y-4">
+                        <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Prioridades Trimestrales del Equipo</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Colabora con tu equipo para priorizar los proyectos trimestrales.</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setQuarterlyModal({ isOpen: true, item: null });
+                                    setQTitle('');
+                                    setQDesc('');
+                                    setQQuarter(selectedQuarter);
+                                    setQPriority('P1');
+                                    setQImpact('Alto');
+                                    setQOwner(currentUserEmail);
+                                    setQStatus('planning');
+                                }}
+                                className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-xs"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> Nueva Prioridad Trimestral
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {(['Q1', 'Q2', 'Q3', 'Q4'] as const).map(q => (
+                                <button
+                                    key={q}
+                                    onClick={() => setSelectedQuarter(q)}
+                                    className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
+                                        selectedQuarter === q
+                                            ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-transparent shadow-xs'
+                                            : 'bg-white dark:bg-[#111] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    {q} Trimestre
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800/60 overflow-hidden shadow-sm">
+                            {quarterlyPriorities.map(item => (
+                                <div key={item.id} className="p-4 flex flex-wrap items-center justify-between gap-4 hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
+                                    <div className="space-y-1 min-w-[240px] flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${
+                                                item.priority_level === 'P1' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                item.priority_level === 'P2' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                'bg-blue-50 text-blue-700 border-blue-200'
+                                            }`}>
+                                                {item.priority_level}
+                                            </span>
+                                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">{item.title}</h4>
+                                        </div>
+                                        {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{item.description}</p>}
+                                    </div>
+
+                                    <div className="flex items-center gap-3 shrink-0">
+                                        <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium bg-gray-50 dark:bg-black px-2 py-1 rounded border border-gray-200 dark:border-gray-800">
+                                            Impacto: {item.impact}
+                                        </span>
+                                        <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
+                                            Responsable: {item.owner_email.split('@')[0]}
+                                        </span>
+                                        <span className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded border ${
+                                            item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                            item.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                            'bg-gray-50 text-gray-700 border-gray-200'
+                                        }`}>
+                                            {item.status === 'completed' ? 'Completado' : item.status === 'in_progress' ? 'En Marcha' : 'Planificado'}
+                                        </span>
+                                        <button
+                                            onClick={async () => {
+                                                const updated = (activeProject.quarterly_priorities || []).filter(p => p.id !== item.id);
+                                                await onUpdateProject(activeProject.id, { quarterly_priorities: updated });
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {quarterlyPriorities.length === 0 && (
+                                <div className="p-8 text-center text-xs text-gray-500">
+                                    No hay prioridades registradas para {selectedQuarter}.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -2918,6 +3324,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <>
                         {activeTab === 'overview' && renderOverview()}
                         {activeTab === 'kanban' && renderKanban()}
+                        {activeTab === 'listas' && renderListas()}
                         {activeTab === 'sprints' && renderSprints()}
                         {activeTab === 'roadmap' && renderRoadmap()}
                         {activeTab === 'docs' && renderDocs()}
@@ -3554,6 +3961,428 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* QUARTERLY PRIORITY MODAL */}
+            <Modal
+                isOpen={quarterlyModal.isOpen}
+                onClose={() => setQuarterlyModal({ isOpen: false, item: null })}
+                title={quarterlyModal.item ? "Editar Prioridad Trimestral" : "Nueva Prioridad Trimestral"}
+            >
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!activeProject || !qTitle.trim()) return;
+
+                    const newPriorityItem: ProjectQuarterlyPriority = {
+                        id: quarterlyModal.item ? quarterlyModal.item.id : Date.now().toString(),
+                        project_id: activeProject.id,
+                        title: qTitle.trim(),
+                        description: qDesc.trim(),
+                        quarter: qQuarter,
+                        priority_level: qPriority,
+                        impact: qImpact,
+                        owner_email: qOwner || currentUserEmail,
+                        status: qStatus,
+                        created_at: quarterlyModal.item ? quarterlyModal.item.created_at : new Date().toISOString()
+                    };
+
+                    const existing = activeProject.quarterly_priorities || [];
+                    let updatedList: ProjectQuarterlyPriority[] = [];
+                    if (quarterlyModal.item) {
+                        updatedList = existing.map(p => p.id === newPriorityItem.id ? newPriorityItem : p);
+                    } else {
+                        updatedList = [...existing, newPriorityItem];
+                    }
+
+                    onUpdateProject(activeProject.id, { quarterly_priorities: updatedList });
+                    setQuarterlyModal({ isOpen: false, item: null });
+                }} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Título de la Prioridad</label>
+                        <input
+                            type="text"
+                            required
+                            placeholder="Ej: Migración de infraestructura a Cloud Run"
+                            value={qTitle}
+                            onChange={e => setQTitle(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
+                        <textarea
+                            rows={2}
+                            placeholder="Detalla los objetivos clave de esta iniciativa..."
+                            value={qDesc}
+                            onChange={e => setQDesc(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Trimestre</label>
+                            <select
+                                value={qQuarter}
+                                onChange={e => setQQuarter(e.target.value as any)}
+                                className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white"
+                            >
+                                <option value="Q1">Q1 Primer Trimestre</option>
+                                <option value="Q2">Q2 Segundo Trimestre</option>
+                                <option value="Q3">Q3 Tercer Trimestre</option>
+                                <option value="Q4">Q4 Cuarto Trimestre</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Nivel de Prioridad</label>
+                            <select
+                                value={qPriority}
+                                onChange={e => setQPriority(e.target.value as any)}
+                                className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white"
+                            >
+                                <option value="P1">P1 - Crítico</option>
+                                <option value="P2">P2 - Alto</option>
+                                <option value="P3">P3 - Medio</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Nivel de Impacto</label>
+                            <select
+                                value={qImpact}
+                                onChange={e => setQImpact(e.target.value)}
+                                className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white"
+                            >
+                                <option value="Alto">Alto Impacto</option>
+                                <option value="Medio">Medio Impacto</option>
+                                <option value="Bajo">Bajo Impacto</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Estado</label>
+                            <select
+                                value={qStatus}
+                                onChange={e => setQStatus(e.target.value as any)}
+                                className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white"
+                            >
+                                <option value="planning">Planificado</option>
+                                <option value="in_progress">En Marcha</option>
+                                <option value="completed">Completado</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Líder Responsable</label>
+                        <select
+                            value={qOwner}
+                            onChange={e => setQOwner(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white"
+                        >
+                            {realMembers.map(m => (
+                                <option key={m.email} value={m.email}>{m.name || m.email}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button type="button" onClick={() => setQuarterlyModal({ isOpen: false, item: null })} className="px-3.5 py-1.5 text-xs text-gray-500 hover:text-gray-700">Cancelar</button>
+                        <button type="submit" className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs">Guardar Prioridad</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* SHARE UPDATE TO CHANNEL MODAL */}
+            <Modal
+                isOpen={!!shareUpdateModal?.isOpen}
+                onClose={() => setShareUpdateModal(null)}
+                title={shareUpdateModal?.title || "Compartir Actualización en Canal"}
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Selecciona el Canal de Destino:
+                        </label>
+                        <select
+                            value={shareTargetChannelId}
+                            onChange={e => {
+                                setShareTargetChannelId(e.target.value);
+                                setShareError(null);
+                                setShareChannelPassword('');
+                            }}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        >
+                            {activeChannels.map(ch => (
+                                <option key={ch.id} value={ch.id}>
+                                    {ch.is_private ? '🔒 ' : '# '}{ch.name} {ch.is_private ? '(Privado)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Password input if target channel is private and locked */}
+                    {(() => {
+                        const targetChan = activeChannels.find(c => c.id === shareTargetChannelId);
+                        const isLocked = targetChan?.is_private && targetChan.password && !unlockedChannels[targetChan.id];
+                        if (!isLocked) return null;
+                        return (
+                            <div>
+                                <label className="block text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1.5">
+                                    <Lock className="w-3.5 h-3.5" /> Contraseña del Canal Privado
+                                </label>
+                                <input
+                                    type="password"
+                                    placeholder="Introduce la contraseña para publicar en este canal..."
+                                    value={shareChannelPassword}
+                                    onChange={e => {
+                                        setShareChannelPassword(e.target.value);
+                                        setShareError(null);
+                                    }}
+                                    className="w-full bg-gray-50 dark:bg-black border border-amber-300 dark:border-amber-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+                        );
+                    })()}
+
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Comentario adicional (opcional):
+                        </label>
+                        <textarea
+                            rows={2}
+                            placeholder="Ej: Adjunto la actualización más reciente..."
+                            value={shareComment}
+                            onChange={e => setShareComment(e.target.value)}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
+
+                    {shareError && (
+                        <p className="text-xs text-red-500 font-medium">{shareError}</p>
+                    )}
+
+                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <button
+                            type="button"
+                            onClick={() => setShareUpdateModal(null)}
+                            className="px-3.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirmShareUpdate}
+                            className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs"
+                        >
+                            Publicar en Canal
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* VIEW SPRINT DETAIL & TASK MANAGEMENT MODAL */}
+            <Modal
+                isOpen={!!viewSprintModal}
+                onClose={() => setViewSprintModal(null)}
+                title={viewSprintModal ? `Sprint: ${viewSprintModal.name}` : "Detalles del Sprint"}
+            >
+                {viewSprintModal && (() => {
+                    const sprintTasks = projectTodos.filter(t => t.sprint_id === viewSprintModal.id);
+                    const unassignedTasks = projectTodos.filter(t => !t.sprint_id);
+                    const totalSP = sprintTasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
+                    const completedSP = sprintTasks.filter(t => t.completed).reduce((sum, t) => sum + (t.story_points || 0), 0);
+                    const progress = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : 0;
+
+                    const handleAddSprintTask = (e: React.FormEvent) => {
+                        e.preventDefault();
+                        if (!sprintTaskText.trim()) return;
+                        const newTodo: ProjectTodo = {
+                            id: crypto.randomUUID(),
+                            project_id: activeProject.id,
+                            text: sprintTaskText.trim(),
+                            completed: false,
+                            priority: sprintTaskPriority,
+                            story_points: Number(sprintTaskSP) || 1,
+                            assignee_email: sprintTaskAssignee || currentUserEmail,
+                            kanban_column: 'Por hacer',
+                            sprint_id: viewSprintModal.id,
+                            created_at: new Date().toISOString()
+                        };
+                        const updated = [newTodo, ...(activeProject.todos || [])];
+                        onUpdateProject(activeProject.id, { todos: updated });
+                        setSprintTaskText('');
+                    };
+
+                    return (
+                        <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
+                            {/* Header Summary */}
+                            <div className="p-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl space-y-2">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                        Fechas: {viewSprintModal.start_date || 'Sin fecha'} — {viewSprintModal.end_date || 'Sin fecha'}
+                                    </span>
+                                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                                        {completedSP} / {totalSP} SP ({progress}%)
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                                    <div className="bg-blue-600 dark:bg-blue-500 h-full transition-all duration-300" style={{ width: `${progress}%` }} />
+                                </div>
+                                {viewSprintModal.goal && (
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 italic pt-1">
+                                        "{viewSprintModal.goal}"
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Add Task directly to this Sprint */}
+                            <form onSubmit={handleAddSprintTask} className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-xl space-y-3">
+                                <span className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                                    <Plus className="w-3.5 h-3.5" /> Crear Tarea en este Sprint
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder="Nombre de la nueva tarea..."
+                                    value={sprintTaskText}
+                                    onChange={e => setSprintTaskText(e.target.value)}
+                                    className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Story Points (SP)</label>
+                                        <select
+                                            value={sprintTaskSP}
+                                            onChange={e => setSprintTaskSP(Number(e.target.value))}
+                                            className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-900 dark:text-white"
+                                        >
+                                            {[1, 2, 3, 5, 8, 13, 21].map(sp => (
+                                                <option key={sp} value={sp}>{sp} SP</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Prioridad</label>
+                                        <select
+                                            value={sprintTaskPriority}
+                                            onChange={e => setSprintTaskPriority(e.target.value as any)}
+                                            className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-900 dark:text-white"
+                                        >
+                                            <option value="low">Baja</option>
+                                            <option value="medium">Media</option>
+                                            <option value="high">Alta</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Asignado a</label>
+                                        <select
+                                            value={sprintTaskAssignee}
+                                            onChange={e => setSprintTaskAssignee(e.target.value)}
+                                            className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-900 dark:text-white"
+                                        >
+                                            <option value="">(Sin Asignar)</option>
+                                            {realMembers.map(m => (
+                                                <option key={m.email} value={m.email}>{m.name || m.email}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end">
+                                    <button
+                                        type="submit"
+                                        className="px-3.5 py-1 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs"
+                                    >
+                                        + Agregar Tarea al Sprint
+                                    </button>
+                                </div>
+                            </form>
+
+                            {/* Sprint Tasks List */}
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                    Tareas en este Sprint ({sprintTasks.length})
+                                </h4>
+                                {sprintTasks.length === 0 ? (
+                                    <p className="text-xs text-gray-400 italic py-3 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
+                                        No hay tareas vinculadas a este Sprint. Crea una arriba o asigna tareas desde el Backlog.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {sprintTasks.map(t => (
+                                            <div key={t.id} className="p-2.5 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl flex items-center justify-between gap-3 text-xs">
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={t.completed}
+                                                        onChange={() => onToggleTodo(t.id)}
+                                                        className="rounded border-gray-300 text-blue-600 focus:ring-0 cursor-pointer"
+                                                    />
+                                                    <span className={`truncate font-medium ${t.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                                                        {t.text}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {/* Story Points dropdown */}
+                                                    <select
+                                                        value={t.story_points || 1}
+                                                        onChange={e => {
+                                                            const newSP = Number(e.target.value);
+                                                            const updated = (activeProject.todos || []).map(item => item.id === t.id ? { ...item, story_points: newSP } : item);
+                                                            onUpdateProject(activeProject.id, { todos: updated });
+                                                        }}
+                                                        className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[10px] font-mono px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 focus:outline-none"
+                                                        title="Editar Story Points"
+                                                    >
+                                                        {[1, 2, 3, 5, 8, 13, 21].map(sp => (
+                                                            <option key={sp} value={sp}>{sp} SP</option>
+                                                        ))}
+                                                    </select>
+
+                                                    {/* Unlink from Sprint button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const updated = (activeProject.todos || []).map(item => item.id === t.id ? { ...item, sprint_id: undefined } : item);
+                                                            onUpdateProject(activeProject.id, { todos: updated });
+                                                        }}
+                                                        className="text-[10px] text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900"
+                                                        title="Quitar del Sprint (Mover a Backlog)"
+                                                    >
+                                                        Quitar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Backlog items that can be assigned */}
+                            {unassignedTasks.length > 0 && (
+                                <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-2">
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                        Asignar tareas sin sprint del Backlog ({unassignedTasks.length})
+                                    </h4>
+                                    <div className="max-h-36 overflow-y-auto space-y-1.5">
+                                        {unassignedTasks.slice(0, 10).map(t => (
+                                            <div key={t.id} className="p-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-lg flex items-center justify-between text-xs">
+                                                <span className="truncate text-gray-700 dark:text-gray-300 min-w-0 pr-2">{t.text}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const updated = (activeProject.todos || []).map(item => item.id === t.id ? { ...item, sprint_id: viewSprintModal.id } : item);
+                                                        onUpdateProject(activeProject.id, { todos: updated });
+                                                    }}
+                                                    className="shrink-0 px-2 py-0.5 bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold rounded hover:bg-gray-800 transition-colors"
+                                                >
+                                                    + Añadir al Sprint
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
             </Modal>
         </div>
     );

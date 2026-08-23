@@ -209,10 +209,26 @@ export const HuddleProvider: React.FC<{ children: React.ReactNode; onHuddleState
     }
   }, [syncMedia, onHuddleStateChange]);
 
-  const leaveHuddle = useCallback(() => {
-    if (activeHuddle && onHuddleStateChange) {
-      onHuddleStateChange(activeHuddle.projectId, activeHuddle.channelId, false, []);
+  const leaveHuddle = useCallback((forceEndAll?: boolean) => {
+    if (!activeHuddle) return;
+
+    // Check remaining participants
+    const remaining = huddleParticipants.filter(p => p.name !== 'Tú');
+
+    if (forceEndAll || remaining.length === 0) {
+      // Last member or force end -> end huddle for everyone
+      if (onHuddleStateChange) {
+        onHuddleStateChange(activeHuddle.projectId, activeHuddle.channelId, false, []);
+      }
+      setHuddleParticipants([]);
+    } else {
+      // Still other members in call -> local user exits call
+      if (onHuddleStateChange) {
+        onHuddleStateChange(activeHuddle.projectId, activeHuddle.channelId, true, remaining);
+      }
+      setHuddleParticipants(remaining);
     }
+
     setActiveHuddle(null);
     stopLocalStream();
     stopScreenStream();
@@ -221,9 +237,8 @@ export const HuddleProvider: React.FC<{ children: React.ReactNode; onHuddleState
     setIsMicOn(true);
     setIsVideoOn(false);
     setIsScreenSharing(false);
-    setHuddleParticipants([]);
     setSpeakingParticipants({});
-  }, [activeHuddle, stopLocalStream, stopScreenStream, onHuddleStateChange]);
+  }, [activeHuddle, huddleParticipants, stopLocalStream, stopScreenStream, onHuddleStateChange]);
 
   const toggleMic = useCallback(() => {
     setIsMicOn((prev) => {

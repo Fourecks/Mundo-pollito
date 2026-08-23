@@ -313,6 +313,20 @@ export interface Project {
   huddles?: ProjectHuddle[];
   expenses?: ProjectExpense[];
   time_entries?: ProjectTimeEntry[];
+  quarterly_priorities?: ProjectQuarterlyPriority[];
+}
+
+export interface ProjectQuarterlyPriority {
+  id: string;
+  project_id?: number;
+  title: string;
+  description?: string;
+  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  priority_level: 'P1' | 'P2' | 'P3' | 'P4';
+  impact: 'Alto' | 'Medio' | 'Bajo';
+  owner_email?: string;
+  status: 'planning' | 'in_progress' | 'completed' | 'on_hold';
+  created_at: string;
 }
 
 export interface Note {
