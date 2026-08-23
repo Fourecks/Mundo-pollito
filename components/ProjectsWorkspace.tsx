@@ -135,6 +135,15 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
 
     // Navigation view state: true = All Projects Dashboard Grid, false = Inside Active Project
     const [showingAllProjects, setShowingAllProjects] = useState<boolean>(activeProjectId === null);
+
+    useEffect(() => {
+        if (activeProjectId === null) {
+            setShowingAllProjects(true);
+        } else {
+            setShowingAllProjects(false);
+        }
+    }, [activeProjectId]);
+
     const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'risks' | 'budget' | 'time' | 'docs' | 'chat' | 'inbox' | 'team' | 'activity'>('overview');
     
     // Project Search & Filter on Grid
@@ -1700,26 +1709,70 @@ const ProjectsWorkspaceInner: React.FC<ProjectsWorkspaceProps> = ({
                         <span className="text-xs font-bold text-gray-900 dark:text-white">Lista de Miembros Oficiales ({members.length || 1})</span>
                     </div>
                     <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {members.map((m, idx) => (
-                            <div key={m?.id || idx} className="p-4 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                                        {(m?.name || m?.email || 'M').charAt(0).toUpperCase()}
+                        {members.map((m, idx) => {
+                            const memberName = m?.name || m?.email?.split('@')[0] || 'Miembro';
+                            const memberEmail = m?.email || '';
+                            const memberAvatar = m?.avatar;
+                            const initials = memberName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'M';
+                            const memberStatus = (activeProject.member_statuses || []).find(s => s.email && s.email.toLowerCase() === memberEmail.toLowerCase());
+                            const presence = memberStatus?.presence || 'online';
+                            const statusEmoji = memberStatus?.status_emoji || '🟢';
+                            const statusText = memberStatus?.status_text || (presence === 'online' ? 'En línea' : presence === 'away' ? 'Ausente' : presence === 'dnd' ? 'Ocupado' : 'Desconectado');
+
+                            return (
+                                <div key={m?.id || idx} className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-[#161616] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative">
+                                            {memberAvatar ? (
+                                                <img src={memberAvatar} alt={memberName} className="w-10 h-10 rounded-full object-cover shadow-sm border border-gray-200 dark:border-gray-800" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm">
+                                                    {initials}
+                                                </div>
+                                            )}
+                                            {/* Status Dot */}
+                                            <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#111] ${
+                                                presence === 'online' ? 'bg-emerald-500' :
+                                                presence === 'away' ? 'bg-amber-500' :
+                                                presence === 'dnd' ? 'bg-red-500' : 'bg-gray-400'
+                                            }`} title={statusText} />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="text-xs font-bold text-gray-900 dark:text-white">{memberName}</h4>
+                                                <span className="text-[10px] text-gray-400 flex items-center gap-1 font-medium">
+                                                    <span>{statusEmoji}</span> {statusText}
+                                                </span>
+                                            </div>
+                                            <span className="text-[11px] text-gray-500 font-mono">{memberEmail || 'Sin correo registrado'}</span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-gray-900 dark:text-white">{m?.name || 'Miembro del Equipo'}</h4>
-                                        <span className="text-[11px] text-gray-400">{m?.email || 'correo@ejemplo.com'}</span>
-                                    </div>
+                                    <span className="text-[10px] px-2.5 py-1 rounded-lg font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                                        {m?.role === 'owner' ? 'Propietario' : m?.role === 'lead' ? 'Líder' : 'Colaborador'}
+                                    </span>
                                 </div>
-                                <span className="text-[10px] px-2.5 py-1 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                                    {m?.role === 'owner' ? 'Propietario' : m?.role === 'lead' ? 'Líder' : 'Colaborador'}
-                                </span>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {members.length === 0 && (
                             <div className="p-4 flex items-center justify-between">
-                                <span className="text-xs font-bold text-gray-900 dark:text-white">Tú (Propietario del Proyecto)</span>
-                                <span className="text-[10px] px-2.5 py-1 rounded font-bold uppercase bg-blue-50 text-blue-700">Propietario</span>
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm">
+                                            {currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : 'RG'}
+                                        </div>
+                                        <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#111] bg-emerald-500" title="En línea" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">{currentUserEmail ? currentUserEmail.split('@')[0] : 'Tú'} (Propietario)</h4>
+                                            <span className="text-[10px] text-gray-400 flex items-center gap-1 font-medium">
+                                                <span>🟢</span> En línea
+                                            </span>
+                                        </div>
+                                        <span className="text-[11px] text-gray-500 font-mono">{currentUserEmail || 'rene.05gonzalez@gmail.com'}</span>
+                                    </div>
+                                </div>
+                                <span className="text-[10px] px-2.5 py-1 rounded-lg font-bold uppercase bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200">Propietario</span>
                             </div>
                         )}
                     </div>
