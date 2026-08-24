@@ -384,8 +384,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         // 2. Add all members from activeProject.members
         rawMembers.forEach(m => {
             const mEmail = typeof m === 'string' ? m : m.email;
-            if (mEmail && mEmail !== 'tu_correo@ejemplo.com' && mEmail !== 'colaborador_prueba@ejemplo.com' && mEmail !== 'correo@ejemplo.com') {
-                const key = mEmail.toLowerCase();
+            if (mEmail && mEmail.trim()) {
+                const key = mEmail.toLowerCase().trim();
                 if (key !== projectOwnerEmail.toLowerCase() && !map.has(key)) {
                     const memberName = typeof m === 'string' 
                         ? (mEmail.toLowerCase() === currentUserEmail.toLowerCase() ? currentUserName : mEmail.split('@')[0])
@@ -411,16 +411,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             });
         }
 
-        // 4. Also check invitations for this project
-        invitations.forEach(inv => {
-            if (inv.project_id === activeProject.id && inv.status === 'accepted') {
-                const invitee = (inv.invitee_email || inv.receiver_email || '').toLowerCase();
+        // 4. Also check invitations for this project (both pending and accepted)
+        (invitations || []).forEach(inv => {
+            if (inv.project_id === activeProject.id) {
+                const invitee = (inv.invitee_email || inv.receiver_email || '').toLowerCase().trim();
                 if (invitee && invitee !== projectOwnerEmail.toLowerCase() && !map.has(invitee)) {
                     map.set(invitee, {
                         id: invitee,
-                        name: invitee.toLowerCase() === currentUserEmail.toLowerCase() ? currentUserName : invitee.split('@')[0],
+                        name: invitee === currentUserEmail.toLowerCase() ? currentUserName : invitee.split('@')[0],
                         email: invitee,
-                        role: 'member'
+                        role: inv.status === 'accepted' ? 'member' : 'pending'
                     });
                 }
             }
@@ -3359,11 +3359,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <span className={`text-[10px] px-2.5 py-1 rounded-md font-semibold tracking-wide ${
                                     isOwner 
                                         ? 'bg-gray-900/10 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-900/20 dark:border-white/20' 
+                                        : m.role === 'pending'
+                                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
                                         : m.role === 'lead'
                                         ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
                                         : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
                                 }`}>
-                                    {isOwner ? 'Propietario / Creador' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
+                                    {isOwner ? 'Propietario / Creador' : m.role === 'pending' ? 'Invitación Pendiente' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
                                 </span>
                             </div>
                         );
@@ -4868,10 +4870,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                             {[
-                                { id: 'project_tracking', name: '📋 Seguimiento de Proyecto', desc: 'Tarea, Estado, Persona asignada, Fecha de entrega' },
-                                { id: 'product_launch', name: '🚀 Lanzamiento de Producto', desc: 'Funcionalidad, QA, Responsable, Sprint' },
-                                { id: 'marketing_launch', name: '📢 Lanzamiento de Marketing', desc: 'Canal, Contenido, Publicación' },
-                                { id: 'bug_tracking', name: '🐛 Control de Errores / Bugs', desc: 'Severidad, Módulo, Estado' },
+                                { id: 'project_tracking', name: 'Seguimiento de Proyecto', desc: 'Tarea, Estado, Persona asignada, Fecha de entrega' },
+                                { id: 'product_launch', name: 'Lanzamiento de Producto', desc: 'Funcionalidad, QA, Responsable, Sprint' },
+                                { id: 'marketing_launch', name: 'Lanzamiento de Marketing', desc: 'Canal, Contenido, Publicación' },
+                                { id: 'bug_tracking', name: 'Control de Errores y Calidad', desc: 'Severidad, Módulo, Estado' },
                             ].map(tpl => (
                                 <button
                                     key={tpl.id}
@@ -5129,12 +5131,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <select
                                     value={inboxFormType}
                                     onChange={e => setInboxFormType(e.target.value as any)}
-                                    className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white"
+                                    className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white font-medium"
                                 >
-                                    <option value="announcement">📢 Anuncio</option>
-                                    <option value="idea">💡 Idea</option>
-                                    <option value="alert">⚠️ Alerta</option>
-                                    <option value="note">📝 Nota</option>
+                                    <option value="announcement">Anuncio</option>
+                                    <option value="idea">Idea</option>
+                                    <option value="alert">Alerta</option>
+                                    <option value="note">Nota</option>
                                 </select>
                             </div>
                         </div>
@@ -5268,6 +5270,105 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     Cerrar
                                 </button>
                             </div>
+                        </div>
+                    );
+                })()}
+            </Modal>
+
+            {/* ASSIGN TASK TO LIST MODAL */}
+            <Modal
+                isOpen={!!assignListTodoId}
+                onClose={() => setAssignListTodoId(null)}
+                title="Asignar Tarea a una Lista"
+            >
+                {(() => {
+                    const targetTodo = projectTodos.find(t => t.id === assignListTodoId);
+                    const lists = activeProject?.lists || [];
+
+                    if (!targetTodo) return null;
+
+                    if (lists.length === 0) {
+                        return (
+                            <div className="space-y-4 text-center py-4">
+                                <div className="w-10 h-10 mx-auto rounded-xl bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-500">
+                                    <List className="w-5 h-5" />
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">No hay listas creadas</h4>
+                                    <p className="text-xs text-gray-500 leading-relaxed max-w-xs mx-auto">
+                                        Este proyecto aún no tiene listas personalizadas a las cuales asignar esta tarea.
+                                    </p>
+                                </div>
+                                <div className="flex items-center justify-center gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAssignListTodoId(null)}
+                                        className="px-3.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-zinc-800 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors font-medium"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setAssignListTodoId(null);
+                                            setCreateListModal({ isOpen: true, templateType: 'project_tracking' });
+                                        }}
+                                        className="px-3.5 py-1.5 text-xs font-semibold text-white dark:text-black bg-gray-900 dark:bg-white rounded-lg hover:bg-gray-800 transition-colors shadow-2xs"
+                                    >
+                                        Crear Primera Lista
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div className="space-y-4">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Selecciona la lista a la cual deseas asignar la tarea <strong className="text-gray-900 dark:text-white">"{targetTodo.text}"</strong>:
+                            </p>
+                            <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                                {lists.map(list => {
+                                    const isCurrent = targetTodo.list_id === list.id;
+                                    return (
+                                        <button
+                                            key={list.id}
+                                            type="button"
+                                            onClick={() => {
+                                                updateTodo(targetTodo.id, { list_id: list.id });
+                                                setAssignListTodoId(null);
+                                            }}
+                                            className={`w-full text-left p-3 rounded-xl border flex items-center justify-between text-xs transition-colors ${
+                                                isCurrent
+                                                    ? 'bg-gray-100 dark:bg-zinc-800 border-gray-400 dark:border-gray-600 font-semibold text-gray-900 dark:text-white'
+                                                    : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/60'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <List className="w-3.5 h-3.5 text-gray-400" />
+                                                <span>{list.name}</span>
+                                            </div>
+                                            {isCurrent && (
+                                                <span className="text-[10px] px-2 py-0.5 rounded bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 font-medium">Asignada</span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {targetTodo.list_id && (
+                                <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            updateTodo(targetTodo.id, { list_id: null as any });
+                                            setAssignListTodoId(null);
+                                        }}
+                                        className="w-full text-center py-1.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors font-medium"
+                                    >
+                                        Quitar de la lista actual
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     );
                 })()}
