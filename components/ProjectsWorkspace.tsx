@@ -3220,435 +3220,281 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         };
 
         return (
-            <div className="p-6 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6">
-                {/* Subnav */}
-                <div className="bg-white dark:bg-[#111] p-1.5 rounded-xl border border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2 shadow-xs">
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setListasSubTab('admin')}
-                            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 ${
-                                listasSubTab === 'admin' 
-                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs' 
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                            }`}
+            <div className="p-8 max-w-7xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-8 font-sans">
+                {/* Minimalist Header & Controls */}
+                <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800/80 pb-5">
+                        <div className="space-y-1">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <List className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Listas de Tareas
+                            </h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Gestiona las tareas, responsables y estados con una interfaz limpia, minimalista y colaborativa.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                onClick={handleShareListSummary}
+                                className="px-3.5 py-2 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-700 shadow-2xs"
+                            >
+                                <Share2 className="w-3.5 h-3.5 text-blue-500" /> Compartir en Canal
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setCreateListModal({ isOpen: true, templateType: 'project_tracking' });
+                                    setNewListTitle('');
+                                    setNewListDescription('');
+                                }}
+                                className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-sm"
+                            >
+                                <Plus className="w-4 h-4" /> Nueva Lista
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* List Tabs */}
+                    <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+                        {projectLists.map(list => (
+                            <button
+                                key={list.id}
+                                onClick={() => setSelectedListId(list.id)}
+                                className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all flex items-center gap-2.5 whitespace-nowrap shrink-0 border ${
+                                    list.id === activeList.id
+                                        ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-800 shadow-2xs'
+                                        : 'bg-gray-50/60 dark:bg-zinc-900/40 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-zinc-900'
+                                }`}
+                            >
+                                <ListOrdered className="w-4 h-4" />
+                                {list.name}
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-mono">
+                                    {list.items?.length || 0}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Quick Add Form for Active List */}
+                    <form onSubmit={handleAddItem} className="pt-4 border-t border-gray-100 dark:border-gray-800/80 flex flex-wrap items-center gap-3">
+                        <input
+                            type="text"
+                            placeholder={`Añadir nueva tarea a "${activeList.name}"...`}
+                            value={newItemTitle}
+                            onChange={e => setNewItemTitle(e.target.value)}
+                            className="flex-1 min-w-[240px] px-3.5 py-2.5 text-xs bg-gray-50/80 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                        />
+                        <select
+                            value={newItemAssignee}
+                            onChange={e => setNewItemAssignee(e.target.value)}
+                            className="px-3 py-2.5 text-xs bg-gray-50/80 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none max-w-[160px]"
                         >
-                            <CheckSquare className="w-3.5 h-3.5" /> 1. Administrar un proyecto
-                        </button>
-                        <button
-                            onClick={() => setListasSubTab('quarterly')}
-                            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 ${
-                                listasSubTab === 'quarterly' 
-                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs' 
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                            }`}
+                            <option value="">(Asignar responsable)</option>
+                            {realMembers.map(m => (
+                                <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
+                            ))}
+                        </select>
+                        <input
+                            type="date"
+                            value={newItemDueDate}
+                            onChange={e => setNewItemDueDate(e.target.value)}
+                            className="px-3 py-2.5 text-xs bg-gray-50/80 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none"
+                        />
+                        <select
+                            value={newItemPriority}
+                            onChange={e => setNewItemPriority(e.target.value as any)}
+                            className="px-3 py-2.5 text-xs bg-gray-50/80 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none font-medium"
                         >
-                            <Target className="w-3.5 h-3.5 text-amber-500" /> 2. Prioridades Trimestrales
+                            <option value="low">Prioridad Baja</option>
+                            <option value="medium">Prioridad Media</option>
+                            <option value="high">Prioridad Alta</option>
+                        </select>
+                        <button
+                            type="submit"
+                            className="px-4 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-1.5 shadow-xs shrink-0"
+                        >
+                            <Plus className="w-4 h-4" /> Agregar Tarea
                         </button>
+                    </form>
+                </div>
+
+                {/* Views Toolbar & Search */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-1 bg-white dark:bg-[#111] p-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 text-xs shadow-2xs">
+                        <span className="text-[10px] uppercase font-bold text-gray-400 px-3 flex items-center gap-1.5">
+                            <SlidersHorizontal className="w-3.5 h-3.5" /> Filtrar:
+                        </span>
+                        {[
+                            { id: 'all', label: 'Todas' },
+                            { id: 'priority', label: 'Por Prioridad' },
+                            { id: 'assigned_to_me', label: 'Asignadas a mí' },
+                            { id: 'due_date', label: 'Por Fecha' },
+                            { id: 'status', label: 'Por Estado' }
+                        ].map(v => (
+                            <button
+                                key={v.id}
+                                onClick={() => setListCustomView(v.id as any)}
+                                className={`px-3 py-1.5 font-medium rounded-xl transition-all ${
+                                    listCustomView === v.id
+                                        ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs font-semibold'
+                                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
+                                }`}
+                            >
+                                {v.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar tarea..."
+                            value={listasSearch}
+                            onChange={e => setListasSearch(e.target.value)}
+                            className="pl-10 pr-4 py-2 text-xs bg-white dark:bg-[#111] border border-gray-200/80 dark:border-gray-800/80 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 w-64 shadow-2xs"
+                        />
                     </div>
                 </div>
 
-                {/* Subtab 1: Administrar un proyecto */}
-                {listasSubTab === 'admin' && (
-                    <div className="space-y-5">
-                        {/* List Selector Header */}
-                        <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800 pb-3">
-                                <div>
-                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <List className="w-4 h-4 text-blue-500" /> Listas del Proyecto
-                                    </h3>
-                                    <p className="text-xs text-gray-500 mt-0.5">
-                                        Coordina el trabajo del equipo, fechas de entrega y estados clave con listas personalizadas.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={handleShareListSummary}
-                                        className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-700"
-                                    >
-                                        <Share2 className="w-3.5 h-3.5 text-blue-500" /> Compartir en Canal
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setCreateListModal({ isOpen: true, templateType: 'project_tracking' });
-                                            setNewListTitle('');
-                                            setNewListDescription('');
-                                        }}
-                                        className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-xs"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" /> Nueva Lista
-                                    </button>
-                                </div>
-                            </div>
+                {/* Main List Data Table */}
+                <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr className="bg-gray-50/70 dark:bg-zinc-900/60 border-b border-gray-200/80 dark:border-gray-800/80 text-gray-500 dark:text-gray-400 font-semibold text-[11px] uppercase tracking-wider">
+                                    <th className="py-3.5 px-4">Tarea</th>
+                                    <th className="py-3.5 px-4">Estado</th>
+                                    <th className="py-3.5 px-4">Responsable</th>
+                                    <th className="py-3.5 px-4">Fecha límite</th>
+                                    <th className="py-3.5 px-4">Prioridad</th>
+                                    <th className="py-3.5 px-4 text-center">Hilo / Discusión</th>
+                                    <th className="py-3.5 px-4 text-right">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
+                                {displayedItems.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="py-12 text-center text-gray-400 italic">
+                                            No hay elementos en esta vista. Crea una nueva tarea arriba.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    displayedItems.map(item => (
+                                        <tr key={item.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/20 transition-colors">
+                                            {/* Title */}
+                                            <td className="py-4 px-4 font-medium text-gray-900 dark:text-gray-100 min-w-[240px]">
+                                                <div className="flex items-center gap-2.5">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.status === 'completed'}
+                                                        onChange={e => handleUpdateItemField(item.id, 'status', e.target.checked ? 'completed' : 'pending')}
+                                                        className="rounded border-gray-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
+                                                    />
+                                                    <span className={item.status === 'completed' ? 'line-through text-gray-400' : ''}>
+                                                        {item.title}
+                                                    </span>
+                                                </div>
+                                            </td>
 
-                            {/* List Tabs */}
-                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                                {projectLists.map(list => (
-                                    <button
-                                        key={list.id}
-                                        onClick={() => setSelectedListId(list.id)}
-                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap shrink-0 border ${
-                                            list.id === activeList.id
-                                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-800 shadow-xs'
-                                                : 'bg-gray-50 dark:bg-black/40 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        <ListOrdered className="w-3.5 h-3.5" />
-                                        {list.name}
-                                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-200/50 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-mono">
-                                            {list.items?.length || 0}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
+                                            {/* Status Dropdown */}
+                                            <td className="py-4 px-4">
+                                                <select
+                                                    value={item.status}
+                                                    onChange={e => handleUpdateItemField(item.id, 'status', e.target.value)}
+                                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border focus:outline-none cursor-pointer ${
+                                                        item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
+                                                        item.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300' :
+                                                        item.status === 'review' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300' :
+                                                        item.status === 'blocked' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300' :
+                                                        'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300'
+                                                    }`}
+                                                >
+                                                    <option value="pending">Por hacer</option>
+                                                    <option value="in_progress">En progreso</option>
+                                                    <option value="review">En revisión</option>
+                                                    <option value="blocked">Bloqueado</option>
+                                                    <option value="completed">Completado</option>
+                                                </select>
+                                            </td>
 
-                            {/* Quick Add Form for Active List */}
-                            <form onSubmit={handleAddItem} className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-2">
-                                <input
-                                    type="text"
-                                    placeholder={`Agregar nuevo elemento a "${activeList.name}"...`}
-                                    value={newItemTitle}
-                                    onChange={e => setNewItemTitle(e.target.value)}
-                                    className="flex-1 min-w-[200px] px-3 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-                                />
-                                <select
-                                    value={newItemAssignee}
-                                    onChange={e => setNewItemAssignee(e.target.value)}
-                                    className="px-2.5 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none max-w-[140px]"
-                                >
-                                    <option value="">(Asignar)</option>
-                                    {realMembers.map(m => (
-                                        <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
-                                    ))}
-                                </select>
-                                <input
-                                    type="date"
-                                    value={newItemDueDate}
-                                    onChange={e => setNewItemDueDate(e.target.value)}
-                                    className="px-2 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none"
-                                />
-                                <select
-                                    value={newItemPriority}
-                                    onChange={e => setNewItemPriority(e.target.value as any)}
-                                    className="px-2 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none"
-                                >
-                                    <option value="low">Baja</option>
-                                    <option value="medium">Media</option>
-                                    <option value="high">Alta</option>
-                                </select>
-                                <select
-                                    value={newItemSP}
-                                    onChange={e => setNewItemSP(Number(e.target.value))}
-                                    className="px-2 py-2 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none font-mono"
-                                >
-                                    {[1, 2, 3, 5, 8, 13].map(sp => (
-                                        <option key={sp} value={sp}>{sp} SP</option>
-                                    ))}
-                                </select>
-                                <button
-                                    type="submit"
-                                    className="px-3.5 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 shadow-xs shrink-0"
-                                >
-                                    <Plus className="w-3.5 h-3.5" /> Agregar
-                                </button>
-                            </form>
-                        </div>
+                                            {/* Assignee */}
+                                            <td className="py-4 px-4">
+                                                <select
+                                                    value={item.assignee_email || ''}
+                                                    onChange={e => handleUpdateItemField(item.id, 'assignee_email', e.target.value || null)}
+                                                    className="bg-transparent text-gray-700 dark:text-gray-300 text-xs focus:outline-none cursor-pointer max-w-[140px] truncate font-medium"
+                                                >
+                                                    <option value="">(Sin Asignar)</option>
+                                                    {realMembers.map(m => (
+                                                        <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
+                                                    ))}
+                                                </select>
+                                            </td>
 
-                        {/* Views Toolbar & Search */}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl border border-gray-200 dark:border-gray-800 text-xs">
-                                <span className="text-[10px] uppercase font-bold text-gray-400 px-2 flex items-center gap-1">
-                                    <SlidersHorizontal className="w-3 h-3" /> Vistas:
-                                </span>
-                                {[
-                                    { id: 'all', label: 'Todas las Tareas' },
-                                    { id: 'priority', label: 'Por Prioridad' },
-                                    { id: 'assigned_to_me', label: 'Asignados a ti' },
-                                    { id: 'due_date', label: 'Por Fecha' },
-                                    { id: 'status', label: 'Por Estado' }
-                                ].map(v => (
-                                    <button
-                                        key={v.id}
-                                        onClick={() => setListCustomView(v.id as any)}
-                                        className={`px-2.5 py-1 font-medium rounded-lg transition-colors ${
-                                            listCustomView === v.id
-                                                ? 'bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white shadow-xs font-semibold'
-                                                : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
-                                        }`}
-                                    >
-                                        {v.label}
-                                    </button>
-                                ))}
-                            </div>
+                                            {/* Due Date */}
+                                            <td className="py-4 px-4">
+                                                <input
+                                                    type="date"
+                                                    value={item.due_date || ''}
+                                                    onChange={e => handleUpdateItemField(item.id, 'due_date', e.target.value || null)}
+                                                    className="bg-transparent text-gray-600 dark:text-gray-400 text-xs focus:outline-none font-medium"
+                                                />
+                                            </td>
 
-                            <div className="relative">
-                                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar en la lista..."
-                                    value={listasSearch}
-                                    onChange={e => setListasSearch(e.target.value)}
-                                    className="pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 w-52"
-                                />
-                            </div>
-                        </div>
+                                            {/* Priority Dropdown */}
+                                            <td className="py-4 px-4">
+                                                <select
+                                                    value={item.priority || 'medium'}
+                                                    onChange={e => handleUpdateItemField(item.id, 'priority', e.target.value)}
+                                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border focus:outline-none cursor-pointer ${
+                                                        item.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40' :
+                                                        item.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40' :
+                                                        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40'
+                                                    }`}
+                                                >
+                                                    <option value="low">Baja</option>
+                                                    <option value="medium">Media</option>
+                                                    <option value="high">Alta</option>
+                                                </select>
+                                            </td>
 
-                        {/* Main List Data Table */}
-                        <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs border-collapse">
-                                    <thead>
-                                        <tr className="bg-gray-50 dark:bg-zinc-900/80 border-b border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 font-semibold text-[11px] uppercase tracking-wider">
-                                            <th className="py-3 px-3 w-8 text-center">🔔</th>
-                                            <th className="py-3 px-3">Tarea / Descripción</th>
-                                            <th className="py-3 px-3">Estado</th>
-                                            <th className="py-3 px-3">Persona Asignada</th>
-                                            <th className="py-3 px-3">Fecha de Entrega</th>
-                                            <th className="py-3 px-3">Prioridad</th>
-                                            <th className="py-3 px-3 text-center">Story Points</th>
-                                            <th className="py-3 px-3 text-center">Hilo / Comentarios</th>
-                                            <th className="py-3 px-3 text-right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800/70">
-                                        {displayedItems.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={9} className="py-8 text-center text-gray-400 italic">
-                                                    No hay elementos en esta vista. Agrega un elemento arriba o cambia el filtro de búsqueda.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            displayedItems.map(item => (
-                                                <tr key={item.id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
-                                                    {/* Notifications Bell */}
-                                                    <td className="py-3 px-3 text-center">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleUpdateItemField(item.id, 'notifications_enabled', !item.notifications_enabled)}
-                                                            className={`p-1 rounded-md transition-colors ${
-                                                                item.notifications_enabled ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30' : 'text-gray-300 dark:text-gray-700 hover:text-gray-500'
-                                                            }`}
-                                                            title={item.notifications_enabled ? 'Notificaciones activadas' : 'Notificaciones desactivadas'}
-                                                        >
-                                                            {item.notifications_enabled ? <Bell className="w-3.5 h-3.5 fill-amber-500/20" /> : <BellOff className="w-3.5 h-3.5" />}
-                                                        </button>
-                                                    </td>
-
-                                                    {/* Title */}
-                                                    <td className="py-3 px-3 font-medium text-gray-900 dark:text-gray-100 min-w-[200px]">
-                                                        <span className={item.status === 'completed' ? 'line-through text-gray-400' : ''}>
-                                                            {item.title}
+                                            {/* Thread / Discussion */}
+                                            <td className="py-4 px-4 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setActiveTaskThreadItem({ listId: activeList.id, item });
+                                                        setListThreadCommentText('');
+                                                    }}
+                                                    className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 transition-colors inline-flex items-center gap-1.5 border border-gray-200 dark:border-gray-700 shadow-2xs"
+                                                >
+                                                    <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
+                                                    <span>Hilo</span>
+                                                    {item.comments && item.comments.length > 0 && (
+                                                        <span className="px-1.5 py-0.2 text-[10px] font-bold bg-blue-600 text-white rounded-full">
+                                                            {item.comments.length}
                                                         </span>
-                                                    </td>
+                                                    )}
+                                                </button>
+                                            </td>
 
-                                                    {/* Status Dropdown */}
-                                                    <td className="py-3 px-3">
-                                                        <select
-                                                            value={item.status}
-                                                            onChange={e => handleUpdateItemField(item.id, 'status', e.target.value)}
-                                                            className={`px-2 py-1 rounded-md text-[11px] font-bold border focus:outline-none cursor-pointer ${
-                                                                item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                                                                item.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300' :
-                                                                item.status === 'review' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300' :
-                                                                item.status === 'blocked' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300' :
-                                                                'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300'
-                                                            }`}
-                                                        >
-                                                            <option value="pending">Por hacer</option>
-                                                            <option value="in_progress">En progreso</option>
-                                                            <option value="review">En revisión</option>
-                                                            <option value="blocked">Bloqueado</option>
-                                                            <option value="completed">Completado</option>
-                                                        </select>
-                                                    </td>
-
-                                                    {/* Assignee */}
-                                                    <td className="py-3 px-3">
-                                                        <select
-                                                            value={item.assignee_email || ''}
-                                                            onChange={e => handleUpdateItemField(item.id, 'assignee_email', e.target.value || null)}
-                                                            className="bg-transparent text-gray-700 dark:text-gray-300 text-xs focus:outline-none cursor-pointer max-w-[130px] truncate"
-                                                        >
-                                                            <option value="">(Sin Asignar)</option>
-                                                            {realMembers.map(m => (
-                                                                <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-
-                                                    {/* Due Date */}
-                                                    <td className="py-3 px-3">
-                                                        <input
-                                                            type="date"
-                                                            value={item.due_date || ''}
-                                                            onChange={e => handleUpdateItemField(item.id, 'due_date', e.target.value || null)}
-                                                            className="bg-transparent text-gray-600 dark:text-gray-400 text-xs focus:outline-none"
-                                                        />
-                                                    </td>
-
-                                                    {/* Priority Dropdown */}
-                                                    <td className="py-3 px-3">
-                                                        <select
-                                                            value={item.priority || 'medium'}
-                                                            onChange={e => handleUpdateItemField(item.id, 'priority', e.target.value)}
-                                                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border focus:outline-none cursor-pointer ${
-                                                                item.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40' :
-                                                                item.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40' :
-                                                                'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40'
-                                                            }`}
-                                                        >
-                                                            <option value="low">Baja</option>
-                                                            <option value="medium">Media</option>
-                                                            <option value="high">Alta</option>
-                                                        </select>
-                                                    </td>
-
-                                                    {/* Story Points */}
-                                                    <td className="py-3 px-3 text-center">
-                                                        <select
-                                                            value={item.story_points || 1}
-                                                            onChange={e => handleUpdateItemField(item.id, 'story_points', Number(e.target.value))}
-                                                            className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[11px] font-mono px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700 focus:outline-none"
-                                                        >
-                                                            {[1, 2, 3, 5, 8, 13].map(sp => (
-                                                                <option key={sp} value={sp}>{sp} SP</option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-
-                                                    {/* Thread / Discussion */}
-                                                    <td className="py-3 px-3 text-center">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setActiveTaskThreadItem({ listId: activeList.id, item });
-                                                                setListThreadCommentText('');
-                                                            }}
-                                                            className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[11px] font-medium rounded-lg hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 transition-colors inline-flex items-center gap-1 border border-gray-200 dark:border-gray-700"
-                                                        >
-                                                            <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
-                                                            <span>Hilo</span>
-                                                            {item.comments && item.comments.length > 0 && (
-                                                                <span className="ml-0.5 px-1.5 py-0.2 text-[9px] font-bold bg-blue-600 text-white rounded-full">
-                                                                    {item.comments.length}
-                                                                </span>
-                                                            )}
-                                                        </button>
-                                                    </td>
-
-                                                    {/* Delete */}
-                                                    <td className="py-3 px-3 text-right">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleDeleteItem(item.id)}
-                                                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                                                            title="Eliminar elemento de la lista"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                                            {/* Delete */}
+                                            <td className="py-4 px-4 text-right">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteItem(item.id)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30"
+                                                    title="Eliminar tarea"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
                     </div>
-                )}
-
-                {/* Subtab 2: Prioridades Trimestrales */}
-                {listasSubTab === 'quarterly' && (
-                    <div className="space-y-4">
-                        <div className="bg-white dark:bg-[#111] p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
-                            <div>
-                                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Prioridades Trimestrales del Equipo</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">Colabora con tu equipo para priorizar los proyectos trimestrales.</p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    setQuarterlyModal({ isOpen: true, item: null });
-                                    setQTitle('');
-                                    setQDesc('');
-                                    setQQuarter(selectedQuarter);
-                                    setQPriority('P1');
-                                    setQImpact('Alto');
-                                    setQOwner(currentUserEmail);
-                                    setQStatus('planning');
-                                }}
-                                className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-xs"
-                            >
-                                <Plus className="w-3.5 h-3.5" /> Nueva Prioridad Trimestral
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            {(['Q1', 'Q2', 'Q3', 'Q4'] as const).map(q => (
-                                <button
-                                    key={q}
-                                    onClick={() => setSelectedQuarter(q)}
-                                    className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
-                                        selectedQuarter === q
-                                            ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-transparent shadow-xs'
-                                            : 'bg-white dark:bg-[#111] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {q} Trimestre
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800/60 overflow-hidden shadow-sm">
-                            {quarterlyPriorities.map(item => (
-                                <div key={item.id} className="p-4 flex flex-wrap items-center justify-between gap-4 hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
-                                    <div className="space-y-1 min-w-[240px] flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${
-                                                item.priority_level === 'P1' ? 'bg-red-50 text-red-700 border-red-200' :
-                                                item.priority_level === 'P2' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                                'bg-blue-50 text-blue-700 border-blue-200'
-                                            }`}>
-                                                {item.priority_level}
-                                            </span>
-                                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">{item.title}</h4>
-                                        </div>
-                                        {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{item.description}</p>}
-                                    </div>
-
-                                    <div className="flex items-center gap-3 shrink-0">
-                                        <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium bg-gray-50 dark:bg-black px-2 py-1 rounded border border-gray-200 dark:border-gray-800">
-                                            Impacto: {item.impact}
-                                        </span>
-                                        <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
-                                            Responsable: {item.owner_email.split('@')[0]}
-                                        </span>
-                                        <span className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded border ${
-                                            item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                            item.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                            'bg-gray-50 text-gray-700 border-gray-200'
-                                        }`}>
-                                            {item.status === 'completed' ? 'Completado' : item.status === 'in_progress' ? 'En Marcha' : 'Planificado'}
-                                        </span>
-                                        <button
-                                            onClick={async () => {
-                                                const updated = (activeProject.quarterly_priorities || []).filter(p => p.id !== item.id);
-                                                await onUpdateProject(activeProject.id, { quarterly_priorities: updated });
-                                            }}
-                                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            {quarterlyPriorities.length === 0 && (
-                                <div className="p-8 text-center text-xs text-gray-500">
-                                    No hay prioridades registradas para {selectedQuarter}.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+                </div>
             </div>
         );
     };
@@ -4861,124 +4707,142 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </form>
             </Modal>
 
-            {/* TASK DISCUSSION THREAD MODAL */}
-            <Modal
-                isOpen={!!activeTaskThreadItem}
-                onClose={() => setActiveTaskThreadItem(null)}
-                title={activeTaskThreadItem ? `Hilo de Discusión: ${activeTaskThreadItem.item.title}` : "Hilo de Tarea"}
-            >
-                {activeTaskThreadItem && (() => {
-                    const { listId, item } = activeTaskThreadItem;
-                    const comments = item.comments || [];
-
-                    const handleAddComment = (e: React.FormEvent) => {
-                        e.preventDefault();
-                        if (!listThreadCommentText.trim() || !activeProject) return;
-
-                        const newComment = {
-                            id: `cmt-${Date.now()}`,
-                            user_email: currentUserEmail,
-                            user_name: currentUserEmail.split('@')[0],
-                            content: listThreadCommentText.trim(),
-                            created_at: new Date().toISOString()
-                        };
-
-                        const updatedComments = [...comments, newComment];
-
-                        // Update item in lists
-                        const currentLists = activeProject.lists || [];
-                        const updatedLists = currentLists.map(l => {
-                            if (l.id === listId) {
-                                return {
-                                    ...l,
-                                    items: l.items.map(i => i.id === item.id ? { ...i, comments: updatedComments } : i)
-                                };
-                            }
-                            return l;
-                        });
-
-                        onUpdateProject(activeProject.id, { lists: updatedLists });
-                        setActiveTaskThreadItem({ listId, item: { ...item, comments: updatedComments } });
-                        setListThreadCommentText('');
-                    };
-
-                    return (
-                        <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-                            {/* Metadata Header */}
-                            <div className="p-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl space-y-2 text-xs">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                                        <Users className="w-3.5 h-3.5 text-blue-500" />
-                                        Asignado: {item.assignee_email || 'Sin asignar'}
-                                    </span>
-                                    <span className="text-gray-500">
-                                        Entrega: {item.due_date || 'Sin fecha'}
-                                    </span>
-                                    <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
-                                        item.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-                                    }`}>
-                                        {item.status}
-                                    </span>
+            {/* TASK DISCUSSION THREAD SIDE DRAWER */}
+            {activeTaskThreadItem && (
+                <div className="fixed inset-0 z-50 overflow-hidden">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity" onClick={() => setActiveTaskThreadItem(null)} />
+                    <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+                        <div className="w-screen max-w-md bg-white dark:bg-zinc-950 border-l border-gray-200 dark:border-gray-800 shadow-2xl flex flex-col">
+                            {/* Drawer Header */}
+                            <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <MessageCircle className="w-4 h-4 text-blue-500" /> Hilo de Discusión
+                                    </h3>
+                                    <p className="text-xs text-gray-500 truncate max-w-xs">{activeTaskThreadItem.item.title}</p>
                                 </div>
+                                <button
+                                    onClick={() => setActiveTaskThreadItem(null)}
+                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
 
-                            {/* Comments Feed */}
-                            <div className="space-y-3">
-                                <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                                    <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
-                                    Comentarios del Hilo ({comments.length})
-                                </h4>
+                            {/* Drawer Body */}
+                            {(() => {
+                                const { listId, item } = activeTaskThreadItem;
+                                const comments = item.comments || [];
 
-                                {comments.length === 0 ? (
-                                    <p className="text-xs text-gray-400 italic py-4 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
-                                        No hay comentarios en este hilo aún. Inicia la conversación abajo.
-                                    </p>
-                                ) : (
-                                    <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-                                        {comments.map(c => (
-                                            <div key={c.id} className="p-3 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl space-y-1">
-                                                <div className="flex items-center justify-between text-[11px]">
-                                                    <span className="font-bold text-blue-600 dark:text-blue-400">
-                                                        {c.user_name || c.user_email}
+                                const handleAddComment = (e: React.FormEvent) => {
+                                    e.preventDefault();
+                                    if (!listThreadCommentText.trim() || !activeProject) return;
+
+                                    const newComment = {
+                                        id: `cmt-${Date.now()}`,
+                                        user_email: currentUserEmail,
+                                        user_name: currentUserEmail.split('@')[0],
+                                        content: listThreadCommentText.trim(),
+                                        created_at: new Date().toISOString()
+                                    };
+
+                                    const updatedComments = [...comments, newComment];
+
+                                    const currentLists = activeProject.lists || [];
+                                    const updatedLists = currentLists.map(l => {
+                                        if (l.id === listId) {
+                                            return {
+                                                ...l,
+                                                items: l.items.map(i => i.id === item.id ? { ...i, comments: updatedComments } : i)
+                                            };
+                                        }
+                                        return l;
+                                    });
+
+                                    onUpdateProject(activeProject.id, { lists: updatedLists });
+                                    setActiveTaskThreadItem({ listId, item: { ...item, comments: updatedComments } });
+                                    setListThreadCommentText('');
+                                };
+
+                                return (
+                                    <div className="flex-1 flex flex-col justify-between p-5 overflow-hidden">
+                                        <div className="space-y-4 overflow-y-auto pr-1 flex-1">
+                                            {/* Metadata Card */}
+                                            <div className="p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl space-y-2 text-xs">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <span className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                                        <Users className="w-3.5 h-3.5 text-blue-500" />
+                                                        Asignado: {item.assignee_email || 'Sin asignar'}
                                                     </span>
-                                                    <span className="text-gray-400 text-[10px]">
-                                                        {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    <span className="text-gray-500">
+                                                        Fecha: {item.due_date || 'Sin fecha'}
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                                                        item.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                                                    }`}>
+                                                        {item.status}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed">
-                                                    {c.content}
-                                                </p>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
 
-                            {/* Comment Input Form */}
-                            <form onSubmit={handleAddComment} className="pt-2 border-t border-gray-200 dark:border-gray-800 space-y-2">
-                                <textarea
-                                    rows={2}
-                                    placeholder="Escribe un comentario en este hilo..."
-                                    value={listThreadCommentText}
-                                    onChange={e => setListThreadCommentText(e.target.value)}
-                                    className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg p-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-                                />
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                                        <Bell className="w-3 h-3 text-amber-500" /> Notificaciones activadas
-                                    </span>
-                                    <button
-                                        type="submit"
-                                        className="px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1"
-                                    >
-                                        <Send className="w-3 h-3" /> Publicar
-                                    </button>
-                                </div>
-                            </form>
+                                            {/* Comments Feed */}
+                                            <div className="space-y-3">
+                                                <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
+                                                    Comentarios ({comments.length})
+                                                </h4>
+
+                                                {comments.length === 0 ? (
+                                                    <p className="text-xs text-gray-400 italic py-8 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
+                                                        No hay comentarios en este hilo aún. Escribe el primero abajo.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-3">
+                                                        {comments.map(c => (
+                                                            <div key={c.id} className="p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl space-y-1.5">
+                                                                <div className="flex items-center justify-between text-[11px]">
+                                                                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                                                                        {c.user_name || c.user_email}
+                                                                    </span>
+                                                                    <span className="text-gray-400 text-[10px]">
+                                                                        {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed">
+                                                                    {c.content}
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Comment Input Form */}
+                                        <form onSubmit={handleAddComment} className="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
+                                            <textarea
+                                                rows={3}
+                                                placeholder="Escribe un comentario en el hilo..."
+                                                value={listThreadCommentText}
+                                                onChange={e => setListThreadCommentText(e.target.value)}
+                                                className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-xl p-3 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                            />
+                                            <div className="flex justify-end">
+                                                <button
+                                                    type="submit"
+                                                    className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1.5"
+                                                >
+                                                    <Send className="w-3.5 h-3.5" /> Publicar Comentario
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                );
+                            })()}
                         </div>
-                    );
-                })()}
-            </Modal>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
