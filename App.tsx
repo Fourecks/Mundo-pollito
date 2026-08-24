@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectMember, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences } from './types';
 import { DEFAULT_PUSH_PREFERENCES, syncPreferencesToOneSignal, sendPushNotification, sendSampleNotificationForEvent, NotificationEventType } from './services/pushNotificationService';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
@@ -2402,6 +2402,156 @@ const App: React.FC = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, [user, dataLoaded, loadData]);
+
+  // --- REAL-TIME SUPABASE SYNCHRONIZATION ---
+  useEffect(() => {
+    if (!user || !dataLoaded || !isOnline) return;
+
+    console.log("Setting up Supabase Realtime Channels...");
+
+    // 1. Subscribe to Projects changes (chats, lists, expenses, docs, time_entries, channels, huddles, etc.)
+    const projectsChannel = supabase
+      .channel('projects-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projects' },
+        async (payload) => {
+          console.log('Realtime project payload received:', payload);
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+
+          if (eventType === 'INSERT') {
+            const insertProj = newRecord as Project;
+            const isBelonging = insertProj.user_id === user.id || 
+              (insertProj.members && Array.isArray(insertProj.members) && 
+               insertProj.members.some((m: any) => m.email === user.email));
+            if (isBelonging) {
+              setProjects(prev => {
+                if (prev.some(p => p.id === insertProj.id)) return prev;
+                return [...prev, insertProj].sort((a, b) => a.name.localeCompare(b.name));
+              });
+              const currentCached = await getAll<Project>('projects');
+              if (!currentCached.some(p => p.id === insertProj.id)) {
+                await clearAndPutAll('projects', [...currentCached, insertProj]);
+              }
+            }
+          } else if (eventType === 'UPDATE') {
+            const updateProj = newRecord as Project;
+            const isBelonging = updateProj.user_id === user.id || 
+              (updateProj.members && Array.isArray(updateProj.members) && 
+               updateProj.members.some((m: any) => m.email === user.email));
+            if (isBelonging) {
+              setProjects(prev => {
+                return prev.map(p => p.id === updateProj.id ? { ...p, ...updateProj } : p)
+                  .sort((a, b) => a.name.localeCompare(b.name));
+              });
+              const currentCached = await getAll<Project>('projects');
+              const updatedCached = currentCached.map(p => p.id === updateProj.id ? { ...p, ...updateProj } : p);
+              await clearAndPutAll('projects', updatedCached);
+            } else {
+              setProjects(prev => prev.filter(p => p.id !== updateProj.id));
+              const currentCached = await getAll<Project>('projects');
+              const updatedCached = currentCached.filter(p => p.id !== updateProj.id);
+              await clearAndPutAll('projects', updatedCached);
+            }
+          } else if (eventType === 'DELETE') {
+            const deletedId = oldRecord.id;
+            setProjects(prev => prev.filter(p => p.id !== deletedId));
+            const currentCached = await getAll<Project>('projects');
+            const updatedCached = currentCached.filter(p => p.id !== deletedId);
+            await clearAndPutAll('projects', updatedCached);
+          }
+        }
+      )
+      .subscribe();
+
+    // 2. Subscribe to Todos changes (tasks)
+    const todosChannel = supabase
+      .channel('todos-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'todos' },
+        async (payload) => {
+          console.log('Realtime todo payload received:', payload);
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+
+          if (eventType === 'INSERT' || eventType === 'UPDATE') {
+            const todo = newRecord as Todo;
+            // Only update if it belongs to this user or to a project the user has access to
+            const userProjects = await getAll<Project>('projects');
+            const isRelevant = todo.user_id === user.id || 
+              (todo.project_id && userProjects.some(p => p.id === todo.project_id));
+
+            if (isRelevant) {
+              setAllTodos(current => getUpdatedTodosState(current, todo));
+              const currentCached = await getAll<Todo>('todos');
+              const updatedCached = currentCached.filter(t => t.id !== todo.id);
+              updatedCached.push(todo);
+              await clearAndPutAll('todos', updatedCached);
+            }
+          } else if (eventType === 'DELETE') {
+            const deletedId = oldRecord.id;
+            setAllTodos(current => {
+              const newAllTodos = JSON.parse(JSON.stringify(current));
+              for (const key in newAllTodos) {
+                const idx = newAllTodos[key].findIndex(t => t.id === deletedId);
+                if (idx !== -1) {
+                  newAllTodos[key].splice(idx, 1);
+                  if (newAllTodos[key].length === 0 && key !== 'undated') {
+                    delete newAllTodos[key];
+                  }
+                  break;
+                }
+              }
+              return newAllTodos;
+            });
+            const currentCached = await getAll<Todo>('todos');
+            const updatedCached = currentCached.filter(t => t.id !== deletedId);
+            await clearAndPutAll('todos', updatedCached);
+          }
+        }
+      )
+      .subscribe();
+
+    // 3. Subscribe to Project Invitations changes
+    const invitationsChannel = supabase
+      .channel('invitations-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'project_invitations' },
+        async (payload) => {
+          console.log('Realtime invitation payload received:', payload);
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+
+          if (eventType === 'INSERT' || eventType === 'UPDATE') {
+            const inv = newRecord as ProjectInvitation;
+            const isRelevant = inv.receiver_email === user.email || inv.sender_email === user.email || inv.invitee_email === user.email || inv.inviter_email === user.email;
+            if (isRelevant) {
+              setProjectInvitations(prev => {
+                const filtered = prev.filter(p => p.id !== inv.id);
+                const updated = [inv, ...filtered];
+                localStorage.setItem(`invitations_${user.email}`, JSON.stringify(updated));
+                return updated;
+              });
+            }
+          } else if (eventType === 'DELETE') {
+            const deletedId = oldRecord.id;
+            setProjectInvitations(prev => {
+              const updated = prev.filter(p => p.id !== deletedId);
+              localStorage.setItem(`invitations_${user.email}`, JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log("Cleaning up Supabase Realtime Channels...");
+      supabase.removeChannel(projectsChannel);
+      supabase.removeChannel(todosChannel);
+      supabase.removeChannel(invitationsChannel);
+    };
+  }, [user, dataLoaded, isOnline]);
 
   // --- Settings Persistence ---
   useEffect(() => {

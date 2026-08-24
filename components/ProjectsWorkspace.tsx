@@ -1050,12 +1050,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const renderKanban = () => {
         if (!activeProject) return null;
-        const columns = activeProject.kanban_columns || ['To Do', 'In Progress', 'Done'];
+        const columns = activeProject.kanban_columns || ['Por hacer', 'En progreso', 'Completado'];
 
         return (
             <div className="h-full flex overflow-x-auto p-6 gap-6 bg-gray-50/50 dark:bg-[#050505]">
                 {columns.map((col) => {
-                    const colTasks = projectTodos.filter(t => (t.kanban_column || 'To Do') === col);
+                    const colTasks = projectTodos.filter(t => (t.kanban_column || 'Por hacer') === col);
                     const isDragOver = dragOverColumn === col && draggedTaskId !== null;
                     
                     return (

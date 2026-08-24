@@ -458,7 +458,7 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/5 dark:bg-black/20 text-gray-500">
-                                            {task.kanban_column || 'To Do'}
+                                            {task.kanban_column || 'Por hacer'}
                                         </span>
                                         <button
                                             onClick={(e) => {

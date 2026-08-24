@@ -80,7 +80,7 @@ export interface ProjectMember {
   id: string;
   name: string;
   avatar?: string;
-  role: 'owner' | 'lead' | 'member';
+  role: 'owner' | 'lead' | 'member' | 'pending';
   email?: string;
 }
 
