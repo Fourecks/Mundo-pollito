@@ -1094,6 +1094,23 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 </h3>
                             </div>
 
+                            <div className="flex gap-2 mb-4">
+                                <input
+                                    type="text"
+                                    value={sprintTaskText}
+                                    onChange={(e) => setSprintTaskText(e.target.value)}
+                                    placeholder="Nueva tarea del sprint..."
+                                    className="flex-1 text-xs p-2.5 rounded-xl bg-gray-50 dark:bg-zinc-900/40 border border-gray-200 dark:border-gray-800 focus:ring-1 focus:ring-blue-500 transition-all"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSprintTask()}
+                                />
+                                <button
+                                    onClick={handleAddSprintTask}
+                                    className="px-4 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                                >
+                                    Añadir
+                                </button>
+                            </div>
+
                             {sprintTasks.length === 0 ? (
                                 <p className="text-xs text-gray-400 py-6 text-center">No hay tareas asignadas a este sprint todavía. Añade desde el backlog abajo.</p>
                             ) : (
@@ -4303,7 +4320,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             story_points: Number(sprintTaskSP) || 1,
                             assignee_email: sprintTaskAssignee || currentUserEmail,
                             kanban_column: 'Por hacer',
-                            sprint_id: viewSprintModal.id,
+                            sprint_id: viewSprintModal?.id || selectedSprintId,
                             created_at: new Date().toISOString()
                         };
                         const updated = [newTodo, ...(activeProject.todos || [])];
