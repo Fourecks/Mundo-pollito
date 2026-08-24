@@ -74,7 +74,7 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'kanban_columns', 'sprints', 'milestones', 'docs', 'inbox', 'activities', 
         'members', 'template_type', 'goal_id', 'channels', 'chat_messages', 'polls',
         'huddles', 'expenses', 'time_entries', 'doc_folders', 'quarterly_priorities',
-        'lists', 'todos'
+        'lists', 'todos', 'owner_email', 'owner_name'
     ]),
     project_invitations: new Set([
         'id', 'project_id', 'project_name', 'project_emoji', 'project_color',

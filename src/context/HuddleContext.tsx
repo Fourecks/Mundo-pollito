@@ -209,36 +209,41 @@ export const HuddleProvider: React.FC<{ children: React.ReactNode; onHuddleState
     }
   }, [syncMedia, onHuddleStateChange]);
 
-  const leaveHuddle = useCallback((forceEndAll?: boolean) => {
+  const leaveHuddle = useCallback((forceEndAll: boolean = true) => {
     if (!activeHuddle) return;
 
-    // Check remaining participants
-    const remaining = huddleParticipants.filter(p => p.name !== 'Tú');
+    const projectId = activeHuddle.projectId;
+    const channelId = activeHuddle.channelId;
 
-    if (forceEndAll || remaining.length === 0) {
-      // Last member or force end -> end huddle for everyone
-      if (onHuddleStateChange) {
-        onHuddleStateChange(activeHuddle.projectId, activeHuddle.channelId, false, []);
-      }
-      setHuddleParticipants([]);
-    } else {
-      // Still other members in call -> local user exits call
-      if (onHuddleStateChange) {
-        onHuddleStateChange(activeHuddle.projectId, activeHuddle.channelId, true, remaining);
-      }
-      setHuddleParticipants(remaining);
-    }
-
-    setActiveHuddle(null);
+    // 1. Terminate local streams and hardware tracks
     stopLocalStream();
     stopScreenStream();
+
+    // 2. Clear state
+    setActiveHuddle(null);
+    setHuddleParticipants([]);
     setIsHuddleFullScreen(false);
     setIsFloatingMinimized(false);
     setIsMicOn(true);
     setIsVideoOn(false);
     setIsScreenSharing(false);
     setSpeakingParticipants({});
-  }, [activeHuddle, huddleParticipants, stopLocalStream, stopScreenStream, onHuddleStateChange]);
+    setLocalVolume(0);
+
+    // 3. Notify callback if passed
+    if (onHuddleStateChange) {
+      onHuddleStateChange(projectId, channelId, false, []);
+    }
+
+    // 4. Dispatch global custom event for instant cross-component synchronization
+    try {
+      window.dispatchEvent(new CustomEvent('huddle-ended', {
+        detail: { projectId, channelId }
+      }));
+    } catch (e) {
+      console.log('Error dispatching huddle-ended event:', e);
+    }
+  }, [activeHuddle, stopLocalStream, stopScreenStream, onHuddleStateChange]);
 
   const toggleMic = useCallback(() => {
     setIsMicOn((prev) => {

@@ -328,38 +328,105 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const currentUserEmail = currentUser?.email || 'usuario@local.com';
     const currentUserName = currentUser?.user_metadata?.full_name || currentUserEmail.split('@')[0] || 'Tú';
-    const rawOwner = activeProject?.owner_email || activeProject?.user_id;
-    const isOwnerEmailValid = rawOwner && rawOwner.includes('@');
-    const projectOwnerEmail = isOwnerEmailValid ? rawOwner : currentUserEmail;
-    const isProjectCreator = !activeProject || !activeProject.owner_email || activeProject.owner_email.toLowerCase() === currentUserEmail.toLowerCase() || activeProject.user_id === currentUser?.id;
+
+    const projectOwnerEmail = useMemo(() => {
+        if (!activeProject) return currentUserEmail;
+        if (activeProject.owner_email && activeProject.owner_email.includes('@')) {
+            return activeProject.owner_email;
+        }
+        if (activeProject.members && Array.isArray(activeProject.members)) {
+            const ownerMem = activeProject.members.find(m => typeof m !== 'string' && m.role === 'owner' && m.email);
+            if (ownerMem && typeof ownerMem !== 'string' && ownerMem.email) {
+                return ownerMem.email;
+            }
+        }
+        const relatedInv = invitations.find(i => i.project_id === activeProject.id && (i.inviter_email || i.sender_email));
+        if (relatedInv && (relatedInv.inviter_email || relatedInv.sender_email)) {
+            return relatedInv.inviter_email || relatedInv.sender_email!;
+        }
+        if (currentUser?.id && activeProject.user_id === currentUser.id) {
+            return currentUserEmail;
+        }
+        if (activeProject.user_id && activeProject.user_id.includes('@')) {
+            return activeProject.user_id;
+        }
+        return currentUserEmail;
+    }, [activeProject, currentUser, currentUserEmail, invitations]);
+
+    const isProjectCreator = useMemo(() => {
+        if (!activeProject) return true;
+        if (currentUserEmail && projectOwnerEmail) {
+            if (currentUserEmail.toLowerCase() === projectOwnerEmail.toLowerCase()) return true;
+        }
+        if (currentUser?.id && activeProject.user_id === currentUser.id && (!activeProject.owner_email || activeProject.owner_email.toLowerCase() === currentUserEmail.toLowerCase())) {
+            return true;
+        }
+        return false;
+    }, [activeProject, currentUser, currentUserEmail, projectOwnerEmail]);
 
     const realMembers = useMemo(() => {
         if (!activeProject) return [];
         const rawMembers = activeProject.members || [];
         const map = new Map<string, ProjectMember>();
 
-        const ownerName = isProjectCreator ? `${currentUserName} (Creador)` : (isOwnerEmailValid ? rawOwner.split('@')[0] + ' (Creador)' : `${currentUserName} (Creador)`);
-        const ownerEmailVal = isOwnerEmailValid ? rawOwner : currentUserEmail;
+        // 1. Put the real Owner / Creator first
+        const ownerName = activeProject.owner_name || projectOwnerEmail.split('@')[0];
+        const ownerDisplayName = isProjectCreator ? `${currentUserName} (Creador)` : `${ownerName} (Creador)`;
 
-        map.set(ownerEmailVal.toLowerCase(), {
+        map.set(projectOwnerEmail.toLowerCase(), {
             id: 'owner',
-            name: ownerName,
-            email: ownerEmailVal,
+            name: ownerDisplayName,
+            email: projectOwnerEmail,
             role: 'owner'
         });
 
+        // 2. Add all members from activeProject.members
         rawMembers.forEach(m => {
             const mEmail = typeof m === 'string' ? m : m.email;
             if (mEmail && mEmail !== 'tu_correo@ejemplo.com' && mEmail !== 'colaborador_prueba@ejemplo.com' && mEmail !== 'correo@ejemplo.com') {
                 const key = mEmail.toLowerCase();
-                if (!map.has(key)) {
-                    map.set(key, typeof m === 'string' ? { id: mEmail, name: mEmail.split('@')[0], email: mEmail, role: 'collaborator' } : m);
+                if (key !== projectOwnerEmail.toLowerCase() && !map.has(key)) {
+                    const memberName = typeof m === 'string' 
+                        ? (mEmail.toLowerCase() === currentUserEmail.toLowerCase() ? currentUserName : mEmail.split('@')[0])
+                        : (m.name || (m.email?.toLowerCase() === currentUserEmail.toLowerCase() ? currentUserName : m.email?.split('@')[0] || 'Colaborador'));
+                    
+                    map.set(key, {
+                        id: typeof m === 'string' ? mEmail : (m.id || mEmail),
+                        name: memberName,
+                        email: mEmail,
+                        role: typeof m === 'string' ? 'member' : (m.role === 'owner' ? 'member' : (m.role || 'member'))
+                    });
+                }
+            }
+        });
+
+        // 3. If current user is not creator and not in map, add current user as member
+        if (!isProjectCreator && currentUserEmail && !map.has(currentUserEmail.toLowerCase())) {
+            map.set(currentUserEmail.toLowerCase(), {
+                id: currentUser?.id || currentUserEmail,
+                name: currentUserName,
+                email: currentUserEmail,
+                role: 'member'
+            });
+        }
+
+        // 4. Also check invitations for this project
+        invitations.forEach(inv => {
+            if (inv.project_id === activeProject.id && inv.status === 'accepted') {
+                const invitee = (inv.invitee_email || inv.receiver_email || '').toLowerCase();
+                if (invitee && invitee !== projectOwnerEmail.toLowerCase() && !map.has(invitee)) {
+                    map.set(invitee, {
+                        id: invitee,
+                        name: invitee.toLowerCase() === currentUserEmail.toLowerCase() ? currentUserName : invitee.split('@')[0],
+                        email: invitee,
+                        role: 'member'
+                    });
                 }
             }
         });
 
         return Array.from(map.values());
-    }, [activeProject, currentUserEmail, currentUserName, rawOwner, isProjectCreator, isOwnerEmailValid]);
+    }, [activeProject, currentUserEmail, currentUserName, projectOwnerEmail, isProjectCreator, currentUser, invitations]);
 
     const activeChannels = useMemo(() => {
         if (!activeProject) return [];
@@ -383,6 +450,27 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject) return [];
         return activeProject.huddles || [];
     }, [activeProject]);
+
+    // Listen for global huddle-ended events to synchronize project huddle state immediately
+    React.useEffect(() => {
+        const handleHuddleEnded = (e: any) => {
+            const detail = e.detail;
+            if (activeProject && detail && (detail.projectId === activeProject.id || !detail.projectId)) {
+                const currentHuddles = activeProject.huddles || [];
+                const updatedHuddles = currentHuddles.map(h => 
+                    (!detail.channelId || h.channel_id === detail.channelId)
+                        ? { ...h, active: false, participants: [] }
+                        : h
+                );
+                onUpdateProject(activeProject.id, { huddles: updatedHuddles });
+            }
+        };
+
+        window.addEventListener('huddle-ended', handleHuddleEnded);
+        return () => {
+            window.removeEventListener('huddle-ended', handleHuddleEnded);
+        };
+    }, [activeProject, onUpdateProject]);
 
     // Handle channel selection synchronization
     React.useEffect(() => {
@@ -3226,22 +3314,36 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </div>
 
                 <div className="bg-white dark:bg-[#111] rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden shadow-sm">
-                    {membersList.map((m, idx) => (
-                        <div key={m.id || idx} className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                                    {(m.name || m.email || 'M').charAt(0).toUpperCase()}
+                    {membersList.map((m, idx) => {
+                        const isOwner = m.role === 'owner';
+                        return (
+                            <div key={m.id || idx} className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-9 h-9 rounded-full ${isOwner ? 'bg-gradient-to-tr from-amber-500 to-orange-400' : 'bg-blue-600 dark:bg-blue-500'} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm`}>
+                                        {(m.name || m.email || 'M').charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-1.5">
+                                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">{m.name || 'Miembro del Equipo'}</h4>
+                                            {isOwner && (
+                                                <span className="text-[10px] text-amber-500 font-semibold">👑</span>
+                                            )}
+                                        </div>
+                                        <span className="text-[10px] text-gray-400 font-mono">{m.email}</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-bold text-gray-900 dark:text-white">{m.name || 'Miembro del Equipo'}</h4>
-                                    <span className="text-[10px] text-gray-400 font-mono">{m.email}</span>
-                                </div>
+                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${
+                                    isOwner 
+                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' 
+                                        : m.role === 'lead'
+                                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                }`}>
+                                    {isOwner ? 'Propietario / Creador' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
+                                </span>
                             </div>
-                            <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
-                                {m.role === 'owner' ? 'Propietario / Creador' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
-                            </span>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         );

@@ -3242,10 +3242,19 @@ const App: React.FC = () => {
   ): Promise<Project | null> => {
       if (!user) return null;
       const tempId = -Date.now();
+      const userEmail = user.email || 'usuario@local.com';
+      const userName = userEmail.split('@')[0];
+      const initialMembers: ProjectMember[] = [
+        { id: user.id, name: userName, email: userEmail, role: 'owner' }
+      ];
+
       const newProject: Project = { 
         id: tempId, 
         name, 
         user_id: user.id, 
+        owner_email: userEmail,
+        owner_name: userName,
+        members: initialMembers,
         created_at: new Date().toISOString(), 
         emoji, 
         color,
@@ -3416,22 +3425,82 @@ const App: React.FC = () => {
     }
 
     const projectToUpdate = projects.find(p => p.id === invitation.project_id);
+    const ownerEmail = invitation.inviter_email || invitation.sender_email;
+    const ownerName = invitation.inviter_name || (ownerEmail ? ownerEmail.split('@')[0] : 'Creador');
+
     if (projectToUpdate) {
       const currentMembers = projectToUpdate.members || [];
-      if (!currentMembers.includes(user.email)) {
-        const updatedMembers = [...currentMembers, user.email];
-        await handleUpdateProject(projectToUpdate.id, { members: updatedMembers });
+      const updatedMembers: ProjectMember[] = [];
+      const projOwnerEmail = projectToUpdate.owner_email || ownerEmail;
+      const projOwnerName = projectToUpdate.owner_name || ownerName;
+
+      // 1. Ensure creator/owner is at the top
+      if (projOwnerEmail) {
+        updatedMembers.push({ id: 'owner', name: projOwnerName || projOwnerEmail.split('@')[0], email: projOwnerEmail, role: 'owner' });
       }
+
+      // 2. Add existing members (filtering out owner duplicate)
+      currentMembers.forEach((m: any) => {
+        const mEmail = typeof m === 'string' ? m : m.email;
+        if (mEmail && (!projOwnerEmail || mEmail.toLowerCase() !== projOwnerEmail.toLowerCase())) {
+          if (typeof m === 'string') {
+            updatedMembers.push({ id: m, name: m.split('@')[0], email: m, role: 'member' });
+          } else {
+            updatedMembers.push(m);
+          }
+        }
+      });
+
+      // 3. Add accepting user as member if not present
+      if (!updatedMembers.some(m => m.email?.toLowerCase() === user.email.toLowerCase())) {
+        updatedMembers.push({ id: user.id, name: user.email.split('@')[0], email: user.email, role: 'member' });
+      }
+
+      await handleUpdateProject(projectToUpdate.id, { 
+        members: updatedMembers,
+        owner_email: projOwnerEmail || null,
+        owner_name: projOwnerName || null
+      });
     } else {
       try {
         const { data: remoteProj } = await supabase.from('projects').select('*').eq('id', invitation.project_id).maybeSingle();
         if (remoteProj) {
-          const members = remoteProj.members || [];
-          if (!members.includes(user.email)) {
-            members.push(user.email);
+          const rawMembers = remoteProj.members || [];
+          const updatedMembers: ProjectMember[] = [];
+          const projOwnerEmail = remoteProj.owner_email || ownerEmail;
+          const projOwnerName = remoteProj.owner_name || ownerName;
+
+          // 1. Ensure owner is at top
+          if (projOwnerEmail) {
+            updatedMembers.push({ id: 'owner', name: projOwnerName || projOwnerEmail.split('@')[0], email: projOwnerEmail, role: 'owner' });
           }
-          await syncableUpdate('projects', { ...remoteProj, members });
-          setProjects(prev => [...prev.filter(p => p.id !== remoteProj.id), { ...remoteProj, members }]);
+
+          // 2. Add existing members
+          rawMembers.forEach((m: any) => {
+            const mEmail = typeof m === 'string' ? m : m.email;
+            if (mEmail && (!projOwnerEmail || mEmail.toLowerCase() !== projOwnerEmail.toLowerCase())) {
+              if (typeof m === 'string') {
+                updatedMembers.push({ id: m, name: m.split('@')[0], email: m, role: 'member' });
+              } else {
+                updatedMembers.push(m);
+              }
+            }
+          });
+
+          // 3. Add current accepting user
+          if (!updatedMembers.some(m => m.email?.toLowerCase() === user.email.toLowerCase())) {
+            updatedMembers.push({ id: user.id, name: user.email.split('@')[0], email: user.email, role: 'member' });
+          }
+
+          const updatedProjectData: Project = { 
+            ...remoteProj, 
+            owner_email: projOwnerEmail || null,
+            owner_name: projOwnerName || null,
+            members: updatedMembers 
+          };
+
+          await syncableUpdate('projects', updatedProjectData);
+          setProjects(prev => [...prev.filter(p => p.id !== remoteProj.id), updatedProjectData]);
         }
       } catch (err) {
         console.log('Error updating project members on accept:', err);

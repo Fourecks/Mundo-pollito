@@ -287,6 +287,8 @@ export interface ProjectTimeEntry {
 export interface Project {
   id: number;
   user_id: string;
+  owner_email?: string | null;
+  owner_name?: string | null;
   name: string;
   description?: string | null;
   created_at: string;
