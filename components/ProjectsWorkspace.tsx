@@ -87,6 +87,31 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [sprintTaskPriority, setSprintTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [sprintTaskAssignee, setSprintTaskAssignee] = useState<string>('');
 
+    const handleAddSprintTask = (e: React.FormEvent, sprintId?: string) => {
+        e.preventDefault();
+        if (!sprintTaskText.trim()) return;
+        if (!activeProject) return;
+        
+        const targetSprintId = sprintId || selectedSprintId;
+        if (!targetSprintId) return;
+
+        const newTodo: ProjectTodo = {
+            id: crypto.randomUUID(),
+            project_id: activeProject.id,
+            text: sprintTaskText.trim(),
+            completed: false,
+            priority: sprintTaskPriority,
+            story_points: Number(sprintTaskSP) || 1,
+            assignee_email: sprintTaskAssignee || currentUserEmail,
+            kanban_column: 'Por hacer',
+            sprint_id: targetSprintId,
+            created_at: new Date().toISOString()
+        };
+        const updated = [newTodo, ...(activeProject.todos || [])];
+        onUpdateProject(activeProject.id, { todos: updated });
+        setSprintTaskText('');
+    };
+
     // Share Sprint/Roadmap Update to Channel Modal
     const [shareToChannelModal, setShareToChannelModal] = useState<{ isOpen: boolean; title: string; content: string } | null>(null);
     const [shareChannelId, setShareChannelId] = useState<string>('general');
@@ -1101,10 +1126,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     onChange={(e) => setSprintTaskText(e.target.value)}
                                     placeholder="Nueva tarea del sprint..."
                                     className="flex-1 text-xs p-2.5 rounded-xl bg-gray-50 dark:bg-zinc-900/40 border border-gray-200 dark:border-gray-800 focus:ring-1 focus:ring-blue-500 transition-all"
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSprintTask()}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSprintTask(e)}
                                 />
                                 <button
-                                    onClick={handleAddSprintTask}
+                                    onClick={(e) => handleAddSprintTask(e)}
                                     className="px-4 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
                                 >
                                     Añadir
@@ -4308,25 +4333,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     const completedSP = sprintTasks.filter(t => t.completed).reduce((sum, t) => sum + (t.story_points || 0), 0);
                     const progress = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : 0;
 
-                    const handleAddSprintTask = (e: React.FormEvent) => {
-                        e.preventDefault();
-                        if (!sprintTaskText.trim()) return;
-                        const newTodo: ProjectTodo = {
-                            id: crypto.randomUUID(),
-                            project_id: activeProject.id,
-                            text: sprintTaskText.trim(),
-                            completed: false,
-                            priority: sprintTaskPriority,
-                            story_points: Number(sprintTaskSP) || 1,
-                            assignee_email: sprintTaskAssignee || currentUserEmail,
-                            kanban_column: 'Por hacer',
-                            sprint_id: viewSprintModal?.id || selectedSprintId,
-                            created_at: new Date().toISOString()
-                        };
-                        const updated = [newTodo, ...(activeProject.todos || [])];
-                        onUpdateProject(activeProject.id, { todos: updated });
-                        setSprintTaskText('');
-                    };
+                    const handleAddSprintTaskInternal = (e: React.FormEvent) => handleAddSprintTask(e, viewSprintModal?.id);
 
                     return (
                         <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
@@ -4350,65 +4357,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 )}
                             </div>
 
-                            {/* Add Task directly to this Sprint */}
-                            <form onSubmit={handleAddSprintTask} className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-xl space-y-3">
-                                <span className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                                    <Plus className="w-3.5 h-3.5" /> Crear Tarea en este Sprint
-                                </span>
+                            <form onSubmit={handleAddSprintTaskInternal} className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-xl space-y-3">
                                 <input
                                     type="text"
-                                    placeholder="Nombre de la nueva tarea..."
                                     value={sprintTaskText}
-                                    onChange={e => setSprintTaskText(e.target.value)}
-                                    className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                    onChange={(e) => setSprintTaskText(e.target.value)}
+                                    placeholder="Nueva tarea del sprint..."
+                                    className="w-full text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 focus:ring-1 focus:ring-blue-500 transition-all"
                                 />
-                                <div className="grid grid-cols-3 gap-2">
-                                    <div>
-                                        <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Story Points (SP)</label>
-                                        <select
-                                            value={sprintTaskSP}
-                                            onChange={e => setSprintTaskSP(Number(e.target.value))}
-                                            className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-900 dark:text-white"
-                                        >
-                                            {[1, 2, 3, 5, 8, 13, 21].map(sp => (
-                                                <option key={sp} value={sp}>{sp} SP</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Prioridad</label>
-                                        <select
-                                            value={sprintTaskPriority}
-                                            onChange={e => setSprintTaskPriority(e.target.value as any)}
-                                            className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-900 dark:text-white"
-                                        >
-                                            <option value="low">Baja</option>
-                                            <option value="medium">Media</option>
-                                            <option value="high">Alta</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Asignado a</label>
-                                        <select
-                                            value={sprintTaskAssignee}
-                                            onChange={e => setSprintTaskAssignee(e.target.value)}
-                                            className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-900 dark:text-white"
-                                        >
-                                            <option value="">(Sin Asignar)</option>
-                                            {realMembers.map(m => (
-                                                <option key={m.email} value={m.email}>{m.name || m.email}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="flex justify-end">
-                                    <button
-                                        type="submit"
-                                        className="px-3.5 py-1 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs"
-                                    >
-                                        + Agregar Tarea al Sprint
-                                    </button>
-                                </div>
+                                <button
+                                    type="submit"
+                                    className="w-full py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+                                >
+                                    Añadir Tarea
+                                </button>
                             </form>
 
                             {/* Sprint Tasks List */}
