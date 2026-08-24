@@ -224,6 +224,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     // Sprint Detail & Share Update States
     const [viewSprintModal, setViewSprintModal] = useState<Sprint | null>(null);
+    const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
     const [shareUpdateModal, setShareUpdateModal] = useState<{ isOpen: boolean; title: string; updateText: string } | null>(null);
 
     // Custom Lists & Task Thread States
@@ -1001,20 +1002,185 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject) return null;
         const sprints = activeProject.sprints || [];
 
+        // If a specific sprint is selected, render inline sprint detail workspace
+        const currentSprint = selectedSprintId ? sprints.find(s => s.id === selectedSprintId) : null;
+        if (selectedSprintId && currentSprint) {
+            const sprintTasks = projectTodos.filter(t => t.sprint_id === currentSprint.id);
+            const backlogTasks = projectTodos.filter(t => !t.sprint_id);
+            const totalSP = sprintTasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
+            const completedSP = sprintTasks.filter(t => t.completed).reduce((sum, t) => sum + (t.story_points || 0), 0);
+            const progress = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : (sprintTasks.length > 0 ? Math.round((sprintTasks.filter(t => t.completed).length / sprintTasks.length) * 100) : 0);
+
+            return (
+                <div className="p-8 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6 font-sans">
+                    {/* Top Navigation Back & Sprint Title */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setSelectedSprintId(null)}
+                                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
+                            >
+                                <ChevronLeft className="w-4 h-4" /> Volver a Sprints
+                            </button>
+                            <div>
+                                <div className="flex items-center gap-2.5">
+                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">{currentSprint.name}</h2>
+                                    <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${
+                                        currentSprint.status === 'active' ? 'bg-zinc-100 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100' :
+                                        currentSprint.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
+                                        'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
+                                    }`}>
+                                        {currentSprint.status === 'active' ? '● En Curso' : currentSprint.status === 'completed' ? '✓ Completado' : 'Planificación'}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5">Fechas: {currentSprint.start_date || 'Sin inicio'} - {currentSprint.end_date || 'Sin fin'}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    const text = `📌 **Sprint: ${currentSprint.name}**\n• Progreso: ${completedSP}/${totalSP} SP (${progress}%)\n• Tareas: ${sprintTasks.filter(t => t.completed).length}/${sprintTasks.length} completadas`;
+                                    setShareTargetChannelId(selectedChannelId || 'general');
+                                    setShareChannelPassword('');
+                                    setShareComment('');
+                                    setShareError(null);
+                                    setShareUpdateModal({ isOpen: true, title: `Compartir Sprint: ${currentSprint.name}`, updateText: text });
+                                }}
+                                className="px-3.5 py-2 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-700 shadow-2xs"
+                            >
+                                <Share2 className="w-3.5 h-3.5 text-blue-500" /> Compartir en Canal
+                            </button>
+                            <button
+                                onClick={() => setSprintModal({ isOpen: true, sprint: currentSprint })}
+                                className="px-3.5 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-sm"
+                            >
+                                <Edit2 className="w-3.5 h-3.5" /> Editar Sprint
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Sprint Goal & Progress Card */}
+                    <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-4">
+                        {currentSprint.goal && (
+                            <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed bg-gray-50 dark:bg-zinc-900/40 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800">
+                                <strong className="font-bold text-gray-900 dark:text-white block mb-0.5">🎯 Objetivo del Sprint:</strong>
+                                {currentSprint.goal}
+                            </p>
+                        )}
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-medium text-gray-500">
+                                <span>Progreso de Story Points ({completedSP} / {totalSP} SP)</span>
+                                <span>{progress}%</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-600 dark:bg-blue-400 transition-all duration-300" style={{ width: `${progress}%` }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tareas del Sprint & Backlog Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Sprint Tasks */}
+                        <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-4">
+                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800/80 pb-3">
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <CheckSquare className="w-4 h-4 text-emerald-500" /> Tareas del Sprint ({sprintTasks.length})
+                                </h3>
+                            </div>
+
+                            {sprintTasks.length === 0 ? (
+                                <p className="text-xs text-gray-400 py-6 text-center">No hay tareas asignadas a este sprint todavía. Añade desde el backlog abajo.</p>
+                            ) : (
+                                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                                    {sprintTasks.map(task => (
+                                        <div key={task.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-zinc-900/40 border border-gray-100 dark:border-gray-800 text-xs">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={task.completed}
+                                                    onChange={() => onToggleTodo(task.id)}
+                                                    className="rounded border-gray-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
+                                                />
+                                                <span className={`truncate ${task.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-gray-100 font-medium'}`}>
+                                                    {task.text}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {task.story_points ? (
+                                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-mono font-bold">
+                                                        {task.story_points} SP
+                                                    </span>
+                                                ) : null}
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = (activeProject.todos || []).map(t => t.id === task.id ? { ...t, sprint_id: undefined } : t);
+                                                        onUpdateProject(activeProject.id, { todos: updated });
+                                                    }}
+                                                    className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+                                                    title="Quitar del sprint"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Backlog / Available Tasks */}
+                        <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-4">
+                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800/80 pb-3">
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Layers className="w-4 h-4 text-blue-500" /> Tareas Disponibles (Backlog)
+                                </h3>
+                            </div>
+
+                            {backlogTasks.length === 0 ? (
+                                <p className="text-xs text-gray-400 py-6 text-center">No hay tareas pendientes en el backlog general.</p>
+                            ) : (
+                                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                                    {backlogTasks.map(task => (
+                                        <div key={task.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 dark:bg-zinc-900/40 border border-gray-100 dark:border-gray-800 text-xs">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <span className="truncate text-gray-800 dark:text-gray-200 font-medium">
+                                                    {task.text}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const updated = (activeProject.todos || []).map(t => t.id === task.id ? { ...t, sprint_id: currentSprint.id } : t);
+                                                    onUpdateProject(activeProject.id, { todos: updated });
+                                                }}
+                                                className="px-2.5 py-1 bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors shadow-2xs shrink-0"
+                                            >
+                                                + Añadir al Sprint
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         return (
-            <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto pb-20">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="p-8 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6 font-sans">
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
                     <div>
                         <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Planificación de Sprints</h2>
                         <p className="text-xs text-gray-500 mt-0.5">Iteraciones ágiles, asignación de tareas, capacidad de equipo y seguimiento en tiempo real.</p>
                     </div>
-                    <button onClick={() => setSprintModal({ isOpen: true, sprint: null })} className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-2 shadow-sm">
-                        <Plus className="w-3.5 h-3.5" /> Crear Sprint
+                    <button onClick={() => setSprintModal({ isOpen: true, sprint: null })} className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-sm">
+                        <Plus className="w-4 h-4" /> Crear Sprint
                     </button>
                 </div>
 
                 {sprints.length === 0 ? renderEmptyState('No hay Sprints configurados', 'Organiza el trabajo del equipo en iteraciones de 1 o 2 semanas.') : (
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {sprints.map(sprint => {
                             const sprintTasks = projectTodos.filter(t => t.sprint_id === sprint.id);
                             const totalSP = sprintTasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
@@ -1035,14 +1201,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             };
 
                             return (
-                                <div key={sprint.id} className="bg-white dark:bg-[#0a0a0a] rounded-xl border border-gray-200 dark:border-gray-800/80 p-5 shadow-sm space-y-4">
-                                    <div className="flex flex-wrap items-center justify-between gap-4">
-                                        <div className="flex items-center gap-3">
+                                <div key={sprint.id} className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-6 shadow-xs space-y-4 hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
                                             <h3 className="text-sm font-bold text-gray-900 dark:text-white">{sprint.name}</h3>
-                                            <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${
-                                                sprint.status === 'active' ? 'bg-zinc-100 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700' :
-                                                sprint.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' :
-                                                'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-800'
+                                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
+                                                sprint.status === 'active' ? 'bg-zinc-100 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100' :
+                                                sprint.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
+                                                'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
                                             }`}>
                                                 {sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'Planificación'}
                                             </span>
@@ -1050,28 +1216,45 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                                         <div className="flex items-center gap-2">
                                             <button
-                                                onClick={() => setViewSprintModal(sprint)}
-                                                className="px-2.5 py-1 text-xs bg-gray-900 dark:bg-white text-white dark:text-black rounded-md font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1 shadow-xs"
-                                                title="Entrar para ver, crear y editar tareas con Story Points"
+                                                onClick={() => setSelectedSprintId(sprint.id)}
+                                                className="px-3 py-1.5 text-xs bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-2xs"
                                             >
                                                 <Layers className="w-3.5 h-3.5" /> Entrar al Sprint ({sprintTasks.length})
                                             </button>
 
                                             <button
                                                 onClick={handleShareSprintProgress}
-                                                className="px-2.5 py-1 text-xs border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md font-medium flex items-center gap-1.5 transition-colors"
-                                                title="Publicar actualización en el canal de chat"
+                                                className="p-1.5 border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl transition-colors"
+                                                title="Publicar actualización en el canal"
                                             >
-                                                <MessageSquare className="w-3.5 h-3.5 text-blue-500" /> Compartir
+                                                <Share2 className="w-3.5 h-3.5 text-blue-500" />
                                             </button>
+                                        </div>
+                                    </div>
 
+                                    {sprint.goal && <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-2">{sprint.goal}</p>}
+
+                                    {/* Progress */}
+                                    <div className="space-y-1.5">
+                                        <div className="flex justify-between text-[11px] font-medium text-gray-500">
+                                            <span>Progreso ({completedSP} / {totalSP} SP)</span>
+                                            <span>{progress}%</span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                            <div className="h-full bg-blue-600 dark:bg-blue-400 transition-all duration-300" style={{ width: `${progress}%` }} />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800/80 text-xs text-gray-500">
+                                        <span>📅 {sprint.start_date || 'Sin fecha'} → {sprint.end_date || 'Sin fecha'}</span>
+                                        <div className="flex items-center gap-2">
                                             {sprint.status === 'planning' && (
                                                 <button 
                                                     onClick={() => {
                                                         const updated = sprints.map(s => s.id === sprint.id ? { ...s, status: 'active' as const } : s);
                                                         onUpdateProject(activeProject.id, { sprints: updated });
                                                     }}
-                                                    className="px-2.5 py-1 text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-md font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                                                    className="px-2.5 py-1 text-[11px] bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg font-semibold hover:bg-gray-800 transition-colors"
                                                 >
                                                     Iniciar
                                                 </button>
@@ -1079,81 +1262,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             {sprint.status === 'active' && (
                                                 <button 
                                                     onClick={() => setCloseSprintModal({ isOpen: true, sprint })}
-                                                    className="px-2.5 py-1 text-xs bg-emerald-600 text-white rounded-md font-semibold hover:bg-emerald-700 transition-colors"
+                                                    className="px-2.5 py-1 text-[11px] bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
                                                 >
                                                     Cerrar
                                                 </button>
                                             )}
-                                            <button onClick={() => setSprintModal({ isOpen: true, sprint })} className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md">
+                                            <button onClick={() => setSprintModal({ isOpen: true, sprint })} className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg">
                                                 <Edit2 className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </div>
-
-                                    {sprint.goal && <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{sprint.goal}</p>}
-
-                                    {/* Progress Bar & Key Metrics */}
-                                    <div className="space-y-1.5">
-                                        <div className="flex justify-between text-[11px] font-medium text-gray-500">
-                                            <span>Progreso Story Points ({completedSP} / {totalSP} SP)</span>
-                                            <span>{progress}%</span>
-                                        </div>
-                                        <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                            <div className="h-full bg-gray-900 dark:bg-white transition-all duration-300" style={{ width: `${progress}%` }} />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-gray-50 dark:bg-zinc-900/40 rounded-lg border border-gray-100 dark:border-gray-800/80 text-xs">
-                                        <div>
-                                            <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 block">Fechas</span>
-                                            <span className="font-medium text-gray-700 dark:text-gray-300">{sprint.start_date || 'Sin fecha'} - {sprint.end_date || 'Sin fecha'}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 block">Tareas Vinculadas</span>
-                                            <span className="font-medium text-gray-700 dark:text-gray-300">{sprintTasks.filter(t => t.completed).length} / {sprintTasks.length} completadas</span>
-                                        </div>
-                                        <div className="col-span-2 sm:col-span-1">
-                                            <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 block">Puntos de Historia</span>
-                                            <span className="font-medium text-gray-700 dark:text-gray-300">{totalSP} SP acumulados</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Sprint Linked Tasks Accordion */}
-                                    {sprintTasks.length > 0 && (
-                                        <div className="pt-2 border-t border-gray-100 dark:border-gray-800/80 space-y-2">
-                                            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Tareas del Sprint</span>
-                                            <div className="space-y-1 max-h-40 overflow-y-auto">
-                                                {sprintTasks.map(task => (
-                                                    <div key={task.id} className="flex items-center justify-between p-2 rounded bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-800 text-xs">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={task.completed}
-                                                                onChange={() => onToggleTodo(task.id)}
-                                                                className="rounded border-gray-300 text-gray-900 focus:ring-0 cursor-pointer"
-                                                            />
-                                                            <span className={`truncate ${task.completed ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200 font-medium'}`}>
-                                                                {task.text}
-                                                            </span>
-                                                        </div>
-                                                        {task.story_points ? (
-                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-mono shrink-0">
-                                                                {task.story_points} SP
-                                                            </span>
-                                                        ) : null}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Retrospective */}
-                                    {sprint.retrospective && (
-                                        <div className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-xs text-gray-700 dark:text-gray-300">
-                                            <strong className="block mb-1 font-bold text-gray-900 dark:text-white">📝 Retrospectiva:</strong>
-                                            {sprint.retrospective}
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })}
@@ -3216,6 +3334,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 isOpen: true,
                 title: `Compartir Lista: ${activeList.name}`,
                 updateText: summaryText
+            });
+        };
+
+        const handleShareTask = (item: ProjectListItem) => {
+            const text = `📌 **Referencia de Tarea:** ${item.title}\n• Lista: ${activeList.name}\n• Estado: ${item.status}\n• Prioridad: ${item.priority || 'medium'}\n• Asignado a: ${item.assignee_email || 'Sin asignar'}`;
+            setShareTargetChannelId(selectedChannelId || 'general');
+            setShareChannelPassword('');
+            setShareComment('');
+            setShareError(null);
+            setShareUpdateModal({
+                isOpen: true,
+                title: `Compartir Tarea: ${item.title}`,
+                updateText: text
             });
         };
 
