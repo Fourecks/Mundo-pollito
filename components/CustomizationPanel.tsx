@@ -1,17 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
-import { Background, ParticleType, AmbientSoundType, ThemeColors, SupabaseUser } from '../types';
+import { Background, ParticleType, AmbientSoundType, ThemeColors, SupabaseUser, PushNotificationPreferences, NotificationEventType } from '../types';
 
 import { 
   User, X, Upload, Trash2, Star, Image as ImageIconLucide, 
   Video as VideoIconLucide, Volume2, CloudOff, Snowflake, 
   CloudRain, Stars, Circle, Zap, TreePine, Coffee, Waves, 
   VolumeX, LogOut, Palette, Sparkles, Smile, Battery, 
-  ChevronRight 
+  ChevronRight, Bell, Clock, Send, Users, AtSign, CheckCircle2, AlertCircle, Radio
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import { UnsplashGallery } from './UnsplashGallery';
+import { DEFAULT_PUSH_PREFERENCES, syncPreferencesToOneSignal, sendSampleNotificationForEvent } from '../services/pushNotificationService';
 
 interface CustomizationPanelProps {
   isOpen: boolean;
@@ -38,6 +39,17 @@ interface CustomizationPanelProps {
   batteryStatus: any;
   currentUser?: SupabaseUser;
   onLogout?: () => void;
+
+  dailyEncouragementHour?: number | null;
+  onSetDailyEncouragement?: (hour: number | null) => void;
+  dailySummaryHour?: number | null;
+  onSetDailySummary?: (hour: number | null) => void;
+  pushPreferences?: PushNotificationPreferences;
+  onUpdatePushPreferences?: (preferences: PushNotificationPreferences) => void;
+  isSubscribed?: boolean;
+  isPermissionBlocked?: boolean;
+  onToggleSubscription?: () => void;
+  onSendTestNotification?: (eventType?: NotificationEventType) => void;
 }
 
 const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
@@ -47,19 +59,26 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
     progressEmoji, onProgressEmojiChange,
     activeBackground, userBackgrounds, onSelectBackground, onAddBackground, onDeleteBackground, onToggleFavorite, backgroundsLoading,
     particleType, setParticleType, ambientSound, setAmbientSound, enableBatterySaver, setEnableBatterySaver,
-    batteryStatus
+    batteryStatus,
+    dailyEncouragementHour, onSetDailyEncouragement,
+    dailySummaryHour, onSetDailySummary,
+    pushPreferences = DEFAULT_PUSH_PREFERENCES,
+    onUpdatePushPreferences,
+    isSubscribed = false,
+    isPermissionBlocked = false,
+    onToggleSubscription
   } = props;
   
-  const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'backgrounds' | 'ambience' | 'emoji'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'notifications' | 'backgrounds' | 'ambience' | 'emoji'>('account');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bgSubTab, setBgSubTab] = useState<'unsplash' | 'custom'>('unsplash');
   const [view, setView] = useState<'all' | 'favorites'>('all');
-  const [bgToDelete, setBgToDelete] = useState<string | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const tabs = [
     { id: 'account', label: 'Cuenta', icon: User },
     { id: 'colors', label: 'Apariencia', icon: Palette },
+    { id: 'notifications', label: 'Notificaciones', icon: Bell },
     { id: 'backgrounds', label: 'Fondos', icon: ImageIconLucide },
     { id: 'ambience', label: 'Efectos', icon: Sparkles },
     { id: 'emoji', label: 'Emoji', icon: Smile },
@@ -93,7 +112,6 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
       case 'account':
         return (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
-            {/* Header Profile */}
             <div className="flex items-center gap-5 pb-8 border-b border-gray-100 dark:border-gray-800">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Perfil" className="w-16 h-16 rounded-full object-cover shadow-sm border border-gray-100 dark:border-gray-800" />
@@ -108,7 +126,6 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               </div>
             </div>
 
-            {/* List */}
             <div className="pt-2">
               <div className="flex justify-between items-center py-5 border-b border-gray-100 dark:border-gray-800">
                 <span className="text-[15px] font-medium text-gray-700 dark:text-gray-200">Nombre</span>
@@ -122,7 +139,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               <div className="pt-8">
                 <button 
                   onClick={() => setShowLogoutConfirm(true)}
-                  className="w-[140px] py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[14px] flex justify-center items-center shadow-sm"
+                  className="w-[140px] py-2.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-lg font-medium transition-colors text-[14px] flex justify-center items-center shadow-sm"
                 >
                   Cerrar sesión
                 </button>
@@ -163,11 +180,118 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
           </div>
         );
 
+      case 'notifications':
+        const hours = Array.from({ length: 24 }, (_, i) => i);
+        return (
+          <div className="flex flex-col h-full animate-in fade-in duration-200 space-y-6 overflow-y-auto">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Notificaciones</h3>
+
+            {/* OneSignal Subscription Banner */}
+            <div className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+                isPermissionBlocked
+                    ? 'bg-red-50 dark:bg-red-950/30 border-red-200 text-red-900 dark:text-red-200'
+                    : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200'
+            }`}>
+                <div className="flex items-center gap-3">
+                    <div className={`w-2.5 h-2.5 rounded-full ${isSubscribed ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                    <div>
+                        <p className="font-bold text-[13px]">OneSignal Push: {isSubscribed ? 'Activo' : 'Inactivo'}</p>
+                        <p className="text-[11px] text-gray-500">
+                            {isSubscribed ? 'Recibiendo notificaciones reales en producción' : 'Activa para recibir alertas instantáneas'}
+                        </p>
+                    </div>
+                </div>
+                {onToggleSubscription && !isPermissionBlocked && (
+                    <button
+                        onClick={onToggleSubscription}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-900 text-white dark:bg-white dark:text-gray-900 hover:opacity-90 transition-opacity"
+                    >
+                        {isSubscribed ? 'Pausar' : 'Activar'}
+                    </button>
+                )}
+            </div>
+
+            {/* Routines & Daily Hours */}
+            <div className="space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Rutinas Diarias</h4>
+
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200/80 dark:border-gray-800 flex items-center justify-between gap-4">
+                    <div>
+                        <h5 className="font-medium text-sm text-gray-900 dark:text-white">Dosis de Ánimo Matutina</h5>
+                        <p className="text-xs text-gray-500">Saludo motivacional diario para empezar tu jornada.</p>
+                    </div>
+                    <select
+                        value={dailyEncouragementHour === null || dailyEncouragementHour === undefined ? '' : dailyEncouragementHour}
+                        onChange={e => onSetDailyEncouragement?.(e.target.value === '' ? null : Number(e.target.value))}
+                        className="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none"
+                    >
+                        <option value="">Desactivado</option>
+                        {hours.filter(h => h >= 5 && h <= 11).map(h => (
+                            <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00`}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200/80 dark:border-gray-800 flex items-center justify-between gap-4">
+                    <div>
+                        <h5 className="font-medium text-sm text-gray-900 dark:text-white">Resumen Diario de Tareas</h5>
+                        <p className="text-xs text-gray-500">Recibe una síntesis de tus tareas pendientes y progreso.</p>
+                    </div>
+                    <select
+                        value={dailySummaryHour === null || dailySummaryHour === undefined ? '' : dailySummaryHour}
+                        onChange={e => onSetDailySummary?.(e.target.value === '' ? null : Number(e.target.value))}
+                        className="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none"
+                    >
+                        <option value="">Desactivado</option>
+                        {hours.map(h => (
+                            <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00`}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Event Preferences */}
+            <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Preferencias de Alertas</h4>
+                {[
+                    { key: 'projectMembers', label: 'Nuevos miembros en proyectos', desc: 'Avisar cuando se invite o ingrese un colaborador' },
+                    { key: 'taskReminders', label: 'Recordatorios de tareas', desc: 'Notificaciones automáticas al aproximarse fechas límite' },
+                    { key: 'channelMentions', label: 'Menciones en canales', desc: 'Alertas cuando alguien te mencione en debates y chats' }
+                ].map(pref => {
+                    const active = pushPreferences?.[pref.key as keyof PushNotificationPreferences] ?? true;
+                    return (
+                        <div key={pref.key} className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200/80 dark:border-gray-800 flex items-center justify-between gap-4">
+                            <div>
+                                <h5 className="font-medium text-sm text-gray-900 dark:text-white">{pref.label}</h5>
+                                <p className="text-xs text-gray-500">{pref.desc}</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    if (onUpdatePushPreferences && pushPreferences) {
+                                        const updated = { ...pushPreferences, [pref.key]: !active };
+                                        onUpdatePushPreferences(updated);
+                                        syncPreferencesToOneSignal(updated).catch(() => {});
+                                    }
+                                }}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                    active ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'
+                                }`}
+                                role="switch"
+                                aria-checked={active}
+                            >
+                                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-900 shadow ring-0 transition duration-200 ease-in-out ${active ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+          </div>
+        );
+
       case 'backgrounds':
         const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.is_favorite) : userBackgrounds;
         return (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
-            {/* Header with Sub-tabs */}
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Fondos de pantalla</h3>
               {bgSubTab === 'custom' && (
@@ -175,7 +299,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={backgroundsLoading || userBackgrounds.length >= 3}
                   title={userBackgrounds.length >= 3 ? 'Límite alcanzado (máximo 3 fondos)' : 'Subir nuevo fondo'}
-                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors text-[13px] flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
+                  className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg font-medium transition-colors text-[13px] flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
                 >
                   <Upload size={14} /> {userBackgrounds.length >= 3 ? 'Límite 3/3' : 'Subir Fondo'}
                 </button>
@@ -183,7 +307,6 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               <input type="file" ref={fileInputRef} onChange={(e) => { if (e.target.files?.[0]) { onAddBackground(e.target.files[0]); e.target.value = ''; } }} accept="image/*,video/mp4,video/webm" className="hidden" />
             </div>
 
-            {/* Sub-tab Switcher (Unsplash vs Custom) */}
             <div className="flex gap-2 mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
               <button
                 onClick={() => setBgSubTab('unsplash')}
@@ -225,14 +348,14 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar -mx-1 px-1 pb-4">
                   {backgroundsLoading && userBackgrounds.length === 0 ? (
-                    <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+                    <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" /></div>
                   ) : filteredBackgrounds.length === 0 ? (
                     <div className="text-center py-12 text-gray-400 text-[15px]">No hay fondos {view === 'favorites' && 'favoritos'}.</div>
                   ) : (
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredBackgrounds.map(bg => (
                         <div key={bg.id} className="relative group aspect-video rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800/50 cursor-pointer border border-gray-100 dark:border-gray-800" onClick={() => onSelectBackground(activeBackground?.id === bg.id ? null : bg)}>
-                          {activeBackground?.id === bg.id && <div className="absolute inset-0 border-2 border-blue-500 rounded-xl z-20 pointer-events-none" />}
+                          {activeBackground?.id === bg.id && <div className="absolute inset-0 border-2 border-gray-900 dark:border-white rounded-xl z-20 pointer-events-none" />}
                           
                           {bg.type === 'video' ? (
                             <video src={bg.url} className="w-full h-full object-cover" />
@@ -248,7 +371,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
                             <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(bg.id); }} className={`p-2.5 rounded-full backdrop-blur-md transition-all shadow-sm ${bg.is_favorite ? 'bg-yellow-400 text-white' : 'bg-white/90 text-gray-700 hover:bg-white'}`}>
                               <Star size={16} className={bg.is_favorite ? 'fill-current' : ''} />
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); setBgToDelete(bg.id); }} className="p-2.5 rounded-full bg-red-500 text-white hover:bg-red-600 backdrop-blur-md transition-all shadow-sm">
+                            <button onClick={(e) => { e.stopPropagation(); onDeleteBackground(bg.id); }} className="p-2.5 rounded-full bg-white/90 text-red-500 hover:bg-white backdrop-blur-md transition-all shadow-sm">
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -259,149 +382,86 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
                 </div>
               </div>
             )}
-            <ConfirmationModal isOpen={!!bgToDelete} onClose={() => setBgToDelete(null)} onConfirm={() => { if (bgToDelete) { onDeleteBackground(bgToDelete); setBgToDelete(null); } }} title="Eliminar Fondo" message="¿Estás seguro de que quieres eliminar este fondo?" confirmText="Eliminar" cancelText="Cancelar" isDestructive={true} />
           </div>
         );
 
       case 'ambience':
         return (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">Efectos visuales y sonido</h3>
-            
-            <div className="space-y-8 pb-8 flex-1 overflow-y-auto custom-scrollbar">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">Efectos y Sonido</h3>
+            <div className="space-y-8">
               <div>
-                <span className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 mb-4">Efectos de pantalla</span>
-                <div className="grid grid-cols-3 gap-3">
-                  {particleOptions.map(opt => (
+                <label className="text-[14px] font-medium text-gray-700 dark:text-gray-300 block mb-3">Partículas en pantalla</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {particleOptions.map((opt) => (
                     <button
                       key={opt.type}
-                      onClick={() => setParticleType(opt.type)}
-                      className={`py-3 px-2 rounded-xl text-[14px] font-medium transition-all flex flex-col items-center gap-2 border ${
-                        particleType === opt.type 
-                          ? 'bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' 
-                          : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200 dark:bg-[#1a1b1e] dark:border-gray-800 dark:text-gray-400 dark:hover:border-gray-700'
+                      onClick={() => setParticleType(opt.type as ParticleType)}
+                      className={`flex items-center gap-3 p-3.5 rounded-xl border text-[14px] font-medium transition-all ${
+                        particleType === opt.type
+                          ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                          : 'border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50/50 dark:hover:bg-gray-800/50'
                       }`}
                     >
-                      <opt.icon className="w-5 h-5" strokeWidth={particleType === opt.type ? 2.5 : 1.5} />
+                      <opt.icon size={18} className={particleType === opt.type ? 'text-gray-900 dark:text-white' : 'opacity-60'} />
                       {opt.label}
                     </button>
                   ))}
                 </div>
               </div>
-              
+
               <div>
-                <span className="block text-[15px] font-medium text-gray-700 dark:text-gray-200 mb-4">Sonido de fondo</span>
-                <div className="grid grid-cols-3 gap-3">
-                  {soundOptions.map(opt => (
+                <label className="text-[14px] font-medium text-gray-700 dark:text-gray-300 block mb-3">Sonido ambiente</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {soundOptions.map((sound) => (
                     <button
-                      key={opt.type}
-                      onClick={() => setAmbientSound({ ...ambientSound, type: opt.type as AmbientSoundType })}
-                      className={`py-3 px-2 rounded-xl text-[14px] font-medium transition-all flex flex-col items-center gap-2 border ${
-                        ambientSound.type === opt.type 
-                          ? 'bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' 
-                          : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200 dark:bg-[#1a1b1e] dark:border-gray-800 dark:text-gray-400 dark:hover:border-gray-700'
+                      key={sound.type}
+                      onClick={() => setAmbientSound({ type: sound.type as AmbientSoundType, volume: ambientSound.volume })}
+                      className={`flex items-center gap-3 p-3.5 rounded-xl border text-[14px] font-medium transition-all ${
+                        ambientSound.type === sound.type
+                          ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                          : 'border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50/50 dark:hover:bg-gray-800/50'
                       }`}
                     >
-                      <opt.icon className="w-5 h-5" strokeWidth={ambientSound.type === opt.type ? 2.5 : 1.5} />
-                      {opt.label}
+                      <sound.icon size={18} className={ambientSound.type === sound.type ? 'text-gray-900 dark:text-white' : 'opacity-60'} />
+                      {sound.label}
                     </button>
                   ))}
                 </div>
                 {ambientSound.type !== 'none' && (
-                  <div className="mt-5 flex items-center gap-4 bg-gray-50 dark:bg-gray-800/30 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
-                    <Volume2 size={18} className="text-gray-500 dark:text-gray-400" />
+                  <div className="mt-4 flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+                    <Volume2 size={18} className="text-gray-500" />
                     <input
                       type="range"
                       min="0"
                       max="1"
                       step="0.05"
                       value={ambientSound.volume}
-                      onChange={(e) => setAmbientSound({ ...ambientSound, volume: parseFloat(e.target.value) })}
-                      className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-blue-500"
+                      onChange={(e) => setAmbientSound({ type: ambientSound.type, volume: parseFloat(e.target.value) })}
+                      className="flex-1 accent-gray-900 dark:accent-white cursor-pointer"
                     />
+                    <span className="text-xs text-gray-500 font-mono w-8 text-right">{Math.round(ambientSound.volume * 100)}%</span>
                   </div>
                 )}
-              </div>
-
-              <div className="flex justify-between items-center py-4 border-t border-gray-100 dark:border-gray-800">
-                <div className="flex flex-col">
-                  <span className="text-[15px] font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                    <Battery size={16} className={batteryStatus?.isLow ? 'text-red-500' : 'text-gray-400'}/>
-                    Ahorro de energía
-                  </span>
-                  <span className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">Detener animaciones con batería baja</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={enableBatterySaver} onChange={(e) => setEnableBatterySaver(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 border border-transparent dark:border-gray-600 dark:peer-checked:border-blue-500"></div>
-                </label>
               </div>
             </div>
           </div>
         );
 
       case 'emoji':
-        const currentEmoji = progressEmoji || '🚀';
-        const presetEmojis = ['🚀', '🐥', '🔥', '⭐', '🎯', '⚡', '🏆', '✨', '💡', '🌱', '🐱', '🥑'];
-
         return (
-          <div className="flex flex-col h-full pb-4 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col h-full animate-in fade-in duration-200">
+            <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Emoji de progreso</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Elige el icono que acompaña tu avance en listas y metas.</p>
+                <p className="text-xs text-gray-500 mt-0.5">Elige el emoji que representa tus logros y completados.</p>
               </div>
-              {currentEmoji !== '🚀' && (
-                <button
-                  onClick={() => onProgressEmojiChange?.('🚀')}
-                  className="text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 font-medium"
-                >
-                  Restablecer
-                </button>
-              )}
-            </div>
-            
-            {/* Live Progress Bar Preview */}
-            <div className="p-4 mb-5 rounded-xl bg-gray-50/80 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center justify-between text-xs font-medium text-gray-500 dark:text-gray-400 mb-2.5">
-                <span>Vista previa de avance</span>
-                <span className="font-semibold text-gray-700 dark:text-gray-300">75%</span>
-              </div>
-              <div className="relative h-3 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: '75%' }} />
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-300"
-                  style={{ left: '75%' }}
-                >
-                  <span className="text-xl leading-none select-none drop-shadow-sm">{currentEmoji}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Select Presets */}
-            <div className="mb-4">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-2">Sugeridos</span>
-              <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
-                {presetEmojis.map((emoji) => {
-                  const isSelected = currentEmoji === emoji;
-                  return (
-                    <button
-                      key={emoji}
-                      onClick={() => onProgressEmojiChange?.(emoji)}
-                      className={`h-10 rounded-lg flex items-center justify-center text-lg transition-all ${
-                        isSelected
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/80 border border-transparent font-bold'
-                          : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800/60'
-                      }`}
-                    >
-                      <span>{emoji}</span>
-                    </button>
-                  );
-                })}
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-xl">
+                <span className="text-xl">{progressEmoji || '🚀'}</span>
+                <span className="text-xs text-gray-500">Actual</span>
               </div>
             </div>
             
-            {/* Full Emoji Picker */}
             <div className="flex-1 min-h-[300px] overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1b1e]">
               <EmojiPicker 
                 width="100%"
@@ -423,8 +483,6 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
 
   const panelContent = (
     <div className="flex flex-col md:flex-row h-full w-full bg-white dark:bg-[#1a1b1e] overflow-hidden">
-      
-      {/* Mobile Header (Close button only) */}
       {isMobile && (
         <div className="flex justify-end p-4 shrink-0 drag-handle cursor-move">
           <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
@@ -433,10 +491,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
         </div>
       )}
 
-      {/* Sidebar Navigation */}
       <div className="w-full md:w-[240px] shrink-0 border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800 flex flex-col bg-gray-50/50 dark:bg-[#151618]">
-        
-        {/* Desktop Drag Handle & Title */}
         {!isMobile && (
           <div className="p-6 pb-2 drag-handle cursor-move flex items-center justify-between">
             <h2 className="text-[16px] font-semibold text-gray-900 dark:text-white tracking-wide">Ajustes</h2>
@@ -446,7 +501,6 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
           </div>
         )}
 
-        {/* Tabs List */}
         <div className="flex md:flex-col p-4 md:p-4 gap-1.5 overflow-x-auto custom-scrollbar md:overflow-visible">
           {tabs.map(tab => (
             <button
@@ -454,18 +508,17 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all text-[14px] whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'bg-white dark:bg-[#1a1b1e] text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-gray-800'
+                  ? 'bg-white dark:bg-[#1a1b1e] text-gray-900 dark:text-white shadow-sm border border-gray-100 dark:border-gray-800'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 border border-transparent'
               }`}
             >
-              <tab.icon size={18} strokeWidth={activeTab === tab.id ? 2.5 : 2} className={activeTab === tab.id ? 'text-blue-500' : 'opacity-70'} />
+              <tab.icon size={18} strokeWidth={activeTab === tab.id ? 2.5 : 2} className={activeTab === tab.id ? 'text-gray-900 dark:text-white' : 'opacity-70'} />
               {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar relative bg-white dark:bg-[#1a1b1e]">
         {renderContent()}
       </div>

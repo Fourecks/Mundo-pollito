@@ -828,6 +828,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         enableBatterySaver={uiSettings?.enableBatterySaver || false}
         setEnableBatterySaver={(enabled) => setUiSettings((s: any) => ({ ...s, enableBatterySaver: enabled }))}
         batteryStatus={batteryStatus}
+        dailyEncouragementHour={uiSettings?.dailyEncouragementLocalHour ?? null}
+        onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
+        dailySummaryHour={uiSettings?.dailySummaryHour ?? null}
+        onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
+        pushPreferences={pushPreferences}
+        onUpdatePushPreferences={onUpdatePushPreferences}
+        isSubscribed={isSubscribed}
+        isPermissionBlocked={isPermissionBlocked}
+        onToggleSubscription={onToggleSubscription}
+        onSendTestNotification={handleNotificationAction}
       />
       
 
@@ -1617,6 +1627,16 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
               enableBatterySaver={uiSettings?.enableBatterySaver || false}
               setEnableBatterySaver={(enabled) => setUiSettings((s: any) => ({ ...s, enableBatterySaver: enabled }))}
               batteryStatus={batteryStatus}
+              dailyEncouragementHour={uiSettings?.dailyEncouragementLocalHour ?? null}
+              onSetDailyEncouragement={(hour) => setUiSettings((s: any) => ({...s, dailyEncouragementLocalHour: hour}))}
+              dailySummaryHour={uiSettings?.dailySummaryHour ?? null}
+              onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
+              pushPreferences={pushPreferences}
+              onUpdatePushPreferences={onUpdatePushPreferences}
+              isSubscribed={isSubscribed}
+              isPermissionBlocked={isPermissionBlocked}
+              onToggleSubscription={onToggleSubscription}
+              onSendTestNotification={handleNotificationAction}
             />
 
             <NotificationsPanel
