@@ -44,7 +44,7 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
 
     const columns = project.kanban_columns && project.kanban_columns.length > 0 
         ? project.kanban_columns 
-        : ['To Do', 'In Progress', 'Done'];
+        : ['Por hacer', 'En progreso', 'Completado'];
 
     const completedTasks = projectTasks.filter(t => t.completed).length;
     const totalTasks = projectTasks.length;
@@ -119,7 +119,7 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
         const text = newTaskText.trim();
         setNewTaskText('');
         setAddingToCol(null);
-        await addTodo(text, { projectId: project.id });
+        await addTodo(text, { projectId: project.id, kanban_column: col } as any);
     };
 
     const getColumnStyle = (col: string) => {
@@ -217,7 +217,7 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
                 {viewMode === 'kanban' ? (
                     <div className="h-full flex overflow-x-auto gap-4 pb-2">
                         {columns.map(col => {
-                            const colTasks = projectTasks.filter(t => (t.kanban_column || 'To Do') === col);
+                            const colTasks = projectTasks.filter(t => (t.kanban_column || (columns[0] || 'Por hacer')) === col);
                             const isDragOver = dragOverColumn === col && draggedTaskId !== null;
                             const style = getColumnStyle(col);
 

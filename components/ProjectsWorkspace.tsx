@@ -543,14 +543,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject || !shareDocModal.doc) return;
         const targetChannel = (activeProject.channels || []).find(c => c.id === shareTargetChannelId);
         
-        // Password verification for private channel
-        if (targetChannel && targetChannel.is_private && targetChannel.password && !unlockedChannels[targetChannel.id]) {
-            if (shareChannelPassword !== targetChannel.password) {
-                setShareError('Contraseña incorrecta para acceder a este canal privado.');
+        // Password verification for private channel (always required when sharing to private channel)
+        if (targetChannel && targetChannel.is_private) {
+            const reqPass = targetChannel.password || '1234';
+            if (shareChannelPassword !== reqPass) {
+                setShareError('Contraseña del canal privado requerida o incorrecta.');
                 return;
             }
-            // Unlock channel
-            setUnlockedChannels(prev => ({ ...prev, [targetChannel.id]: true }));
         }
 
         const doc = shareDocModal.doc;
@@ -590,14 +589,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject || !shareUpdateModal) return;
         const targetChannel = (activeProject.channels || []).find(c => c.id === shareTargetChannelId);
         
-        // Password verification for private channel
-        if (targetChannel && targetChannel.is_private && targetChannel.password && !unlockedChannels[targetChannel.id]) {
-            if (shareChannelPassword !== targetChannel.password) {
-                setShareError('Contraseña incorrecta para acceder a este canal privado.');
+        // Password verification for private channel (always required when sharing to private channel)
+        if (targetChannel && targetChannel.is_private) {
+            const reqPass = targetChannel.password || '1234';
+            if (shareChannelPassword !== reqPass) {
+                setShareError('Contraseña del canal privado requerida o incorrecta.');
                 return;
             }
-            // Unlock channel
-            setUnlockedChannels(prev => ({ ...prev, [targetChannel.id]: true }));
         }
 
         const newMessage: ProjectChatMessage = {
@@ -835,10 +833,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         ].map(tab => (
                             <button
                                 key={tab.id}
-                                onClick={() => {
-                                    setActiveTab(tab.id as any);
-                                    if (tab.id !== 'chat') setUnlockedChannels({});
-                                }}
+                                onClick={() => setActiveTab(tab.id as any)}
                                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap relative ${
                                     activeTab === tab.id 
                                         ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' 
@@ -1055,12 +1050,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const renderKanban = () => {
         if (!activeProject) return null;
-        const columns = activeProject.kanban_columns || ['Por hacer', 'En curso', 'Completado'];
+        const columns = activeProject.kanban_columns || ['To Do', 'In Progress', 'Done'];
 
         return (
             <div className="h-full flex overflow-x-auto p-6 gap-6 bg-gray-50/50 dark:bg-[#050505]">
                 {columns.map((col) => {
-                    const colTasks = projectTodos.filter(t => (t.kanban_column || 'Por hacer') === col);
+                    const colTasks = projectTodos.filter(t => (t.kanban_column || 'To Do') === col);
                     const isDragOver = dragOverColumn === col && draggedTaskId !== null;
                     
                     return (
@@ -2199,10 +2194,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
                                         }`}
                                         onClick={() => {
-                                            if (selectedChannelId !== chan.id) {
-                                                setUnlockedChannels({});
-                                                setSelectedChannelId(chan.id);
+                                            if (chan.is_private) {
+                                                setUnlockedChannels(prev => ({ ...prev, [chan.id]: false }));
                                             }
+                                            setSelectedChannelId(chan.id);
                                         }}
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
@@ -2372,7 +2367,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         )}
 
                         {/* CONDITIONAL LOCK VIEW OR ACTIVE CONVERSATION VIEW */}
-                        {currentChannel.is_private && currentChannel.password && !unlockedChannels[currentChannel.id] ? (
+                        {currentChannel.is_private && !unlockedChannels[currentChannel.id] ? (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/40 dark:bg-black/10">
                                 <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-950/20 flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4 shadow-sm">
                                     <Lock className="w-6 h-6" />
@@ -2381,7 +2376,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     Canal Privado Protegido
                                 </h3>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs leading-relaxed mb-6">
-                                    Este canal está protegido con contraseña. Por favor, ingresa la clave de acceso para ver las conversaciones y participar.
+                                    Este canal es privado y requiere contraseña. Ingresa la clave de acceso para entrar.
                                 </p>
                                 <div className="w-full max-w-xs space-y-3">
                                     <input 
@@ -2392,7 +2387,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         className="w-full px-3.5 py-2 text-xs text-center bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-white font-mono"
                                         onKeyDown={e => {
                                             if (e.key === 'Enter') {
-                                                if (inputPassword === currentChannel.password) {
+                                                const reqPass = currentChannel.password || '1234';
+                                                if (inputPassword === reqPass) {
                                                     setUnlockedChannels(prev => ({ ...prev, [currentChannel.id]: true }));
                                                     setInputPassword('');
                                                 } else {
@@ -2403,7 +2399,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     />
                                     <button 
                                         onClick={() => {
-                                            if (inputPassword === currentChannel.password) {
+                                            const reqPass = currentChannel.password || '1234';
+                                            if (inputPassword === reqPass) {
                                                 setUnlockedChannels(prev => ({ ...prev, [currentChannel.id]: true }));
                                                 setInputPassword('');
                                             } else {
@@ -3440,14 +3437,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             e.preventDefault();
             if (!newItemTitle.trim()) return;
             const assigneeValue = newItemAssignee.trim() || undefined;
-            const columns = activeProject.kanban_columns || ['Por hacer', 'En curso', 'Completado'];
+            const availableCols = activeProject.kanban_columns && activeProject.kanban_columns.length > 0 ? activeProject.kanban_columns : ['Por hacer', 'En progreso', 'Completado'];
+            const defaultCol = availableCols[0] || 'Por hacer';
             await addTodo(newItemTitle.trim(), {
                 projectId: activeProject.id,
                 priority: newItemPriority,
                 assignee: assigneeValue,
                 assigned_to: assigneeValue,
                 dueDate: newItemDueDate || undefined,
-                kanban_column: columns[0],
+                kanban_column: defaultCol,
                 list_id: effectiveListId
             });
             setNewItemTitle('');
@@ -3687,7 +3685,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 ) : (
                                     displayedTodos.map(todo => {
                                         const currentAssignee = todo.assigned_to || todo.assignee || '';
-                                        const currentCol = todo.kanban_column || (todo.completed ? 'Completado' : 'Por hacer');
+                                        const availableCols = activeProject.kanban_columns && activeProject.kanban_columns.length > 0 ? activeProject.kanban_columns : ['Por hacer', 'En progreso', 'Completado'];
+                                        const doneCol = availableCols.find(c => /done|complet|finaliz|termin/i.test(c)) || availableCols[availableCols.length - 1] || 'Completado';
+                                        const firstCol = availableCols[0] || 'Por hacer';
+                                        const currentCol = todo.kanban_column || (todo.completed ? doneCol : firstCol);
 
                                         return (
                                             <tr key={todo.id} className="hover:bg-gray-50/50 dark:hover:bg-zinc-900/30 transition-colors">
@@ -3701,7 +3702,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                 const nextCompleted = !todo.completed;
                                                                 updateTodo(todo.id, { 
                                                                     completed: nextCompleted, 
-                                                                    kanban_column: nextCompleted ? 'Completado' : 'Por hacer' 
+                                                                    kanban_column: nextCompleted ? doneCol : firstCol 
                                                                 });
                                                             }}
                                                             className="rounded border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:ring-0 cursor-pointer w-3.5 h-3.5"
@@ -3718,7 +3719,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         value={currentCol}
                                                         onChange={e => {
                                                             const newCol = e.target.value;
-                                                            const isDone = /complet|done|finaliz/i.test(newCol);
+                                                            const isDone = /done|complet|finaliz|termin/i.test(newCol);
                                                             updateTodo(todo.id, { 
                                                                 kanban_column: newCol, 
                                                                 completed: isDone 
@@ -3726,9 +3727,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         }}
                                                         className="px-2 py-1 text-xs rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
                                                     >
-                                                        {(activeProject.kanban_columns || ['Por hacer', 'En curso', 'Completado']).map(col => (
-                                                            <option key={col} value={col}>{col}</option>
+                                                        {availableCols.map(colName => (
+                                                            <option key={colName} value={colName}>{colName}</option>
                                                         ))}
+                                                        {!availableCols.includes(currentCol) && (
+                                                            <option value={currentCol}>{currentCol}</option>
+                                                        )}
                                                     </select>
                                                 </td>
 
@@ -4360,15 +4364,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         />
                     </div>
 
-                    {/* Password input if target channel is private and locked */}
+                    {/* Password input if target channel is private */}
                     {(() => {
                         const targetChan = activeChannels.find(c => c.id === shareTargetChannelId);
-                        const isLocked = targetChan?.is_private && targetChan.password && !unlockedChannels[targetChan.id];
-                        if (!isLocked) return null;
+                        if (!targetChan?.is_private) return null;
                         return (
                             <div>
                                 <label className="block text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1.5">
-                                    <Lock className="w-3 h-3" /> Contraseña del Canal Privado
+                                    <Lock className="w-3 h-3" /> Contraseña del Canal Privado *
                                 </label>
                                 <input
                                     type="password"
@@ -4621,15 +4624,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </select>
                     </div>
 
-                    {/* Password input if target channel is private and locked */}
+                    {/* Password input if target channel is private */}
                     {(() => {
                         const targetChan = activeChannels.find(c => c.id === shareTargetChannelId);
-                        const isLocked = targetChan?.is_private && targetChan.password && !unlockedChannels[targetChan.id];
-                        if (!isLocked) return null;
+                        if (!targetChan?.is_private) return null;
                         return (
                             <div>
                                 <label className="block text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1.5">
-                                    <Lock className="w-3.5 h-3.5" /> Contraseña del Canal Privado
+                                    <Lock className="w-3.5 h-3.5" /> Contraseña del Canal Privado *
                                 </label>
                                 <input
                                     type="password"
@@ -4811,23 +4813,23 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             <Modal
                 isOpen={!!createListModal?.isOpen}
                 onClose={() => setCreateListModal(null)}
-                title="Crear Nueva Lista"
+                title="Crear Nueva Lista de Seguimiento"
             >
                 <form onSubmit={(e) => {
                     e.preventDefault();
                     if (!activeProject || !newListTitle.trim()) return;
 
                     const listId = `list-${Date.now()}`;
-                    const templateItems: ProjectListItem[] = [];
+                    const templateType = createListModal?.templateType || 'project_tracking';
 
                     const newList: ProjectList = {
                         id: listId,
                         project_id: activeProject.id,
                         name: newListTitle.trim(),
                         description: newListDescription.trim(),
-                        template_type: createListModal.templateType,
+                        template_type: templateType,
                         created_at: new Date().toISOString(),
-                        items: templateItems
+                        items: []
                     };
 
                     const existingLists = activeProject.lists || [];
@@ -4839,6 +4841,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     setNewListTitle('');
                     setNewListDescription('');
                 }} className="space-y-4">
+
                     <div>
                         <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
                             Nombre de la Lista
@@ -5166,13 +5169,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 title="Añadir Tareas del Tablero a esta Lista"
             >
                 {(() => {
-                    const currentList = (activeProject?.lists || []).find(l => l.id === selectedListId);
-                    const availableTasks = projectTodos.filter(t => t.list_id !== selectedListId);
+                    const projectLists = activeProject?.lists || [];
+                    const effectiveTargetListId = (selectedListId === 'all' || !projectLists.some(l => l.id === selectedListId)) ? (projectLists[0]?.id || '') : selectedListId;
+                    const currentList = projectLists.find(l => l.id === effectiveTargetListId);
+                    const availableTasks = projectTodos.filter(t => t.list_id !== effectiveTargetListId);
 
                     return (
                         <div className="space-y-4">
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Selecciona tareas existentes en el tablero para vincularlas a la lista <strong>"{currentList?.name}"</strong>:
+                                Selecciona tareas existentes en el tablero para vincularlas a la lista <strong>"{currentList?.name || 'Lista'}"</strong>:
                             </p>
 
                             {availableTasks.length === 0 ? (
@@ -5197,7 +5202,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => {
-                                                    updateTodo(t.id, { list_id: selectedListId });
+                                                    updateTodo(t.id, { list_id: effectiveTargetListId });
                                                 }}
                                                 className="px-3 py-1 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 transition-colors shadow-2xs shrink-0 flex items-center gap-1"
                                             >

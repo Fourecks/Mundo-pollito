@@ -58,7 +58,7 @@ export interface Todo {
   notification_sent?: boolean;
   project_id?: number | null;
   gcal_event_id?: string | null;
-  calendar_provider?: CalendarProvider | null;
+  calendar_provider?: 'google' | 'outlook' | null;
   calendar_event_link?: string | null;
   kanban_column?: string | null;
   notion_page_id?: string | null;
@@ -80,7 +80,7 @@ export interface ProjectMember {
   id: string;
   name: string;
   avatar?: string;
-  role: 'owner' | 'lead' | 'member' | 'pending';
+  role: 'owner' | 'lead' | 'member';
   email?: string;
 }
 
@@ -604,6 +604,5 @@ declare global {
     };
     // OneSignal SDK
     OneSignal: any;
-    OneSignalDeferred?: any[];
   }
 }

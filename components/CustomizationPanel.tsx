@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
-import { Background, ParticleType, AmbientSoundType, ThemeColors, SupabaseUser, PushNotificationPreferences } from '../types';
-import { NotificationEventType } from '../services/pushNotificationService';
+import { Background, ParticleType, AmbientSoundType, ThemeColors, SupabaseUser, PushNotificationPreferences, NotificationEventType } from '../types';
 
 import { 
   User, X, Upload, Trash2, Star, Image as ImageIconLucide, 

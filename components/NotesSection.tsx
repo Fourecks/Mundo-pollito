@@ -83,7 +83,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
   // Textarea / Editor ref for inserting text tools
   const editorRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Convert legacy markdown or plain text to HTML for visual editor
@@ -195,34 +194,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     editorRef.current.focus();
     document.execCommand(command, false, value);
     handleEditorInput();
-  };
-
-  const handleContentChange = (newContent: string) => {
-    setActiveNoteContent(newContent);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveCurrentNote(activeNoteTitle, newContent);
-    }, 600);
-  };
-
-  const insertFormat = (prefix: string, suffix: string, name: string) => {
-    if (name === 'negrita') applyRichCommand('bold');
-    else if (name === 'cursiva') applyRichCommand('italic');
-    else if (name === 'tachado') applyRichCommand('strikeThrough');
-    else {
-      handleContentChange(`${activeNoteContent}${prefix}${suffix}`);
-    }
-  };
-
-  const insertLinePrefix = (prefix: string) => {
-    if (prefix === '# ') applyRichCommand('formatBlock', 'h1');
-    else if (prefix === '## ') applyRichCommand('formatBlock', 'h2');
-    else if (prefix === '- ') applyRichCommand('insertUnorderedList');
-    else if (prefix === '1. ') applyRichCommand('insertOrderedList');
-    else if (prefix === '> ') applyRichCommand('formatBlock', 'blockquote');
-    else {
-      handleContentChange(`${activeNoteContent}\n${prefix}`);
-    }
   };
 
   // Copy note content

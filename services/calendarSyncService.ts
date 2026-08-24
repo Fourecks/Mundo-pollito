@@ -2,8 +2,8 @@ import { Todo, GoogleCalendarEvent, GoogleCalendar, CalendarIntegrationAccount }
 
 declare global {
   interface Window {
-    gapi: any;
-    google: any;
+    gapi?: any;
+    google?: any;
   }
 }
 
