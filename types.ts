@@ -72,6 +72,8 @@ export interface Todo {
   comments?: TaskComment[];
   attachments?: TaskAttachment[];
   assignee?: string | null;
+  assigned_to?: string | null;
+  list_id?: string | null;
 }
 
 export interface ProjectMember {

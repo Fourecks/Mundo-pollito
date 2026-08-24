@@ -2596,6 +2596,7 @@ const App: React.FC = () => {
     kanban_column?: string | null;
     assignee?: string | null;
     assigned_to?: string | null;
+    list_id?: string | null;
     tags?: string[];
     dependencies?: number[];
     comments?: any[];
@@ -2628,6 +2629,8 @@ const App: React.FC = () => {
         story_points: options?.story_points,
         kanban_column: options?.kanban_column || 'Por hacer',
         assignee: options?.assignee || options?.assigned_to || null,
+        assigned_to: options?.assignee || options?.assigned_to || null,
+        list_id: options?.list_id || null,
         tags: options?.tags || [],
         dependencies: options?.dependencies || [],
         comments: options?.comments || [],

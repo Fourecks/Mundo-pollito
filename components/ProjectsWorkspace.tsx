@@ -4,7 +4,7 @@ import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, Project
 import { sendPushNotification } from '../services/pushNotificationService';
 import { useHuddle } from '../src/context/HuddleContext';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, LayoutGrid
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -83,7 +83,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // Sprint Detail & Task Management
     const [sprintDetailModal, setSprintDetailModal] = useState<Sprint | null>(null);
     const [sprintTaskText, setSprintTaskText] = useState('');
-    const [sprintTaskSP, setSprintTaskSP] = useState<number>(3);
     const [sprintTaskPriority, setSprintTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [sprintTaskAssignee, setSprintTaskAssignee] = useState<string>('');
 
@@ -98,7 +97,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         await addTodo(sprintTaskText.trim(), {
             projectId: activeProject.id,
             sprint_id: targetSprintId,
-            story_points: Number(sprintTaskSP) || 1,
             priority: sprintTaskPriority,
             assignee: sprintTaskAssignee || currentUserEmail,
             kanban_column: 'Por hacer'
@@ -128,7 +126,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     // Inline Task Creation for Listas Admin
     const [inlineTaskText, setInlineTaskText] = useState('');
-    const [inlineTaskSP, setInlineTaskSP] = useState<number>(3);
     const [inlineTaskPriority, setInlineTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [inlineTaskAssignee, setInlineTaskAssignee] = useState('');
     
@@ -247,7 +244,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [shareUpdateModal, setShareUpdateModal] = useState<{ isOpen: boolean; title: string; updateText: string } | null>(null);
 
     // Custom Lists & Task Thread States
-    const [selectedListId, setSelectedListId] = useState<string | null>(null);
+    const [selectedListId, setSelectedListId] = useState<string>('all');
     const [createListModal, setCreateListModal] = useState<{ isOpen: boolean; templateType: string }>({ isOpen: false, templateType: 'project_tracking' });
     const [newListTitle, setNewListTitle] = useState<string>('');
     const [newListDescription, setNewListDescription] = useState<string>('');
@@ -258,7 +255,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [newItemAssignee, setNewItemAssignee] = useState<string>('');
     const [newItemDueDate, setNewItemDueDate] = useState<string>('');
     const [newItemPriority, setNewItemPriority] = useState<Priority>('medium');
-    const [newItemSP, setNewItemSP] = useState<number>(1);
+    const [isAddBoardTaskModalOpen, setIsAddBoardTaskModalOpen] = useState<boolean>(false);
+
+    // Bandeja de Novedades y Anuncios States
+    const [inboxModalOpen, setInboxModalOpen] = useState(false);
+    const [inboxFormTitle, setInboxFormTitle] = useState('');
+    const [inboxFormText, setInboxFormText] = useState('');
+    const [inboxFormType, setInboxFormType] = useState<'announcement' | 'idea' | 'alert' | 'note'>('announcement');
+    const [inboxFormPriority, setInboxFormPriority] = useState<'normal' | 'high'>('normal');
 
     // Team Search State
     const [memberSearchText, setMemberSearchText] = useState<string>('');
@@ -528,6 +532,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         setActiveTab('chat');
     };
 
+    // Helper: Share a Todo Task to a Chat Channel
+    const handleShareTask = (todo: Todo) => {
+        const isDone = todo.completed;
+        const col = todo.kanban_column || (isDone ? 'Completado' : 'Por hacer');
+        const assignee = todo.assignee || todo.assigned_to;
+        const assigneeText = assignee ? `@${assignee.split('@')[0]}` : 'Sin Asignar';
+        const dueText = todo.due_date ? todo.due_date : 'Sin fecha límite';
+        const priorityBadge = todo.priority === 'high' ? '🔴 Alta' : todo.priority === 'low' ? '🟢 Baja' : '🟡 Media';
+
+        const updateText = `📌 **Tarea del Proyecto: ${todo.text}**\n• **Estado:** ${isDone ? '✅ Completada' : `📋 ${col}`}\n• **Responsable:** ${assigneeText}\n• **Fecha Límite:** ${dueText}\n• **Prioridad:** ${priorityBadge}`;
+
+        setShareTargetChannelId(selectedChannelId || 'general');
+        setShareChannelPassword('');
+        setShareComment('');
+        setShareError(null);
+        setShareUpdateModal({
+            isOpen: true,
+            title: `Compartir Tarea: ${todo.text}`,
+            updateText
+        });
+    };
+
     // Helper: Reference Document in Chat (Direct Shortcut)
     const handleReferenceDocInChat = (doc: ProjectDoc) => {
         handleOpenShareDoc(doc);
@@ -663,11 +689,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                         <div className="flex items-center gap-2 shrink-0">
                             <button 
-                                onClick={() => setExportReportModal(true)}
+                                onClick={() => setInboxModalOpen(true)}
                                 className="px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
-                                title="Generar e imprimir resumen del proyecto"
+                                title="Bandeja de Novedades y Anuncios"
                             >
-                                <Share2 className="w-3.5 h-3.5" /> Reporte
+                                <Inbox className="w-3.5 h-3.5 text-amber-500" /> Bandeja
+                                {activeProject.inbox && activeProject.inbox.length > 0 && (
+                                    <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                                        {activeProject.inbox.length}
+                                    </span>
+                                )}
                             </button>
                             <button 
                                 onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} 
@@ -852,23 +883,42 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                 <Inbox className="w-4 h-4 text-amber-500" /> Novedades y Anuncios
                             </h3>
-                            <button onClick={() => setActiveTab('inbox')} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold">Ir a la Bandeja →</button>
+                            <button onClick={() => setInboxModalOpen(true)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold flex items-center gap-1">
+                                Gestionar Bandeja →
+                            </button>
                         </div>
                         <div className="p-4 space-y-3 overflow-y-auto max-h-80">
-                            {(activeProject.inbox || []).slice(0, 4).map(item => (
-                                <div key={item.id} className="p-3 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg">
-                                    <div className="flex items-center justify-between mb-1">
+                            {(activeProject.inbox || []).slice(0, 6).map(item => (
+                                <div key={item.id} className="p-3 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-xl space-y-1.5">
+                                    <div className="flex items-center justify-between gap-2">
                                         <span className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                                            {item.type === 'announcement' && <Megaphone className="w-3.5 h-3.5 text-blue-500" />}
-                                            {item.title || 'Nota Informativa'}
+                                            {item.type === 'announcement' ? <Megaphone className="w-3.5 h-3.5 text-blue-500" /> :
+                                             item.type === 'alert' ? <AlertCircle className="w-3.5 h-3.5 text-red-500" /> :
+                                             item.type === 'idea' ? <Sparkles className="w-3.5 h-3.5 text-amber-500" /> :
+                                             <FileText className="w-3.5 h-3.5 text-gray-400" />}
+                                            {item.title || 'Comunicado'}
                                         </span>
-                                        <span className="text-[10px] text-gray-400">{format(parseISO(item.created_at), 'd MMM, HH:mm', { locale: es })}</span>
+                                        <span className="text-[10px] text-gray-400 font-mono">
+                                            {item.created_at ? format(parseISO(item.created_at), 'd MMM, HH:mm', { locale: es }) : ''}
+                                        </span>
                                     </div>
-                                    <p className="text-xs text-gray-600 dark:text-gray-300">{item.text}</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{item.text}</p>
+                                    {(item.author_name || item.created_by) && (
+                                        <p className="text-[10px] text-gray-400">Publicado por {item.author_name || item.created_by?.split('@')[0]}</p>
+                                    )}
                                 </div>
                             ))}
                             {(!activeProject.inbox || activeProject.inbox.length === 0) && (
-                                <div className="text-center py-8 text-sm text-gray-500">Sin notificaciones ni anuncios recientes.</div>
+                                <div className="text-center py-8 text-xs text-gray-400 flex flex-col items-center gap-2">
+                                    <Inbox className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+                                    <span>Sin novedades ni anuncios recientes.</span>
+                                    <button
+                                        onClick={() => setInboxModalOpen(true)}
+                                        className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline mt-1"
+                                    >
+                                        + Publicar primer anuncio
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -1031,9 +1081,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (selectedSprintId && currentSprint) {
             const sprintTasks = projectTodos.filter(t => t.sprint_id === currentSprint.id);
             const backlogTasks = projectTodos.filter(t => !t.sprint_id);
-            const totalSP = sprintTasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
-            const completedSP = sprintTasks.filter(t => t.completed).reduce((sum, t) => sum + (t.story_points || 0), 0);
-            const progress = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : (sprintTasks.length > 0 ? Math.round((sprintTasks.filter(t => t.completed).length / sprintTasks.length) * 100) : 0);
+            const completedTasks = sprintTasks.filter(t => t.completed).length;
+            const totalTasks = sprintTasks.length;
+            const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
             return (
                 <div className="p-8 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6 font-sans">
@@ -1064,7 +1114,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => {
-                                    const text = `📌 **Sprint: ${currentSprint.name}**\n• Progreso: ${completedSP}/${totalSP} SP (${progress}%)\n• Tareas: ${sprintTasks.filter(t => t.completed).length}/${sprintTasks.length} completadas`;
+                                    const text = `📌 **Sprint: ${currentSprint.name}**\n• Progreso: ${completedTasks}/${totalTasks} tareas (${progress}%)\n• Tareas completadas: ${completedTasks} de ${totalTasks}`;
                                     setShareTargetChannelId(selectedChannelId || 'general');
                                     setShareChannelPassword('');
                                     setShareComment('');
@@ -1094,7 +1144,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         )}
                         <div className="space-y-1.5">
                             <div className="flex justify-between text-xs font-medium text-gray-500">
-                                <span>Progreso de Story Points ({completedSP} / {totalSP} SP)</span>
+                                <span>Progreso de Tareas ({completedTasks} / {totalTasks} tareas)</span>
                                 <span>{progress}%</span>
                             </div>
                             <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -1148,11 +1198,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
-                                                {task.story_points ? (
-                                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-mono font-bold">
-                                                        {task.story_points} SP
-                                                    </span>
-                                                ) : null}
                                                 <button
                                                     onClick={() => {
                                                         updateTodo(task.id, { sprint_id: null as any });
@@ -1222,12 +1267,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {sprints.map(sprint => {
                             const sprintTasks = projectTodos.filter(t => t.sprint_id === sprint.id);
-                            const totalSP = sprintTasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
-                            const completedSP = sprintTasks.filter(t => t.completed).reduce((sum, t) => sum + (t.story_points || 0), 0);
-                            const progress = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : (sprintTasks.length > 0 ? Math.round((sprintTasks.filter(t => t.completed).length / sprintTasks.length) * 100) : 0);
+                            const completedTasks = sprintTasks.filter(t => t.completed).length;
+                            const totalTasks = sprintTasks.length;
+                            const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
                             const handleShareSprintProgress = () => {
-                                const text = `📌 **Actualización de Sprint: ${sprint.name}**\n• Estado: ${sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'En Planificación'}\n• Puntos de Historia: ${completedSP}/${totalSP} SP (${progress}%)\n• Tareas Completadas: ${sprintTasks.filter(t => t.completed).length} de ${sprintTasks.length}`;
+                                const text = `📌 **Actualización de Sprint: ${sprint.name}**\n• Estado: ${sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'En Planificación'}\n• Progreso: ${completedTasks}/${totalTasks} tareas (${progress}%)\n• Tareas Completadas: ${completedTasks} de ${totalTasks}`;
                                 setShareTargetChannelId(selectedChannelId || 'general');
                                 setShareChannelPassword('');
                                 setShareComment('');
@@ -1276,7 +1321,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     {/* Progress */}
                                     <div className="space-y-1.5">
                                         <div className="flex justify-between text-[11px] font-medium text-gray-500">
-                                            <span>Progreso ({completedSP} / {totalSP} SP)</span>
+                                            <span>Progreso ({completedTasks} / {totalTasks} tareas)</span>
                                             <span>{progress}%</span>
                                         </div>
                                         <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -3202,11 +3247,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // LISTAS TAB (Unified with projectTodos & Minimalist Elegant Design)
+    // LISTAS TAB (Multiple Lists, Bi-directional Kanban Sync & Inline Task Editing)
     const renderListas = () => {
         if (!activeProject) return null;
 
+        const projectLists = activeProject.lists || [];
+        const isAllLists = selectedListId === 'all';
+        const activeCustomList = projectLists.find(l => l.id === selectedListId);
+
+        // Filter todos based on selected list and search
         let displayedTodos = projectTodos.filter(t => {
+            if (!isAllLists) {
+                if (t.list_id !== selectedListId) return false;
+            }
             if (!listasSearch.trim()) return true;
             return t.text.toLowerCase().includes(listasSearch.toLowerCase());
         });
@@ -3229,58 +3282,163 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const handleAddListTodo = async (e: React.FormEvent) => {
             e.preventDefault();
             if (!newItemTitle.trim()) return;
+            const assigneeValue = newItemAssignee.trim() || undefined;
             await addTodo(newItemTitle.trim(), {
                 projectId: activeProject.id,
                 priority: newItemPriority,
-                story_points: newItemSP,
-                assigned_to: newItemAssignee || undefined,
+                assignee: assigneeValue,
+                assigned_to: assigneeValue,
                 dueDate: newItemDueDate || undefined,
-                kanban_column: 'Por hacer'
+                kanban_column: 'Por hacer',
+                list_id: !isAllLists ? selectedListId : undefined
             });
             setNewItemTitle('');
             setNewItemDueDate('');
         };
 
         const handleShareListSummary = () => {
-            const pendingCount = projectTodos.filter(t => !t.completed).length;
-            const completedCount = projectTodos.filter(t => t.completed).length;
+            const listTasks = isAllLists ? projectTodos : projectTodos.filter(t => t.list_id === selectedListId);
+            const pendingCount = listTasks.filter(t => !t.completed).length;
+            const completedCount = listTasks.filter(t => t.completed).length;
+            const listName = isAllLists ? 'Todas las tareas del proyecto' : (activeCustomList?.name || 'Lista');
             
-            let summaryText = `📋 **Lista de Proyecto: ${activeProject.name}**\n`;
+            let summaryText = `📋 **Lista: ${listName}** (${activeProject.name})\n`;
             summaryText += `📊 **Resumen:** ${completedCount} Tareas completadas | ${pendingCount} Pendientes\n\n`;
             summaryText += `**Tareas Clave:**\n`;
-            projectTodos.slice(0, 8).forEach(t => {
+            listTasks.slice(0, 8).forEach(t => {
                 const statusBadge = t.completed ? '✅' : '📌';
-                const assignee = t.assigned_to ? `@${t.assigned_to.split('@')[0]}` : 'Sin Asignar';
-                summaryText += `- ${statusBadge} **${t.text}** - Asignado a ${assignee}\n`;
+                const assignee = t.assigned_to || t.assignee;
+                const assigneeText = assignee ? `@${assignee.split('@')[0]}` : 'Sin Asignar';
+                const col = t.kanban_column || (t.completed ? 'Completado' : 'Por hacer');
+                summaryText += `- ${statusBadge} **${t.text}** [${col}] - ${assigneeText}\n`;
             });
 
+            setShareTargetChannelId(selectedChannelId || 'general');
+            setShareChannelPassword('');
+            setShareComment('');
+            setShareError(null);
             setShareUpdateModal({
                 isOpen: true,
-                title: `Compartir Lista del Proyecto`,
+                title: `Compartir Lista: ${listName}`,
                 updateText: summaryText
             });
         };
 
+        const handleDeleteCustomList = (listId: string) => {
+            if (!confirm('¿Estás seguro de que deseas eliminar esta lista? Las tareas no se borrarán del tablero, sólo se desvincularán de esta lista.')) return;
+            const updatedLists = projectLists.filter(l => l.id !== listId);
+            onUpdateProject(activeProject.id, { lists: updatedLists });
+            
+            // Unlink tasks
+            projectTodos.filter(t => t.list_id === listId).forEach(t => {
+                updateTodo(t.id, { list_id: null as any });
+            });
+
+            setSelectedListId('all');
+        };
+
         return (
-            <div className="p-8 max-w-7xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-8 font-sans">
-                {/* Minimalist Elegant Header & Quick Add */}
-                <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/60 dark:border-gray-800/80 shadow-2xs space-y-6">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800/80 pb-5">
+            <div className="p-8 max-w-7xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6 font-sans">
+                {/* Lists Navigation Tabs Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#111] p-3 rounded-2xl border border-gray-200/60 dark:border-gray-800/80 shadow-2xs">
+                    <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
+                        <button
+                            onClick={() => setSelectedListId('all')}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+                                selectedListId === 'all'
+                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                            }`}
+                        >
+                            <LayoutGrid className="w-3.5 h-3.5" />
+                            <span>Todas las Tareas (Tablero)</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                                selectedListId === 'all'
+                                    ? 'bg-gray-700 dark:bg-gray-200 text-white dark:text-gray-900'
+                                    : 'bg-gray-200 dark:bg-zinc-800 text-gray-600 dark:text-gray-400'
+                            }`}>
+                                {projectTodos.length}
+                            </span>
+                        </button>
+
+                        {projectLists.map(list => {
+                            const count = projectTodos.filter(t => t.list_id === list.id).length;
+                            const isSelected = selectedListId === list.id;
+                            return (
+                                <div key={list.id} className="flex items-center">
+                                    <button
+                                        onClick={() => setSelectedListId(list.id)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                                            isSelected
+                                                ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs'
+                                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                                        }`}
+                                    >
+                                        <List className="w-3.5 h-3.5" />
+                                        <span className="max-w-[140px] truncate">{list.name}</span>
+                                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                                            isSelected
+                                                ? 'bg-gray-700 dark:bg-gray-200 text-white dark:text-gray-900'
+                                                : 'bg-gray-200 dark:bg-zinc-800 text-gray-600 dark:text-gray-400'
+                                        }`}>
+                                            {count}
+                                        </span>
+                                    </button>
+                                </div>
+                            );
+                        })}
+
+                        <button
+                            onClick={() => setCreateListModal({ isOpen: true, templateType: 'project_tracking' })}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-dashed border-blue-300 dark:border-blue-800 flex items-center gap-1.5 transition-all"
+                        >
+                            <Plus className="w-3.5 h-3.5" /> Nueva Lista
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {!isAllLists && activeCustomList && (
+                            <>
+                                <button
+                                    onClick={() => setIsAddBoardTaskModalOpen(true)}
+                                    className="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 transition-colors flex items-center gap-1.5 shadow-2xs"
+                                >
+                                    <Plus className="w-3.5 h-3.5" /> Añadir del Tablero
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteCustomList(activeCustomList.id)}
+                                    className="p-1.5 text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-colors"
+                                    title="Eliminar esta lista"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </>
+                        )}
+                        <button
+                            onClick={handleShareListSummary}
+                            className="px-3.5 py-1.5 text-xs bg-gray-50 dark:bg-zinc-900 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-800 shadow-2xs"
+                        >
+                            <Share2 className="w-3.5 h-3.5 text-gray-400" /> Compartir
+                        </button>
+                    </div>
+                </div>
+
+                {/* List Header & Quick Add */}
+                <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/60 dark:border-gray-800/80 shadow-2xs space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800/80 pb-4">
                         <div className="space-y-1">
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <List className="w-4 h-4 text-gray-500 dark:text-gray-400" /> Lista General de Tareas
+                                <List className="w-4 h-4 text-blue-500" />
+                                {isAllLists ? 'Lista General de Tareas (Tablero)' : activeCustomList?.name}
                             </h3>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Sincronizado en tiempo real con el tablero Kanban y los Sprints.
+                                {isAllLists 
+                                    ? 'Todas las tareas creadas aquí aparecen en el tablero Kanban como "Por hacer" y están sincronizadas.'
+                                    : (activeCustomList?.description || 'Tareas asignadas a esta lista. Todas las tareas creadas aquí se reflejan en el tablero Kanban.')}
                             </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={handleShareListSummary}
-                                className="px-3.5 py-2 text-xs bg-gray-50 dark:bg-zinc-900 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-800 shadow-2xs"
-                            >
-                                <Share2 className="w-3.5 h-3.5 text-gray-400" /> Compartir Resumen
-                            </button>
+                        <div className="text-xs text-gray-400 font-medium">
+                            {displayedTodos.length} {displayedTodos.length === 1 ? 'tarea' : 'tareas'}
                         </div>
                     </div>
 
@@ -3288,7 +3446,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <form onSubmit={handleAddListTodo} className="flex flex-wrap items-center gap-3">
                         <input
                             type="text"
-                            placeholder="Añadir nueva tarea..."
+                            placeholder={isAllLists ? "Añadir nueva tarea al proyecto..." : `Añadir tarea a "${activeCustomList?.name}"...`}
                             value={newItemTitle}
                             onChange={e => setNewItemTitle(e.target.value)}
                             className="flex-1 min-w-[240px] px-3.5 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-600 shadow-2xs"
@@ -3296,9 +3454,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <select
                             value={newItemAssignee}
                             onChange={e => setNewItemAssignee(e.target.value)}
-                            className="px-3 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none max-w-[160px]"
+                            className="px-3 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none max-w-[170px]"
                         >
-                            <option value="">(Responsable)</option>
+                            <option value="">(Sin asignar)</option>
                             {realMembers.map(m => (
                                 <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
                             ))}
@@ -3314,15 +3472,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             onChange={e => setNewItemPriority(e.target.value as any)}
                             className="px-3 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none font-medium"
                         >
-                            <option value="low">Baja</option>
-                            <option value="medium">Media</option>
-                            <option value="high">Alta</option>
+                            <option value="low">Prioridad Baja</option>
+                            <option value="medium">Prioridad Media</option>
+                            <option value="high">Prioridad Alta</option>
                         </select>
                         <button
                             type="submit"
                             className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-2xs shrink-0"
                         >
-                            <Plus className="w-3.5 h-3.5" /> Agregar
+                            <Plus className="w-3.5 h-3.5" /> Agregar Tarea
                         </button>
                     </form>
                 </div>
@@ -3366,80 +3524,155 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
                 </div>
 
-                {/* Minimalist Clean Table */}
+                {/* Minimalist Clean Table with Inline Editing */}
                 <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/60 dark:border-gray-800/80 overflow-hidden shadow-2xs">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/50 dark:bg-zinc-900/50 border-b border-gray-200/60 dark:border-gray-800 text-gray-400 font-semibold text-[10px] uppercase tracking-wider">
-                                    <th className="py-3 px-4">Tarea</th>
-                                    <th className="py-3 px-4">Columna / Estado</th>
-                                    <th className="py-3 px-4">Responsable</th>
-                                    <th className="py-3 px-4">Fecha límite</th>
-                                    <th className="py-3 px-4">Prioridad</th>
-                                    <th className="py-3 px-4 text-right">Acción</th>
+                                    <th className="py-3.5 px-4 min-w-[200px]">Tarea</th>
+                                    <th className="py-3.5 px-4 min-w-[140px]">Columna / Estado</th>
+                                    <th className="py-3.5 px-4 min-w-[160px]">Responsable</th>
+                                    <th className="py-3.5 px-4 min-w-[140px]">Fecha límite</th>
+                                    <th className="py-3.5 px-4 min-w-[120px]">Prioridad</th>
+                                    <th className="py-3.5 px-4 text-right min-w-[100px]">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800/40">
                                 {displayedTodos.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="py-12 text-center text-gray-400 italic">
-                                            No hay tareas registradas. Añade una arriba para verla reflejada en el tablero.
+                                            {isAllLists 
+                                                ? 'No hay tareas registradas. Añade una arriba para verla reflejada en el tablero.'
+                                                : 'No hay tareas en esta lista. Añade una arriba o usa "+ Añadir del Tablero" para incorporar tareas existentes.'}
                                         </td>
                                     </tr>
                                 ) : (
-                                    displayedTodos.map(todo => (
-                                        <tr key={todo.id} className="hover:bg-gray-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-                                            <td className="py-3.5 px-4 font-medium text-gray-900 dark:text-gray-100 min-w-[220px]">
-                                                <div className="flex items-center gap-2.5">
+                                    displayedTodos.map(todo => {
+                                        const currentAssignee = todo.assigned_to || todo.assignee || '';
+                                        const currentCol = todo.kanban_column || (todo.completed ? 'Completado' : 'Por hacer');
+
+                                        return (
+                                            <tr key={todo.id} className="hover:bg-gray-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                                                {/* Task Title & Completed Checkbox */}
+                                                <td className="py-3 px-4 font-medium text-gray-900 dark:text-gray-100">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={todo.completed}
+                                                            onChange={() => {
+                                                                const nextCompleted = !todo.completed;
+                                                                updateTodo(todo.id, { 
+                                                                    completed: nextCompleted, 
+                                                                    kanban_column: nextCompleted ? 'Completado' : 'Por hacer' 
+                                                                });
+                                                            }}
+                                                            className="rounded border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:ring-0 cursor-pointer w-3.5 h-3.5"
+                                                        />
+                                                        <span className={todo.completed ? 'line-through text-gray-400' : ''}>
+                                                            {todo.text}
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Editable Kanban Column / Status */}
+                                                <td className="py-3 px-4">
+                                                    <select
+                                                        value={currentCol}
+                                                        onChange={e => {
+                                                            const newCol = e.target.value;
+                                                            const isDone = newCol === 'Completado';
+                                                            updateTodo(todo.id, { 
+                                                                kanban_column: newCol, 
+                                                                completed: isDone 
+                                                            });
+                                                        }}
+                                                        className="px-2 py-1 text-xs rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                                    >
+                                                        <option value="Por hacer">Por hacer</option>
+                                                        <option value="En progreso">En progreso</option>
+                                                        <option value="En revisión">En revisión</option>
+                                                        <option value="Completado">Completado</option>
+                                                    </select>
+                                                </td>
+
+                                                {/* Editable Assignee Dropdown */}
+                                                <td className="py-3 px-4">
+                                                    <select
+                                                        value={currentAssignee}
+                                                        onChange={e => {
+                                                            const val = e.target.value || null;
+                                                            updateTodo(todo.id, { 
+                                                                assigned_to: val as any, 
+                                                                assignee: val as any 
+                                                            });
+                                                        }}
+                                                        className="px-2 py-1 text-xs rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[150px]"
+                                                    >
+                                                        <option value="">Sin asignar</option>
+                                                        {realMembers.map(m => (
+                                                            <option key={m.email} value={m.email}>
+                                                                {m.name || m.email.split('@')[0]}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+
+                                                {/* Editable Due Date */}
+                                                <td className="py-3 px-4">
                                                     <input
-                                                        type="checkbox"
-                                                        checked={todo.completed}
-                                                        onChange={() => updateTodo(todo.id, { completed: !todo.completed, kanban_column: !todo.completed ? 'Completado' : 'Por hacer' })}
-                                                        className="rounded border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:ring-0 cursor-pointer w-3.5 h-3.5"
+                                                        type="date"
+                                                        value={todo.due_date || ''}
+                                                        onChange={e => {
+                                                            updateTodo(todo.id, { due_date: e.target.value || null });
+                                                        }}
+                                                        className="px-2 py-1 text-xs rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                                     />
-                                                    <span className={todo.completed ? 'line-through text-gray-400' : ''}>
-                                                        {todo.text}
-                                                    </span>
-                                                </div>
-                                            </td>
+                                                </td>
 
-                                            <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300 font-medium">
-                                                <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-[11px]">
-                                                    {todo.kanban_column || 'Por hacer'}
-                                                </span>
-                                            </td>
+                                                {/* Editable Priority */}
+                                                <td className="py-3 px-4">
+                                                    <select
+                                                        value={todo.priority || 'medium'}
+                                                        onChange={e => {
+                                                            updateTodo(todo.id, { priority: e.target.value as any });
+                                                        }}
+                                                        className={`px-2 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border focus:outline-none ${
+                                                            todo.priority === 'high' ? 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800' :
+                                                            todo.priority === 'low' ? 'bg-gray-100 dark:bg-zinc-800 text-gray-500 border-gray-200 dark:border-gray-700' :
+                                                            'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                                                        }`}
+                                                    >
+                                                        <option value="low">Baja</option>
+                                                        <option value="medium">Media</option>
+                                                        <option value="high">Alta</option>
+                                                    </select>
+                                                </td>
 
-                                            <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300 truncate max-w-[140px]">
-                                                {todo.assigned_to || 'Sin asignar'}
-                                            </td>
-
-                                            <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400">
-                                                {todo.due_date || 'Sin fecha'}
-                                            </td>
-
-                                            <td className="py-3.5 px-4">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                                    todo.priority === 'high' ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100' :
-                                                    todo.priority === 'low' ? 'bg-gray-50 dark:bg-zinc-900 text-gray-500' :
-                                                    'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300'
-                                                }`}>
-                                                    {todo.priority || 'media'}
-                                                </span>
-                                            </td>
-
-                                            <td className="py-3.5 px-4 text-right">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => deleteTodo(todo.id)}
-                                                    className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded"
-                                                    title="Eliminar tarea"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
+                                                {/* Actions: Share Task & Delete Task */}
+                                                <td className="py-3 px-4 text-right">
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleShareTask(todo)}
+                                                            className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors rounded-lg"
+                                                            title="Compartir tarea en un canal de chat"
+                                                        >
+                                                            <Share2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => deleteTodo(todo.id)}
+                                                            className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors rounded-lg"
+                                                            title="Eliminar tarea"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -4321,9 +4554,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 {viewSprintModal && (() => {
                     const sprintTasks = projectTodos.filter(t => t.sprint_id === viewSprintModal.id);
                     const unassignedTasks = projectTodos.filter(t => !t.sprint_id);
-                    const totalSP = sprintTasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
-                    const completedSP = sprintTasks.filter(t => t.completed).reduce((sum, t) => sum + (t.story_points || 0), 0);
-                    const progress = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : 0;
+                    const completedTasks = sprintTasks.filter(t => t.completed).length;
+                    const totalTasks = sprintTasks.length;
+                    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
                     const handleAddSprintTaskInternal = (e: React.FormEvent) => handleAddSprintTask(e, viewSprintModal?.id);
 
@@ -4335,8 +4568,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <span className="font-semibold text-gray-700 dark:text-gray-300">
                                         Fechas: {viewSprintModal.start_date || 'Sin fecha'} — {viewSprintModal.end_date || 'Sin fecha'}
                                     </span>
-                                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
-                                        {completedSP} / {totalSP} SP ({progress}%)
+                                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                                        {completedTasks} / {totalTasks} tareas ({progress}%)
                                     </span>
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
@@ -4391,28 +4624,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 </div>
 
                                                 <div className="flex items-center gap-2 shrink-0">
-                                                    {/* Story Points dropdown */}
-                                                    <select
-                                                        value={t.story_points || 1}
-                                                        onChange={e => {
-                                                            const newSP = Number(e.target.value);
-                                                            updateTodo(t.id, { story_points: newSP });
-                                                        }}
-                                                        className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[10px] font-mono px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 focus:outline-none"
-                                                        title="Editar Story Points"
-                                                    >
-                                                        {[1, 2, 3, 5, 8, 13, 21].map(sp => (
-                                                            <option key={sp} value={sp}>{sp} SP</option>
-                                                        ))}
-                                                    </select>
-
                                                     {/* Unlink from Sprint button */}
                                                     <button
                                                         type="button"
                                                         onClick={() => {
                                                             updateTodo(t.id, { sprint_id: null as any });
                                                         }}
-                                                        className="text-[10px] text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900"
+                                                        className="text-[10px] text-red-500 hover:text-red-700 px-2 py-1 rounded bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 font-medium"
                                                         title="Quitar del Sprint (Mover a Backlog)"
                                                     >
                                                         Quitar
@@ -4727,6 +4945,207 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* BANDEJA DE NOVEDADES Y ANUNCIOS MODAL */}
+            <Modal
+                isOpen={inboxModalOpen}
+                onClose={() => setInboxModalOpen(false)}
+                title="Bandeja de Novedades y Anuncios del Proyecto"
+            >
+                <div className="space-y-6">
+                    {/* Create Announcement Form */}
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!activeProject || !inboxFormTitle.trim() || !inboxFormText.trim()) return;
+
+                            const newAnnouncement = {
+                                id: `ann-${Date.now()}`,
+                                project_id: activeProject.id,
+                                title: inboxFormTitle.trim(),
+                                text: inboxFormText.trim(),
+                                type: inboxFormType,
+                                priority: inboxFormPriority,
+                                author_name: currentUserEmail.split('@')[0],
+                                created_by: currentUserEmail,
+                                created_at: new Date().toISOString()
+                            };
+
+                            const currentInbox = activeProject.inbox || [];
+                            const updatedInbox = [newAnnouncement, ...currentInbox];
+                            onUpdateProject(activeProject.id, { inbox: updatedInbox });
+
+                            setInboxFormTitle('');
+                            setInboxFormText('');
+                            setInboxFormType('announcement');
+                            setInboxFormPriority('normal');
+                        }}
+                        className="p-4 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl space-y-3.5"
+                    >
+                        <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <Plus className="w-3.5 h-3.5 text-blue-500" /> Publicar Nuevo Anuncio o Novedad
+                        </h4>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="sm:col-span-2">
+                                <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Título</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Ej: Lanzamiento de la versión v2.0 programado"
+                                    value={inboxFormTitle}
+                                    onChange={e => setInboxFormTitle(e.target.value)}
+                                    className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
+                                <select
+                                    value={inboxFormType}
+                                    onChange={e => setInboxFormType(e.target.value as any)}
+                                    className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white"
+                                >
+                                    <option value="announcement">📢 Anuncio</option>
+                                    <option value="idea">💡 Idea</option>
+                                    <option value="alert">⚠️ Alerta</option>
+                                    <option value="note">📝 Nota</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Contenido / Mensaje</label>
+                            <textarea
+                                rows={3}
+                                required
+                                placeholder="Escribe el detalle del comunicado para que aparezca en el resumen del proyecto..."
+                                value={inboxFormText}
+                                onChange={e => setInboxFormText(e.target.value)}
+                                className="w-full bg-white dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 leading-relaxed"
+                            />
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                type="submit"
+                                className="px-4 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-xs flex items-center gap-1.5"
+                            >
+                                <Send className="w-3.5 h-3.5" /> Publicar en Resumen
+                            </button>
+                        </div>
+                    </form>
+
+                    {/* Existing Announcements List */}
+                    <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center justify-between">
+                            <span>Anuncios Publicados ({activeProject?.inbox?.length || 0})</span>
+                        </h4>
+
+                        {(!activeProject?.inbox || activeProject.inbox.length === 0) ? (
+                            <p className="text-xs text-gray-400 italic py-6 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
+                                No hay anuncios publicados aún. Usa el formulario de arriba para crear uno.
+                            </p>
+                        ) : (
+                            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                                {activeProject.inbox.map(item => (
+                                    <div key={item.id} className="p-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl flex items-start justify-between gap-3 text-xs shadow-2xs">
+                                        <div className="space-y-1 min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                                    {item.type === 'announcement' ? <Megaphone className="w-3.5 h-3.5 text-blue-500" /> :
+                                                     item.type === 'alert' ? <AlertCircle className="w-3.5 h-3.5 text-red-500" /> :
+                                                     item.type === 'idea' ? <Sparkles className="w-3.5 h-3.5 text-amber-500" /> :
+                                                     <FileText className="w-3.5 h-3.5 text-gray-400" />}
+                                                    {item.title}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 font-mono">
+                                                    {item.created_at ? format(parseISO(item.created_at), 'd MMM, HH:mm', { locale: es }) : ''}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{item.text}</p>
+                                            <p className="text-[10px] text-gray-400">Por {item.author_name || item.created_by?.split('@')[0]}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const updated = (activeProject.inbox || []).filter(i => i.id !== item.id);
+                                                onUpdateProject(activeProject.id, { inbox: updated });
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+                                            title="Eliminar anuncio"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </Modal>
+
+            {/* ADD BOARD TASKS TO LIST MODAL */}
+            <Modal
+                isOpen={isAddBoardTaskModalOpen}
+                onClose={() => setIsAddBoardTaskModalOpen(false)}
+                title="Añadir Tareas del Tablero a esta Lista"
+            >
+                {(() => {
+                    const currentList = (activeProject?.lists || []).find(l => l.id === selectedListId);
+                    const availableTasks = projectTodos.filter(t => t.list_id !== selectedListId);
+
+                    return (
+                        <div className="space-y-4">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Selecciona tareas existentes en el tablero para vincularlas a la lista <strong>"{currentList?.name}"</strong>:
+                            </p>
+
+                            {availableTasks.length === 0 ? (
+                                <div className="text-center py-8 text-xs text-gray-400 border border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
+                                    Todas las tareas del tablero ya están en esta lista o no hay tareas en el proyecto.
+                                </div>
+                            ) : (
+                                <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                                    {availableTasks.map(t => (
+                                        <div
+                                            key={t.id}
+                                            className="p-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl flex items-center justify-between gap-3 text-xs"
+                                        >
+                                            <div className="min-w-0 flex-1 space-y-0.5">
+                                                <div className="font-medium text-gray-900 dark:text-white truncate">{t.text}</div>
+                                                <div className="text-[10px] text-gray-400 flex items-center gap-2">
+                                                    <span>Columna: {t.kanban_column || 'Por hacer'}</span>
+                                                    <span>•</span>
+                                                    <span>Asignado: {t.assigned_to || t.assignee || 'Sin asignar'}</span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    updateTodo(t.id, { list_id: selectedListId });
+                                                }}
+                                                className="px-3 py-1 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 transition-colors shadow-2xs shrink-0 flex items-center gap-1"
+                                            >
+                                                <Plus className="w-3 h-3" /> Añadir
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="pt-3 flex justify-end border-t border-gray-200 dark:border-gray-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddBoardTaskModalOpen(false)}
+                                    className="px-4 py-1.5 text-xs bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg hover:bg-gray-800 transition-colors"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </Modal>
         </div>
     );
 };
