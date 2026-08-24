@@ -835,7 +835,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         ].map(tab => (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
+                                onClick={() => {
+                                    setActiveTab(tab.id as any);
+                                    if (tab.id !== 'chat') setUnlockedChannels({});
+                                }}
                                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap relative ${
                                     activeTab === tab.id 
                                         ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-sm' 
@@ -1052,12 +1055,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const renderKanban = () => {
         if (!activeProject) return null;
-        const columns = activeProject.kanban_columns || ['To Do', 'In Progress', 'Done'];
+        const columns = activeProject.kanban_columns || ['Por hacer', 'En curso', 'Completado'];
 
         return (
             <div className="h-full flex overflow-x-auto p-6 gap-6 bg-gray-50/50 dark:bg-[#050505]">
                 {columns.map((col) => {
-                    const colTasks = projectTodos.filter(t => (t.kanban_column || 'To Do') === col);
+                    const colTasks = projectTodos.filter(t => (t.kanban_column || 'Por hacer') === col);
                     const isDragOver = dragOverColumn === col && draggedTaskId !== null;
                     
                     return (
@@ -2195,7 +2198,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 font-semibold' 
                                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
                                         }`}
-                                        onClick={() => setSelectedChannelId(chan.id)}
+                                        onClick={() => {
+                                            if (selectedChannelId !== chan.id) {
+                                                setUnlockedChannels({});
+                                                setSelectedChannelId(chan.id);
+                                            }
+                                        }}
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
                                             <span className="text-gray-400 dark:text-gray-500 shrink-0">
@@ -3432,13 +3440,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             e.preventDefault();
             if (!newItemTitle.trim()) return;
             const assigneeValue = newItemAssignee.trim() || undefined;
+            const columns = activeProject.kanban_columns || ['Por hacer', 'En curso', 'Completado'];
             await addTodo(newItemTitle.trim(), {
                 projectId: activeProject.id,
                 priority: newItemPriority,
                 assignee: assigneeValue,
                 assigned_to: assigneeValue,
                 dueDate: newItemDueDate || undefined,
-                kanban_column: 'Por hacer',
+                kanban_column: columns[0],
                 list_id: effectiveListId
             });
             setNewItemTitle('');
@@ -3709,7 +3718,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         value={currentCol}
                                                         onChange={e => {
                                                             const newCol = e.target.value;
-                                                            const isDone = newCol === 'Completado';
+                                                            const isDone = /complet|done|finaliz/i.test(newCol);
                                                             updateTodo(todo.id, { 
                                                                 kanban_column: newCol, 
                                                                 completed: isDone 
@@ -3717,10 +3726,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         }}
                                                         className="px-2 py-1 text-xs rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
                                                     >
-                                                        <option value="Por hacer">Por hacer</option>
-                                                        <option value="En progreso">En progreso</option>
-                                                        <option value="En revisión">En revisión</option>
-                                                        <option value="Completado">Completado</option>
+                                                        {(activeProject.kanban_columns || ['Por hacer', 'En curso', 'Completado']).map(col => (
+                                                            <option key={col} value={col}>{col}</option>
+                                                        ))}
                                                     </select>
                                                 </td>
 
@@ -4803,54 +4811,21 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             <Modal
                 isOpen={!!createListModal?.isOpen}
                 onClose={() => setCreateListModal(null)}
-                title="Crear Nueva Lista de Seguimiento"
+                title="Crear Nueva Lista"
             >
                 <form onSubmit={(e) => {
                     e.preventDefault();
                     if (!activeProject || !newListTitle.trim()) return;
 
                     const listId = `list-${Date.now()}`;
-                    const templateType = createListModal?.templateType || 'project_tracking';
-                    
-                    // Prepopulate template items if desired
-                    let templateItems: ProjectListItem[] = [];
-                    if (templateType === 'project_tracking') {
-                        templateItems = [
-                            {
-                                id: `item-${Date.now()}-1`,
-                                list_id: listId,
-                                title: 'Definir alcance y requerimientos clave',
-                                status: 'completed',
-                                assignee_email: currentUserEmail,
-                                due_date: new Date().toISOString().split('T')[0],
-                                priority: 'high',
-                                story_points: 3,
-                                notifications_enabled: true,
-                                comments: [],
-                                created_at: new Date().toISOString()
-                            },
-                            {
-                                id: `item-${Date.now()}-2`,
-                                list_id: listId,
-                                title: 'Diseñar prototipos de interfaz de usuario',
-                                status: 'in_progress',
-                                assignee_email: currentUserEmail,
-                                due_date: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-                                priority: 'medium',
-                                story_points: 5,
-                                notifications_enabled: true,
-                                comments: [],
-                                created_at: new Date().toISOString()
-                            }
-                        ];
-                    }
+                    const templateItems: ProjectListItem[] = [];
 
                     const newList: ProjectList = {
                         id: listId,
                         project_id: activeProject.id,
                         name: newListTitle.trim(),
                         description: newListDescription.trim(),
-                        template_type: templateType,
+                        template_type: createListModal.templateType,
                         created_at: new Date().toISOString(),
                         items: templateItems
                     };
@@ -4864,34 +4839,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     setNewListTitle('');
                     setNewListDescription('');
                 }} className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                            Seleccionar Plantilla de Lista
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {[
-                                { id: 'project_tracking', name: 'Seguimiento de Proyecto', desc: 'Tarea, Estado, Persona asignada, Fecha de entrega' },
-                                { id: 'product_launch', name: 'Lanzamiento de Producto', desc: 'Funcionalidad, QA, Responsable, Sprint' },
-                                { id: 'marketing_launch', name: 'Lanzamiento de Marketing', desc: 'Canal, Contenido, Publicación' },
-                                { id: 'bug_tracking', name: 'Control de Errores y Calidad', desc: 'Severidad, Módulo, Estado' },
-                            ].map(tpl => (
-                                <button
-                                    key={tpl.id}
-                                    type="button"
-                                    onClick={() => setCreateListModal({ isOpen: true, templateType: tpl.id as any })}
-                                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                                        createListModal?.templateType === tpl.id
-                                            ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 ring-1 ring-blue-500'
-                                            : 'bg-gray-50 dark:bg-black/50 border-gray-200 dark:border-gray-800 hover:bg-gray-100'
-                                    }`}
-                                >
-                                    <div className="text-xs font-bold text-gray-900 dark:text-white">{tpl.name}</div>
-                                    <div className="text-[10px] text-gray-500 mt-0.5">{tpl.desc}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
                     <div>
                         <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
                             Nombre de la Lista

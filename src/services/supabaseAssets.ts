@@ -1,6 +1,7 @@
 import { supabase } from '../../supabaseClient';
-import outlookDefault from '../../components/icons/outlook.jpg';
-import notionDefault from '../../components/icons/notion.jpg';
+
+const outlookDefault = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=100';
+const notionDefault = 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=100';
 
 const iconCache: { [key: string]: string } = {
   outlook: outlookDefault,

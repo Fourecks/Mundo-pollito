@@ -7,7 +7,8 @@ import {
     X, 
     Users, 
     Mail, 
-    Clock
+    Clock,
+    Folder
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -153,37 +154,34 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
                                         pendingInvitations.map((inv) => (
                                             <div
                                                 key={inv.id}
-                                                className="bg-white dark:bg-[#111] p-3 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col gap-2"
+                                                className="bg-transparent p-3 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col gap-3"
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <div
-                                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shadow-sm"
-                                                        style={{ backgroundColor: inv.project_color || '#3B82F6' }}
-                                                    >
-                                                        {inv.project_emoji || '📁'}
+                                                    <div className="w-8 h-8 rounded-md flex items-center justify-center bg-gray-100 dark:bg-zinc-800 border border-gray-200/50 dark:border-gray-700/50">
+                                                        <Folder className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h5 className="font-semibold text-xs text-gray-900 dark:text-gray-100 truncate">
+                                                    <div className="flex-1 min-w-0 leading-tight">
+                                                        <h5 className="font-medium text-xs text-gray-900 dark:text-gray-100 truncate">
                                                             {inv.project_name}
                                                         </h5>
-                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-                                                            Invitado por {inv.inviter_name || inv.inviter_email || 'usuario'}
+                                                        <p className="text-[10px] text-gray-500 dark:text-gray-500 truncate mt-0.5">
+                                                            De: {inv.inviter_name || inv.inviter_email || 'usuario'}
                                                         </p>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex gap-2">
+                                                <div className="flex gap-2 pt-1">
                                                     <button
                                                         onClick={() => onAcceptInvitation && onAcceptInvitation(inv.id)}
-                                                        className="flex-1 py-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1 shadow-sm"
+                                                        className="flex-1 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90 rounded-md text-[11px] font-medium transition-opacity flex items-center justify-center gap-1.5"
                                                     >
-                                                        <Check className="w-3 h-3" /> Aceptar
+                                                        Aceptar
                                                     </button>
                                                     <button
                                                         onClick={() => onDeclineInvitation && onDeclineInvitation(inv.id)}
-                                                        className="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1"
+                                                        className="flex-1 py-1.5 bg-transparent border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-md text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5"
                                                     >
-                                                        <X className="w-3 h-3" /> Rechazar
+                                                        Rechazar
                                                     </button>
                                                 </div>
                                             </div>

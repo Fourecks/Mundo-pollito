@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Playlist } from '../types';
 import CloseIcon from './icons/CloseIcon';
-import YouTubeIFramePlayer from './YouTubeIFramePlayer';
 
 interface MobileMusicPlayerProps {
     track: Playlist | null;

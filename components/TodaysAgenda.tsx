@@ -237,7 +237,7 @@ const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'calendarEvents' | 
                 start_time: startTimeStr,
                 end_time: endTimeStr,
                 notes: e.description || e.location ? `${e.location ? '📍 ' + e.location + '\n' : ''}${e.description || ''}` : undefined,
-                priority: 'media',
+                priority: 'medium',
                 gcal_event_id: e.id,
                 calendar_provider: (e as any).provider || 'google',
                 calendar_event_link: e.htmlLink,

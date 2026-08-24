@@ -152,8 +152,7 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
     <>
       {/* 1. IMMERSIVE FULLSCREEN HUDDLE MODAL */}
       {isHuddleFullScreen && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md text-white z-[100000] flex flex-col p-4 sm:p-6 select-none animate-in fade-in zoom-in-95 duration-200">
-          {/* Header */}
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md text-white z-[100000] flex flex-col p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse ring-4 ring-emerald-500/20" />
@@ -164,7 +163,7 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
                   <span className="text-gray-400 font-normal">#{activeHuddle.channelName}</span>
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {huddleParticipants.length} {huddleParticipants.length === 1 ? 'participante' : 'participantes'} en llamada • Conexión en vivo
+                  Conexión en vivo
                 </p>
               </div>
             </div>
@@ -177,7 +176,6 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
                     onOpenProjectsWorkspace(activeHuddle.projectId, activeHuddle.channelId);
                   }}
                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-gray-200 rounded-lg flex items-center gap-1.5 transition-colors border border-white/10"
-                  title="Abrir espacio de trabajo del proyecto"
                 >
                   <FolderKanban className="w-3.5 h-3.5 text-blue-400" />
                   <span className="hidden sm:inline">Ver Proyecto</span>
@@ -200,143 +198,17 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
             </div>
           </div>
 
-          {/* Participants Video Grid */}
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 overflow-y-auto p-2">
-            {huddleParticipants.map((p, idx) => {
-              const isSpeaking = p.name === 'Tú' ? isLocalSpeaking : !!speakingParticipants[p.name];
-              return (
-                <div
-                  key={p.email || idx}
-                  className={`bg-slate-900/90 rounded-2xl p-4 border relative overflow-hidden flex flex-col justify-between min-h-[240px] transition-all duration-300 shadow-xl ${
-                    isSpeaking
-                      ? 'border-emerald-500 shadow-[0_0_24px_rgba(16,185,129,0.3)] ring-2 ring-emerald-500/30'
-                      : 'border-white/10'
-                  }`}
-                >
-                  {/* Top Bar */}
-                  <div className="flex items-center justify-between z-10 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-3 absolute inset-x-0 top-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-gray-200">{p.name}</span>
-                      {p.name === 'Tú' && (
-                        <span className="text-[10px] bg-blue-500/30 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                          Tú
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {p.has_mic ? (
-                        <span className="p-1 rounded-full bg-emerald-500/20 text-emerald-400">
-                          <Mic className="w-3.5 h-3.5" />
-                        </span>
-                      ) : (
-                        <span className="p-1 rounded-full bg-red-500/20 text-red-400">
-                          <MicOff className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                      {p.has_screen && (
-                        <span className="text-[10px] bg-blue-600/40 text-blue-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 border border-blue-400/30">
-                          <Monitor className="w-3 h-3" /> Pantalla
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Video / Avatar Canvas */}
-                  <div className="absolute inset-0 bg-slate-950 flex items-center justify-center overflow-hidden">
-                    {p.has_screen && p.name === 'Tú' && screenStream ? (
-                      <VideoStream stream={screenStream} isMirrored={false} />
-                    ) : p.has_video && p.name === 'Tú' && localStream ? (
-                      <VideoStream stream={localStream} isMirrored={true} />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center p-6 text-center">
-                        <div
-                          className={`w-24 h-24 rounded-full bg-slate-800 border-2 flex items-center justify-center text-3xl font-bold text-gray-200 transition-all duration-300 ${
-                            isSpeaking
-                              ? 'border-emerald-400 ring-8 ring-emerald-500/20 scale-105 shadow-[0_0_30px_rgba(16,185,129,0.4)]'
-                              : 'border-slate-700'
-                          }`}
-                        >
-                          {p.name.charAt(0).toUpperCase()}
-                        </div>
-                        <p className="text-xs font-semibold text-gray-400 mt-4 flex items-center gap-1.5">
-                          {isSpeaking ? (
-                            <span className="text-emerald-400 font-bold flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                              Hablando...
-                            </span>
-                          ) : (
-                            <span>{p.has_mic ? 'Micrófono activo' : 'Silenciado'}</span>
-                          )}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bottom Footer Info */}
-                  <div className="mt-auto z-10 bg-gradient-to-t from-black/80 to-transparent p-3 absolute inset-x-0 bottom-0 flex items-center justify-between text-xs text-gray-300">
-                    <span className="font-medium text-[11px]">{p.has_video ? '📹 Cámara ON' : '📷 Cámara OFF'}</span>
-                    <span className="text-gray-400 text-[10px] truncate max-w-[140px]">{p.email}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Bottom Floating Control Bar */}
-          <div className="border-t border-white/10 pt-4 mt-2 shrink-0 flex items-center justify-center gap-4 bg-slate-900/80 backdrop-blur-md p-3 rounded-2xl border border-white/10 max-w-xl mx-auto w-full shadow-2xl">
-            <button
-              onClick={toggleMic}
-              className={`p-3.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${
-                isMicOn
-                  ? 'bg-slate-800 hover:bg-slate-700 text-white border border-white/10'
-                  : 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/30'
-              }`}
-              title={isMicOn ? 'Silenciar Micrófono' : 'Activar Micrófono'}
-            >
-              {isMicOn ? <Mic className="w-5 h-5 text-emerald-400" /> : <MicOff className="w-5 h-5" />}
-              <span className="text-xs hidden sm:inline">{isMicOn ? 'Silenciar' : 'Activar Mic'}</span>
-            </button>
-
-            <button
-              onClick={toggleVideo}
-              className={`p-3.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${
-                isVideoOn
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30'
-                  : 'bg-slate-800 hover:bg-slate-700 text-gray-300 border border-white/10'
-              }`}
-              title={isVideoOn ? 'Apagar Cámara' : 'Encender Cámara'}
-            >
-              {isVideoOn ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
-              <span className="text-xs hidden sm:inline">{isVideoOn ? 'Apagar Video' : 'Encender Video'}</span>
-            </button>
-
-            <button
-              onClick={toggleScreenShare}
-              className={`p-3.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${
-                isScreenSharing
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/30'
-                  : 'bg-slate-800 hover:bg-slate-700 text-gray-300 border border-white/10'
-              }`}
-              title={isScreenSharing ? 'Detener Compartir' : 'Compartir Pantalla'}
-            >
-              <Monitor className="w-5 h-5" />
-              <span className="text-xs hidden sm:inline">{isScreenSharing ? 'Detener Pantalla' : 'Compartir'}</span>
-            </button>
-
-            <button
-              onClick={leaveHuddle}
-              className="px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-red-900/40"
-              title="Finalizar y Salir de la llamada"
-            >
-              <PhoneOff className="w-5 h-5" />
-              <span>Colgar</span>
-            </button>
+          <div className="flex-1 rounded-2xl overflow-hidden shadow-2xl relative bg-black border border-white/10">
+            <iframe
+              src={`https://meet.jit.si/pollito-huddle-${activeHuddle.projectId}-${activeHuddle.channelId}#userInfo.displayName="${encodeURIComponent('Miembro del Equipo')}"`}
+              allow="camera; microphone; display-capture; autoplay; clipboard-write"
+              className="w-full h-full border-none"
+            />
           </div>
         </div>
       )}
 
       {/* 2. PERSISTENT FLOATING PICTURE-IN-PICTURE SQUARE WIDGET */}
-      {/* Appears over all other windows and sections */}
       {!isHuddleFullScreen && (
         <div
           style={{
@@ -349,7 +221,6 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
           onTouchStart={handleTouchStart}
         >
           {isFloatingMinimized ? (
-            /* MINIMIZED PILL VIEW */
             <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-full shadow-2xl px-4 py-2 flex items-center gap-3 text-white">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2.5 w-2.5">
@@ -360,64 +231,37 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
                   #{activeHuddle.channelName}
                 </span>
               </div>
-
-              {/* Quick mic control */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleMic();
-                }}
-                className={`p-1.5 rounded-full transition-colors ${
-                  isMicOn ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                }`}
-                title={isMicOn ? 'Silenciar' : 'Activar Micrófono'}
-              >
-                {isMicOn ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
-              </button>
-
-              {/* Quick video control */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleVideo();
-                }}
-                className={`p-1.5 rounded-full transition-colors ${
-                  isVideoOn ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-800 text-gray-400 hover:bg-slate-700'
-                }`}
-                title={isVideoOn ? 'Apagar Cámara' : 'Encender Cámara'}
-              >
-                {isVideoOn ? <Camera className="w-3.5 h-3.5" /> : <CameraOff className="w-3.5 h-3.5" />}
-              </button>
-
-              {/* Expand to square */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleExpandWidget();
                 }}
                 className="p-1 text-gray-400 hover:text-white transition-colors"
-                title="Expandir Cuadrado de Video"
+                title="Expandir"
               >
                 <ChevronUp className="w-4 h-4" />
               </button>
-
-              {/* Leave Call */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   leaveHuddle();
                 }}
                 className="p-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors ml-1"
-                title="Colgar llamada"
+                title="Colgar"
               >
                 <PhoneOff className="w-3.5 h-3.5" />
               </button>
+              
+              {/* Hidden iframe to keep call active */}
+              <div className="hidden">
+                 <iframe
+                  src={`https://meet.jit.si/pollito-huddle-${activeHuddle.projectId}-${activeHuddle.channelId}#userInfo.displayName="${encodeURIComponent('Miembro del Equipo')}"`}
+                  allow="camera; microphone; display-capture; autoplay; clipboard-write"
+                 />
+              </div>
             </div>
           ) : (
-            /* EXPANDED FLOATING SQUARE WIDGET (EL CUADRADO DE LLAMADA CON CÁMARA Y CONTROLES) */
             <div className="w-[280px] sm:w-[320px] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-white flex flex-col animate-in fade-in zoom-in-95 duration-150">
-              
-              {/* Header Bar */}
               <div className="px-3.5 py-2.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0 ring-2 ring-emerald-500/30" />
@@ -440,12 +284,11 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
                         onOpenProjectsWorkspace(activeHuddle.projectId, activeHuddle.channelId);
                       }}
                       className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-slate-800 rounded-lg transition-colors"
-                      title="Abrir Espacio de Proyectos"
+                      title="Abrir Proyecto"
                     >
                       <FolderKanban className="w-3.5 h-3.5" />
                     </button>
                   )}
-
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -456,7 +299,6 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
                   >
                     <Maximize2 className="w-3.5 h-3.5" />
                   </button>
-
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -470,131 +312,27 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
                 </div>
               </div>
 
-              {/* CAMERA / VIDEO SQUARE VIEWPORT (EL CUADRADO DE VIDEO QUE MUESTRA A QUIEN HABLA) */}
-              <div className="relative aspect-square w-full bg-slate-950 overflow-hidden flex items-center justify-center p-2">
-                {currentSpeaker.hasVideo && currentSpeaker.stream ? (
-                  <div className="w-full h-full relative rounded-xl overflow-hidden">
-                    <VideoStream stream={currentSpeaker.stream} isMirrored={!isScreenSharing} />
-                    {/* Live label overlay */}
-                    <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-[10px] font-bold text-white flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      {currentSpeaker.name} {isScreenSharing ? '(Pantalla)' : ''}
-                    </div>
-                  </div>
-                ) : (
-                  /* Avatar & Reactive Audio Speaking Wave */
-                  <div className="w-full h-full rounded-xl bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-slate-800/80 flex flex-col items-center justify-center relative p-4">
-                    {/* Pulsing Audio Ring */}
-                    <div
-                      className={`w-20 h-20 rounded-full bg-slate-800 border-2 flex items-center justify-center text-2xl font-bold text-gray-100 transition-all duration-150 ${
-                        isLocalSpeaking
-                          ? 'border-emerald-400 ring-8 ring-emerald-500/25 scale-105 shadow-[0_0_25px_rgba(16,185,129,0.35)]'
-                          : 'border-slate-700'
-                      }`}
-                    >
-                      {currentSpeaker.name.charAt(0).toUpperCase()}
-                    </div>
-
-                    <div className="mt-3 text-center">
-                      <p className="text-xs font-bold text-gray-200">{currentSpeaker.name}</p>
-                      <p className="text-[10px] mt-0.5">
-                        {isLocalSpeaking ? (
-                          <span className="text-emerald-400 font-semibold flex items-center justify-center gap-1">
-                            <Volume2 className="w-3 h-3 animate-pulse" /> Hablando...
-                          </span>
-                        ) : isMicOn ? (
-                          <span className="text-gray-400">Micrófono listo</span>
-                        ) : (
-                          <span className="text-red-400 font-semibold">Silenciado</span>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Audio visualizer bar */}
-                    {isMicOn && (
-                      <div className="absolute bottom-2.5 flex items-center gap-1 h-3 px-3 py-0.5 rounded-full bg-black/40">
-                        {[20, 40, 60, 80].map((threshold, i) => (
-                          <span
-                            key={i}
-                            className={`w-1 rounded-full transition-all duration-100 ${
-                              localVolume >= threshold
-                                ? 'bg-emerald-400 h-3'
-                                : 'bg-slate-700 h-1.5'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+              <div className="relative aspect-[4/3] w-full bg-black overflow-hidden flex items-center justify-center pointer-events-auto">
+                {/* Jitsi Floating Player */}
+                <iframe
+                  src={`https://meet.jit.si/pollito-huddle-${activeHuddle.projectId}-${activeHuddle.channelId}#userInfo.displayName="${encodeURIComponent('Miembro del Equipo')}"`}
+                  allow="camera; microphone; display-capture; autoplay; clipboard-write"
+                  className="w-full h-full border-none"
+                />
               </div>
 
-              {/* QUICK CONTROLS BAR (CONTROLES RÁPIDOS: MIC, CÁMARA, PANTALLA, COLGAR) */}
-              <div className="p-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between gap-1.5">
-                {/* 1. Mic Toggle */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleMic();
-                  }}
-                  className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    isMicOn
-                      ? 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700'
-                      : 'bg-red-600/90 hover:bg-red-600 text-white shadow-sm'
-                  }`}
-                  title={isMicOn ? 'Silenciar Micrófono' : 'Activar Micrófono'}
-                >
-                  {isMicOn ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
-                  <span className="text-[11px]">{isMicOn ? 'Mic' : 'Mutado'}</span>
-                </button>
-
-                {/* 2. Video Camera Toggle */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleVideo();
-                  }}
-                  className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    isVideoOn
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
-                      : 'bg-slate-800 hover:bg-slate-700 text-gray-300 border border-slate-700'
-                  }`}
-                  title={isVideoOn ? 'Apagar Cámara' : 'Encender Cámara'}
-                >
-                  {isVideoOn ? <Camera className="w-3.5 h-3.5" /> : <CameraOff className="w-3.5 h-3.5" />}
-                  <span className="text-[11px]">{isVideoOn ? 'Cam ON' : 'Cam'}</span>
-                </button>
-
-                {/* 3. Screen Share Toggle */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleScreenShare();
-                  }}
-                  className={`p-2 rounded-xl text-xs font-bold flex items-center justify-center transition-all ${
-                    isScreenSharing
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                      : 'bg-slate-800 hover:bg-slate-700 text-gray-400 border border-slate-700'
-                  }`}
-                  title={isScreenSharing ? 'Detener Compartir Pantalla' : 'Compartir Pantalla'}
-                >
-                  <Monitor className="w-3.5 h-3.5" />
-                </button>
-
-                {/* 4. Hang Up Button (Colgar) */}
+              <div className="p-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-center">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     leaveHuddle();
                   }}
-                  className="py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all shadow-md shadow-red-950/40"
-                  title="Finalizar y Salir de la llamada"
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-red-950/40"
                 >
-                  <PhoneOff className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Colgar</span>
+                  <PhoneOff className="w-4 h-4" />
+                  <span>Finalizar y Salir</span>
                 </button>
               </div>
-
             </div>
           )}
         </div>

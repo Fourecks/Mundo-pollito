@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences, ProjectMember } from './types';
 import { DEFAULT_PUSH_PREFERENCES, syncPreferencesToOneSignal, sendPushNotification, sendSampleNotificationForEvent, NotificationEventType } from './services/pushNotificationService';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
@@ -2091,9 +2091,9 @@ const App: React.FC = () => {
       setPlaylists(cachedPlaylists);
     } else {
       const defaultPlaylistsList: Playlist[] = [
-        { id: 1, user_id: user?.id || 'default', name: 'Lofi Beats', source_id: '37i9dQZF1DXcBWIGoYBM5M', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003002f232e08e6ff05f5904838' },
-        { id: 2, user_id: user?.id || 'default', name: 'Peaceful Piano', source_id: '37i9dQZF1DX4sWSpwq3LiO', type: 'playlist', platform: 'spotify', is_favorite: false, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003ca22a83e01dd89a1fa9f123f' },
-        { id: 3, user_id: user?.id || 'default', name: 'Deep Focus', source_id: '37i9dQZF1DWZeKCadgRdKQ', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f0000000355482310ff97c2a7813a0785' }
+        { id: 1, user_id: user?.id || 'default', name: 'Lofi Beats', source_id: '37i9dQZF1DXcBWIGoYBM5M', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003002f232e08e6ff05f5904838', created_at: new Date().toISOString() },
+        { id: 2, user_id: user?.id || 'default', name: 'Peaceful Piano', source_id: '37i9dQZF1DX4sWSpwq3LiO', type: 'playlist', platform: 'spotify', is_favorite: false, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003ca22a83e01dd89a1fa9f123f', created_at: new Date().toISOString() },
+        { id: 3, user_id: user?.id || 'default', name: 'Deep Focus', source_id: '37i9dQZF1DWZeKCadgRdKQ', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f0000000355482310ff97c2a7813a0785', created_at: new Date().toISOString() }
       ];
       setPlaylists(defaultPlaylistsList);
     }
@@ -2245,7 +2245,19 @@ const App: React.FC = () => {
       if(notesData) { setNotes(notesData); await clearAndPutAll('notes', notesData); }
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
-      if(projectsData) { setProjects(projectsData); await clearAndPutAll('projects', projectsData); }
+      if(projectsData) { 
+        const myEmail = user?.email?.toLowerCase() || '';
+        const validProjects = projectsData.filter(p => {
+            if (p.user_id === user?.id) return true;
+            if ((p.owner_email || '').toLowerCase() === myEmail) return true;
+            if (p.members && Array.isArray(p.members)) {
+                return p.members.some((m: any) => typeof m === 'string' ? m.toLowerCase() === myEmail : (m.email || '').toLowerCase() === myEmail);
+            }
+            return false;
+        });
+        setProjects(validProjects); 
+        await clearAndPutAll('projects', validProjects); 
+      }
       if(invitationsData && user?.email) {
         setProjectInvitations(invitationsData);
         localStorage.setItem(`invitations_${user.email}`, JSON.stringify(invitationsData));
@@ -2402,6 +2414,34 @@ const App: React.FC = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, [user, dataLoaded, loadData]);
+
+  // --- Real-time Synchronization ---
+  useEffect(() => {
+    if (!user || !dataLoaded || !isOnline) return;
+
+    // Use a debounce ref to prevent rapid consecutive reloads on batch updates
+    let debounceTimer: ReturnType<typeof setTimeout>;
+
+    const handleRealtimeChange = (payload: any) => {
+      console.log('Realtime change detected:', payload);
+      clearTimeout(debounceTimer);
+      // Wait 1s before reloading to allow batch operations to complete
+      debounceTimer = setTimeout(() => {
+        if (isOnline) loadData('fetch');
+      }, 1000);
+    };
+
+    const channel = supabase.channel('realtime:app')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'todos' }, handleRealtimeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_invitations' }, handleRealtimeChange)
+      .subscribe();
+
+    return () => {
+      clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [user, dataLoaded, isOnline, loadData]);
 
   // --- Settings Persistence ---
   useEffect(() => {
@@ -4529,27 +4569,28 @@ const App: React.FC = () => {
 
           flatAllTodos.forEach((todo: Todo) => {
               if (todo.completed) return;
-              if (!todo.reminder_time && !todo.due_date) return;
-
-              const reminderKey = `${todo.id}_${todo.reminder_time || ''}_${todo.due_date?.day || ''}`;
+              if (!todo.reminder_at) return;
+              const reminderKey = `${todo.id}_${todo.reminder_at}`;
               if (notifiedTaskIdsRef.current.has(reminderKey)) return;
-
-              if (todo.reminder_time) {
-                  const [rHour, rMinute] = todo.reminder_time.split(':').map(Number);
-                  const isToday = !todo.due_date || (
-                      todo.due_date.year === currentYear &&
-                      todo.due_date.month === currentMonth &&
-                      todo.due_date.day === currentDay
-                  );
-
-                  if (isToday && rHour === currentHour && Math.abs(rMinute - currentMinute) <= 1) {
-                      notifiedTaskIdsRef.current.add(reminderKey);
-                      sendPushNotification({
-                          title: `⏰ Recordatorio de tarea`,
-                          message: `Es hora de: "${todo.text}"`,
-                          eventType: 'taskReminders'
-                      }, uiSettings?.pushPreferences);
-                  }
+              const reminderTime = new Date(todo.reminder_at);
+              if (isNaN(reminderTime.getTime())) return;
+              const rYear = reminderTime.getFullYear();
+              const rMonth = reminderTime.getMonth() + 1;
+              const rDay = reminderTime.getDate();
+              const rHour = reminderTime.getHours();
+              const rMinute = reminderTime.getMinutes();
+              const isToday = (
+                  rYear === currentYear &&
+                  rMonth === currentMonth &&
+                  rDay === currentDay
+              );
+              if (isToday && rHour === currentHour && Math.abs(rMinute - currentMinute) <= 1) {
+                  notifiedTaskIdsRef.current.add(reminderKey);
+                  sendPushNotification({
+                      title: `⏰ Recordatorio de tarea`,
+                      message: `Es hora de: "${todo.text}"`,
+                      eventType: 'taskReminders'
+                  }, uiSettings?.pushPreferences);
               }
           });
       };
