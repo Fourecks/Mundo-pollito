@@ -305,33 +305,38 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const currentUserEmail = currentUser?.email || 'usuario@local.com';
     const currentUserName = currentUser?.user_metadata?.full_name || currentUserEmail.split('@')[0] || 'Tú';
-    const projectOwnerEmail = activeProject?.owner_email || activeProject?.user_id || currentUserEmail;
-    const isProjectCreator = !activeProject || !activeProject.owner_email || activeProject.owner_email.toLowerCase() === currentUserEmail.toLowerCase();
+    const rawOwner = activeProject?.owner_email || activeProject?.user_id;
+    const isOwnerEmailValid = rawOwner && rawOwner.includes('@');
+    const projectOwnerEmail = isOwnerEmailValid ? rawOwner : currentUserEmail;
+    const isProjectCreator = !activeProject || !activeProject.owner_email || activeProject.owner_email.toLowerCase() === currentUserEmail.toLowerCase() || activeProject.user_id === currentUser?.id;
 
     const realMembers = useMemo(() => {
         if (!activeProject) return [];
         const rawMembers = activeProject.members || [];
         const map = new Map<string, ProjectMember>();
 
-        const isOwnerCurrent = projectOwnerEmail.toLowerCase() === currentUserEmail.toLowerCase();
-        map.set(projectOwnerEmail.toLowerCase(), {
+        const ownerName = isProjectCreator ? `${currentUserName} (Creador)` : (isOwnerEmailValid ? rawOwner.split('@')[0] + ' (Creador)' : `${currentUserName} (Creador)`);
+        const ownerEmailVal = isOwnerEmailValid ? rawOwner : currentUserEmail;
+
+        map.set(ownerEmailVal.toLowerCase(), {
             id: 'owner',
-            name: isOwnerCurrent ? `${currentUserName} (Creador)` : projectOwnerEmail.split('@')[0] + ' (Creador)',
-            email: projectOwnerEmail,
+            name: ownerName,
+            email: ownerEmailVal,
             role: 'owner'
         });
 
         rawMembers.forEach(m => {
-            if (m.email && m.email !== 'tu_correo@ejemplo.com' && m.email !== 'colaborador_prueba@ejemplo.com' && m.email !== 'correo@ejemplo.com') {
-                const key = m.email.toLowerCase();
+            const mEmail = typeof m === 'string' ? m : m.email;
+            if (mEmail && mEmail !== 'tu_correo@ejemplo.com' && mEmail !== 'colaborador_prueba@ejemplo.com' && mEmail !== 'correo@ejemplo.com') {
+                const key = mEmail.toLowerCase();
                 if (!map.has(key)) {
-                    map.set(key, m);
+                    map.set(key, typeof m === 'string' ? { id: mEmail, name: mEmail.split('@')[0], email: mEmail, role: 'collaborator' } : m);
                 }
             }
         });
 
         return Array.from(map.values());
-    }, [activeProject, currentUserEmail, currentUserName, projectOwnerEmail]);
+    }, [activeProject, currentUserEmail, currentUserName, rawOwner, isProjectCreator, isOwnerEmailValid]);
 
     const activeChannels = useMemo(() => {
         if (!activeProject) return [];
