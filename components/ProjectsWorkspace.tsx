@@ -3574,7 +3574,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <form onSubmit={handleAddListTodo} className="flex flex-wrap items-center gap-3">
                         <input
                             type="text"
-                            placeholder={isAllLists ? "Añadir nueva tarea al proyecto..." : `Añadir tarea a "${activeCustomList?.name}"...`}
+                            placeholder={`Añadir tarea a "${activeCustomList?.name}"...`}
                             value={newItemTitle}
                             onChange={e => setNewItemTitle(e.target.value)}
                             className="flex-1 min-w-[240px] px-3.5 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-600 shadow-2xs"
@@ -3670,9 +3670,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 {displayedTodos.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="py-12 text-center text-gray-400 italic">
-                                            {isAllLists 
-                                                ? 'No hay tareas registradas. Añade una arriba para verla reflejada en el tablero.'
-                                                : 'No hay tareas en esta lista. Añade una arriba o usa "+ Añadir del Tablero" para incorporar tareas existentes.'}
+                                            No hay tareas en esta lista. Añade una arriba o usa "+ Añadir del Tablero" para incorporar tareas existentes.
                                         </td>
                                     </tr>
                                 ) : (
