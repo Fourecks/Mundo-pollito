@@ -4,7 +4,7 @@ import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, Project
 import { sendPushNotification } from '../services/pushNotificationService';
 import { useHuddle } from '../src/context/HuddleContext';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -3168,262 +3168,103 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // LISTAS TAB (Administrar Proyecto con Múltiples Listas, Vistas y Comentarios)
+    // LISTAS TAB (Unified with projectTodos & Minimalist Elegant Design)
     const renderListas = () => {
         if (!activeProject) return null;
 
-        // Auto-initialize default list if no lists exist
-        const projectLists: ProjectList[] = (activeProject.lists && activeProject.lists.length > 0)
-            ? activeProject.lists
-            : [
-                {
-                    id: 'list-default-1',
-                    project_id: activeProject.id,
-                    name: 'Seguimiento de Proyecto',
-                    description: 'Lista principal para realizar un seguimiento de tareas clave y fechas de entrega.',
-                    template_type: 'project_tracking',
-                    created_at: new Date().toISOString(),
-                    items: (activeProject.todos || []).map((t, idx) => ({
-                        id: `item-${t.id || idx}`,
-                        list_id: 'list-default-1',
-                        title: t.text,
-                        status: t.completed ? 'completed' : (t.kanban_column === 'En progreso' ? 'in_progress' : 'pending'),
-                        assignee_email: t.assignee || t.assigned_to || null,
-                        due_date: t.due_date || null,
-                        priority: t.priority || 'medium',
-                        story_points: t.story_points || 1,
-                        tags: t.tags || [],
-                        notifications_enabled: true,
-                        comments: t.comments || [],
-                        todo_id: t.id,
-                        created_at: t.created_at || new Date().toISOString()
-                    }))
-                }
-            ];
-
-        // Active list selection
-        const currentListId = selectedListId && projectLists.some(l => l.id === selectedListId)
-            ? selectedListId
-            : projectLists[0].id;
-        
-        const activeList = projectLists.find(l => l.id === currentListId) || projectLists[0];
-
-        // Filter and sort items based on custom views and search
-        let displayedItems = (activeList.items || []).filter(item => {
+        let displayedTodos = projectTodos.filter(t => {
             if (!listasSearch.trim()) return true;
-            return item.title.toLowerCase().includes(listasSearch.toLowerCase());
+            return t.text.toLowerCase().includes(listasSearch.toLowerCase());
         });
 
         if (listCustomView === 'assigned_to_me') {
-            displayedItems = displayedItems.filter(i => i.assignee_email === currentUserEmail);
+            displayedTodos = displayedTodos.filter(t => (t.assigned_to || t.assignee) === currentUserEmail);
         } else if (listCustomView === 'priority') {
             const priorityWeight = { high: 3, medium: 2, low: 1 };
-            displayedItems = [...displayedItems].sort((a, b) => (priorityWeight[b.priority || 'medium'] - priorityWeight[a.priority || 'medium']));
+            displayedTodos = [...displayedTodos].sort((a, b) => (priorityWeight[b.priority || 'medium'] - priorityWeight[a.priority || 'medium']));
         } else if (listCustomView === 'due_date') {
-            displayedItems = [...displayedItems].sort((a, b) => {
+            displayedTodos = [...displayedTodos].sort((a, b) => {
                 if (!a.due_date) return 1;
                 if (!b.due_date) return -1;
                 return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
             });
         } else if (listCustomView === 'status') {
-            const statusWeight = { blocked: 4, in_progress: 3, review: 2, pending: 1, completed: 0 };
-            displayedItems = [...displayedItems].sort((a, b) => (statusWeight[b.status] - statusWeight[a.status]));
+            displayedTodos = [...displayedTodos].sort((a, b) => (Number(b.completed) - Number(a.completed)));
         }
 
-        // Helper to update list items in project state
-        const updateProjectLists = (updatedLists: ProjectList[]) => {
-            onUpdateProject(activeProject.id, { lists: updatedLists });
-        };
-
-        const handleAddItem = (e: React.FormEvent) => {
+        const handleAddListTodo = async (e: React.FormEvent) => {
             e.preventDefault();
             if (!newItemTitle.trim()) return;
-
-            const newItem: ProjectListItem = {
-                id: `item-${Date.now()}`,
-                list_id: activeList.id,
-                title: newItemTitle.trim(),
-                status: 'pending',
-                assignee_email: newItemAssignee || currentUserEmail,
-                due_date: newItemDueDate || null,
+            await addTodo(newItemTitle.trim(), {
+                projectId: activeProject.id,
                 priority: newItemPriority,
                 story_points: newItemSP,
-                notifications_enabled: true,
-                comments: [],
-                created_at: new Date().toISOString()
-            };
-
-            // Create corresponding ProjectTodo so it's visible in Kanban/Sprints
-            const newTodo: Todo = {
-                id: Date.now(),
-                project_id: activeProject.id,
-                text: newItemTitle.trim(),
-                completed: false,
-                priority: newItemPriority,
-                story_points: newItemSP,
-                assigned_to: newItemAssignee || currentUserEmail,
-                kanban_column: 'Por hacer',
-                due_date: newItemDueDate || undefined,
-                created_at: new Date().toISOString()
-            };
-
-            newItem.todo_id = newTodo.id;
-
-            const updatedList = {
-                ...activeList,
-                items: [newItem, ...activeList.items]
-            };
-
-            const updatedLists = projectLists.map(l => l.id === activeList.id ? updatedList : l);
-            const updatedTodos = [newTodo, ...(activeProject.todos || [])];
-
-            onUpdateProject(activeProject.id, { lists: updatedLists, todos: updatedTodos });
-
+                assigned_to: newItemAssignee || undefined,
+                dueDate: newItemDueDate || undefined,
+                kanban_column: 'Por hacer'
+            });
             setNewItemTitle('');
             setNewItemDueDate('');
         };
 
-        const handleUpdateItemField = (itemId: string, field: keyof ProjectListItem, value: any) => {
-            const updatedItems = activeList.items.map(item => {
-                if (item.id === itemId) {
-                    const updated = { ...item, [field]: value };
-                    
-                    // Keep status in sync with todo completion
-                    if (field === 'status' && item.todo_id) {
-                        const isDone = value === 'completed';
-                        const updatedTodos = (activeProject.todos || []).map(t => 
-                            t.id === item.todo_id 
-                                ? { ...t, completed: isDone, kanban_column: isDone ? 'Completado' : (value === 'in_progress' ? 'En progreso' : 'Por hacer') }
-                                : t
-                        );
-                        onUpdateProject(activeProject.id, { todos: updatedTodos });
-                    }
-                    return updated;
-                }
-                return item;
-            });
-
-            const updatedLists = projectLists.map(l => l.id === activeList.id ? { ...activeList, items: updatedItems } : l);
-            updateProjectLists(updatedLists);
-        };
-
-        const handleDeleteItem = (itemId: string) => {
-            const targetItem = activeList.items.find(i => i.id === itemId);
-            const updatedItems = activeList.items.filter(i => i.id !== itemId);
-            const updatedLists = projectLists.map(l => l.id === activeList.id ? { ...activeList, items: updatedItems } : l);
-            
-            let updatedTodos = activeProject.todos || [];
-            if (targetItem?.todo_id) {
-                updatedTodos = updatedTodos.filter(t => t.id !== targetItem.todo_id);
-            }
-
-            onUpdateProject(activeProject.id, { lists: updatedLists, todos: updatedTodos });
-        };
-
         const handleShareListSummary = () => {
-            const pendingCount = activeList.items.filter(i => i.status !== 'completed').length;
-            const completedCount = activeList.items.filter(i => i.status === 'completed').length;
+            const pendingCount = projectTodos.filter(t => !t.completed).length;
+            const completedCount = projectTodos.filter(t => t.completed).length;
             
-            let summaryText = `📋 **Lista de Seguimiento: ${activeList.name}**\n`;
-            if (activeList.description) summaryText += `_${activeList.description}_\n\n`;
+            let summaryText = `📋 **Lista de Proyecto: ${activeProject.name}**\n`;
             summaryText += `📊 **Resumen:** ${completedCount} Tareas completadas | ${pendingCount} Pendientes\n\n`;
             summaryText += `**Tareas Clave:**\n`;
-            activeList.items.slice(0, 8).forEach(item => {
-                const statusBadge = item.status === 'completed' ? '✅' : (item.status === 'in_progress' ? '🔄' : '📌');
-                const assignee = item.assignee_email ? `@${item.assignee_email.split('@')[0]}` : 'Sin Asignar';
-                const dueDate = item.due_date ? `(Entrega: ${item.due_date})` : '';
-                summaryText += `- ${statusBadge} **${item.title}** - Asignado a ${assignee} ${dueDate}\n`;
+            projectTodos.slice(0, 8).forEach(t => {
+                const statusBadge = t.completed ? '✅' : '📌';
+                const assignee = t.assigned_to ? `@${t.assigned_to.split('@')[0]}` : 'Sin Asignar';
+                summaryText += `- ${statusBadge} **${t.text}** - Asignado a ${assignee}\n`;
             });
 
             setShareUpdateModal({
                 isOpen: true,
-                title: `Compartir Lista: ${activeList.name}`,
+                title: `Compartir Lista del Proyecto`,
                 updateText: summaryText
-            });
-        };
-
-        const handleShareTask = (item: ProjectListItem) => {
-            const text = `📌 **Referencia de Tarea:** ${item.title}\n• Lista: ${activeList.name}\n• Estado: ${item.status}\n• Prioridad: ${item.priority || 'medium'}\n• Asignado a: ${item.assignee_email || 'Sin asignar'}`;
-            setShareTargetChannelId(selectedChannelId || 'general');
-            setShareChannelPassword('');
-            setShareComment('');
-            setShareError(null);
-            setShareUpdateModal({
-                isOpen: true,
-                title: `Compartir Tarea: ${item.title}`,
-                updateText: text
             });
         };
 
         return (
             <div className="p-8 max-w-7xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-8 font-sans">
-                {/* Minimalist Header & Controls */}
-                <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-6">
+                {/* Minimalist Elegant Header & Quick Add */}
+                <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/60 dark:border-gray-800/80 shadow-2xs space-y-6">
                     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800/80 pb-5">
                         <div className="space-y-1">
-                            <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                <List className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Listas de Tareas
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <List className="w-4 h-4 text-gray-500 dark:text-gray-400" /> Lista General de Tareas
                             </h3>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Gestiona las tareas, responsables y estados con una interfaz limpia, minimalista y colaborativa.
+                                Sincronizado en tiempo real con el tablero Kanban y los Sprints.
                             </p>
                         </div>
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2">
                             <button
                                 onClick={handleShareListSummary}
-                                className="px-3.5 py-2 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-700 shadow-2xs"
+                                className="px-3.5 py-2 text-xs bg-gray-50 dark:bg-zinc-900 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-800 shadow-2xs"
                             >
-                                <Share2 className="w-3.5 h-3.5 text-blue-500" /> Compartir en Canal
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setCreateListModal({ isOpen: true, templateType: 'project_tracking' });
-                                    setNewListTitle('');
-                                    setNewListDescription('');
-                                }}
-                                className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-sm"
-                            >
-                                <Plus className="w-4 h-4" /> Nueva Lista
+                                <Share2 className="w-3.5 h-3.5 text-gray-400" /> Compartir Resumen
                             </button>
                         </div>
                     </div>
 
-                    {/* List Tabs */}
-                    <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-                        {projectLists.map(list => (
-                            <button
-                                key={list.id}
-                                onClick={() => setSelectedListId(list.id)}
-                                className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all flex items-center gap-2.5 whitespace-nowrap shrink-0 border ${
-                                    list.id === activeList.id
-                                        ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-800 shadow-2xs'
-                                        : 'bg-gray-50/60 dark:bg-zinc-900/40 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-zinc-900'
-                                }`}
-                            >
-                                <ListOrdered className="w-4 h-4" />
-                                {list.name}
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-mono">
-                                    {list.items?.length || 0}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Quick Add Form for Active List */}
-                    <form onSubmit={handleAddItem} className="pt-4 border-t border-gray-100 dark:border-gray-800/80 flex flex-wrap items-center gap-3">
+                    {/* Quick Add Form */}
+                    <form onSubmit={handleAddListTodo} className="flex flex-wrap items-center gap-3">
                         <input
                             type="text"
-                            placeholder={`Añadir nueva tarea a "${activeList.name}"...`}
+                            placeholder="Añadir nueva tarea..."
                             value={newItemTitle}
                             onChange={e => setNewItemTitle(e.target.value)}
-                            className="flex-1 min-w-[240px] px-3.5 py-2.5 text-xs bg-gray-50/80 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                            className="flex-1 min-w-[240px] px-3.5 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-600 shadow-2xs"
                         />
                         <select
                             value={newItemAssignee}
                             onChange={e => setNewItemAssignee(e.target.value)}
-                            className="px-3 py-2.5 text-xs bg-gray-50/80 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none max-w-[160px]"
+                            className="px-3 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none max-w-[160px]"
                         >
-                            <option value="">(Asignar responsable)</option>
+                            <option value="">(Responsable)</option>
                             {realMembers.map(m => (
                                 <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
                             ))}
@@ -3432,45 +3273,45 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             type="date"
                             value={newItemDueDate}
                             onChange={e => setNewItemDueDate(e.target.value)}
-                            className="px-3 py-2.5 text-xs bg-gray-50/80 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none"
+                            className="px-3 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none"
                         />
                         <select
                             value={newItemPriority}
                             onChange={e => setNewItemPriority(e.target.value as any)}
-                            className="px-3 py-2.5 text-xs bg-gray-50/80 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none font-medium"
+                            className="px-3 py-2 text-xs bg-gray-50/60 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl text-gray-700 dark:text-gray-300 focus:outline-none font-medium"
                         >
-                            <option value="low">Prioridad Baja</option>
-                            <option value="medium">Prioridad Media</option>
-                            <option value="high">Prioridad Alta</option>
+                            <option value="low">Baja</option>
+                            <option value="medium">Media</option>
+                            <option value="high">Alta</option>
                         </select>
                         <button
                             type="submit"
-                            className="px-4 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-1.5 shadow-xs shrink-0"
+                            className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-2xs shrink-0"
                         >
-                            <Plus className="w-4 h-4" /> Agregar Tarea
+                            <Plus className="w-3.5 h-3.5" /> Agregar
                         </button>
                     </form>
                 </div>
 
-                {/* Views Toolbar & Search */}
+                {/* Filters & Search Toolbar */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-1 bg-white dark:bg-[#111] p-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 text-xs shadow-2xs">
+                    <div className="flex items-center gap-1 bg-white dark:bg-[#111] p-1 rounded-xl border border-gray-200/60 dark:border-gray-800/80 text-xs shadow-2xs">
                         <span className="text-[10px] uppercase font-bold text-gray-400 px-3 flex items-center gap-1.5">
-                            <SlidersHorizontal className="w-3.5 h-3.5" /> Filtrar:
+                            <SlidersHorizontal className="w-3 h-3" /> Filtrar:
                         </span>
                         {[
                             { id: 'all', label: 'Todas' },
-                            { id: 'priority', label: 'Por Prioridad' },
+                            { id: 'priority', label: 'Prioridad' },
                             { id: 'assigned_to_me', label: 'Asignadas a mí' },
-                            { id: 'due_date', label: 'Por Fecha' },
-                            { id: 'status', label: 'Por Estado' }
+                            { id: 'due_date', label: 'Fecha' },
+                            { id: 'status', label: 'Estado' }
                         ].map(v => (
                             <button
                                 key={v.id}
                                 onClick={() => setListCustomView(v.id as any)}
-                                className={`px-3 py-1.5 font-medium rounded-xl transition-all ${
+                                className={`px-3 py-1 font-medium rounded-lg transition-all ${
                                     listCustomView === v.id
-                                        ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs font-semibold'
+                                        ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-2xs font-semibold'
                                         : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
                                 }`}
                             >
@@ -3480,148 +3321,87 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Buscar tarea..."
+                            placeholder="Buscar en tareas..."
                             value={listasSearch}
                             onChange={e => setListasSearch(e.target.value)}
-                            className="pl-10 pr-4 py-2 text-xs bg-white dark:bg-[#111] border border-gray-200/80 dark:border-gray-800/80 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 w-64 shadow-2xs"
+                            className="pl-9 pr-4 py-1.5 text-xs bg-white dark:bg-[#111] border border-gray-200/60 dark:border-gray-800/80 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-gray-400 dark:focus:border-gray-600 w-60 shadow-2xs"
                         />
                     </div>
                 </div>
 
-                {/* Main List Data Table */}
-                <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 overflow-hidden shadow-xs">
+                {/* Minimalist Clean Table */}
+                <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/60 dark:border-gray-800/80 overflow-hidden shadow-2xs">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="bg-gray-50/70 dark:bg-zinc-900/60 border-b border-gray-200/80 dark:border-gray-800/80 text-gray-500 dark:text-gray-400 font-semibold text-[11px] uppercase tracking-wider">
-                                    <th className="py-3.5 px-4">Tarea</th>
-                                    <th className="py-3.5 px-4">Estado</th>
-                                    <th className="py-3.5 px-4">Responsable</th>
-                                    <th className="py-3.5 px-4">Fecha límite</th>
-                                    <th className="py-3.5 px-4">Prioridad</th>
-                                    <th className="py-3.5 px-4 text-center">Hilo / Discusión</th>
-                                    <th className="py-3.5 px-4 text-right">Acción</th>
+                                <tr className="bg-gray-50/50 dark:bg-zinc-900/50 border-b border-gray-200/60 dark:border-gray-800 text-gray-400 font-semibold text-[10px] uppercase tracking-wider">
+                                    <th className="py-3 px-4">Tarea</th>
+                                    <th className="py-3 px-4">Columna / Estado</th>
+                                    <th className="py-3 px-4">Responsable</th>
+                                    <th className="py-3 px-4">Fecha límite</th>
+                                    <th className="py-3 px-4">Prioridad</th>
+                                    <th className="py-3 px-4 text-right">Acción</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
-                                {displayedItems.length === 0 ? (
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800/40">
+                                {displayedTodos.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="py-12 text-center text-gray-400 italic">
-                                            No hay elementos en esta vista. Crea una nueva tarea arriba.
+                                        <td colSpan={6} className="py-12 text-center text-gray-400 italic">
+                                            No hay tareas registradas. Añade una arriba para verla reflejada en el tablero.
                                         </td>
                                     </tr>
                                 ) : (
-                                    displayedItems.map(item => (
-                                        <tr key={item.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/20 transition-colors">
-                                            {/* Title */}
-                                            <td className="py-4 px-4 font-medium text-gray-900 dark:text-gray-100 min-w-[240px]">
+                                    displayedTodos.map(todo => (
+                                        <tr key={todo.id} className="hover:bg-gray-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                                            <td className="py-3.5 px-4 font-medium text-gray-900 dark:text-gray-100 min-w-[220px]">
                                                 <div className="flex items-center gap-2.5">
                                                     <input
                                                         type="checkbox"
-                                                        checked={item.status === 'completed'}
-                                                        onChange={e => handleUpdateItemField(item.id, 'status', e.target.checked ? 'completed' : 'pending')}
-                                                        className="rounded border-gray-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
+                                                        checked={todo.completed}
+                                                        onChange={() => updateTodo(todo.id, { completed: !todo.completed, kanban_column: !todo.completed ? 'Completado' : 'Por hacer' })}
+                                                        className="rounded border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:ring-0 cursor-pointer w-3.5 h-3.5"
                                                     />
-                                                    <span className={item.status === 'completed' ? 'line-through text-gray-400' : ''}>
-                                                        {item.title}
+                                                    <span className={todo.completed ? 'line-through text-gray-400' : ''}>
+                                                        {todo.text}
                                                     </span>
                                                 </div>
                                             </td>
 
-                                            {/* Status Dropdown */}
-                                            <td className="py-4 px-4">
-                                                <select
-                                                    value={item.status}
-                                                    onChange={e => handleUpdateItemField(item.id, 'status', e.target.value)}
-                                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border focus:outline-none cursor-pointer ${
-                                                        item.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                                                        item.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300' :
-                                                        item.status === 'review' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300' :
-                                                        item.status === 'blocked' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300' :
-                                                        'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300'
-                                                    }`}
-                                                >
-                                                    <option value="pending">Por hacer</option>
-                                                    <option value="in_progress">En progreso</option>
-                                                    <option value="review">En revisión</option>
-                                                    <option value="blocked">Bloqueado</option>
-                                                    <option value="completed">Completado</option>
-                                                </select>
+                                            <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300 font-medium">
+                                                <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-[11px]">
+                                                    {todo.kanban_column || 'Por hacer'}
+                                                </span>
                                             </td>
 
-                                            {/* Assignee */}
-                                            <td className="py-4 px-4">
-                                                <select
-                                                    value={item.assignee_email || ''}
-                                                    onChange={e => handleUpdateItemField(item.id, 'assignee_email', e.target.value || null)}
-                                                    className="bg-transparent text-gray-700 dark:text-gray-300 text-xs focus:outline-none cursor-pointer max-w-[140px] truncate font-medium"
-                                                >
-                                                    <option value="">(Sin Asignar)</option>
-                                                    {realMembers.map(m => (
-                                                        <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
-                                                    ))}
-                                                </select>
+                                            <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300 truncate max-w-[140px]">
+                                                {todo.assigned_to || 'Sin asignar'}
                                             </td>
 
-                                            {/* Due Date */}
-                                            <td className="py-4 px-4">
-                                                <input
-                                                    type="date"
-                                                    value={item.due_date || ''}
-                                                    onChange={e => handleUpdateItemField(item.id, 'due_date', e.target.value || null)}
-                                                    className="bg-transparent text-gray-600 dark:text-gray-400 text-xs focus:outline-none font-medium"
-                                                />
+                                            <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400">
+                                                {todo.due_date || 'Sin fecha'}
                                             </td>
 
-                                            {/* Priority Dropdown */}
-                                            <td className="py-4 px-4">
-                                                <select
-                                                    value={item.priority || 'medium'}
-                                                    onChange={e => handleUpdateItemField(item.id, 'priority', e.target.value)}
-                                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border focus:outline-none cursor-pointer ${
-                                                        item.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40' :
-                                                        item.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40' :
-                                                        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40'
-                                                    }`}
-                                                >
-                                                    <option value="low">Baja</option>
-                                                    <option value="medium">Media</option>
-                                                    <option value="high">Alta</option>
-                                                </select>
+                                            <td className="py-3.5 px-4">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                                    todo.priority === 'high' ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100' :
+                                                    todo.priority === 'low' ? 'bg-gray-50 dark:bg-zinc-900 text-gray-500' :
+                                                    'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300'
+                                                }`}>
+                                                    {todo.priority || 'media'}
+                                                </span>
                                             </td>
 
-                                            {/* Thread / Discussion */}
-                                            <td className="py-4 px-4 text-center">
+                                            <td className="py-3.5 px-4 text-right">
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        setActiveTaskThreadItem({ listId: activeList.id, item });
-                                                        setListThreadCommentText('');
-                                                    }}
-                                                    className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 transition-colors inline-flex items-center gap-1.5 border border-gray-200 dark:border-gray-700 shadow-2xs"
-                                                >
-                                                    <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
-                                                    <span>Hilo</span>
-                                                    {item.comments && item.comments.length > 0 && (
-                                                        <span className="px-1.5 py-0.2 text-[10px] font-bold bg-blue-600 text-white rounded-full">
-                                                            {item.comments.length}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            </td>
-
-                                            {/* Delete */}
-                                            <td className="py-4 px-4 text-right">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteItem(item.id)}
-                                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30"
+                                                    onClick={() => deleteTodo(todo.id)}
+                                                    className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded"
                                                     title="Eliminar tarea"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </td>
                                         </tr>
