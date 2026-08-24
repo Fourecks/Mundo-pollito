@@ -677,16 +677,67 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         handleOpenShareDoc(doc);
     };
 
-    // Helper: File Upload to Docs
+    // Helper: File Upload to Docs with auto-compression and size limits
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !activeProject) return;
 
-        const reader = new FileReader();
-        reader.onload = () => {
-            const dataUrl = reader.result as string;
-            const ext = file.name.split('.').pop()?.toLowerCase() || '';
-            
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+
+        // If it's an image, compress it first to save cloud and local space
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Maximum dimensions to prevent massive canvas memory usage
+                    const MAX_WIDTH = 1200;
+                    const MAX_HEIGHT = 1200;
+                    if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                        if (width > height) {
+                            height = Math.round((height * MAX_WIDTH) / width);
+                            width = MAX_WIDTH;
+                        } else {
+                            width = Math.round((width * MAX_HEIGHT) / height);
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0, width, height);
+                        // Export as compressed JPEG (0.7 quality is extremely lightweight and clear)
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        saveDocument(file, compressedDataUrl, Math.round(compressedDataUrl.length * 0.75));
+                    } else {
+                        saveDocument(file, event.target?.result as string, file.size);
+                    }
+                };
+                img.src = event.target?.result as string;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            // General file size validation (max 1.5 MB)
+            if (file.size > 1.5 * 1024 * 1024) {
+                alert(`El archivo "${file.name}" supera el límite permitido de 1.5 MB.\n\nPor favor, sube un archivo más pequeño o utiliza enlaces a servicios en la nube (como Google Drive, OneDrive o Dropbox) para archivos grandes.`);
+                if (e.target) e.target.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                saveDocument(file, reader.result as string, file.size);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function saveDocument(file: File, fileUrl: string, fileSize: number) {
             let category: ProjectDoc['category'] = 'Other';
             if (['xlsx', 'xls', 'csv'].includes(ext)) category = 'Specifications';
             else if (['docx', 'doc', 'pdf'].includes(ext)) category = 'Requirements';
@@ -694,25 +745,24 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
             const newDoc: ProjectDoc = {
                 id: crypto.randomUUID(),
-                project_id: activeProject.id,
+                project_id: activeProject!.id,
                 folder_id: selectedFolderId,
                 title: file.name,
-                content: `Archivo adjunto: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`,
+                content: `Archivo adjunto: ${file.name} (${(fileSize / 1024).toFixed(1)} KB)`,
                 category,
-                file_url: dataUrl,
+                file_url: fileUrl,
                 file_name: file.name,
                 file_type: file.type || ext,
-                file_size: file.size,
+                file_size: fileSize,
                 created_by: currentUserEmail,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             };
 
-            const updatedDocs = [newDoc, ...(activeProject.docs || [])];
-            onUpdateProject(activeProject.id, { docs: updatedDocs });
+            const updatedDocs = [newDoc, ...(activeProject!.docs || [])];
+            onUpdateProject(activeProject!.id, { docs: updatedDocs });
             if (e.target) e.target.value = '';
-        };
-        reader.readAsDataURL(file);
+        }
     };
 
     // File Extension Icon Renderer

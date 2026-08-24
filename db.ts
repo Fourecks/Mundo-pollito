@@ -126,6 +126,25 @@ const sanitizeForSupabase = (tableName: string, data: any) => {
             clean[key] = data[key];
         }
     }
+
+    // Optimization: Prevent PostgreSQL JSONB statement timeouts (error 57014)
+    // by ensuring extremely large base64 strings in 'projects.docs' are stripped
+    // before syncing to the cloud database.
+    if (tableName === 'projects' && clean.docs && Array.isArray(clean.docs)) {
+        clean.docs = clean.docs.map((doc: any) => {
+            if (doc && doc.file_url && doc.file_url.startsWith('data:') && doc.file_url.length > 500 * 1024) {
+                // If the file is larger than 500KB in base64 length, strip it from the remote payload.
+                // This keeps the remote database lightweight and lightning-fast.
+                return {
+                    ...doc,
+                    file_url: "", // Strip the file_url from remote sync
+                    content: (doc.content || "") + "\n\n(Archivo local de gran tamaño optimizado; se conserva en el dispositivo del autor)."
+                };
+            }
+            return doc;
+        });
+    }
+
     return clean;
 };
 
