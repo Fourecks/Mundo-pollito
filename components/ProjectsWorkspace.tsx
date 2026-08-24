@@ -365,6 +365,37 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         return false;
     }, [activeProject, currentUser, currentUserEmail, projectOwnerEmail]);
 
+    // Unread Channel Messages Logic
+    const [lastReadTimes, setLastReadTimes] = useState<Record<string, string>>(() => {
+        try {
+            const saved = localStorage.getItem(`channel_last_read_${currentUserEmail}`);
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
+        }
+    });
+
+    useEffect(() => {
+        if (activeTab === 'chat' && selectedChannelId && currentUserEmail) {
+            setLastReadTimes(prev => {
+                const updated = { ...prev, [selectedChannelId]: new Date().toISOString() };
+                localStorage.setItem(`channel_last_read_${currentUserEmail}`, JSON.stringify(updated));
+                return updated;
+            });
+        }
+    }, [activeTab, selectedChannelId, currentUserEmail]);
+
+    const unreadChatMessagesCount = useMemo(() => {
+        if (!activeProject || !activeProject.chat_messages) return 0;
+        return activeProject.chat_messages.filter(m => {
+            const chanId = m.channel_id || 'general';
+            const lastRead = lastReadTimes[chanId];
+            if (m.sender_email === currentUserEmail) return false;
+            if (!lastRead) return true;
+            return m.created_at > lastRead;
+        }).length;
+    }, [activeProject, lastReadTimes, currentUserEmail]);
+
     const realMembers = useMemo(() => {
         if (!activeProject) return [];
         const rawMembers = activeProject.members || [];
@@ -672,6 +703,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 file_name: file.name,
                 file_type: file.type || ext,
                 file_size: file.size,
+                created_by: currentUserEmail,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             };
@@ -826,7 +858,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             { id: 'sprints', label: 'Sprints', icon: Target },
                             { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                             { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
-                            { id: 'chat', label: 'Canales', icon: MessageSquare, badge: activeProject.chat_messages?.length, isHuddle: isGlobalHuddleActive || (activeProject.huddles || []).some(h => h.active) },
+                            { id: 'chat', label: 'Canales', icon: MessageSquare, badge: unreadChatMessagesCount, isHuddle: isGlobalHuddleActive || (activeProject.huddles || []).some(h => h.active) },
                             { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: activeProject.expenses?.length },
                             { id: 'time', label: 'Tiempo', icon: Clock, badge: activeProject.time_entries?.length },
                             { id: 'team', label: 'Equipo', icon: Users, badge: realMembers.length },
@@ -1690,6 +1722,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredDocs.map(doc => {
                             const folder = folders.find(f => f.id === doc.folder_id);
+                            const canDeleteDoc = !doc.created_by || doc.created_by.toLowerCase() === currentUserEmail.toLowerCase() || isProjectCreator;
                             return (
                                 <div key={doc.id} className="bg-white dark:bg-[#0a0a0a] p-4 rounded-xl border border-gray-200 dark:border-gray-800/80 shadow-xs flex flex-col justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-all group">
                                     <div>
@@ -1708,9 +1741,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     </div>
 
                                     <div className="pt-3 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between">
-                                        <span className="text-[10px] text-gray-400 font-mono">
-                                            {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
-                                        </span>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-[10px] text-gray-400 font-mono">
+                                                {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
+                                            </span>
+                                            <span className="text-[9px] text-gray-400">
+                                                Por: {doc.created_by ? (doc.created_by.toLowerCase() === currentUserEmail.toLowerCase() ? 'Tú' : doc.created_by.split('@')[0]) : 'Creador'}
+                                            </span>
+                                        </div>
                                         <div className="flex items-center gap-1.5">
                                             <button 
                                                 onClick={() => setPreviewDocModal(doc)}
@@ -1733,6 +1771,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             >
                                                 <Download className="w-3.5 h-3.5" />
                                             </button>
+                                            {canDeleteDoc && (
+                                                <button 
+                                                    onClick={async () => {
+                                                        if (confirm(`¿Estás seguro de eliminar el documento "${doc.title}"?`)) {
+                                                            const updated = (activeProject.docs || []).filter(d => d.id !== doc.id);
+                                                            await onUpdateProject(activeProject.id, { docs: updated });
+                                                        }
+                                                    }}
+                                                    title="Eliminar Documento"
+                                                    className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1748,6 +1800,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <th className="py-2.5 px-4">Documento</th>
                                     <th className="py-2.5 px-4">Carpeta</th>
                                     <th className="py-2.5 px-4">Tamaño</th>
+                                    <th className="py-2.5 px-4">Autor</th>
                                     <th className="py-2.5 px-4">Fecha</th>
                                     <th className="py-2.5 px-4 text-right">Acciones</th>
                                 </tr>
@@ -1755,6 +1808,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
                                 {filteredDocs.map(doc => {
                                     const folder = folders.find(f => f.id === doc.folder_id);
+                                    const canDeleteDoc = !doc.created_by || doc.created_by.toLowerCase() === currentUserEmail.toLowerCase() || isProjectCreator;
                                     return (
                                         <tr key={doc.id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
                                             <td className="py-2.5 px-4">
@@ -1772,6 +1826,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             </td>
                                             <td className="py-2.5 px-4 font-mono text-[11px] text-gray-500">
                                                 {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
+                                            </td>
+                                            <td className="py-2.5 px-4 text-gray-500 text-[11px]">
+                                                {doc.created_by ? (doc.created_by.toLowerCase() === currentUserEmail.toLowerCase() ? 'Tú' : doc.created_by.split('@')[0]) : 'Creador'}
                                             </td>
                                             <td className="py-2.5 px-4 text-gray-500 text-[11px]">
                                                 {doc.created_at ? format(parseISO(doc.created_at), 'dd/MM/yyyy') : '-'}
@@ -1799,6 +1856,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                     >
                                                         <Download className="w-3.5 h-3.5" />
                                                     </button>
+                                                    {canDeleteDoc && (
+                                                        <button 
+                                                            onClick={async () => {
+                                                                if (confirm(`¿Estás seguro de eliminar el documento "${doc.title}"?`)) {
+                                                                    const updated = (activeProject.docs || []).filter(d => d.id !== doc.id);
+                                                                    await onUpdateProject(activeProject.id, { docs: updated });
+                                                                }
+                                                            }}
+                                                            title="Eliminar"
+                                                            className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -2184,8 +2255,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 const isSelected = chan.id === currentChannel.id;
                                 const isChanHuddleActive = (activeHuddles.find(h => h.channel_id === chan.id)?.active) || (isGlobalHuddleActive && activeHuddle?.projectId === activeProject.id && activeHuddle?.channelId === chan.id);
                                 
-                                // Simulation: unread notifications for non-selected channels (e.g. general usually has some history)
-                                const hasUnread = !isSelected && chan.id === 'ideas';
+                                // Check dynamic unread status for the channel
+                                const hasUnread = !isSelected && (activeProject.chat_messages || []).some(m => {
+                                    if ((m.channel_id || 'general') !== chan.id) return false;
+                                    if (m.sender_email === currentUserEmail) return false;
+                                    const lastRead = lastReadTimes[chan.id];
+                                    if (!lastRead) return true;
+                                    return m.created_at > lastRead;
+                                });
 
                                 return (
                                     <div 
@@ -2484,7 +2561,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         
                                                         {/* Sender Metadata */}
                                                         <div className="flex items-center gap-2 mb-1">
-                                                            <span className="text-xs font-bold text-gray-900 dark:text-white">{msg.sender_name}</span>
+                                                            <span className="text-xs font-bold text-gray-900 dark:text-white">{isUser ? 'Tú' : msg.sender_name}</span>
                                                             <span className="text-[10px] text-gray-400">{format(parseISO(msg.created_at), 'HH:mm', { locale: es })}</span>
                                                             {isPinned && (
                                                                 <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 uppercase tracking-wider bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.2 rounded border border-amber-200/40">
@@ -2496,7 +2573,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         {/* Replying Context Bar */}
                                                         {msg.reply_to && (
                                                             <div className="p-2 mb-1.5 bg-gray-100 dark:bg-gray-800/60 rounded border-l-2 border-blue-500 text-[11px] text-gray-600 dark:text-gray-300">
-                                                                <strong className="block text-[10px] text-blue-500">Respondiendo a {msg.reply_to.sender_name}:</strong>
+                                                                <strong className="block text-[10px] text-blue-500">Respondiendo a {msg.reply_to.sender_email === currentUserEmail ? 'Tú' : msg.reply_to.sender_name}:</strong>
                                                                 {msg.reply_to.text}
                                                             </div>
                                                         )}
@@ -2765,7 +2842,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             {activeThreadMessage.sender_name.charAt(0).toUpperCase()}
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-[11px] font-bold text-gray-900 dark:text-white truncate">{activeThreadMessage.sender_name}</p>
+                                            <p className="text-[11px] font-bold text-gray-900 dark:text-white truncate">{activeThreadMessage.sender_email === currentUserEmail ? 'Tú' : activeThreadMessage.sender_name}</p>
                                             <p className="text-[8px] text-gray-400">{format(parseISO(activeThreadMessage.created_at), 'HH:mm', { locale: es })}</p>
                                         </div>
                                     </div>
@@ -2790,7 +2867,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 mb-0.5">
-                                                        <span className="text-[11px] font-bold text-gray-900 dark:text-white">{reply.sender_name}</span>
+                                                        <span className="text-[11px] font-bold text-gray-900 dark:text-white">{reply.sender_email === currentUserEmail ? 'Tú' : reply.sender_name}</span>
                                                         <span className="text-[8px] text-gray-400">{format(parseISO(reply.created_at), 'HH:mm', { locale: es })}</span>
                                                     </div>
                                                     <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{reply.text}</p>
@@ -3341,9 +3418,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 className="pl-8 pr-3 py-1.5 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white w-44"
                             />
                         </div>
-                        <button onClick={() => setIsInviteModalOpen(true)} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 flex items-center gap-1.5 shadow-sm transition-colors">
-                            <Users className="w-3.5 h-3.5" /> Invitar Miembro
-                        </button>
+                        {isProjectCreator && (
+                            <button onClick={() => setIsInviteModalOpen(true)} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 flex items-center gap-1.5 shadow-sm transition-colors">
+                                <Users className="w-3.5 h-3.5" /> Invitar Miembro
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -4033,6 +4112,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         folder_id: folder_id || null,
                         title,
                         content,
+                        created_by: currentUserEmail,
                         created_at: new Date().toISOString(),
                         updated_at: new Date().toISOString()
                     };

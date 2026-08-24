@@ -440,6 +440,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   };
 
   const handleOpenProjectEditor = (project: Project) => {
+    if (!currentUser) return;
+    const ownerEmail = project.owner_email || project.members?.find((m: any) => m.role === 'owner')?.email;
+    const isOwner = currentUser.id === project.user_id || 
+      (currentUser.email && ownerEmail && currentUser.email.toLowerCase() === ownerEmail.toLowerCase());
+    
+    if (!isOwner) {
+      alert('Solo el propietario o creador del proyecto puede modificar su configuración o cambiar el nombre.');
+      return;
+    }
     setProjectToEdit(project);
     setIsProjectEditorOpen(true);
   };
@@ -2767,7 +2776,10 @@ const App: React.FC = () => {
     const projectId = options?.projectId || options?.project_id || null;
     const isUndated = options?.isUndated || false;
 
-    const targetDueDate = options?.dueDate !== undefined ? options.dueDate : (isUndated ? null : formatDateKey(selectedDate));
+    let targetDueDate = (options?.dueDate !== undefined && options.dueDate !== '') ? options.dueDate : (isUndated ? null : formatDateKey(selectedDate));
+    if (targetDueDate === '') {
+      targetDueDate = null;
+    }
     const dateKey = isUndated || !targetDueDate ? 'undated' : targetDueDate;
 
     const tempId = -Date.now();
@@ -2776,17 +2788,17 @@ const App: React.FC = () => {
         text, 
         completed: false, 
         priority: options?.priority || 'medium', 
-        due_date: targetDueDate, 
-        start_time: options?.startTime,
-        end_time: options?.endTime,
-        notes: options?.notes,
+        due_date: targetDueDate || null, 
+        start_time: options?.startTime || null,
+        end_time: options?.endTime || null,
+        notes: options?.notes || null,
         user_id: user.id, 
         created_at: new Date().toISOString(), 
         subtasks: [],
         project_id: projectId,
-        sprint_id: options?.sprint_id,
-        milestone_id: options?.milestone_id,
-        story_points: options?.story_points,
+        sprint_id: options?.sprint_id || null,
+        milestone_id: options?.milestone_id || null,
+        story_points: options?.story_points || null,
         kanban_column: options?.kanban_column || 'Por hacer',
         assignee: options?.assignee || options?.assigned_to || null,
         assigned_to: options?.assignee || options?.assigned_to || null,
@@ -2977,8 +2989,15 @@ const App: React.FC = () => {
       }
       updatedTodo = { ...original, ...maybeUpdates };
     } else {
-      updatedTodo = todoOrId;
+      updatedTodo = { ...todoOrId };
     }
+
+    // Normalize empty strings to null for database compatibility
+    if (updatedTodo.due_date === '') updatedTodo.due_date = null;
+    if (updatedTodo.sprint_id === '') updatedTodo.sprint_id = null;
+    if (updatedTodo.milestone_id === '') updatedTodo.milestone_id = null;
+    if (updatedTodo.list_id === '') updatedTodo.list_id = null;
+    if (updatedTodo.project_id as any === '') updatedTodo.project_id = null;
 
     const originalTodo = findTodoById(updatedTodo.id);
     
