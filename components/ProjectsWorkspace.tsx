@@ -256,6 +256,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [newItemDueDate, setNewItemDueDate] = useState<string>('');
     const [newItemPriority, setNewItemPriority] = useState<Priority>('medium');
     const [isAddBoardTaskModalOpen, setIsAddBoardTaskModalOpen] = useState<boolean>(false);
+    const [assignListTodoId, setAssignListTodoId] = useState<string | null>(null);
 
     // Bandeja de Novedades y Anuncios States
     const [inboxModalOpen, setInboxModalOpen] = useState(false);
@@ -1096,11 +1097,37 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 {todo.text}
                                             </p>
                                         </div>
-                                        {todo.story_points != null && (
-                                            <div className="mt-2 text-[10px] inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 font-semibold">
-                                                {todo.story_points} SP
-                                            </div>
-                                        )}
+                                        {(() => {
+                                            const prio = todo.priority || 'medium';
+                                            const prioLabel = prio === 'high' ? 'Prioridad Alta' : prio === 'low' ? 'Prioridad Baja' : 'Prioridad Media';
+                                            const prioStyles = prio === 'high' 
+                                                ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-200 dark:border-red-800/60' 
+                                                : prio === 'low'
+                                                ? 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+                                                : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/60';
+                                            
+                                            const listMatch = (activeProject?.lists || []).find(l => l.id === todo.list_id);
+
+                                            return (
+                                                <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-gray-800/60 flex items-center justify-between gap-2 text-[10px]">
+                                                    <span className={`px-2 py-0.5 rounded font-medium border ${prioStyles}`}>
+                                                        {prioLabel}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setAssignListTodoId(todo.id);
+                                                        }}
+                                                        className="text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 px-2 py-0.5 rounded transition-colors flex items-center gap-1 font-medium border border-gray-200 dark:border-gray-800"
+                                                        title="Añadir a una lista"
+                                                    >
+                                                        <List className="w-3 h-3 text-gray-400" />
+                                                        <span className="max-w-[100px] truncate">{listMatch ? listMatch.name : 'Añadir a Lista'}</span>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 ))}
 
@@ -3319,25 +3346,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         return (
                             <div key={m.id || idx} className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-9 h-9 rounded-full ${isOwner ? 'bg-gradient-to-tr from-amber-500 to-orange-400' : 'bg-blue-600 dark:bg-blue-500'} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm`}>
+                                    <div className={`w-9 h-9 rounded-full ${isOwner ? 'bg-gray-900 dark:bg-white text-white dark:text-black font-semibold' : 'bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-medium'} text-xs flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-800`}>
                                         {(m.name || m.email || 'M').charAt(0).toUpperCase()}
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-1.5">
-                                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">{m.name || 'Miembro del Equipo'}</h4>
-                                            {isOwner && (
-                                                <span className="text-[10px] text-amber-500 font-semibold">👑</span>
-                                            )}
+                                            <h4 className="text-xs font-semibold text-gray-900 dark:text-white">{m.name || 'Miembro del Equipo'}</h4>
                                         </div>
                                         <span className="text-[10px] text-gray-400 font-mono">{m.email}</span>
                                     </div>
                                 </div>
-                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${
+                                <span className={`text-[10px] px-2.5 py-1 rounded-md font-semibold tracking-wide ${
                                     isOwner 
-                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' 
+                                        ? 'bg-gray-900/10 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-900/20 dark:border-white/20' 
                                         : m.role === 'lead'
                                         ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                        : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
                                 }`}>
                                     {isOwner ? 'Propietario / Creador' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
                                 </span>
@@ -3354,14 +3378,35 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject) return null;
 
         const projectLists = activeProject.lists || [];
-        const isAllLists = selectedListId === 'all';
-        const activeCustomList = projectLists.find(l => l.id === selectedListId);
+
+        if (projectLists.length === 0) {
+            return (
+                <div className="p-8 max-w-md mx-auto w-full h-full flex flex-col items-center justify-center text-center space-y-4 font-sans my-auto py-20">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                        <List className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1.5">
+                        <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">No hay listas creadas</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                            Este proyecto aún no tiene listas personalizadas. Crea una lista para organizar y clasificar tus tareas.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => setCreateListModal({ isOpen: true, templateType: 'project_tracking' })}
+                        className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors shadow-2xs flex items-center gap-2"
+                    >
+                        <Plus className="w-4 h-4" /> Crear Primera Lista
+                    </button>
+                </div>
+            );
+        }
+
+        const effectiveListId = (selectedListId === 'all' || !projectLists.some(l => l.id === selectedListId)) ? projectLists[0].id : selectedListId;
+        const activeCustomList = projectLists.find(l => l.id === effectiveListId) || projectLists[0];
 
         // Filter todos based on selected list and search
         let displayedTodos = projectTodos.filter(t => {
-            if (!isAllLists) {
-                if (t.list_id !== selectedListId) return false;
-            }
+            if (t.list_id !== effectiveListId) return false;
             if (!listasSearch.trim()) return true;
             return t.text.toLowerCase().includes(listasSearch.toLowerCase());
         });
@@ -3392,23 +3437,23 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 assigned_to: assigneeValue,
                 dueDate: newItemDueDate || undefined,
                 kanban_column: 'Por hacer',
-                list_id: !isAllLists ? selectedListId : undefined
+                list_id: effectiveListId
             });
             setNewItemTitle('');
             setNewItemDueDate('');
         };
 
         const handleShareListSummary = () => {
-            const listTasks = isAllLists ? projectTodos : projectTodos.filter(t => t.list_id === selectedListId);
+            const listTasks = projectTodos.filter(t => t.list_id === effectiveListId);
             const pendingCount = listTasks.filter(t => !t.completed).length;
             const completedCount = listTasks.filter(t => t.completed).length;
-            const listName = isAllLists ? 'Todas las tareas del proyecto' : (activeCustomList?.name || 'Lista');
+            const listName = activeCustomList?.name || 'Lista';
             
-            let summaryText = `📋 **Lista: ${listName}** (${activeProject.name})\n`;
-            summaryText += `📊 **Resumen:** ${completedCount} Tareas completadas | ${pendingCount} Pendientes\n\n`;
-            summaryText += `**Tareas Clave:**\n`;
+            let summaryText = `**Lista: ${listName}** (${activeProject.name})\n`;
+            summaryText += `Resumen: ${completedCount} completadas | ${pendingCount} pendientes\n\n`;
+            summaryText += `**Tareas:**\n`;
             listTasks.slice(0, 8).forEach(t => {
-                const statusBadge = t.completed ? '✅' : '📌';
+                const statusBadge = t.completed ? '[Completado]' : '[Pendiente]';
                 const assignee = t.assigned_to || t.assignee;
                 const assigneeText = assignee ? `@${assignee.split('@')[0]}` : 'Sin Asignar';
                 const col = t.kanban_column || (t.completed ? 'Completado' : 'Por hacer');
@@ -3436,7 +3481,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 updateTodo(t.id, { list_id: null as any });
             });
 
-            setSelectedListId('all');
+            if (updatedLists.length > 0) {
+                setSelectedListId(updatedLists[0].id);
+            }
         };
 
         return (
@@ -3444,28 +3491,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 {/* Lists Navigation Tabs Bar */}
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#111] p-3 rounded-2xl border border-gray-200/60 dark:border-gray-800/80 shadow-2xs">
                     <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
-                        <button
-                            onClick={() => setSelectedListId('all')}
-                            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-                                selectedListId === 'all'
-                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800'
-                            }`}
-                        >
-                            <LayoutGrid className="w-3.5 h-3.5" />
-                            <span>Todas las Tareas (Tablero)</span>
-                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                                selectedListId === 'all'
-                                    ? 'bg-gray-700 dark:bg-gray-200 text-white dark:text-gray-900'
-                                    : 'bg-gray-200 dark:bg-zinc-800 text-gray-600 dark:text-gray-400'
-                            }`}>
-                                {projectTodos.length}
-                            </span>
-                        </button>
-
                         {projectLists.map(list => {
                             const count = projectTodos.filter(t => t.list_id === list.id).length;
-                            const isSelected = selectedListId === list.id;
+                            const isSelected = effectiveListId === list.id;
                             return (
                                 <div key={list.id} className="flex items-center">
                                     <button
@@ -3499,7 +3527,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {!isAllLists && activeCustomList && (
+                        {activeCustomList && (
                             <>
                                 <button
                                     onClick={() => setIsAddBoardTaskModalOpen(true)}
@@ -3531,12 +3559,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <div className="space-y-1">
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                 <List className="w-4 h-4 text-blue-500" />
-                                {isAllLists ? 'Lista General de Tareas (Tablero)' : activeCustomList?.name}
+                                {activeCustomList?.name}
                             </h3>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {isAllLists 
-                                    ? 'Todas las tareas creadas aquí aparecen en el tablero Kanban como "Por hacer" y están sincronizadas.'
-                                    : (activeCustomList?.description || 'Tareas asignadas a esta lista. Todas las tareas creadas aquí se reflejan en el tablero Kanban.')}
+                                {activeCustomList?.description || 'Tareas asignadas a esta lista. Todas las tareas creadas aquí se reflejan en el tablero Kanban.'}
                             </p>
                         </div>
                         <div className="text-xs text-gray-400 font-medium">
