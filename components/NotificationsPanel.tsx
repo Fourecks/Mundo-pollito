@@ -17,23 +17,50 @@ interface NotificationsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   isMobile?: boolean;
-  
+  currentUserEmail?: string | null;
   invitations?: ProjectInvitation[];
   onAcceptInvitation?: (invitationId: string) => Promise<void>;
   onDeclineInvitation?: (invitationId: string) => Promise<void>;
+  pushPreferences?: any;
+  onUpdatePushPreferences?: any;
+  isSubscribed?: boolean;
+  isPermissionBlocked?: boolean;
+  onToggleSubscription?: any;
+  dailyEncouragementHour?: number | null;
+  onSetDailyEncouragement?: (hour: number | null) => void;
+  dailySummaryHour?: number | null;
+  onSetDailySummary?: (hour: number | null) => void;
+  onSendTestNotification?: () => void;
 }
 
 const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
     const { 
         isOpen, 
         onClose, 
+        currentUserEmail,
         invitations = [], 
         onAcceptInvitation, 
         onDeclineInvitation
     } = props;
 
-    const pendingInvitations = invitations.filter(inv => inv.status === 'pending');
-    const pastInvitations = invitations.filter(inv => inv.status !== 'pending');
+    // Only show invitations where the current user is the recipient (not the sender)
+    const userEmail = (currentUserEmail || '').toLowerCase().trim();
+    const receivedInvitations = invitations.filter(inv => {
+        const invitee = (inv.invitee_email || inv.receiver_email || '').toLowerCase().trim();
+        const sender = (inv.sender_email || inv.inviter_email || '').toLowerCase().trim();
+        
+        // If current user is sender and NOT receiver, do not show as received
+        if (sender === userEmail && invitee !== userEmail) return false;
+        
+        // If current user is invitee/receiver, show it
+        if (invitee === userEmail) return true;
+        
+        // Fallback: if no userEmail set, show pending
+        return !userEmail;
+    });
+
+    const pendingInvitations = receivedInvitations.filter(inv => inv.status === 'pending');
+    const pastInvitations = receivedInvitations.filter(inv => inv.status !== 'pending');
 
     const [activeTab, setActiveTab] = useState<'notifications' | 'invitations'>(
         pendingInvitations.length > 0 ? 'invitations' : 'notifications'
@@ -46,15 +73,16 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[90000] flex justify-end bg-black/20 backdrop-blur-sm" 
+                    transition={{ duration: 0.2 }}
+                    className="fixed inset-0 z-[90000] flex justify-end bg-black/30 backdrop-blur-sm" 
                     onClick={onClose}
                 >
                     <motion.div 
-                        initial={{ x: '100%' }}
-                        animate={{ x: 0 }}
-                        exit={{ x: '100%' }}
-                        transition={{ type: 'tween', duration: 0.3 }}
-                        className="w-full max-w-sm h-full bg-white dark:bg-[#0a0a0a] border-l border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden shadow-xl"
+                        initial={{ x: '100%', opacity: 0.5 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: '100%', opacity: 0 }}
+                        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+                        className="w-full max-w-sm h-full bg-white dark:bg-[#0a0a0a] border-l border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden shadow-2xl"
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Header */}

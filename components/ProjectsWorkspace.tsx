@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem } from '../types';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem, Priority } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
 import { useHuddle } from '../src/context/HuddleContext';
 import { 
@@ -87,7 +87,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [sprintTaskPriority, setSprintTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [sprintTaskAssignee, setSprintTaskAssignee] = useState<string>('');
 
-    const handleAddSprintTask = (e: React.FormEvent, sprintId?: string) => {
+    const handleAddSprintTask = async (e: React.FormEvent, sprintId?: string) => {
         e.preventDefault();
         if (!sprintTaskText.trim()) return;
         if (!activeProject) return;
@@ -95,20 +95,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const targetSprintId = sprintId || selectedSprintId;
         if (!targetSprintId) return;
 
-        const newTodo: ProjectTodo = {
-            id: crypto.randomUUID(),
-            project_id: activeProject.id,
-            text: sprintTaskText.trim(),
-            completed: false,
-            priority: sprintTaskPriority,
-            story_points: Number(sprintTaskSP) || 1,
-            assignee_email: sprintTaskAssignee || currentUserEmail,
-            kanban_column: 'Por hacer',
+        await addTodo(sprintTaskText.trim(), {
+            projectId: activeProject.id,
             sprint_id: targetSprintId,
-            created_at: new Date().toISOString()
-        };
-        const updated = [newTodo, ...(activeProject.todos || [])];
-        onUpdateProject(activeProject.id, { todos: updated });
+            story_points: Number(sprintTaskSP) || 1,
+            priority: sprintTaskPriority,
+            assignee: sprintTaskAssignee || currentUserEmail,
+            kanban_column: 'Por hacer'
+        });
         setSprintTaskText('');
     };
 
@@ -1146,7 +1140,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 <input
                                                     type="checkbox"
                                                     checked={task.completed}
-                                                    onChange={() => onToggleTodo(task.id)}
+                                                    onChange={() => updateTodo(task.id, { completed: !task.completed })}
                                                     className="rounded border-gray-300 text-blue-600 focus:ring-0 cursor-pointer w-4 h-4"
                                                 />
                                                 <span className={`truncate ${task.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-gray-100 font-medium'}`}>
@@ -1161,8 +1155,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 ) : null}
                                                 <button
                                                     onClick={() => {
-                                                        const updated = (activeProject.todos || []).map(t => t.id === task.id ? { ...t, sprint_id: undefined } : t);
-                                                        onUpdateProject(activeProject.id, { todos: updated });
+                                                        updateTodo(task.id, { sprint_id: null as any });
                                                     }}
                                                     className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
                                                     title="Quitar del sprint"
@@ -1197,8 +1190,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             </div>
                                             <button
                                                 onClick={() => {
-                                                    const updated = (activeProject.todos || []).map(t => t.id === task.id ? { ...t, sprint_id: currentSprint.id } : t);
-                                                    onUpdateProject(activeProject.id, { todos: updated });
+                                                    updateTodo(task.id, { sprint_id: currentSprint.id });
                                                 }}
                                                 className="px-2.5 py-1 bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors shadow-2xs shrink-0"
                                             >
@@ -4390,7 +4382,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                     <input
                                                         type="checkbox"
                                                         checked={t.completed}
-                                                        onChange={() => onToggleTodo(t.id)}
+                                                        onChange={() => updateTodo(t.id, { completed: !t.completed })}
                                                         className="rounded border-gray-300 text-blue-600 focus:ring-0 cursor-pointer"
                                                     />
                                                     <span className={`truncate font-medium ${t.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
@@ -4404,8 +4396,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         value={t.story_points || 1}
                                                         onChange={e => {
                                                             const newSP = Number(e.target.value);
-                                                            const updated = (activeProject.todos || []).map(item => item.id === t.id ? { ...item, story_points: newSP } : item);
-                                                            onUpdateProject(activeProject.id, { todos: updated });
+                                                            updateTodo(t.id, { story_points: newSP });
                                                         }}
                                                         className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[10px] font-mono px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 focus:outline-none"
                                                         title="Editar Story Points"
@@ -4419,8 +4410,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                     <button
                                                         type="button"
                                                         onClick={() => {
-                                                            const updated = (activeProject.todos || []).map(item => item.id === t.id ? { ...item, sprint_id: undefined } : item);
-                                                            onUpdateProject(activeProject.id, { todos: updated });
+                                                            updateTodo(t.id, { sprint_id: null as any });
                                                         }}
                                                         className="text-[10px] text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900"
                                                         title="Quitar del Sprint (Mover a Backlog)"
@@ -4447,8 +4437,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        const updated = (activeProject.todos || []).map(item => item.id === t.id ? { ...item, sprint_id: viewSprintModal.id } : item);
-                                                        onUpdateProject(activeProject.id, { todos: updated });
+                                                        updateTodo(t.id, { sprint_id: viewSprintModal.id });
                                                     }}
                                                     className="shrink-0 px-2 py-0.5 bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-semibold rounded hover:bg-gray-800 transition-colors"
                                                 >

@@ -60,7 +60,10 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
     todos: new Set([
         'id', 'user_id', 'created_at', 'text', 'completed', 'priority', 'due_date', 
         'end_date', 'start_time', 'end_time', 'notes', 'project_id', 'gcal_event_id', 
-        'recurrence', 'reminder_offset', 'reminder_at', 'notification_sent'
+        'recurrence', 'reminder_offset', 'reminder_at', 'notification_sent',
+        'kanban_column', 'story_points', 'sprint_id', 'milestone_id', 'tags',
+        'dependencies', 'comments', 'attachments', 'assignee', 'calendar_provider',
+        'calendar_event_link', 'notion_page_id', 'notion_url'
     ]),
     subtasks: new Set([
         'id', 'todo_id', 'created_at', 'text', 'completed'
@@ -69,7 +72,14 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'id', 'user_id', 'created_at', 'name', 'description', 'emoji', 'color', 
         'is_archived', 'status', 'priority', 'start_date', 'target_date', 'lead', 
         'kanban_columns', 'sprints', 'milestones', 'docs', 'inbox', 'activities', 
-        'members', 'template_type', 'goal_id'
+        'members', 'template_type', 'goal_id', 'channels', 'chat_messages', 'polls',
+        'huddles', 'expenses', 'time_entries', 'doc_folders', 'quarterly_priorities',
+        'lists', 'todos'
+    ]),
+    project_invitations: new Set([
+        'id', 'project_id', 'project_name', 'project_emoji', 'project_color',
+        'inviter_id', 'inviter_name', 'inviter_email', 'sender_id', 'sender_email',
+        'invitee_email', 'receiver_email', 'status', 'created_at'
     ]),
     folders: new Set([
         'id', 'user_id', 'created_at', 'name'
@@ -95,6 +105,9 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
     ]),
     user_backgrounds: new Set([
         'id', 'user_id', 'name', 'path', 'type', 'is_favorite', 'created_at'
+    ]),
+    ai_conversations: new Set([
+        'id', 'user_id', 'created_at', 'title', 'messages'
     ]),
 };
 

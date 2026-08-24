@@ -845,6 +845,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       <NotificationsPanel
         isOpen={isNotificationsPanelOpen}
         onClose={() => setIsNotificationsPanelOpen(false)}
+        currentUserEmail={currentUser?.email}
         invitations={projectInvitations}
         onAcceptInvitation={onAcceptInvitation}
         onDeclineInvitation={onDeclineInvitation}
@@ -1643,6 +1644,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 isOpen={isNotificationsPanelOpen}
                 onClose={() => setIsNotificationsPanelOpen(false)}
                 isMobile={true}
+                currentUserEmail={currentUser?.email}
                 invitations={projectInvitations}
                 onAcceptInvitation={onAcceptInvitation}
                 onDeclineInvitation={onDeclineInvitation}
@@ -2591,6 +2593,13 @@ const App: React.FC = () => {
     sprint_id?: string | null;
     milestone_id?: string | null;
     story_points?: number | null;
+    kanban_column?: string | null;
+    assignee?: string | null;
+    assigned_to?: string | null;
+    tags?: string[];
+    dependencies?: number[];
+    comments?: any[];
+    attachments?: any[];
   }) => {
     if (!user) return;
 
@@ -2617,6 +2626,12 @@ const App: React.FC = () => {
         sprint_id: options?.sprint_id,
         milestone_id: options?.milestone_id,
         story_points: options?.story_points,
+        kanban_column: options?.kanban_column || 'Por hacer',
+        assignee: options?.assignee || options?.assigned_to || null,
+        tags: options?.tags || [],
+        dependencies: options?.dependencies || [],
+        comments: options?.comments || [],
+        attachments: options?.attachments || [],
     };
     
     // Optimistic UI update
