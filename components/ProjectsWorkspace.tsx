@@ -310,7 +310,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             projects.forEach(p => {
                 if (p.members) {
                     p.members.forEach(m => {
-                        if (m.email && m.email !== 'tu_correo@ejemplo.com' && (m.email.toLowerCase().includes(term) || m.name.toLowerCase().includes(term))) {
+                        if (m.email && m.email !== currentUserEmail && (m.email.toLowerCase().includes(term) || m.name.toLowerCase().includes(term))) {
                             usersMap.set(m.email, { name: m.name, email: m.email, avatar: m.avatar });
                         }
                     });
@@ -560,8 +560,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             id: crypto.randomUUID(),
             project_id: activeProject.id,
             channel_id: shareTargetChannelId,
-            sender_name: 'Tú',
-            sender_email: 'tu_correo@ejemplo.com',
+            sender_name: currentUserName,
+            sender_email: currentUserEmail,
             text: shareComment.trim() 
                 ? `${shareComment.trim()}\n\n📄 **Documento compartido:** [${doc.title}]`
                 : `Ha compartido una referencia del documento: **${doc.title}**`,
@@ -822,7 +822,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {[
                             { id: 'overview', label: 'Resumen', icon: Activity },
                             { id: 'kanban', label: 'Tablero', icon: AlignLeft },
-                            { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: (projectTodos.length || 0) },
+                            { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: (activeProject.lists?.length || 0) },
                             { id: 'sprints', label: 'Sprints', icon: Target },
                             { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                             { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
@@ -1843,8 +1843,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 id: crypto.randomUUID(),
                 project_id: activeProject.id,
                 channel_id: currentChannel.id,
-                sender_name: 'Tú',
-                sender_email: 'tu_correo@ejemplo.com',
+                sender_name: currentUserName,
+                sender_email: currentUserEmail,
                 text: chatText.trim(),
                 created_at: new Date().toISOString(),
                 reply_to: replyingToMessage ? {
@@ -1878,8 +1878,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 id: crypto.randomUUID(),
                 project_id: activeProject.id,
                 channel_id: currentChannel.id,
-                sender_name: 'Tú',
-                sender_email: 'tu_correo@ejemplo.com',
+                sender_name: currentUserName,
+                sender_email: currentUserEmail,
                 text: threadInputText.trim(),
                 created_at: new Date().toISOString(),
                 thread_id: activeThreadMessage.id
@@ -2023,7 +2023,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     voters: []
                 })),
                 allow_multiple: newPollAllowMultiple,
-                created_by: 'Tú',
+                created_by: currentUserName,
                 created_at: new Date().toISOString()
             };
 
@@ -2033,8 +2033,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 id: crypto.randomUUID(),
                 project_id: activeProject.id,
                 channel_id: currentChannel.id,
-                sender_name: 'Tú',
-                sender_email: 'tu_correo@ejemplo.com',
+                sender_name: currentUserName,
+                sender_email: currentUserEmail,
                 text: `🗳️ ENCUESTA DE EQUIPO: ${newPollQuestion.trim()}\nResponde directamente haciendo clic en las opciones.`,
                 created_at: new Date().toISOString(),
                 poll_id: pollId
@@ -2053,7 +2053,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         };
 
         const handleVoteOption = (pollId: string, optionId: string) => {
-            const userEmail = 'tu_correo@ejemplo.com';
+            const userEmail = currentUserEmail;
             const updatedPolls = activePolls.map(poll => {
                 if (poll.id !== pollId) return poll;
 
@@ -2081,7 +2081,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         };
 
         const handleReactToMessage = (messageId: string, emoji: string) => {
-            const userEmail = 'tu_correo@ejemplo.com';
+            const userEmail = currentUserEmail;
             const updatedMessages = messages.map(msg => {
                 if (msg.id !== messageId) return msg;
 
@@ -2123,8 +2123,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             } else {
                 startHuddle(activeProject.id, activeProject.name, currentChannel.id, currentChannel.name, activeProject.emoji);
                 const updatedHuddles = activeHuddles.some(h => h.channel_id === currentChannel.id)
-                    ? activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: true, started_at: new Date().toISOString(), participants: [{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] } : h)
-                    : [...activeHuddles, { id: crypto.randomUUID(), project_id: activeProject.id, channel_id: currentChannel.id, active: true, started_at: new Date().toISOString(), participants: [{ name: 'Tú', email: 'tu_correo@ejemplo.com', has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] }];
+                    ? activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: true, started_at: new Date().toISOString(), participants: [{ name: currentUserName, email: currentUserEmail, has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] } : h)
+                    : [...activeHuddles, { id: crypto.randomUUID(), project_id: activeProject.id, channel_id: currentChannel.id, active: true, started_at: new Date().toISOString(), participants: [{ name: currentUserName, email: currentUserEmail, has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] }];
                 onUpdateProject(activeProject.id, { huddles: updatedHuddles });
             }
         };
@@ -2140,13 +2140,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {/* Sidebar Header */}
                         <div className="p-4 border-b border-gray-100 dark:border-gray-800/80 flex items-center justify-between">
                             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Canales de Equipo</span>
-                            <button 
-                                onClick={() => setIsCreateChannelOpen(true)}
-                                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors text-blue-600 dark:text-blue-400"
-                                title="Crear nuevo canal"
-                            >
-                                <Plus className="w-4 h-4" />
-                            </button>
+                            {isProjectCreator && (
+                                <button 
+                                    onClick={() => setIsCreateChannelOpen(true)}
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors text-blue-600 dark:text-blue-400"
+                                    title="Crear nuevo canal"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
 
                         {/* Active Global Huddle Banner */}
@@ -2221,7 +2223,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             )}
 
                                             {/* Edit & Delete Action Triggers */}
-                                            {chan.id !== 'general' && (
+                                            {chan.id !== 'general' && isProjectCreator && (
                                                 <div className="hidden group-hover/chan:flex items-center gap-0.5">
                                                     <button 
                                                         onClick={(e) => {
@@ -2451,7 +2453,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     ) : (
                                         channelMessages.map(msg => {
                                             const isSystem = msg.sender_name.includes('Sistema');
-                                            const isUser = msg.sender_email === 'tu_correo@ejemplo.com';
+                                            const isUser = msg.sender_email === currentUserEmail;
                                             const reactions = msg.reactions || {};
                                             const isPinned = msg.is_pinned;
 
@@ -2520,7 +2522,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                     {poll.options.map(opt => {
                                                                         const totalPollVotes = poll.options.reduce((sum, o) => sum + o.voters.length, 0);
                                                                         const percentage = totalPollVotes > 0 ? Math.round((opt.voters.length / totalPollVotes) * 100) : 0;
-                                                                        const userVoted = opt.voters.includes('tu_correo@ejemplo.com');
+                                                                        const userVoted = opt.voters.includes(currentUserEmail);
 
                                                                         return (
                                                                             <div 
@@ -2552,7 +2554,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                                     <div className="relative z-10 text-[9px] text-gray-400 mt-1 flex flex-wrap gap-1 items-center">
                                                                                         <span className="font-semibold text-gray-500">Votado por:</span>
                                                                                         {opt.voters.map((v, i) => (
-                                                                                            <span key={i} className="px-1 py-0.2 bg-gray-100 dark:bg-gray-800 rounded">{v === 'tu_correo@ejemplo.com' ? 'Tú' : v.split('@')[0]}</span>
+                                                                                            <span key={i} className="px-1 py-0.2 bg-gray-100 dark:bg-gray-800 rounded">{v === currentUserEmail ? 'Tú' : v.split('@')[0]}</span>
                                                                                         ))}
                                                                                     </div>
                                                                                 )}
@@ -2598,7 +2600,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                             {/* Map and alternate interactive reactions */}
                                                             {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
                                                                 const voters = reactions[emoji] || [];
-                                                                const hasReacted = voters.includes('tu_correo@ejemplo.com');
+                                                                const hasReacted = voters.includes(currentUserEmail);
                                                                 if (voters.length === 0) return null;
 
                                                                 return (
@@ -2627,7 +2629,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         <div className="flex items-center gap-0.5 border-r border-gray-100 dark:border-gray-800/80 pr-1.5 mr-1">
                                                             {['👍', '❤️', '🔥', '🎉', '🚀', '👀'].map(emoji => {
                                                                 const voters = reactions[emoji] || [];
-                                                                const hasReacted = voters.includes('tu_correo@ejemplo.com');
+                                                                const hasReacted = voters.includes(currentUserEmail);
                                                                 return (
                                                                     <button
                                                                         key={emoji}
@@ -3361,17 +3363,33 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         <span className="text-[10px] text-gray-400 font-mono">{m.email}</span>
                                     </div>
                                 </div>
-                                <span className={`text-[10px] px-2.5 py-1 rounded-md font-semibold tracking-wide ${
-                                    isOwner 
-                                        ? 'bg-gray-900/10 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-900/20 dark:border-white/20' 
-                                        : m.role === 'pending'
-                                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
-                                        : m.role === 'lead'
-                                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                                        : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
-                                }`}>
-                                    {isOwner ? 'Propietario / Creador' : m.role === 'pending' ? 'Invitación Pendiente' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
-                                </span>
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-[10px] px-2.5 py-1 rounded-md font-semibold tracking-wide ${
+                                        isOwner 
+                                            ? 'bg-gray-900/10 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-900/20 dark:border-white/20' 
+                                            : m.role === 'pending'
+                                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
+                                            : m.role === 'lead'
+                                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
+                                    }`}>
+                                        {isOwner ? 'Propietario / Creador' : m.role === 'pending' ? 'Invitación Pendiente' : m.role === 'lead' ? 'Líder de Proyecto' : 'Colaborador'}
+                                    </span>
+                                    {isProjectCreator && !isOwner && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm(`¿Estás seguro de eliminar a ${m.name || m.email} de los colaboradores? Perderá acceso a este proyecto.`)) {
+                                                    const updatedMembers = (activeProject.members || []).filter((mem: any) => mem.email !== m.email);
+                                                    onUpdateProject(activeProject.id, { members: updatedMembers });
+                                                }
+                                            }}
+                                            className="p-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors"
+                                            title="Eliminar Colaborador"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
@@ -4176,8 +4194,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         const newTime = {
                             id: crypto.randomUUID(),
                             project_id: activeProject.id,
-                            user_email: 'tu_correo@ejemplo.com',
-                            user_name: 'Tú',
+                            user_email: currentUserEmail,
+                            user_name: currentUserName,
                             duration_minutes: totalMinutes,
                             date: date || new Date().toISOString().split('T')[0],
                             description: desc || 'Trabajo general',

@@ -1159,6 +1159,16 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     };
 
     const handleOpenProjectEditor = (project: Project) => {
+        if (!currentUser) return;
+        const ownerEmail = project.owner_email || project.members?.find((m: any) => m.role === 'owner')?.email;
+        const isOwner = currentUser.id === project.user_id || 
+          (currentUser.email && ownerEmail && currentUser.email.toLowerCase() === ownerEmail.toLowerCase());
+        
+        if (!isOwner) {
+            alert('Solo el propietario o creador del proyecto puede modificar su configuración o cambiar el nombre.');
+            return;
+        }
+
         setProjectToEdit(project);
         setIsProjectEditorOpen(true);
     };
