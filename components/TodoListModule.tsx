@@ -334,23 +334,9 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                 <div className="flex items-center gap-1 bg-black/5 dark:bg-black/20 p-0.5 rounded-lg">
                     <button
                         onClick={() => { setActiveTab('tasks'); setViewingProject(null); }}
-                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                            activeTab === 'tasks'
-                                ? 'bg-white dark:bg-gray-800 text-primary-dark dark:text-primary shadow-xs'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                        }`}
+                        className={`px-4 py-1 text-xs font-bold rounded-md transition-all bg-white dark:bg-gray-800 text-primary-dark dark:text-primary shadow-xs`}
                     >
                         Tareas
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('projects')}
-                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                            activeTab === 'projects'
-                                ? 'bg-white dark:bg-gray-800 text-primary-dark dark:text-primary shadow-xs'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                    >
-                        Mis Proyectos ({projects.filter(p => !p.is_archived).length})
                     </button>
                 </div>
             </div>

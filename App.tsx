@@ -1105,9 +1105,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           onSyncToCalendar={onSyncToCalendar}
         />
         {(activeSpotifyTrack || activeTrack) && (
-            <ModalWindow isOpen onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} frameless isDraggable isResizable zIndex={getWindowZIndex('spotify')} onFocus={() => bringToFront('spotify')} className="w-[320px] h-[352px]" windowState={windowStatesRef.current.spotify} onStateChange={s => handleWindowStateChange('spotify', s)}>
-                <SpotifyFloatingPlayer track={activeSpotifyTrack || activeTrack!} onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} />
-            </ModalWindow>
+            <SpotifyFloatingPlayer 
+              track={activeSpotifyTrack || activeTrack!} 
+              onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} 
+            />
         )}
         <ProjectEditorPanel
           isOpen={isProjectEditorOpen}

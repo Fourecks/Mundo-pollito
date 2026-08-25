@@ -445,7 +445,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
         onMouseDown={() => onFocus?.()}
         style={computedStyle}
         className={`
-          ${!frameless ? 'bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden' : 'relative flex flex-col'}
+          ${!frameless ? `bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}` : 'relative flex flex-col'}
           ${!isCustomPlaced ? (className || 'w-[92vw] max-w-3xl h-[80vh]') : ''}
           ${!isCustomPlaced ? 'animate-deploy' : ''}
           pointer-events-auto select-auto

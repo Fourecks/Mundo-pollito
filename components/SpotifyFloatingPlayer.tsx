@@ -1,148 +1,168 @@
-import React, { useState, useContext } from 'react';
-import { GripHorizontal } from 'lucide-react';
-import { ModalWindowContext } from './ModalWindow';
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Playlist } from '../types';
-import CloseIcon from './icons/CloseIcon';
+import { ChevronUp, ChevronDown, Music, X } from 'lucide-react';
 
 interface SpotifyFloatingPlayerProps {
-    track: Playlist;
-    onClose: () => void;
+  track: Playlist;
+  onClose: () => void;
 }
 
-const SpotifyIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-.1.2-1.02-.36-.18-.6.36-1.02.96-1.2 4.2-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z" />
-    </svg>
-);
-
 const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, onClose }) => {
-    const spotifyId = track.source_id || track.id;
-    const embedUrl = `https://open.spotify.com/embed/${track.type}/${spotifyId}?utm_source=generator`;
-    const isTrack = track.type === 'track';
-    const playerHeight = isTrack ? 152 : 352;
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-    const [sessionConfirmed, setSessionConfirmed] = useState<boolean>(() => {
-        return localStorage.getItem('spotify_session_active') === 'true';
-    });
+  const spotifyId = track.source_id || track.id;
+  const embedUrl = `https://open.spotify.com/embed/${track.type}/${spotifyId}?utm_source=generator`;
 
-    const handleOpenSpotifyLogin = () => {
-        window.open('https://accounts.spotify.com/login', '_blank');
-    };
-
-    const handleConfirmSession = () => {
-        localStorage.setItem('spotify_session_active', 'true');
-        setSessionConfirmed(true);
-    };
-
-    const { startInteraction } = useContext(ModalWindowContext);
-
-    const handleRequireLogin = () => {
-        localStorage.removeItem('spotify_session_active');
-        setSessionConfirmed(false);
-    };
-
-    if (!sessionConfirmed) {
-        return (
-            <div className="w-full h-full bg-[#121212] border border-white/10 text-white rounded-2xl p-5 shadow-2xl flex flex-col justify-center">
-                <div className="relative">
-                    <div 
-                        className="absolute -top-3 -left-3 p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-move z-50"
-                        onMouseDown={(e) => startInteraction?.(e, 'drag')}
-                        onTouchStart={(e) => startInteraction?.(e, 'drag')}
-                        title="Mover reproductor"
-                    >
-                        <GripHorizontal className="w-4 h-4" />
+  return (
+    <div className="fixed bottom-6 right-6 z-[100] pointer-events-none">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="pointer-events-auto relative group/player flex flex-col items-end"
+      >
+        <AnimatePresence mode="wait">
+          {!isCollapsed ? (
+            <motion.div
+              key="expanded"
+              initial={{ height: 100, opacity: 0, scale: 0.95 }}
+              animate={{ height: 'auto', opacity: 1, scale: 1 }}
+              exit={{ height: 100, opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden w-[320px]"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-slate-100/50 dark:border-slate-800/50">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Music className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate leading-none mb-1">
+                      {track.name}
+                    </h3>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3].map(i => (
+                          <motion.div 
+                            key={i}
+                            animate={{ height: [3, 8, 3] }}
+                            transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
+                            className="w-0.5 bg-emerald-500/60 rounded-full"
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tight">Escuchando</span>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="absolute -top-3 -right-3 p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer z-50"
-                        aria-label="Cerrar"
-                    >
-                        <CloseIcon />
-                    </button>
-
-                    <div className="flex items-center gap-2.5 mb-3">
-                        <div className="text-[#1DB954]">
-                            <SpotifyIcon className="w-6 h-6" />
-                        </div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-[#1DB954]">Spotify</span>
-                    </div>
-
-                    <h4 className="text-base font-bold text-white mb-1.5 leading-snug">
-                        Inicia sesión en Spotify
-                    </h4>
-
-                    <p className="text-xs text-gray-300 mb-4 leading-relaxed">
-                        Para escuchar canciones completas y tus listas guardadas sin la restricción de 30 segundos de muestra, inicia sesión con tu cuenta de Spotify.
-                    </p>
-
-                    <div className="flex flex-col gap-2">
-                        <button
-                            onClick={handleOpenSpotifyLogin}
-                            className="w-full bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold py-2.5 px-4 rounded-full text-xs transition-colors shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                            <span>Iniciar sesión en Spotify</span>
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                        </button>
-
-                        <button
-                            onClick={handleConfirmSession}
-                            className="w-full bg-transparent hover:bg-white/5 text-gray-300 hover:text-white border border-white/20 py-2 px-4 rounded-full text-xs font-semibold transition-colors cursor-pointer"
-                        >
-                            Ya inicié sesión / Reproducir
-                        </button>
-                    </div>
+                  </div>
                 </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="w-full h-full relative group">
-            <iframe
-                title="Spotify Player"
-                src={embedUrl}
-                width="100%"
-                height="100%"
-                frameBorder="0"
-                allowFullScreen
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                referrerPolicy="no-referrer-when-downgrade"
-                loading="lazy"
-                className="rounded-2xl shadow-2xl"
-            ></iframe>
-            <div className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-50">
-                <div 
-                    className="p-1 text-white/80 hover:text-white transition-all bg-black/60 rounded-full backdrop-blur-sm cursor-move flex items-center justify-center"
-                    onMouseDown={(e) => startInteraction?.(e, 'drag')}
-                    onTouchStart={(e) => startInteraction?.(e, 'drag')}
-                    style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8))' }}
-                    title="Mover reproductor"
-                >
-                    <GripHorizontal className="w-4 h-4" />
-                </div>
-            </div>
-            <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-50">
-                <button
-                    onClick={handleRequireLogin}
-                    title="Iniciar sesión en Spotify en nueva ventana"
-                    className="p-1 bg-black/60 text-white/80 hover:text-white rounded-full text-[10px] px-2 backdrop-blur-sm transition-colors cursor-pointer"
-                >
-                    Login Spotify
-                </button>
-                <button
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    onClick={() => setIsCollapsed(true)}
+                    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                    title="Minimizar"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                  <button 
                     onClick={onClose}
-                    className="p-1 text-white/80 hover:text-white focus:text-white transition-all bg-black/60 rounded-full backdrop-blur-sm cursor-pointer"
-                    style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8))' }}
-                    aria-label="Cerrar reproductor de Spotify"
-                >
-                    <CloseIcon />
-                </button>
-            </div>
-        </div>
-    );
+                    className="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                    title="Cerrar"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-0 bg-black aspect-[3/3.5] min-h-[300px]">
+                <iframe
+                  ref={iframeRef}
+                  src={embedUrl}
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  allowFullScreen
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  title="Spotify Player"
+                />
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="collapsed"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="flex flex-col items-end"
+            >
+              {/* Hover card that pops up */}
+              <div className="hidden group-hover/player:block absolute bottom-full right-0 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-300 pointer-events-none">
+                  <div className="bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 rounded-3xl shadow-2xl p-4 w-[280px]">
+                      <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <img 
+                              src={track.thumbnail_url || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&h=100&fit=crop'} 
+                              alt="" 
+                              className="w-14 h-14 rounded-2xl shadow-lg object-cover"
+                            />
+                            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+                                <Music className="w-3 h-3 text-white" />
+                            </div>
+                          </div>
+                          <div className="flex-grow overflow-hidden">
+                              <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 truncate mb-1">{track.name}</h4>
+                              <div className="flex items-center gap-2">
+                                  <div className="flex gap-0.5">
+                                      {[1, 2, 3].map(i => (
+                                          <motion.div 
+                                            key={i}
+                                            animate={{ height: [4, 12, 4] }}
+                                            transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.2 }}
+                                            className="w-0.5 bg-emerald-500 rounded-full"
+                                          />
+                                      ))}
+                                  </div>
+                                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">En curso</span>
+                              </div>
+                          </div>
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); setIsCollapsed(false); }}
+                              className="p-2.5 rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 transition-all active:scale-95 pointer-events-auto cursor-pointer"
+                          >
+                              <ChevronUp className="w-5 h-5" />
+                          </button>
+                      </div>
+                  </div>
+              </div>
+
+              {/* Small static pill */}
+              <button
+                onClick={() => setIsCollapsed(false)}
+                className="flex items-center gap-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 p-2.5 pl-2.5 pr-5 rounded-[22px] shadow-xl hover:shadow-2xl transition-all hover:border-emerald-500/50 group active:scale-95 cursor-pointer pointer-events-auto"
+              >
+                <div className="w-11 h-11 rounded-2xl overflow-hidden relative shadow-md">
+                  <img 
+                    src={track.thumbnail_url || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100&h=100&fit=crop'} 
+                    alt="" 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-emerald-500/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                     <ChevronUp className="w-6 h-6 text-white drop-shadow-md" />
+                  </div>
+                </div>
+                <div className="text-left">
+                  <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-1.5 opacity-80">Música</p>
+                  <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate max-w-[140px] leading-none">
+                    {track.name}
+                  </p>
+                </div>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
 };
 
 export default SpotifyFloatingPlayer;

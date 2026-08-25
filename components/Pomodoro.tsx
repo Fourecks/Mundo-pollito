@@ -290,8 +290,8 @@ const Pomodoro: React.FC<PomodoroProps> = ({
               {/* Popover list */}
               {isDropdownOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
-                  <div className="absolute left-0 right-0 top-full mt-1 z-50 max-h-48 overflow-y-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 py-1 animate-pop-in custom-scrollbar">
+                  <div className="fixed inset-0 z-[60]" onClick={() => setIsDropdownOpen(false)} />
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-[70] max-h-56 overflow-y-auto bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl border border-slate-200/90 dark:border-slate-700/80 rounded-xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 py-1 animate-pop-in custom-scrollbar">
                     <button
                       type="button"
                       onClick={() => {

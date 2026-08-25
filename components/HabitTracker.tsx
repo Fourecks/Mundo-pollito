@@ -838,8 +838,8 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                       </div>
                     </div>
 
-                    <div className="habit-weekly-view-container w-full overflow-x-auto custom-scrollbar -mx-1 px-1 py-1">
-                      <div className="flex items-center justify-between min-w-[310px] sm:min-w-[330px] gap-1.5 px-0.5">
+                    <div className="habit-weekly-view-container w-full py-1">
+                      <div className="grid grid-cols-7 gap-1 sm:gap-1.5 px-0.5">
                         {weekDates.map((date, index) => {
                           const dateKey = formatDateKey(date);
                           const isFuture = date.getTime() > todayObj.getTime();
