@@ -563,6 +563,20 @@ export interface GCalSettings {
 }
 // --- End Calendar Integration Types ---
 
+export interface AppNotification {
+  id: string;
+  type: 'chat';
+  title: string;
+  body: string;
+  senderName?: string;
+  projectName: string;
+  projectId: number;
+  channelId: string;
+  isPrivate: boolean;
+  timestamp: string;
+  read: boolean;
+}
+
 // Centralized YouTube IFrame API type definitions.
 declare global {
   namespace YT {
@@ -604,5 +618,14 @@ declare global {
     };
     // OneSignal SDK
     OneSignal: any;
+    __currentActiveChannelContext?: {
+      projectId: number;
+      channelId: string | null;
+      isOpen: boolean;
+    };
+    __pendingProjectChannel?: {
+      projectId: number;
+      channelId: string;
+    };
   }
 }

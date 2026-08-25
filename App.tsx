@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectMember, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences } from './types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectMember, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences, AppNotification } from './types';
 import { DEFAULT_PUSH_PREFERENCES, syncPreferencesToOneSignal, sendPushNotification, sendSampleNotificationForEvent, NotificationEventType } from './services/pushNotificationService';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
@@ -433,6 +434,30 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [isProjectEditorOpen, setIsProjectEditorOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const pomodoroStartedRef = useRef(false);
+
+  useEffect(() => {
+    const handleRedirect = (e: Event) => {
+      const customEvent = e as CustomEvent<{ projectId: number; channelId: string }>;
+      const { projectId } = customEvent.detail;
+      
+      // Open projects window
+      setOpenWindows(prev => {
+        if (prev.includes('projects')) return prev;
+        return [...prev, 'projects'];
+      });
+
+      // Focus/bringToFront
+      bringToFront('projects');
+
+      // Set viewing project ID
+      setViewingProjectId(projectId);
+    };
+
+    window.addEventListener('app-redirect-project-channel', handleRedirect);
+    return () => {
+      window.removeEventListener('app-redirect-project-channel', handleRedirect);
+    };
+  }, [bringToFront]);
 
   const handleOpenProjectCreator = () => {
     setProjectToEdit(null);
@@ -868,6 +893,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         dailySummaryHour={uiSettings?.dailySummaryHour ?? null}
         onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
         onSendTestNotification={handleNotificationAction}
+        notifications={notifications}
+        onNotificationClick={handleNotificationClick}
+        onClearNotifications={handleClearNotifications}
+        onMarkNotificationRead={handleMarkNotificationRead}
+        onDeleteNotification={handleDeleteNotification}
       />
       
       <div className="fixed top-0 bottom-0 left-0 w-4 z-[70000] app-left-sidebar-trigger-area hidden md:block"></div>
@@ -1135,6 +1165,19 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [viewingProjectId, setViewingProjectId] = useState<number | null>(null);
     const [isProjectEditorOpen, setIsProjectEditorOpen] = useState(false);
     const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
+
+    useEffect(() => {
+      const handleRedirect = (e: Event) => {
+        const customEvent = e as CustomEvent<{ projectId: number; channelId: string }>;
+        const { projectId } = customEvent.detail;
+        setViewingProjectId(projectId);
+      };
+
+      window.addEventListener('app-redirect-project-channel', handleRedirect);
+      return () => {
+        window.removeEventListener('app-redirect-project-channel', handleRedirect);
+      };
+    }, []);
     
     // Main Daily Goal for Mobile
     const todayGoalKey = new Date().toLocaleDateString('en-CA');
@@ -1681,6 +1724,11 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 dailySummaryHour={uiSettings?.dailySummaryHour ?? null}
                 onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
                 onSendTestNotification={handleNotificationAction}
+                notifications={notifications}
+                onNotificationClick={handleNotificationClick}
+                onClearNotifications={handleClearNotifications}
+                onMarkNotificationRead={handleMarkNotificationRead}
+                onDeleteNotification={handleDeleteNotification}
             />
             <AddTaskModal
                 isOpen={isAddTaskModalOpen}
@@ -1738,6 +1786,63 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             />
 
             <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
+
+            {/* Custom bottom-left sliding notifications toasts */}
+            <div className="fixed bottom-4 left-4 z-[99999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+                <AnimatePresence>
+                    {toastNotifications.map((toast) => (
+                        <motion.div
+                            key={toast.id}
+                            initial={{ x: -300, opacity: 0, scale: 0.9 }}
+                            animate={{ x: 0, opacity: 1, scale: 1 }}
+                            exit={{ x: -300, opacity: 0, scale: 0.9 }}
+                            transition={{ type: 'spring', damping: 22, stiffness: 220 }}
+                            onClick={() => handleNotificationClick(toast)}
+                            className="pointer-events-auto w-full bg-white dark:bg-[#111] text-gray-900 dark:text-white border border-gray-200 dark:border-zinc-800 rounded-xl shadow-2xl p-3.5 flex gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-900/40 select-none transition-all duration-200 border-l-4 border-l-blue-500"
+                        >
+                            <div className="flex-shrink-0 mt-0.5">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shadow-sm ${
+                                    toast.isPrivate
+                                        ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400'
+                                        : 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+                                }`}>
+                                    {toast.isPrivate ? (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-lock"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-square"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex-grow min-w-0 pr-4">
+                                <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 font-medium truncate">
+                                    <span>📁 {toast.projectName}</span>
+                                    <span>•</span>
+                                    <span>#{toast.isPrivate ? 'privado' : toast.channelId}</span>
+                                </div>
+
+                                <h5 className="text-xs font-semibold mt-0.5 truncate text-gray-900 dark:text-gray-100">
+                                    {toast.isPrivate ? 'Nuevo mensaje de canal' : toast.senderName || 'Usuario'}
+                                </h5>
+
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 leading-relaxed">
+                                    {toast.isPrivate ? 'Mensaje en canal privado (se requiere contraseña)' : toast.body}
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
+                                }}
+                                className="flex-shrink-0 self-start p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded hover:bg-gray-100 dark:hover:bg-zinc-800"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </button>
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
+            </div>
         </div>
     );
 };
@@ -1804,6 +1909,43 @@ const App: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+
+  // Context synchronization for real-time notifications
+  const openWindowsRef = useRef<WindowType[]>([]);
+  const viewingProjectIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    openWindowsRef.current = openWindows;
+  }, [openWindows]);
+
+  useEffect(() => {
+    viewingProjectIdRef.current = viewingProjectId;
+  }, [viewingProjectId]);
+
+  // Notifications State
+  const [toastNotifications, setToastNotifications] = useState<AppNotification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  // Load and save persistent notifications for current user
+  useEffect(() => {
+    if (user?.email) {
+      try {
+        const saved = localStorage.getItem(`app_notifications_${user.email}`);
+        setNotifications(saved ? JSON.parse(saved) : []);
+      } catch (e) {
+        setNotifications([]);
+      }
+    } else {
+      setNotifications([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user?.email) {
+      localStorage.setItem(`app_notifications_${user.email}`, JSON.stringify(notifications));
+    }
+  }, [notifications, user]);
+
   const [projectInvitations, setProjectInvitations] = useState<ProjectInvitation[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitRecords, setHabitRecords] = useState<HabitRecord[]>([]);
@@ -2479,6 +2621,72 @@ const App: React.FC = () => {
 
             if (belongs) {
               setProjects(prev => {
+                const oldProj = prev.find(p => p.id === updateProj.id);
+                if (oldProj && oldProj.chat_messages && updateProj.chat_messages) {
+                  const oldMsgIds = new Set(oldProj.chat_messages.filter(m => m && m.id).map(m => m.id));
+                  const newMessages = updateProj.chat_messages.filter(m => m && m.id && !oldMsgIds.has(m.id));
+
+                  if (newMessages.length > 0) {
+                    newMessages.forEach(msg => {
+                      const isMe = (msg.sender_email && user?.email && msg.sender_email.toLowerCase() === user.email.toLowerCase()) || 
+                                   (msg.sender_id && user?.id && msg.sender_id === user.id);
+                      if (!isMe) {
+                        const chanId = msg.channel_id || 'general';
+                        const channelObj = updateProj.channels?.find(c => c.id === chanId);
+                        const isPrivate = channelObj ? channelObj.is_private : false;
+
+                        // Check if active context is watching this channel
+                        const isProjectsOpen = openWindowsRef.current.includes('projects');
+                        const isProjectsFocused = focusedWindowRef.current === 'projects';
+                        const activeContext = (window as any).__currentActiveChannelContext;
+
+                        const isActivelyViewingChannel = 
+                          isProjectsOpen && 
+                          isProjectsFocused && 
+                          activeContext && 
+                          activeContext.isOpen && 
+                          activeContext.projectId === updateProj.id && 
+                          activeContext.channelId === chanId;
+
+                        if (!isActivelyViewingChannel) {
+                          const notificationId = msg.id || `${Date.now()}-${Math.random()}`;
+                          const senderName = msg.sender_name || msg.sender_email?.split('@')[0] || 'Usuario';
+                          const newNotif: AppNotification = {
+                            id: notificationId,
+                            type: 'chat',
+                            title: isPrivate ? 'Mensaje privado' : `Nuevo mensaje en #${chanId}`,
+                            body: msg.text || '',
+                            senderName: senderName,
+                            projectName: updateProj.name || 'Proyecto',
+                            projectId: updateProj.id,
+                            channelId: chanId,
+                            isPrivate: isPrivate,
+                            timestamp: msg.created_at || new Date().toISOString(),
+                            read: false
+                          };
+
+                          // 1. Add to persistent notifications list
+                          setNotifications(currentNotifs => {
+                            if (currentNotifs.some(n => n.id === notificationId)) return currentNotifs;
+                            return [newNotif, ...currentNotifs];
+                          });
+
+                          // 2. Add to active floating toasts list
+                          setToastNotifications(currentToasts => {
+                            if (currentToasts.some(t => t.id === notificationId)) return currentToasts;
+                            return [...currentToasts, newNotif];
+                          });
+
+                          // 3. Auto-remove toast after 6 seconds
+                          setTimeout(() => {
+                            setToastNotifications(currentToasts => currentToasts.filter(t => t.id !== notificationId));
+                          }, 6000);
+                        }
+                      }
+                    });
+                  }
+                }
+
                 return prev.map(p => p.id === updateProj.id ? { ...p, ...updateProj } : p)
                   .sort((a, b) => a.name.localeCompare(b.name));
               });
@@ -3605,6 +3813,37 @@ const App: React.FC = () => {
       console.log('Push notification invocation note:', err);
     }
   }, [user]);
+
+  const handleNotificationClick = useCallback((notif: AppNotification) => {
+    // 1. Mark as read
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    
+    // 2. Set pending redirect
+    (window as any).__pendingProjectChannel = {
+      projectId: notif.projectId,
+      channelId: notif.channelId
+    };
+
+    // 3. Dispatch the redirection event globally
+    window.dispatchEvent(new CustomEvent('app-redirect-project-channel', {
+      detail: { projectId: notif.projectId, channelId: notif.channelId }
+    }));
+
+    // 4. Dismiss toast if clicked from a toast
+    setToastNotifications(prev => prev.filter(t => t.id !== notif.id));
+  }, []);
+
+  const handleMarkNotificationRead = useCallback((id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  }, []);
+
+  const handleDeleteNotification = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  const handleClearNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
 
   const handleAcceptInvitation = useCallback(async (invitationId: string) => {
     const invitation = projectInvitations.find(i => i.id === invitationId);

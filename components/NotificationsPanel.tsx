@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import CloseIcon from './icons/CloseIcon';
 import BellIcon from './icons/BellIcon';
-import { ProjectInvitation } from '../types';
+import { ProjectInvitation, AppNotification } from '../types';
 import { 
     Check, 
     X, 
     Users, 
     Mail, 
-    Clock
+    Clock,
+    Trash2,
+    MessageSquare,
+    Lock
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -31,6 +34,11 @@ interface NotificationsPanelProps {
   dailySummaryHour?: number | null;
   onSetDailySummary?: (hour: number | null) => void;
   onSendTestNotification?: () => void;
+  notifications?: AppNotification[];
+  onNotificationClick?: (notification: AppNotification) => void;
+  onClearNotifications?: () => void;
+  onMarkNotificationRead?: (id: string) => void;
+  onDeleteNotification?: (id: string) => void;
 }
 
 const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
@@ -40,7 +48,12 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
         currentUserEmail,
         invitations = [], 
         onAcceptInvitation, 
-        onDeclineInvitation
+        onDeclineInvitation,
+        notifications = [],
+        onNotificationClick,
+        onClearNotifications,
+        onMarkNotificationRead,
+        onDeleteNotification
     } = props;
 
     // Only show invitations where the current user is the recipient (not the sender)
@@ -137,8 +150,116 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = (props) => {
                         <main className="flex-grow p-4 overflow-y-auto custom-scrollbar space-y-4">
                             {/* TAB: NOTIFICATIONS */}
                             {activeTab === 'notifications' && (
-                                <div className="text-center py-10 text-gray-400 text-xs">
-                                    No hay actividad reciente.
+                                <div className="space-y-3">
+                                    {notifications.length === 0 ? (
+                                        <div className="text-center py-10 text-gray-400 text-xs">
+                                            No hay actividad reciente.
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {onClearNotifications && (
+                                                <div className="flex justify-end">
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onClearNotifications();
+                                                        }}
+                                                        className="text-[10px] text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 font-semibold transition-colors flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-900"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                        Limpiar todas
+                                                    </button>
+                                                </div>
+                                            )}
+                                            
+                                            <div className="space-y-2.5">
+                                                {notifications.map((notif) => {
+                                                    const formattedDate = (() => {
+                                                        try {
+                                                            return format(parseISO(notif.timestamp), 'HH:mm, d MMM', { locale: es });
+                                                        } catch (err) {
+                                                            return '';
+                                                        }
+                                                    })();
+
+                                                    return (
+                                                        <div
+                                                            key={notif.id}
+                                                            onClick={() => onNotificationClick && onNotificationClick(notif)}
+                                                            className={`group relative p-3 rounded-xl border transition-all duration-200 cursor-pointer select-none flex gap-3 ${
+                                                                notif.read
+                                                                    ? 'bg-gray-50/50 dark:bg-[#0c0c0c]/50 border-gray-100 dark:border-zinc-900 text-gray-600 dark:text-gray-400'
+                                                                    : 'bg-white dark:bg-[#111] border-gray-200 dark:border-zinc-800 shadow-sm text-gray-900 dark:text-gray-100 border-l-4 border-l-blue-500'
+                                                            }`}
+                                                        >
+                                                            <div className="flex-shrink-0 mt-0.5">
+                                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shadow-sm ${
+                                                                    notif.isPrivate
+                                                                        ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400'
+                                                                        : 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+                                                                }`}>
+                                                                    {notif.isPrivate ? (
+                                                                        <Lock className="w-4 h-4" />
+                                                                    ) : (
+                                                                        <MessageSquare className="w-4 h-4" />
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex-grow min-w-0 pr-6">
+                                                                <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 font-medium truncate">
+                                                                    <span>📁 {notif.projectName}</span>
+                                                                    <span>•</span>
+                                                                    <span>#{notif.isPrivate ? 'privado' : notif.channelId}</span>
+                                                                </div>
+
+                                                                <h5 className={`text-xs font-semibold mt-0.5 truncate ${notif.read ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100'}`}>
+                                                                    {notif.isPrivate ? 'Nuevo mensaje de canal' : notif.senderName || 'Usuario'}
+                                                                </h5>
+
+                                                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 leading-relaxed">
+                                                                    {notif.isPrivate ? 'Mensaje en canal privado (se requiere contraseña)' : notif.body}
+                                                                </p>
+
+                                                                <span className="text-[9px] text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-1 font-medium">
+                                                                    <Clock className="w-2.5 h-2.5" />
+                                                                    {formattedDate}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Action buttons (always visible on hover or mobile) */}
+                                                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                                                                {!notif.read && onMarkNotificationRead && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            onMarkNotificationRead(notif.id);
+                                                                        }}
+                                                                        title="Marcar como leído"
+                                                                        className="p-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-500 hover:text-blue-600 transition-colors"
+                                                                    >
+                                                                        <Check className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                )}
+                                                                {onDeleteNotification && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            onDeleteNotification(notif.id);
+                                                                        }}
+                                                                        title="Eliminar notificación"
+                                                                        className="p-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-500 hover:text-red-600 transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
 

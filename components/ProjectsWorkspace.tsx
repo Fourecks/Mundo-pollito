@@ -417,6 +417,95 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }).length;
     }, [activeProject, lastReadTimes, currentUserEmail]);
 
+    // Tracking tab visit times per project
+    const [tabsLastVisitedTimes, setTabsLastVisitedTimes] = useState<Record<string, string>>(() => {
+        try {
+            const saved = localStorage.getItem(`project_tabs_last_visited_${currentUserEmail}_${activeProject?.id || 'none'}`);
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
+        }
+    });
+
+    useEffect(() => {
+        if (!activeProject || !currentUserEmail) return;
+        const key = `project_tabs_last_visited_${currentUserEmail}_${activeProject.id}`;
+        let saved: Record<string, string> = {};
+        try {
+            const savedStr = localStorage.getItem(key);
+            saved = savedStr ? JSON.parse(savedStr) : {};
+        } catch {}
+
+        // Mark current activeTab as visited now
+        const now = new Date().toISOString();
+        saved[activeTab] = now;
+        localStorage.setItem(key, JSON.stringify(saved));
+        setTabsLastVisitedTimes(saved);
+    }, [activeProject?.id, activeTab, currentUserEmail]);
+
+    // Calculate unread counts for all other tabs based on when they were last visited and if they were created by another user
+    const unreadTabCounts = useMemo(() => {
+        const counts: Record<string, number> = {
+            listas: 0,
+            docs: 0,
+            expenses: 0,
+            time: 0,
+        };
+
+        if (!activeProject) return counts;
+
+        const checkIsOtherUser = (email?: string | null) => {
+            if (!email) return false;
+            return email.toLowerCase() !== currentUserEmail?.toLowerCase();
+        };
+
+        // 1. Listas (new lists created by others)
+        if (activeProject.lists) {
+            const lastVisited = tabsLastVisitedTimes['listas'];
+            counts.listas = activeProject.lists.filter(list => {
+                const isOther = checkIsOtherUser(list.created_by);
+                if (!isOther) return false;
+                if (!lastVisited) return true;
+                return list.created_at > lastVisited;
+            }).length;
+        }
+
+        // 2. Docs (new docs created by others)
+        if (activeProject.docs) {
+            const lastVisited = tabsLastVisitedTimes['docs'];
+            counts.docs = activeProject.docs.filter(doc => {
+                const isOther = checkIsOtherUser(doc.created_by);
+                if (!isOther) return false;
+                if (!lastVisited) return true;
+                return doc.created_at > lastVisited;
+            }).length;
+        }
+
+        // 3. Expenses (new expenses created by others)
+        if (activeProject.expenses) {
+            const lastVisited = tabsLastVisitedTimes['expenses'];
+            counts.expenses = activeProject.expenses.filter(exp => {
+                const isOther = checkIsOtherUser(exp.created_by);
+                if (!isOther) return false;
+                if (!lastVisited) return true;
+                return exp.created_at > lastVisited;
+            }).length;
+        }
+
+        // 4. Time Entries (new time entries logged by others)
+        if (activeProject.time_entries) {
+            const lastVisited = tabsLastVisitedTimes['time'];
+            counts.time = activeProject.time_entries.filter(te => {
+                const isOther = checkIsOtherUser(te.user_email);
+                if (!isOther) return false;
+                if (!lastVisited) return true;
+                return te.created_at > lastVisited;
+            }).length;
+        }
+
+        return counts;
+    }, [activeProject, tabsLastVisitedTimes, currentUserEmail]);
+
     const realMembers = useMemo(() => {
         if (!activeProject) return [];
         const rawMembers = activeProject.members || [];
@@ -942,14 +1031,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {[
                             { id: 'overview', label: 'Resumen', icon: Activity },
                             { id: 'kanban', label: 'Tablero', icon: AlignLeft },
-                            { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: (activeProject.lists?.length || 0) },
+                            { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: unreadTabCounts.listas },
                             { id: 'sprints', label: 'Sprints', icon: Target },
                             { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
-                            { id: 'docs', label: 'Documentos', icon: FileText, badge: activeProject.docs?.length },
+                            { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs },
                             { id: 'chat', label: 'Canales', icon: MessageSquare, badge: unreadChatMessagesCount, isHuddle: isGlobalHuddleActive || (activeProject.huddles || []).some(h => h.active) },
-                            { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: activeProject.expenses?.length },
-                            { id: 'time', label: 'Tiempo', icon: Clock, badge: activeProject.time_entries?.length },
-                            { id: 'team', label: 'Equipo', icon: Users, badge: realMembers.length },
+                            { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
+                            { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time },
+                            { id: 'team', label: 'Equipo', icon: Users },
                         ].map(tab => (
                             <button
                                 key={tab.id}
@@ -3397,7 +3486,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <div className="flex items-center gap-3 mt-1">
                                         <span className="text-[10px] text-gray-400">{exp.date}</span>
                                         <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{exp.category}</span>
-                                        <span className="text-[10px] text-gray-400 text-ellipsis overflow-hidden">Por: {exp.created_by}</span>
+                                        <span className="text-[10px] text-gray-400 text-ellipsis overflow-hidden">
+                                            Por: {(() => {
+                                                if (!exp.created_by) return 'Desconocido';
+                                                if (exp.created_by === 'Tú' || (currentUserEmail && exp.created_by.toLowerCase() === currentUserEmail.toLowerCase())) {
+                                                    return 'Tú';
+                                                }
+                                                const member = realMembers.find(m => m.email && m.email.toLowerCase() === exp.created_by.toLowerCase());
+                                                return member ? member.name : exp.created_by;
+                                            })()}
+                                        </span>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -4362,7 +4460,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             date: date || new Date().toISOString().split('T')[0],
                             category: (cat || 'Other') as any,
                             created_at: new Date().toISOString(),
-                            created_by: 'Tú'
+                            created_by: currentUserEmail || 'Tú'
                         };
                         onUpdateProject(activeProject.id, { expenses: [newExp, ...(activeProject.expenses || [])] });
                         setIsExpenseModalOpen(false);
@@ -5070,6 +5168,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         description: newListDescription.trim(),
                         template_type: templateType,
                         created_at: new Date().toISOString(),
+                        created_by: currentUserEmail || undefined,
                         items: []
                     };
 
