@@ -635,6 +635,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // Handle channel redirection from notifications
     const pendingRedirectChannelRef = useRef<string | null>(null);
 
+    const applyPendingChannelRedirect = React.useCallback((targetChannelId?: string) => {
+        const chanId = targetChannelId || pendingRedirectChannelRef.current || (window as any).__pendingProjectChannel?.channelId;
+        if (chanId) {
+            setActiveTab('chat');
+            setSelectedChannelId(chanId);
+            pendingRedirectChannelRef.current = chanId;
+            try {
+                delete (window as any).__pendingProjectChannel;
+            } catch (e) {}
+        }
+    }, []);
+
+    React.useEffect(() => {
+        applyPendingChannelRedirect();
+    }, [activeProject?.id, applyPendingChannelRedirect]);
+
     React.useEffect(() => {
         const handleRedirect = (e: Event) => {
             const customEvent = e as CustomEvent<{ projectId: number; channelId: string }>;
@@ -654,18 +670,17 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         };
     }, []);
 
-    React.useEffect(() => {
-        if (pendingRedirectChannelRef.current) {
-            const targetChan = pendingRedirectChannelRef.current;
-            setActiveTab('chat');
-            setSelectedChannelId(targetChan);
-            pendingRedirectChannelRef.current = null;
-        }
-    }, [activeProject?.id]);
-
     // Handle channel selection synchronization
     React.useEffect(() => {
         if (activeChannels.length > 0) {
+            const pendingChan = pendingRedirectChannelRef.current;
+            if (pendingChan && activeChannels.some(c => c.id === pendingChan)) {
+                if (selectedChannelId !== pendingChan) {
+                    setSelectedChannelId(pendingChan);
+                }
+                return;
+            }
+
             const exists = activeChannels.some(c => c.id === selectedChannelId);
             if (!exists) {
                 setSelectedChannelId(activeChannels[0].id);
@@ -673,7 +688,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         } else {
             setSelectedChannelId('general');
         }
-    }, [activeProject, activeChannels]);
+    }, [activeProject, activeChannels, selectedChannelId]);
 
     // Scroll to bottom when opening chat or changing channel
     React.useEffect(() => {
@@ -3519,21 +3534,26 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{exp.category}</span>
                                         <span className="text-[10px] text-gray-400 text-ellipsis overflow-hidden">
                                             Por: {(() => {
+                                                const creatorEmail = exp.created_by;
+                                                const isMe = (currentUserEmail && creatorEmail && creatorEmail.toLowerCase() === currentUserEmail.toLowerCase()) || creatorEmail === 'Tú' || exp.created_by_name === 'Tú';
+                                                
+                                                if (isMe) {
+                                                    return "Tú";
+                                                }
+
                                                 if (exp.created_by_name && exp.created_by_name !== 'Tú') {
                                                     return exp.created_by_name;
                                                 }
-                                                if (!exp.created_by) return 'Desconocido';
-                                                const member = realMembers.find(m => m.email && m.email.toLowerCase() === exp.created_by.toLowerCase());
-                                                if (member && member.name) {
-                                                    return member.name;
+
+                                                if (creatorEmail && creatorEmail.includes('@')) {
+                                                    const member = realMembers.find(m => m.email && m.email.toLowerCase() === creatorEmail.toLowerCase());
+                                                    if (member && member.name) {
+                                                        return member.name;
+                                                    }
+                                                    return creatorEmail.split('@')[0];
                                                 }
-                                                if (exp.created_by.includes('@')) {
-                                                    return exp.created_by.split('@')[0];
-                                                }
-                                                if (exp.created_by === 'Tú') {
-                                                    return currentUserName;
-                                                }
-                                                return exp.created_by;
+
+                                                return creatorEmail || "Colaborador";
                                             })()}
                                         </span>
                                     </div>

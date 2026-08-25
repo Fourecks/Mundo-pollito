@@ -238,6 +238,7 @@ export interface ProjectHuddleParticipant {
   has_mic: boolean;
   has_video: boolean;
   has_screen: boolean;
+  stream?: MediaStream;
 }
 
 export interface ProjectHuddle {

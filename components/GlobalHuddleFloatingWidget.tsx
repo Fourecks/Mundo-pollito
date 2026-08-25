@@ -9,7 +9,7 @@ interface GlobalHuddleFloatingWidgetProps {
   onOpenProjectsWorkspace?: (projectId: number, channelId?: string) => void;
 }
 
-const VideoStream: React.FC<{ stream: MediaStream | null; isMirrored?: boolean }> = ({ stream, isMirrored = true }) => {
+const VideoStream: React.FC<{ stream: MediaStream | null; isMirrored?: boolean; muted?: boolean }> = ({ stream, isMirrored = true, muted = true }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ const VideoStream: React.FC<{ stream: MediaStream | null; isMirrored?: boolean }
       ref={videoRef}
       autoPlay
       playsInline
-      muted
+      muted={muted}
       className={`w-full h-full object-cover rounded-xl ${isMirrored ? 'scale-x-[-1]' : ''}`}
     />
   );
@@ -43,6 +43,8 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
     localVolume,
     speakingParticipants,
     huddleParticipants,
+    remoteStreams,
+    userEmail,
     isHuddleFullScreen,
     isFloatingMinimized,
     leaveHuddle,
@@ -243,32 +245,60 @@ export const GlobalHuddleFloatingWidget: React.FC<GlobalHuddleFloatingWidgetProp
 
                   {/* Video / Avatar Canvas */}
                   <div className="absolute inset-0 bg-slate-950 flex items-center justify-center overflow-hidden">
-                    {p.has_screen && p.name === 'Tú' && screenStream ? (
-                      <VideoStream stream={screenStream} isMirrored={false} />
-                    ) : p.has_video && p.name === 'Tú' && localStream ? (
-                      <VideoStream stream={localStream} isMirrored={true} />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center p-6 text-center">
-                        <div
-                          className={`w-24 h-24 rounded-full bg-slate-800 border-2 flex items-center justify-center text-3xl font-bold text-gray-200 transition-all duration-300 ${
-                            isSpeaking
-                              ? 'border-emerald-400 ring-8 ring-emerald-500/20 scale-105 shadow-[0_0_30px_rgba(16,185,129,0.4)]'
-                              : 'border-slate-700'
-                          }`}
-                        >
-                          {p.name.charAt(0).toUpperCase()}
+                    {(p.name === 'Tú' || (userEmail && p.email === userEmail)) ? (
+                      p.has_screen && screenStream ? (
+                        <VideoStream stream={screenStream} isMirrored={false} muted={true} />
+                      ) : p.has_video && localStream ? (
+                        <VideoStream stream={localStream} isMirrored={true} muted={true} />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-6 text-center">
+                          <div
+                            className={`w-24 h-24 rounded-full bg-slate-800 border-2 flex items-center justify-center text-3xl font-bold text-gray-200 transition-all duration-300 ${
+                              isSpeaking
+                                ? 'border-emerald-400 ring-8 ring-emerald-500/20 scale-105 shadow-[0_0_30px_rgba(16,185,129,0.4)]'
+                                : 'border-slate-700'
+                            }`}
+                          >
+                            {p.name.charAt(0).toUpperCase()}
+                          </div>
+                          <p className="text-xs font-semibold text-gray-400 mt-4 flex items-center gap-1.5">
+                            {isSpeaking ? (
+                              <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                                Hablando...
+                              </span>
+                            ) : (
+                              <span>{p.has_mic ? 'Micrófono activo' : 'Silenciado'}</span>
+                            )}
+                          </p>
                         </div>
-                        <p className="text-xs font-semibold text-gray-400 mt-4 flex items-center gap-1.5">
-                          {isSpeaking ? (
-                            <span className="text-emerald-400 font-bold flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                              Hablando...
-                            </span>
-                          ) : (
-                            <span>{p.has_mic ? 'Micrófono activo' : 'Silenciado'}</span>
-                          )}
-                        </p>
-                      </div>
+                      )
+                    ) : (
+                      (p.has_video || p.has_screen) && (remoteStreams[p.email] || p.stream) ? (
+                        <VideoStream stream={remoteStreams[p.email] || p.stream || null} isMirrored={false} muted={false} />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-6 text-center">
+                          <div
+                            className={`w-24 h-24 rounded-full bg-slate-800 border-2 flex items-center justify-center text-3xl font-bold text-gray-200 transition-all duration-300 ${
+                              isSpeaking
+                                ? 'border-emerald-400 ring-8 ring-emerald-500/20 scale-105 shadow-[0_0_30px_rgba(16,185,129,0.4)]'
+                                : 'border-slate-700'
+                            }`}
+                          >
+                            {p.name.charAt(0).toUpperCase()}
+                          </div>
+                          <p className="text-xs font-semibold text-gray-400 mt-4 flex items-center gap-1.5">
+                            {isSpeaking ? (
+                              <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                                Hablando...
+                              </span>
+                            ) : (
+                              <span>{p.has_mic ? 'Micrófono activo' : 'Silenciado'}</span>
+                            )}
+                          </p>
+                        </div>
+                      )
                     )}
                   </div>
 
