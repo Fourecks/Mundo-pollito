@@ -603,8 +603,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 file_type: doc.file_type || doc.category || 'Documento',
                 file_name: doc.file_name || doc.title,
                 file_size_formatted: formattedSize,
-                folder_name: folder ? folder.name : 'General',
-                url: doc.file_url
+                folder_name: folder ? folder.name : 'General'
             }
         };
 

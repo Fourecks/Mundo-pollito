@@ -145,6 +145,18 @@ const sanitizeForSupabase = (tableName: string, data: any) => {
         });
     }
 
+    // Defensive: Strip heavy base64 strings from chat_messages history if they exist
+    if (tableName === 'projects' && clean.chat_messages && Array.isArray(clean.chat_messages)) {
+        clean.chat_messages = clean.chat_messages.map((msg: any) => {
+            if (msg && msg.doc_reference && msg.doc_reference.url) {
+                const updatedMsg = { ...msg, doc_reference: { ...msg.doc_reference } };
+                delete updatedMsg.doc_reference.url; // Remove heavy dead weight base64 url
+                return updatedMsg;
+            }
+            return msg;
+        });
+    }
+
     return clean;
 };
 
