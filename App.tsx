@@ -49,8 +49,7 @@ import MotivationalToast from './components/MotivationalToast';
 import NotificationsPanel from './components/NotificationsPanel';
 import ProjectEditorPanel, { ProjectFormData } from './components/ProjectEditorPanel';
 import HabitTracker from './components/HabitTracker';
-import HabitEditorPanel, { HabitFormData } from './components/HabitEditorPanel';
-import { HabitRecordStatus } from './types';
+import HabitEditorPanel from './components/HabitEditorPanel';
 import ProgressView from './components/ProgressView';
 import { ProjectsWorkspace } from './components/ProjectsWorkspace';
 import { GlobalHuddleFloatingWidget } from './components/GlobalHuddleFloatingWidget';
@@ -306,13 +305,10 @@ interface AppComponentProps {
   handleDeleteProject: (projectId: number) => Promise<void>;
   handleDeleteProjectAndTasks: (projectId: number) => Promise<void>;
   handleArchiveProject: (projectId: number, isArchived: boolean) => Promise<void>;
-  handleAddHabit: (data: HabitFormData | { name: string; emoji: string; frequency: HabitFrequency }) => Promise<void>;
-  handleUpdateHabit: (habitId: number, data: Partial<HabitFormData> | string, emoji?: string | null, frequency?: HabitFrequency) => Promise<void>;
+  handleAddHabit: (name: string, emoji: string, frequency: HabitFrequency) => Promise<void>;
+  handleUpdateHabit: (habitId: number, name: string, emoji: string | null, frequency: HabitFrequency) => Promise<void>;
   handleDeleteHabit: (habitId: number) => Promise<void>;
   handleToggleHabitRecord: (habitId: number, date: string) => Promise<void>;
-  handleRecordHabitProgress?: (habitId: number, date: string, value: number, status?: HabitRecordStatus) => Promise<void>;
-  handleTogglePauseHabit?: (habitId: number) => Promise<void>;
-  handleToggleArchiveHabit?: (habitId: number) => Promise<void>;
   onOpenHabitCreator: () => void;
   onOpenHabitEditor: (habit: Habit) => void;
   handleAddPlaylist: (playlistData: Omit<Playlist, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
@@ -381,9 +377,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
-    handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord,
-    handleRecordHabitProgress, handleTogglePauseHabit, handleToggleArchiveHabit,
-    onOpenHabitCreator, onOpenHabitEditor,
+    handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator, onOpenHabitEditor,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
@@ -1014,9 +1008,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 onOpenHabitEditor={onOpenHabitEditor}
                 onDeleteHabit={handleDeleteHabit} 
                 onToggleRecord={handleToggleHabitRecord}
-                onRecordProgress={handleRecordHabitProgress}
-                onTogglePauseHabit={handleTogglePauseHabit}
-                onToggleArchiveHabit={handleToggleArchiveHabit}
               />
             </ModalWindow>
           )}
@@ -1154,9 +1145,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
-      handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord,
-      handleRecordHabitProgress, handleTogglePauseHabit, handleToggleArchiveHabit,
-      onOpenHabitCreator, onOpenHabitEditor,
+      handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator, onOpenHabitEditor,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
@@ -1557,9 +1546,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 onOpenHabitEditor={onOpenHabitEditor}
                                 onDeleteHabit={handleDeleteHabit} 
                                 onToggleRecord={handleToggleHabitRecord}
-                                onRecordProgress={handleRecordHabitProgress}
-                                onTogglePauseHabit={handleTogglePauseHabit}
-                                onToggleArchiveHabit={handleToggleArchiveHabit}
                             />
                         </div>
                     </div>
@@ -3966,72 +3952,36 @@ const App: React.FC = () => {
   };
   
   // --- Habit Handlers ---
-  const handleAddHabit = useCallback(async (data: HabitFormData | { name: string; emoji: string; frequency: HabitFrequency }) => {
+  const handleAddHabit = useCallback(async (name: string, emoji: string, frequency: HabitFrequency) => {
     if (!user) return;
     const tempId = -Date.now();
-    const fullData = data as HabitFormData;
     const newHabit: Habit = { 
         id: tempId, 
-        name: data.name, 
-        emoji: data.emoji || '✨', 
-        frequency: data.frequency,
-        category: fullData.category || null,
-        time_of_day: fullData.time_of_day || 'anytime',
-        habit_type: fullData.habit_type || 'boolean',
-        target_value: fullData.target_value ?? null,
-        target_unit: fullData.target_unit ?? null,
-        difficulty: fullData.difficulty || 'medium',
-        reminder_time: fullData.reminder_time || null,
-        reminder_enabled: fullData.reminder_enabled ?? false,
-        is_archived: false,
-        is_paused: false,
-        paused_at: null,
-        pause_reason: null,
+        name, 
+        emoji, 
+        frequency,
         user_id: user.id, 
         created_at: new Date().toISOString()
     };
     setHabits(h => [...h, newHabit]);
-    const payloadForDb = { ...newHabit, frequency: JSON.stringify(data.frequency) };
+    const payloadForDb = { ...newHabit, frequency: JSON.stringify(frequency) };
     const savedHabit = await syncableCreate('habits', payloadForDb) as any;
-    if (savedHabit && savedHabit.id !== tempId) {
-        const parsedSavedHabit: Habit = { 
-          ...savedHabit, 
-          frequency: typeof savedHabit.frequency === 'string' ? JSON.parse(savedHabit.frequency) : savedHabit.frequency 
-        };
+    if (savedHabit.id !== tempId) {
+        const parsedSavedHabit: Habit = { ...savedHabit, frequency: JSON.parse(savedHabit.frequency) };
         setHabits(h => h.map(item => item.id === tempId ? parsedSavedHabit : item));
     }
   }, [user]);
 
-  const handleUpdateHabit = async (habitId: number, data: Partial<HabitFormData> | string, maybeEmoji?: string | null, maybeFreq?: HabitFrequency) => {
+  const handleUpdateHabit = async (habitId: number, name: string, emoji: string | null, frequency: HabitFrequency) => {
       const habitToUpdate = habits.find(h => h.id === habitId);
       if(!habitToUpdate) return;
-
-      let updatedHabit: Habit;
-      if (typeof data === 'string') {
-        updatedHabit = {
-          ...habitToUpdate,
-          name: data,
-          emoji: maybeEmoji !== undefined ? maybeEmoji : habitToUpdate.emoji,
-          frequency: maybeFreq || habitToUpdate.frequency
-        };
-      } else {
-        updatedHabit = {
-          ...habitToUpdate,
-          ...data,
-          frequency: data.frequency || habitToUpdate.frequency
-        };
-      }
+      const updatedHabit: Habit = { ...habitToUpdate, name, emoji, frequency };
 
       setHabits(h => h.map(habit => habit.id === habitId ? updatedHabit : habit));
-      const payloadForDb = { ...updatedHabit, frequency: JSON.stringify(updatedHabit.frequency) };
+      const payloadForDb = { ...updatedHabit, frequency: JSON.stringify(frequency) };
       const savedHabit = await syncableUpdate('habits', payloadForDb) as any;
-      if (savedHabit) {
-        const parsedSavedHabit: Habit = { 
-          ...savedHabit, 
-          frequency: typeof savedHabit.frequency === 'string' ? JSON.parse(savedHabit.frequency) : savedHabit.frequency 
-        };
-        setHabits(h => h.map(habit => habit.id === habitId ? parsedSavedHabit : habit));
-      }
+      const parsedSavedHabit: Habit = { ...savedHabit, frequency: JSON.parse(savedHabit.frequency) };
+      setHabits(h => h.map(habit => habit.id === habitId ? parsedSavedHabit : habit));
   };
 
   const handleDeleteHabit = async (habitId: number) => {
@@ -4061,79 +4011,17 @@ const App: React.FC = () => {
                 id: tempId,
                 habit_id: habitId,
                 completed_at: date,
-                status: 'completed',
-                value: 1,
                 user_id: user.id
             };
             setHabitRecords(r => [...r, newRecord]);
             const savedRecord = await syncableCreate('habit_records', newRecord) as HabitRecord;
-            if (savedRecord && savedRecord.id !== tempId) {
+            if (savedRecord.id !== tempId) {
                 setHabitRecords(r => r.map(item => item.id === tempId ? savedRecord : item));
             }
         }
     } finally {
         setProcessingHabitRecord(null);
     }
-  };
-
-  const handleRecordHabitProgress = async (habitId: number, date: string, value: number, status: HabitRecordStatus = 'completed') => {
-    if (!user) return;
-    const existingRecord = habitRecords.find(r => r.habit_id === habitId && r.completed_at === date);
-    if (existingRecord) {
-      if (value <= 0 && status !== 'skipped') {
-        setHabitRecords(r => r.filter(item => item.id !== existingRecord.id));
-        await syncableDelete('habit_records', existingRecord.id);
-      } else {
-        const updated: HabitRecord = { ...existingRecord, value, status };
-        setHabitRecords(r => r.map(item => item.id === existingRecord.id ? updated : item));
-        await syncableUpdate('habit_records', updated);
-      }
-    } else {
-      if (value > 0 || status === 'skipped') {
-        const tempId = -Date.now();
-        const newRecord: HabitRecord = {
-          id: tempId,
-          habit_id: habitId,
-          completed_at: date,
-          status,
-          value,
-          user_id: user.id
-        };
-        setHabitRecords(r => [...r, newRecord]);
-        const saved = await syncableCreate('habit_records', newRecord) as HabitRecord;
-        if (saved && saved.id !== tempId) {
-          setHabitRecords(r => r.map(item => item.id === tempId ? saved : item));
-        }
-      }
-    }
-  };
-
-  const handleTogglePauseHabit = async (habitId: number) => {
-    const habit = habits.find(h => h.id === habitId);
-    if (!habit) return;
-    const isPausedNow = !habit.is_paused;
-    const updated: Habit = {
-      ...habit,
-      is_paused: isPausedNow,
-      paused_at: isPausedNow ? new Date().toISOString() : null,
-      pause_reason: isPausedNow ? (habit.pause_reason || 'Pausa temporal') : null
-    };
-    setHabits(h => h.map(item => item.id === habitId ? updated : item));
-    const payloadForDb = { ...updated, frequency: JSON.stringify(updated.frequency) };
-    await syncableUpdate('habits', payloadForDb);
-  };
-
-  const handleToggleArchiveHabit = async (habitId: number) => {
-    const habit = habits.find(h => h.id === habitId);
-    if (!habit) return;
-    const isArchivedNow = !habit.is_archived;
-    const updated: Habit = {
-      ...habit,
-      is_archived: isArchivedNow
-    };
-    setHabits(h => h.map(item => item.id === habitId ? updated : item));
-    const payloadForDb = { ...updated, frequency: JSON.stringify(updated.frequency) };
-    await syncableUpdate('habits', payloadForDb);
   };
 
   const handleOpenHabitCreator = () => {
@@ -4146,11 +4034,11 @@ const App: React.FC = () => {
     setIsHabitEditorOpen(true);
   };
   
-  const handleSaveHabit = (data: HabitFormData) => {
+  const handleSaveHabit = (name: string, emoji: string, frequency: HabitFrequency) => {
       if (habitToEdit) {
-          handleUpdateHabit(habitToEdit.id, data);
+          handleUpdateHabit(habitToEdit.id, name, emoji, frequency);
       } else {
-          handleAddHabit(data);
+          handleAddHabit(name, emoji, frequency);
       }
       setIsHabitEditorOpen(false);
       setHabitToEdit(null);
@@ -5045,29 +4933,11 @@ const App: React.FC = () => {
                   }
               }
           });
-          // Habit Reminders Check
-          if (habits && habits.length > 0) {
-            const todayStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
-            habits.forEach((habit: Habit) => {
-              if (habit.is_archived || habit.is_paused || !habit.reminder_enabled || !habit.reminder_time) return;
-              const habitReminderKey = `habit_${habit.id}_${habit.reminder_time}_${todayStr}`;
-              if (notifiedTaskIdsRef.current.has(habitReminderKey)) return;
-              const [rHour, rMinute] = habit.reminder_time.split(':').map(Number);
-              if (rHour === currentHour && Math.abs(rMinute - currentMinute) <= 1) {
-                notifiedTaskIdsRef.current.add(habitReminderKey);
-                sendPushNotification({
-                  title: `🌟 Recordatorio de Hábito`,
-                  message: `Momento para: ${habit.emoji || '✨'} ${habit.name}`,
-                  eventType: 'taskReminders'
-                }, uiSettings?.pushPreferences);
-              }
-            });
-          }
       };
 
       const interval = setInterval(checkTaskReminders, 30000);
       return () => clearInterval(interval);
-  }, [flatAllTodos, habits, isSubscribed, uiSettings?.pushPreferences]);
+  }, [flatAllTodos, isSubscribed, uiSettings?.pushPreferences]);
   
   if (authLoading || (user && !dataLoaded) || (user && !uiSettings)) {
     return (
@@ -5102,9 +4972,7 @@ const App: React.FC = () => {
     handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
     handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
     handleArchiveProject,
-    handleAddHabit, handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord,
-    handleRecordHabitProgress, handleTogglePauseHabit, handleToggleArchiveHabit,
-    onOpenHabitCreator: handleOpenHabitCreator, onOpenHabitEditor: handleOpenHabitEditor,
+    handleAddHabit, handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator: handleOpenHabitCreator, onOpenHabitEditor: handleOpenHabitEditor,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
