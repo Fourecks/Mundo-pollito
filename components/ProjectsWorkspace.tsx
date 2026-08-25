@@ -660,6 +660,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     setActiveTab('chat');
                     setSelectedChannelId(channelId);
                     pendingRedirectChannelRef.current = null;
+                    // Also clear global pending redirect to avoid "forcing" back to this channel
+                    try {
+                        delete (window as any).__pendingProjectChannel;
+                    } catch (e) {}
                 }
             }
         };
@@ -2472,8 +2476,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             } else {
                 startHuddle(activeProject.id, activeProject.name, currentChannel.id, currentChannel.name, activeProject.emoji);
                 const updatedHuddles = activeHuddles.some(h => h.channel_id === currentChannel.id)
-                    ? activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: true, started_at: new Date().toISOString(), participants: [{ name: currentUserName, email: currentUserEmail, has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] } : h)
-                    : [...activeHuddles, { id: crypto.randomUUID(), project_id: activeProject.id, channel_id: currentChannel.id, active: true, started_at: new Date().toISOString(), participants: [{ name: currentUserName, email: currentUserEmail, has_mic: isMicOn, has_video: isVideoOn, has_screen: isScreenSharing }] }];
+                    ? activeHuddles.map(h => h.channel_id === currentChannel.id ? { 
+                        ...h, 
+                        active: true, 
+                        started_at: h.started_at || new Date().toISOString(),
+                        participants: (h.participants || []).some(p => p.email === currentUserEmail) 
+                            ? h.participants 
+                            : [...(h.participants || []), { name: currentUserName, email: currentUserEmail, avatar: currentUser?.avatar_url || null, has_mic: true, has_video: false, has_screen: false }] 
+                      } : h)
+                    : [...activeHuddles, { 
+                        id: crypto.randomUUID(), 
+                        project_id: activeProject.id, 
+                        channel_id: currentChannel.id, 
+                        active: true, 
+                        started_at: new Date().toISOString(), 
+                        participants: [{ name: currentUserName, email: currentUserEmail, avatar: currentUser?.avatar_url || null, has_mic: true, has_video: false, has_screen: false }] 
+                      }];
                 onUpdateProject(activeProject.id, { huddles: updatedHuddles });
             }
         };

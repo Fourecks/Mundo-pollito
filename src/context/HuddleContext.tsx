@@ -79,6 +79,7 @@ export const HuddleProvider: React.FC<{
   const isMicOnRef = useRef(true);
   const isVideoOnRef = useRef(false);
   const isScreenSharingRef = useRef(false);
+  const activeHuddleRef = useRef<ActiveHuddleSession | null>(null);
   const lastHeartbeatRef = useRef<Map<string, number>>(new Map());
   const allSessionParticipantsRef = useRef<Set<string>>(new Set());
   const huddleStartTimeRef = useRef<number | null>(null);
@@ -96,6 +97,11 @@ export const HuddleProvider: React.FC<{
   }, [isScreenSharing]);
 
   const isHuddleActive = !!activeHuddle;
+
+  // Keep activeHuddleRef in sync for cleanup purposes
+  useEffect(() => {
+    activeHuddleRef.current = activeHuddle;
+  }, [activeHuddle]);
 
   // Audio analysis for local microphone meter & speaking detection
   const setUpAudioAnalysis = useCallback((stream: MediaStream) => {
@@ -402,6 +408,11 @@ export const HuddleProvider: React.FC<{
     channelName: string,
     projectEmoji?: string
   ) => {
+    // If already in a huddle, leave it first to cleanup resources
+    if (activeHuddleRef.current) {
+      leaveHuddle();
+    }
+
     // 1. Fetch current authenticated user info
     let myEmail = 'usuario@local.com';
     let myName = 'Tú';
@@ -433,6 +444,11 @@ export const HuddleProvider: React.FC<{
     setIsVideoOn(false);
     setIsScreenSharing(false);
     setIsFloatingMinimized(false);
+
+    // Update refs immediately to avoid stale state in signaling
+    isMicOnRef.current = true;
+    isVideoOnRef.current = false;
+    isScreenSharingRef.current = false;
 
     const initialParticipant: ProjectHuddleParticipant = {
       name: 'Tú',
@@ -658,30 +674,34 @@ export const HuddleProvider: React.FC<{
       onHuddleStateChange(projectId, channelId, stillActive, remainingParticipants);
     }
 
-    try {
-      window.dispatchEvent(
-        new CustomEvent('huddle-ended', {
-          detail: { projectId, channelId },
-        })
-      );
-      window.dispatchEvent(
-        new CustomEvent('huddle-call-summary', {
-          detail: {
-            projectId,
-            channelId,
-            durationText,
-            participantsStr,
-          },
-        })
-      );
-    } catch (e) {
-      console.log('Error dispatching huddle-ended event:', e);
+    // Only dispatch summary and huddle-ended events if the call is actually finished (no one else left)
+    if (!stillActive) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('huddle-ended', {
+            detail: { projectId, channelId },
+          })
+        );
+        window.dispatchEvent(
+          new CustomEvent('huddle-call-summary', {
+            detail: {
+              projectId,
+              channelId,
+              durationText,
+              participantsStr,
+            },
+          })
+        );
+      } catch (e) {
+        console.log('Error dispatching huddle-ended event:', e);
+      }
     }
   }, [activeHuddle, huddleParticipants, stopLocalStream, stopScreenStream, onHuddleStateChange]);
 
   const toggleMic = useCallback(() => {
     setIsMicOn((prev) => {
       const next = !prev;
+      isMicOnRef.current = next;
       if (localStreamRef.current) {
         localStreamRef.current.getAudioTracks().forEach((t) => {
           t.enabled = next;
@@ -713,6 +733,7 @@ export const HuddleProvider: React.FC<{
   const toggleVideo = useCallback(async () => {
     const next = !isVideoOn;
     setIsVideoOn(next);
+    isVideoOnRef.current = next;
     const stream = await syncMedia(isMicOn, next);
 
     if (realtimeChannelRef.current) {
@@ -736,6 +757,7 @@ export const HuddleProvider: React.FC<{
   const toggleScreenShare = useCallback(async () => {
     if (isScreenSharing) {
       stopScreenStream();
+      isScreenSharingRef.current = false;
       const activeStream = localStreamRef.current;
       updatePeerTracks(activeStream);
 
@@ -757,6 +779,7 @@ export const HuddleProvider: React.FC<{
         screenStreamRef.current = stream;
         setScreenStream(stream);
         setIsScreenSharing(true);
+        isScreenSharingRef.current = true;
 
         updatePeerTracks(stream);
 
@@ -775,6 +798,7 @@ export const HuddleProvider: React.FC<{
 
         stream.getVideoTracks()[0].onended = () => {
           stopScreenStream();
+          isScreenSharingRef.current = false;
           const activeLocalStream = localStreamRef.current;
           updatePeerTracks(activeLocalStream);
 
@@ -857,10 +881,10 @@ export const HuddleProvider: React.FC<{
         } catch (e) {}
       }
 
-      // Prune participants who haven't sent a heartbeat for > 25 seconds
+      // Prune participants who haven't sent a heartbeat for > 15 seconds
       const now = Date.now();
       lastHeartbeatRef.current.forEach((lastTime, email) => {
-        if (email !== userSessionRef.current.email && now - lastTime > 25000) {
+        if (email !== userSessionRef.current.email && now - lastTime > 15000) {
           lastHeartbeatRef.current.delete(email);
           setHuddleParticipants((prev) => prev.filter((p) => p.email !== email));
 
@@ -919,9 +943,12 @@ export const HuddleProvider: React.FC<{
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      leaveHuddle();
+      // Use a ref-based check to ensure we only leave if there's an active session during unmount
+      if (activeHuddleRef.current) {
+        leaveHuddle();
+      }
     };
-  }, [leaveHuddle]);
+  }, []); // Only on real unmount
 
   const currentSpeaker = useMemo(() => {
     if (isScreenSharing && screenStream) {
