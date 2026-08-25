@@ -352,6 +352,11 @@ interface AppComponentProps {
   pushPreferences: PushNotificationPreferences;
   onUpdatePushPreferences: (newPrefs: PushNotificationPreferences) => Promise<void>;
   onToggleSubscription: () => Promise<void>;
+  notifications: AppNotification[];
+  onNotificationClick: (notif: AppNotification) => void;
+  onClearNotifications: () => void;
+  onMarkNotificationRead: (id: string) => void;
+  onDeleteNotification: (id: string) => void;
   isPowerSavingActive: boolean;
   batteryStatus: any;
   focusSessions: FocusSession[];
@@ -384,6 +389,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     onSyncNotion,
     isSubscribed, isPermissionBlocked, handleNotificationAction,
     pushPreferences, onUpdatePushPreferences, onToggleSubscription,
+    notifications, onNotificationClick, onClearNotifications, onMarkNotificationRead, onDeleteNotification,
     isPowerSavingActive, batteryStatus,
     focusSessions, onLogFocusSession,
     projectInvitations, onSendInvitation, onAcceptInvitation, onDeclineInvitation
@@ -1146,6 +1152,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       onSyncNotion,
       isSubscribed, isPermissionBlocked, handleNotificationAction,
       pushPreferences, onUpdatePushPreferences, onToggleSubscription,
+      notifications, onNotificationClick, onClearNotifications, onMarkNotificationRead, onDeleteNotification,
       isPowerSavingActive, batteryStatus,
       focusSessions, onLogFocusSession,
       projectInvitations, onSendInvitation, onAcceptInvitation, onDeclineInvitation
@@ -1786,63 +1793,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             />
 
             <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
-
-            {/* Custom bottom-left sliding notifications toasts */}
-            <div className="fixed bottom-4 left-4 z-[99999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
-                <AnimatePresence>
-                    {toastNotifications.map((toast) => (
-                        <motion.div
-                            key={toast.id}
-                            initial={{ x: -300, opacity: 0, scale: 0.9 }}
-                            animate={{ x: 0, opacity: 1, scale: 1 }}
-                            exit={{ x: -300, opacity: 0, scale: 0.9 }}
-                            transition={{ type: 'spring', damping: 22, stiffness: 220 }}
-                            onClick={() => handleNotificationClick(toast)}
-                            className="pointer-events-auto w-full bg-white dark:bg-[#111] text-gray-900 dark:text-white border border-gray-200 dark:border-zinc-800 rounded-xl shadow-2xl p-3.5 flex gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-900/40 select-none transition-all duration-200 border-l-4 border-l-blue-500"
-                        >
-                            <div className="flex-shrink-0 mt-0.5">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shadow-sm ${
-                                    toast.isPrivate
-                                        ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400'
-                                        : 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
-                                }`}>
-                                    {toast.isPrivate ? (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-lock"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                                    ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-square"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="flex-grow min-w-0 pr-4">
-                                <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 font-medium truncate">
-                                    <span>📁 {toast.projectName}</span>
-                                    <span>•</span>
-                                    <span>#{toast.isPrivate ? 'privado' : toast.channelId}</span>
-                                </div>
-
-                                <h5 className="text-xs font-semibold mt-0.5 truncate text-gray-900 dark:text-gray-100">
-                                    {toast.isPrivate ? 'Nuevo mensaje de canal' : toast.senderName || 'Usuario'}
-                                </h5>
-
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 leading-relaxed">
-                                    {toast.isPrivate ? 'Mensaje en canal privado (se requiere contraseña)' : toast.body}
-                                </p>
-                            </div>
-
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
-                                }}
-                                className="flex-shrink-0 self-start p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded hover:bg-gray-100 dark:hover:bg-zinc-800"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                            </button>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
-            </div>
         </div>
     );
 };
@@ -1909,18 +1859,6 @@ const App: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-
-  // Context synchronization for real-time notifications
-  const openWindowsRef = useRef<WindowType[]>([]);
-  const viewingProjectIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    openWindowsRef.current = openWindows;
-  }, [openWindows]);
-
-  useEffect(() => {
-    viewingProjectIdRef.current = viewingProjectId;
-  }, [viewingProjectId]);
 
   // Notifications State
   const [toastNotifications, setToastNotifications] = useState<AppNotification[]>([]);
@@ -2636,13 +2574,9 @@ const App: React.FC = () => {
                         const isPrivate = channelObj ? channelObj.is_private : false;
 
                         // Check if active context is watching this channel
-                        const isProjectsOpen = openWindowsRef.current.includes('projects');
-                        const isProjectsFocused = focusedWindowRef.current === 'projects';
                         const activeContext = (window as any).__currentActiveChannelContext;
 
                         const isActivelyViewingChannel = 
-                          isProjectsOpen && 
-                          isProjectsFocused && 
                           activeContext && 
                           activeContext.isOpen && 
                           activeContext.projectId === updateProj.id && 
@@ -5041,6 +4975,11 @@ const App: React.FC = () => {
     pushPreferences: uiSettings?.pushPreferences || DEFAULT_PUSH_PREFERENCES,
     onUpdatePushPreferences: handleUpdatePushPreferences,
     onToggleSubscription: handleToggleSubscription,
+    notifications,
+    onNotificationClick: handleNotificationClick,
+    onClearNotifications: handleClearNotifications,
+    onMarkNotificationRead: handleMarkNotificationRead,
+    onDeleteNotification: handleDeleteNotification,
     gcalSettings, onGCalSettingsChange: handleGCalSettingsChange, userCalendars, calendarEvents,
     loadAndValidateCalendarData, onRemoveFromCalendar: handleRemoveFromCalendar, onSyncToCalendar: handleSyncToCalendar,
     onSyncNotion: handleSyncNotion,
@@ -5200,6 +5139,63 @@ const App: React.FC = () => {
         habitToEdit={habitToEdit}
       />
       <audio ref={ambientAudioRef} />
+
+      {/* Custom bottom-left sliding notifications toasts */}
+      <div className="fixed bottom-4 left-4 z-[99999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+          <AnimatePresence>
+              {toastNotifications.map((toast) => (
+                  <motion.div
+                      key={toast.id}
+                      initial={{ x: -300, opacity: 0, scale: 0.9 }}
+                      animate={{ x: 0, opacity: 1, scale: 1 }}
+                      exit={{ x: -300, opacity: 0, scale: 0.9 }}
+                      transition={{ type: 'spring', damping: 22, stiffness: 220 }}
+                      onClick={() => handleNotificationClick(toast)}
+                      className="pointer-events-auto w-full bg-white dark:bg-[#111] text-gray-900 dark:text-white border border-gray-200 dark:border-zinc-800 rounded-xl shadow-2xl p-3.5 flex gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-900/40 select-none transition-all duration-200 border-l-4 border-l-blue-500"
+                  >
+                      <div className="flex-shrink-0 mt-0.5">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shadow-sm ${
+                              toast.isPrivate
+                                  ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400'
+                                  : 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+                          }`}>
+                              {toast.isPrivate ? (
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-lock"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                              ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-square"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                              )}
+                          </div>
+                      </div>
+
+                      <div className="flex-grow min-w-0 pr-4">
+                          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 font-medium truncate">
+                              <span>📁 {toast.projectName}</span>
+                              <span>•</span>
+                              <span>#{toast.isPrivate ? 'privado' : toast.channelId}</span>
+                          </div>
+
+                          <h5 className="text-xs font-semibold mt-0.5 truncate text-gray-900 dark:text-gray-100">
+                              {toast.isPrivate ? 'Nuevo mensaje de canal' : toast.senderName || 'Usuario'}
+                          </h5>
+
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 leading-relaxed">
+                              {toast.isPrivate ? 'Mensaje en canal privado (se requiere contraseña)' : toast.body}
+                          </p>
+                      </div>
+
+                      <button
+                          onClick={(e) => {
+                              e.stopPropagation();
+                              setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
+                          }}
+                          className="flex-shrink-0 self-start p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded hover:bg-gray-100 dark:hover:bg-zinc-800"
+                      >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                      </button>
+                  </motion.div>
+              ))}
+          </AnimatePresence>
+      </div>
     </>
   );
 };
