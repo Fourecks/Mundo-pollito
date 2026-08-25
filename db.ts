@@ -95,10 +95,13 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'id', 'user_id', 'created_at', 'text'
     ]),
     habits: new Set([
-        'id', 'user_id', 'created_at', 'name', 'emoji', 'frequency'
+        'id', 'user_id', 'created_at', 'name', 'emoji', 'frequency', 
+        'category', 'time_of_day', 'habit_type', 'target_value', 'target_unit', 
+        'difficulty', 'reminder_time', 'reminder_enabled', 'is_archived', 
+        'is_paused', 'paused_at', 'pause_reason'
     ]),
     habit_records: new Set([
-        'id', 'user_id', 'habit_id', 'created_at', 'completed_at'
+        'id', 'user_id', 'habit_id', 'created_at', 'completed_at', 'status', 'value', 'notes'
     ]),
     profiles: new Set([
         'id', 'pomodoro_settings', 'gcal_settings', 'ui_settings', 'timezone_offset'

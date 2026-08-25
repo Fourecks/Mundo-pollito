@@ -491,12 +491,30 @@ export type HabitFrequency =
     | { type: 'times_per_week'; count: number }
     | { type: 'interval'; days: number; startDate: string };
 
+export type HabitCategory = 'Salud' | 'Productividad' | 'Mente' | 'Finanzas' | 'Rutina' | 'Personal' | 'Fitness' | 'Estudio' | 'Relaciones' | 'Otro';
+export type HabitTimeOfDay = 'anytime' | 'morning' | 'afternoon' | 'night';
+export type HabitType = 'boolean' | 'quantitative';
+export type HabitDifficulty = 'easy' | 'medium' | 'hard';
+export type HabitRecordStatus = 'completed' | 'skipped';
+
 export interface Habit {
   id: number;
   user_id: string;
   name: string;
   emoji: string | null;
   frequency: HabitFrequency;
+  category?: HabitCategory | string | null;
+  time_of_day?: HabitTimeOfDay | null;
+  habit_type?: HabitType | null;
+  target_value?: number | null;
+  target_unit?: string | null;
+  difficulty?: HabitDifficulty | null;
+  reminder_time?: string | null;
+  reminder_enabled?: boolean | null;
+  is_archived?: boolean | null;
+  is_paused?: boolean | null;
+  paused_at?: string | null;
+  pause_reason?: string | null;
   created_at: string;
 }
 
@@ -505,6 +523,10 @@ export interface HabitRecord {
   user_id: string;
   habit_id: number;
   completed_at: string; // YYYY-MM-DD
+  status?: HabitRecordStatus | null;
+  value?: number | null;
+  notes?: string | null;
+  created_at?: string;
 }
 // --- End Habit Tracker Types ---
 
