@@ -433,6 +433,19 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [focusedWindow, setFocusedWindow] = useState<WindowType | null>(null);
   const [windowZIndices, setWindowZIndices] = useState<{ [key in WindowType]?: number }>({});
   const [highestZIndex, setHighestZIndex] = useState<number>(100);
+
+  // --- Windowing and Misc Handlers ---
+  const bringToFront = useCallback((windowType: WindowType) => {
+    if (focusedWindowRef.current === windowType) return;
+    focusedWindowRef.current = windowType;
+    setFocusedWindow(windowType);
+    setHighestZIndex(prev => {
+      const nextZ = prev + 1;
+      setWindowZIndices(current => ({ ...current, [windowType]: nextZ }));
+      return nextZ;
+    });
+  }, []);
+
   const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
   const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
   const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
@@ -698,17 +711,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   }, [pomodoroState, handleTimerCompletion, setPomodoroState]);
 
   // --- Windowing and Misc Handlers ---
-  const bringToFront = useCallback((windowType: WindowType) => {
-    if (focusedWindowRef.current === windowType) return;
-    focusedWindowRef.current = windowType;
-    setFocusedWindow(windowType);
-    setHighestZIndex(prev => {
-      const nextZ = prev + 1;
-      setWindowZIndices(current => ({ ...current, [windowType]: nextZ }));
-      return nextZ;
-    });
-  }, []);
-
   const toggleWindow = useCallback((windowType: WindowType) => {
     setOpenWindows(open => {
       const isOpening = !open.includes(windowType);
