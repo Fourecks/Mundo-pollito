@@ -13,7 +13,7 @@ import ModalWindow from './components/ModalWindow';
 import TodoListModule from './components/TodoListModule';
 import NotesSection from './components/NotesSection';
 import MusicPlayer from './components/MusicPlayer';
-import SpotifyPlayerModal from './components/SpotifyPlayerModal';
+import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
 import { useBatteryStatus } from './utils/battery';
@@ -1098,13 +1098,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           onSyncToCalendar={onSyncToCalendar}
         />
         {(activeSpotifyTrack || activeTrack) && (
-            <SpotifyPlayerModal 
+            <SpotifyFloatingPlayer 
               track={activeSpotifyTrack || activeTrack!} 
               onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} 
-              zIndex={getWindowZIndex('spotify')}
-              onFocus={() => bringToFront('spotify')}
-              windowState={windowStatesRef.current.spotify}
-              onStateChange={s => handleWindowStateChange('spotify', s)}
             />
         )}
         <ProjectEditorPanel
