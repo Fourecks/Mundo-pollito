@@ -84,14 +84,21 @@ export const isDayApplicable = (date: Date, freq: HabitFrequency): boolean => {
 };
 
 const calculateStreak = (habit: Habit, records: HabitRecord[]): number => {
-  const habitRecords = records.filter(r => r.habit_id === habit.id);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const habitRecords = records.filter(r => {
+    if (r.habit_id !== habit.id) return false;
+    const [y, m, d] = r.completed_at.split('-').map(Number);
+    const recDate = new Date(y, m - 1, d);
+    return recDate.getTime() <= today.getTime();
+  });
   if (habitRecords.length === 0) return 0;
   const completedDates = new Set(habitRecords.map(r => r.completed_at));
   let streak = 0;
   
   if (habit.frequency.type === 'times_per_week') {
     let weeksToCheck = 0;
-    const today = new Date();
     while (weeksToCheck < 104) {
       const weekStart = getStartOfWeekLocal(today);
       weekStart.setDate(weekStart.getDate() - (weeksToCheck * 7));
@@ -100,7 +107,9 @@ const calculateStreak = (habit: Habit, records: HabitRecord[]): number => {
       
       let completionsThisWeek = 0;
       for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
-        if (completedDates.has(formatDateKey(d))) completionsThisWeek++;
+        if (d.getTime() <= today.getTime() && completedDates.has(formatDateKey(d))) {
+          completionsThisWeek++;
+        }
       }
       
       if (weeksToCheck === 0) {
@@ -114,7 +123,6 @@ const calculateStreak = (habit: Habit, records: HabitRecord[]): number => {
     return streak;
   }
   
-  const today = new Date();
   const currentDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   
   if (isDayApplicable(currentDate, habit.frequency)) {
@@ -139,7 +147,15 @@ const calculateStreak = (habit: Habit, records: HabitRecord[]): number => {
 };
 
 const calculateLongestStreak = (habit: Habit, records: HabitRecord[]): number => {
-  const habitRecords = records.filter(r => r.habit_id === habit.id);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const habitRecords = records.filter(r => {
+    if (r.habit_id !== habit.id) return false;
+    const [y, m, d] = r.completed_at.split('-').map(Number);
+    const recDate = new Date(y, m - 1, d);
+    return recDate.getTime() <= today.getTime();
+  });
   if (habitRecords.length === 0) return 0;
   const completedDates = new Set(habitRecords.map(r => r.completed_at));
   const sortedDateStrings = Array.from(completedDates).sort();
@@ -152,7 +168,6 @@ const calculateLongestStreak = (habit: Habit, records: HabitRecord[]): number =>
     const [year, month, day] = firstDateStr.split('-').map(Number);
     const firstDate = new Date(year, month - 1, day);
     const startOfWeek = getStartOfWeekLocal(firstDate);
-    const today = new Date();
 
     while (startOfWeek <= today) {
       const endOfWeek = new Date(startOfWeek);
@@ -160,7 +175,9 @@ const calculateLongestStreak = (habit: Habit, records: HabitRecord[]): number =>
       
       let completionsThisWeek = 0;
       for (let d = new Date(startOfWeek); d <= endOfWeek; d.setDate(d.getDate() + 1)) {
-        if (completedDates.has(formatDateKey(d))) completionsThisWeek++;
+        if (d.getTime() <= today.getTime() && completedDates.has(formatDateKey(d))) {
+          completionsThisWeek++;
+        }
       }
       
       if (completionsThisWeek >= habit.frequency.count) {
@@ -179,7 +196,7 @@ const calculateLongestStreak = (habit: Habit, records: HabitRecord[]): number =>
   const firstDateStr = sortedDateStrings[0];
   const [year, month, day] = firstDateStr.split('-').map(Number);
   const startDate = new Date(year, month - 1, day);
-  const endDate = new Date();
+  const endDate = new Date(today);
 
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     if (isDayApplicable(d, habit.frequency)) {
@@ -533,7 +550,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
     const weekEnd = new Date(dates[6]);
     weekEnd.setHours(23,59,59,999);
     
-    const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     return { weekStart, weekEnd, weekDates: dates, weekDayLabels: labels };
   }, [weekOffset]);
 
@@ -698,38 +715,75 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
 
         {viewMode === 'week' && (
           <div className="space-y-4 max-w-5xl mx-auto w-full pb-8">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-semibold text-slate-800 dark:text-slate-100">Vista Semanal</h3>
-              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-lg shadow-sm">
-                <button onClick={() => setWeekOffset(weekOffset - 1)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
-                  <ChevronLeftIcon />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm sm:text-base">Vista Semanal</h3>
+                {weekOffset !== 0 && (
+                  <button
+                    onClick={() => setWeekOffset(0)}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
+                  >
+                    Semana actual
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm">
+                <button 
+                  onClick={() => setWeekOffset(weekOffset - 1)} 
+                  title="Semana anterior"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+                >
+                  <ChevronLeftIcon className="w-4 h-4" />
                 </button>
-                <div className="flex items-center gap-2 px-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  <CalendarIcon className="w-4 h-4 text-slate-400" />
-                  <span>{weekStart.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })} - {weekEnd.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}</span>
+                <div className="flex items-center gap-2 px-2 text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <CalendarIcon className="w-4 h-4 text-emerald-500" />
+                  <span>
+                    {weekStart.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - {weekEnd.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                  </span>
                 </div>
-                <button onClick={() => setWeekOffset(weekOffset + 1)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
-                  <ChevronRightIcon />
+                <button 
+                  onClick={() => setWeekOffset(weekOffset + 1)} 
+                  title="Semana siguiente"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+                >
+                  <ChevronRightIcon className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {habits.map(habit => {
+                const todayObj = new Date();
+                todayObj.setHours(0, 0, 0, 0);
+
+                // Only count completions for days up to today (never count future days)
+                const compsThisWeek = weekDates.filter(d => {
+                  const isFuture = d.getTime() > todayObj.getTime();
+                  if (isFuture) return false;
+                  return completedRecords.has(`${habit.id}-${formatDateKey(d)}`);
+                }).length;
+
                 let progressText = '';
+                let isGoalMet = false;
+
                 if (habit.frequency.type === 'times_per_week') {
-                  const compsThisWeek = weekDates.filter(d => completedRecords.has(`${habit.id}-${formatDateKey(d)}`)).length;
-                  progressText = `${compsThisWeek} / ${habit.frequency.count} esta semana`;
+                  const target = habit.frequency.count;
+                  isGoalMet = compsThisWeek >= target;
+                  progressText = isGoalMet 
+                    ? `✓ Meta cumplida (${compsThisWeek} / ${target} esta semana)` 
+                    : `${compsThisWeek} / ${target} tareas esta semana`;
                 } else if (habit.frequency.type === 'daily') {
-                  const compsThisWeek = weekDates.filter(d => completedRecords.has(`${habit.id}-${formatDateKey(d)}`)).length;
-                  progressText = `${compsThisWeek} / 7 esta semana`;
+                  isGoalMet = compsThisWeek >= 7;
+                  progressText = isGoalMet 
+                    ? `✓ Semana completa (7 / 7 días)` 
+                    : `${compsThisWeek} / 7 días esta semana`;
                 } else if (habit.frequency.type === 'specific_days') {
-                  const compsThisWeek = weekDates.filter(d => completedRecords.has(`${habit.id}-${formatDateKey(d)}`)).length;
-                  const applicableThisWeek = weekDates.filter(d => isDayApplicable(d, habit.frequency)).length;
-                  progressText = `${compsThisWeek} / ${applicableThisWeek} esta semana`;
+                  const totalScheduled = weekDates.filter(d => isDayApplicable(d, habit.frequency)).length;
+                  isGoalMet = totalScheduled > 0 && compsThisWeek >= totalScheduled;
+                  progressText = isGoalMet 
+                    ? `✓ Días programados cumplidos (${compsThisWeek} / ${totalScheduled})` 
+                    : `${compsThisWeek} / ${totalScheduled} días programados esta semana`;
                 } else if (habit.frequency.type === 'interval') {
-                  const todayObj = new Date();
-                  todayObj.setHours(0,0,0,0);
                   let nextDate = todayObj;
                   for (let i = 0; i < 30; i++) {
                     const check = new Date(todayObj);
@@ -741,16 +795,18 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                   }
                   const isTodayCompleted = completedRecords.has(`${habit.id}-${formatDateKey(todayObj)}`);
                   if (nextDate.getTime() === todayObj.getTime() && isTodayCompleted) {
-                    progressText = `✓ Completado hoy`;
+                    progressText = `✓ Completado hoy (Cada ${habit.frequency.days} días)`;
+                    isGoalMet = true;
                   } else {
-                    progressText = `Próximo: ${nextDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric' })}`;
+                    const dayLabel = nextDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+                    progressText = `Próximo: ${dayLabel} (Cada ${habit.frequency.days} días)`;
                   }
                 }
 
                 const streak = calculateStreak(habit, records);
 
                 return (
-                  <div key={habit.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow min-w-0">
+                  <div key={habit.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col gap-3.5 shadow-sm hover:shadow-md transition-shadow min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl flex-shrink-0">
@@ -770,7 +826,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                             <span>{streak}</span>
                           </div>
                         )}
-                        <button onClick={() => setMenuOpenFor(habit.id)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <button onClick={() => setMenuOpenFor(habit.id)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
                           <DotsVerticalIcon />
                         </button>
                         {menuOpenFor === habit.id && (
@@ -783,27 +839,42 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                     </div>
 
                     <div className="habit-weekly-view-container w-full overflow-x-auto custom-scrollbar -mx-1 px-1 py-1">
-                      <div className="flex items-center justify-between min-w-[270px] sm:min-w-[280px] gap-2">
+                      <div className="flex items-center justify-between min-w-[310px] sm:min-w-[330px] gap-1.5 px-0.5">
                         {weekDates.map((date, index) => {
                           const dateKey = formatDateKey(date);
-                          const todayObj = new Date();
-                          todayObj.setHours(0, 0, 0, 0);
                           const isFuture = date.getTime() > todayObj.getTime();
                           const isToday = date.getTime() === todayObj.getTime();
                           const isApplicable = isDayApplicable(date, habit.frequency);
                           const isCompleted = !isFuture && completedRecords.has(`${habit.id}-${dateKey}`);
                           const isDisabled = isFuture || (!isApplicable && !isCompleted && habit.frequency.type !== 'times_per_week');
+                          const dayNum = date.getDate();
 
                           return (
-                            <div key={dateKey} className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                            <div 
+                              key={dateKey} 
+                              className={`flex flex-col items-center gap-1 flex-1 min-w-[38px] transition-all ${
+                                isToday ? 'py-1 px-0.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30' : ''
+                              }`}
+                            >
                               <span 
-                                className={`text-[10px] uppercase tracking-wider transition-colors ${
+                                className={`text-[10px] uppercase tracking-tight transition-colors ${
                                   isToday 
-                                    ? 'text-emerald-600 dark:text-emerald-400 font-extrabold' 
-                                    : 'text-slate-400 dark:text-slate-500 font-bold'
+                                    ? 'text-emerald-700 dark:text-emerald-300 font-extrabold' 
+                                    : 'text-slate-400 dark:text-slate-500 font-semibold'
                                 }`}
                               >
                                 {weekDayLabels[index]}
+                              </span>
+                              <span
+                                className={`text-[11px] font-black transition-colors leading-none ${
+                                  isToday
+                                    ? 'text-emerald-700 dark:text-emerald-300'
+                                    : isFuture
+                                      ? 'text-slate-300 dark:text-slate-600 font-semibold'
+                                      : 'text-slate-700 dark:text-slate-300'
+                                }`}
+                              >
+                                {dayNum}
                               </span>
                               <button 
                                 type="button"
@@ -811,39 +882,54 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                                 disabled={isDisabled} 
                                 title={
                                   isFuture 
-                                    ? `${weekDayLabels[index]} (${dateKey}) - Día futuro (no disponible)` 
+                                    ? `${weekDayLabels[index]} ${dayNum} (${dateKey}) - Día futuro (no disponible)` 
                                     : !isApplicable && habit.frequency.type !== 'times_per_week'
-                                      ? `${weekDayLabels[index]} (${dateKey}) - No programado según frecuencia`
+                                      ? `${weekDayLabels[index]} ${dayNum} (${dateKey}) - No programado según frecuencia`
                                       : isCompleted 
-                                        ? `Completado el ${dateKey} - Clic para desmarcar` 
-                                        : `Marcar como completado el ${dateKey}`
+                                        ? `Completado el ${weekDayLabels[index]} ${dayNum} - Clic para desmarcar` 
+                                        : `Marcar como completado el ${weekDayLabels[index]} ${dayNum}`
                                 }
-                                aria-label={`${habit.name} - ${weekDayLabels[index]} ${dateKey}`}
+                                aria-label={`${habit.name} - ${weekDayLabels[index]} ${dayNum}`}
                                 className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                                   isCompleted 
-                                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 scale-105 hover:bg-emerald-600 cursor-pointer' 
-                                    : isFuture
-                                      ? (isApplicable || habit.frequency.type === 'times_per_week')
-                                        ? 'bg-slate-50/60 dark:bg-slate-900/30 border border-dashed border-slate-300 dark:border-slate-700/70 text-transparent cursor-not-allowed opacity-50'
-                                        : 'bg-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                                      : (!isApplicable && habit.frequency.type !== 'times_per_week')
-                                        ? 'bg-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700/60 cursor-pointer'
+                                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30 scale-105 hover:bg-emerald-600 cursor-pointer' 
+                                    : isToday
+                                      ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer shadow-sm'
+                                      : isFuture
+                                        ? (isApplicable || habit.frequency.type === 'times_per_week')
+                                          ? 'bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-300 dark:border-slate-700/60 text-transparent cursor-not-allowed opacity-40'
+                                          : 'bg-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                                        : (!isApplicable && habit.frequency.type !== 'times_per_week')
+                                          ? 'bg-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700/60 cursor-pointer'
                                 }`}
                               >
                                 {isCompleted ? (
                                   <CheckIcon className="w-4 h-4" strokeWidth={3} />
+                                ) : isToday ? (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                 ) : (!isApplicable && habit.frequency.type !== 'times_per_week') ? (
                                   <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
                                 ) : null}
                               </button>
+                              {isToday ? (
+                                <span className="text-[8px] font-black tracking-tight text-emerald-700 dark:text-emerald-300 leading-none">
+                                  HOY
+                                </span>
+                              ) : (
+                                <span className="text-[8px] opacity-0 select-none leading-none">·</span>
+                              )}
                             </div>
                           );
                         })}
                       </div>
                     </div>
 
-                    <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1">
+                    <div className={`text-[11px] font-semibold mt-0.5 flex items-center gap-1.5 ${
+                      isGoalMet 
+                        ? 'text-emerald-600 dark:text-emerald-400' 
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}>
                       {progressText}
                     </div>
                   </div>

@@ -3992,6 +3992,10 @@ const App: React.FC = () => {
 
   const handleToggleHabitRecord = async (habitId: number, date: string) => {
     if(!user) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date > todayStr) {
+      return; // Do not allow marking future dates
+    }
     const recordKey = `${habitId}-${date}`;
     if (processingHabitRecord === recordKey) {
         return; // Prevent rapid-fire clicks
@@ -3999,11 +4003,13 @@ const App: React.FC = () => {
     setProcessingHabitRecord(recordKey);
 
     try {
-        const existingRecord = habitRecords.find(r => r.habit_id === habitId && r.completed_at === date);
-        if(existingRecord) {
-            // Delete it
-            setHabitRecords(r => r.filter(item => item.id !== existingRecord.id));
-            await syncableDelete('habit_records', existingRecord.id);
+        const existingRecords = habitRecords.filter(r => r.habit_id === habitId && r.completed_at === date);
+        if(existingRecords.length > 0) {
+            // Delete all matching records to avoid duplicates
+            setHabitRecords(r => r.filter(item => !(item.habit_id === habitId && item.completed_at === date)));
+            for (const rec of existingRecords) {
+                await syncableDelete('habit_records', rec.id);
+            }
         } else {
             // Create it
             const tempId = -Date.now();
