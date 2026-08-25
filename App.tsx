@@ -900,10 +900,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
         onSendTestNotification={handleNotificationAction}
         notifications={notifications}
-        onNotificationClick={handleNotificationClick}
-        onClearNotifications={handleClearNotifications}
-        onMarkNotificationRead={handleMarkNotificationRead}
-        onDeleteNotification={handleDeleteNotification}
+        onNotificationClick={onNotificationClick}
+        onClearNotifications={onClearNotifications}
+        onMarkNotificationRead={onMarkNotificationRead}
+        onDeleteNotification={onDeleteNotification}
       />
       
       <div className="fixed top-0 bottom-0 left-0 w-4 z-[70000] app-left-sidebar-trigger-area hidden md:block"></div>
@@ -1732,10 +1732,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 onSetDailySummary={(hour) => setUiSettings((s: any) => ({...s, dailySummaryHour: hour}))}
                 onSendTestNotification={handleNotificationAction}
                 notifications={notifications}
-                onNotificationClick={handleNotificationClick}
-                onClearNotifications={handleClearNotifications}
-                onMarkNotificationRead={handleMarkNotificationRead}
-                onDeleteNotification={handleDeleteNotification}
+                onNotificationClick={onNotificationClick}
+                onClearNotifications={onClearNotifications}
+                onMarkNotificationRead={onMarkNotificationRead}
+                onDeleteNotification={onDeleteNotification}
             />
             <AddTaskModal
                 isOpen={isAddTaskModalOpen}
