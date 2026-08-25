@@ -454,6 +454,8 @@ export interface PushNotificationPreferences {
   channelMentions: boolean;   // Menciones en canales (@nombre, @todos) y chats
 }
 
+export type NotificationEventType = 'projectMembers' | 'taskReminders' | 'channelMentions' | 'test';
+
 export interface UiSettings {
   themeColors: ThemeColors;
   activeBackgroundId: string | null;
@@ -620,6 +622,7 @@ declare global {
     };
     // OneSignal SDK
     OneSignal: any;
+    OneSignalDeferred: any[];
     __currentActiveChannelContext?: {
       projectId: number;
       channelId: string | null;

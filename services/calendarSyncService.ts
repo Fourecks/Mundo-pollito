@@ -1,12 +1,5 @@
 import { Todo, GoogleCalendarEvent, GoogleCalendar, CalendarIntegrationAccount } from '../types';
 
-declare global {
-  interface Window {
-    gapi?: any;
-    google?: any;
-  }
-}
-
 // Storage keys
 const CALENDAR_ACCOUNTS_KEY = 'pollito_calendar_accounts';
 const ACTIVE_CALENDAR_PROVIDER_KEY = 'pollito_active_calendar_provider';

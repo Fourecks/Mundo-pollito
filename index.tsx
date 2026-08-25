@@ -1,23 +1,24 @@
 
-import React from 'react';
+import React, { Component, ReactNode, ErrorInfo } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { HuddleProvider } from './src/context/HuddleContext';
 
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: { children: React.ReactNode }) {
+interface Props { children: ReactNode; }
+interface State { hasError: boolean; error: Error | null; }
+
+class ErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false, error: null };
+
+  constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error) {
+  static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
@@ -35,7 +36,7 @@ class ErrorBoundary extends React.Component<
             </p>
             <button
               onClick={() => {
-                this.setState({ hasError: false, error: null });
+                (this as any).setState({ hasError: false, error: null });
                 window.location.reload();
               }}
               className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition-colors text-sm"
@@ -46,7 +47,7 @@ class ErrorBoundary extends React.Component<
         </div>
       );
     }
-    return this.props.children;
+    return (this as any).props.children;
   }
 }
 

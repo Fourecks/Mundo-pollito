@@ -932,6 +932,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
             mainDailyGoal={todayMainGoal}
             onUpdateMainDailyGoal={handleUpdateMainDailyGoal}
+            habits={habits}
+            habitRecords={habitRecords}
+            onOpenHabits={() => toggleWindow('habits')}
           />
       </div>
       
@@ -1426,6 +1429,9 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
                             mainDailyGoal={todayMainGoal}
                             onUpdateMainDailyGoal={handleUpdateMainDailyGoal}
+                            habits={habits}
+                            habitRecords={habitRecords}
+                            onOpenHabits={() => setActiveTab('habits')}
                         />
                     </div>
                 </div>
@@ -2196,9 +2202,9 @@ const App: React.FC = () => {
       setPlaylists(cachedPlaylists);
     } else {
       const defaultPlaylistsList: Playlist[] = [
-        { id: 1, user_id: user?.id || 'default', name: 'Lofi Beats', source_id: '37i9dQZF1DXcBWIGoYBM5M', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003002f232e08e6ff05f5904838' },
-        { id: 2, user_id: user?.id || 'default', name: 'Peaceful Piano', source_id: '37i9dQZF1DX4sWSpwq3LiO', type: 'playlist', platform: 'spotify', is_favorite: false, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003ca22a83e01dd89a1fa9f123f' },
-        { id: 3, user_id: user?.id || 'default', name: 'Deep Focus', source_id: '37i9dQZF1DWZeKCadgRdKQ', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f0000000355482310ff97c2a7813a0785' }
+        { id: 1, user_id: user?.id || 'default', name: 'Lofi Beats', source_id: '37i9dQZF1DXcBWIGoYBM5M', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003002f232e08e6ff05f5904838', created_at: new Date().toISOString() },
+        { id: 2, user_id: user?.id || 'default', name: 'Peaceful Piano', source_id: '37i9dQZF1DX4sWSpwq3LiO', type: 'playlist', platform: 'spotify', is_favorite: false, thumbnail_url: 'https://i.scdn.co/image/ab67706f00000003ca22a83e01dd89a1fa9f123f', created_at: new Date().toISOString() },
+        { id: 3, user_id: user?.id || 'default', name: 'Deep Focus', source_id: '37i9dQZF1DWZeKCadgRdKQ', type: 'playlist', platform: 'spotify', is_favorite: true, thumbnail_url: 'https://i.scdn.co/image/ab67706f0000000355482310ff97c2a7813a0785', created_at: new Date().toISOString() }
       ];
       setPlaylists(defaultPlaylistsList);
     }
@@ -4372,11 +4378,11 @@ const App: React.FC = () => {
         const calId = gcalSettings.calendarId || 'primary';
         const calResult = await CalendarSyncService.insertGoogleEvent(todo, googleApiToken!, calId);
         if (calResult && calResult.id) {
-          const updatedTodo = {
+          const updatedTodo: Todo = {
             ...todo,
             gcal_event_id: calResult.id,
             calendar_event_link: calResult.htmlLink,
-            calendar_provider: 'google' as CalendarProvider,
+            calendar_provider: 'google',
           };
           setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
           await syncableUpdate('todos', updatedTodo);
@@ -4388,11 +4394,11 @@ const App: React.FC = () => {
         const calId = currentOutlook.selectedCalendarId || 'primary';
         const calResult = await CalendarSyncService.insertOutlookEvent(todo, currentOutlook.token, calId);
         if (calResult && calResult.id) {
-          const updatedTodo = {
+          const updatedTodo: Todo = {
             ...todo,
             gcal_event_id: calResult.id,
             calendar_event_link: calResult.htmlLink,
-            calendar_provider: 'outlook' as CalendarProvider,
+            calendar_provider: 'outlook',
           };
           setAllTodos(current => getUpdatedTodosState(current, updatedTodo));
           await syncableUpdate('todos', updatedTodo);
@@ -4902,18 +4908,20 @@ const App: React.FC = () => {
 
           flatAllTodos.forEach((todo: Todo) => {
               if (todo.completed) return;
-              if (!todo.reminder_time && !todo.due_date) return;
-
-              const reminderKey = `${todo.id}_${todo.reminder_time || ''}_${todo.due_date?.day || ''}`;
+              if (!todo.start_time && !todo.due_date) return;
+              const reminderKey = `${todo.id}_${todo.start_time || ''}_${todo.due_date || ''}`;
               if (notifiedTaskIdsRef.current.has(reminderKey)) return;
 
-              if (todo.reminder_time) {
-                  const [rHour, rMinute] = todo.reminder_time.split(':').map(Number);
-                  const isToday = !todo.due_date || (
-                      todo.due_date.year === currentYear &&
-                      todo.due_date.month === currentMonth &&
-                      todo.due_date.day === currentDay
-                  );
+              if (todo.start_time) {
+                  const [rHour, rMinute] = todo.start_time.split(':').map(Number);
+                  
+                  let isToday = false;
+                  if (!todo.due_date) {
+                      isToday = true;
+                  } else {
+                      const [dYear, dMonth, dDay] = todo.due_date.split('-').map(Number);
+                      isToday = (dYear === currentYear && dMonth === currentMonth && dDay === currentDay);
+                  }
 
                   if (isToday && rHour === currentHour && Math.abs(rMinute - currentMinute) <= 1) {
                       notifiedTaskIdsRef.current.add(reminderKey);

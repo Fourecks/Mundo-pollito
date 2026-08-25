@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Todo, Subtask, QuickNote, GoogleCalendarEvent, FocusSession } from '../types';
+import { Todo, Subtask, QuickNote, GoogleCalendarEvent, FocusSession, Habit, HabitRecord } from '../types';
+import { isDayApplicable } from './HabitTracker';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import ClockIcon from './icons/ClockIcon';
 import PlusIcon from './icons/PlusIcon';
@@ -237,7 +238,7 @@ const AgendaView: React.FC<Pick<TodaysAgendaProps, 'tasks' | 'calendarEvents' | 
                 start_time: startTimeStr,
                 end_time: endTimeStr,
                 notes: e.description || e.location ? `${e.location ? '📍 ' + e.location + '\n' : ''}${e.description || ''}` : undefined,
-                priority: 'media',
+                priority: 'medium',
                 gcal_event_id: e.id,
                 calendar_provider: (e as any).provider || 'google',
                 calendar_event_link: e.htmlLink,
@@ -356,6 +357,9 @@ export interface TodaysAgendaProps {
   mainDailyGoal?: { text: string; completed: boolean } | string;
   onSetMainDailyGoal?: (goal: string) => void;
   onUpdateMainDailyGoal?: (goal: { text: string; completed: boolean } | null) => void;
+  habits?: Habit[];
+  habitRecords?: HabitRecord[];
+  onOpenHabits?: () => void;
 }
 
 const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
@@ -374,9 +378,25 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
         isFocusTimerRunning = false,
         mainDailyGoal: propMainGoal,
         onSetMainDailyGoal: propOnSetMainGoal,
-        onUpdateMainDailyGoal: propOnUpdateMainGoal
+        onUpdateMainDailyGoal: propOnUpdateMainGoal,
+        habits = [],
+        habitRecords = [],
+        onOpenHabits
     } = props;
     const [activeView, setActiveView] = useState<'agenda' | 'notes'>('agenda');
+
+    // Habits calculations
+    const { habitsForToday, todayCompletedCount } = useMemo(() => {
+        const today = new Date();
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        
+        const completedRecords = new Set(habitRecords.map(r => `${r.habit_id}-${r.completed_at}`));
+        
+        const applicableHabits = habits.filter(habit => isDayApplicable(today, habit.frequency));
+        const completedCount = applicableHabits.filter(h => completedRecords.has(`${h.id}-${todayKey}`)).length;
+        
+        return { habitsForToday: applicableHabits, todayCompletedCount: completedCount };
+    }, [habits, habitRecords]);
 
     // Date-scoped Main Daily Goal state with local persistence and cross-component sync
     const todayKey = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
@@ -633,6 +653,28 @@ const TodaysAgenda: React.FC<TodaysAgendaProps> = (props) => {
                     </div>
                 )}
              </div>
+
+             {/* Habits Summary Widget */}
+             {habitsForToday.length > 0 && (
+                <div 
+                    onClick={onOpenHabits}
+                    className="mb-2 p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/40 transition-colors flex items-center justify-between group shadow-xs"
+                >
+                    <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400">
+                           <Target className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                            Hábitos de hoy
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded-sm">
+                            {todayCompletedCount} / {habitsForToday.length}
+                        </span>
+                    </div>
+                </div>
+             )}
 
              {/* View Navigation Tabs */}
              <div className="flex border-b border-yellow-200/50 dark:border-gray-700/50 mb-2">

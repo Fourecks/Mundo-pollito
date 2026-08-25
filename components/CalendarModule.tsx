@@ -778,9 +778,8 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
   // Helper priority badge color
   const getPriorityColor = (p: Priority) => {
     switch (p) {
-      case 'urgent': return 'bg-red-500 text-white';
-      case 'high': return 'bg-amber-500 text-white';
-      case 'medium': return 'bg-sky-500 text-white';
+      case 'high': return 'bg-red-500 text-white';
+      case 'medium': return 'bg-amber-500 text-white';
       case 'low': return 'bg-emerald-500 text-white';
       default: return 'bg-gray-400 text-white';
     }

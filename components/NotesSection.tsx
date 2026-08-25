@@ -486,21 +486,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
             </div>
           </div>
 
-          {/* Tools Bar (Mobile) */}
-          <div className="px-2 py-1.5 border-b border-stone-200/60 dark:border-stone-800/80 flex items-center gap-1 overflow-x-auto custom-scrollbar bg-stone-50/40 dark:bg-stone-900/40">
-            <button onClick={() => insertFormat('**', '**', 'negrita')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><Bold className="w-3.5 h-3.5" /></button>
-            <button onClick={() => insertFormat('*', '*', 'cursiva')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><Italic className="w-3.5 h-3.5" /></button>
-            <button onClick={() => insertFormat('~~', '~~', 'tachado')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><Strikethrough className="w-3.5 h-3.5" /></button>
-            <div className="w-[1px] h-4 bg-stone-200 dark:bg-stone-700 mx-0.5" />
-            <button onClick={() => insertLinePrefix('# ')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><Heading1 className="w-3.5 h-3.5" /></button>
-            <button onClick={() => insertLinePrefix('## ')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><Heading2 className="w-3.5 h-3.5" /></button>
-            <div className="w-[1px] h-4 bg-stone-200 dark:bg-stone-700 mx-0.5" />
-            <button onClick={() => insertLinePrefix('- ')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><List className="w-3.5 h-3.5" /></button>
-            <button onClick={() => insertLinePrefix('1. ')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><ListOrdered className="w-3.5 h-3.5" /></button>
-            <button onClick={() => insertLinePrefix('- [ ] ')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><CheckSquare className="w-3.5 h-3.5" /></button>
-            <button onClick={() => insertLinePrefix('> ')} className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300"><Quote className="w-3.5 h-3.5" /></button>
-          </div>
-
           {/* Editor Body */}
           <div className="flex-grow flex flex-col p-4 overflow-y-auto">
             <input
@@ -511,16 +496,16 @@ const NotesSection: React.FC<NotesSectionProps> = ({
               placeholder="Título de la nota..."
               className="text-xl font-bold text-stone-900 dark:text-stone-100 bg-transparent focus:outline-none mb-3 placeholder:text-stone-300 dark:placeholder:text-stone-600"
             />
-            <textarea
-              ref={textareaRef}
-              value={activeNoteContent}
-              onChange={(e) => handleContentChange(e.target.value)}
-              onBlur={handleBlurSave}
-              placeholder="Escribe tu nota aquí..."
-              className="flex-grow w-full bg-transparent focus:outline-none resize-none text-sm text-stone-800 dark:text-stone-200 leading-relaxed custom-scrollbar placeholder:text-stone-400"
+            <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleEditorInput}
+                onBlur={handleBlurSave}
+                data-placeholder="Escribe tu nota aquí..."
+                className="note-editor-content flex-grow w-full bg-transparent focus:outline-none text-sm text-stone-800 dark:text-stone-200 leading-relaxed custom-scrollbar min-h-[300px] outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-stone-400 dark:empty:before:text-stone-600 empty:before:pointer-events-none"
             />
           </div>
-
           <ConfirmationModal
             isOpen={!!noteToDelete}
             onClose={() => setNoteToDelete(null)}
