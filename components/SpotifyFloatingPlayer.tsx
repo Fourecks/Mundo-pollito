@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Playlist } from '../types';
-import { X, Music, ChevronUp, Minus } from 'lucide-react';
+import { X, ChevronUp, Minus } from 'lucide-react';
 
 interface SpotifyFloatingPlayerProps {
   track: Playlist;
@@ -13,6 +13,7 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
     return localStorage.getItem('spotify_session_active') === 'true';
   });
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const spotifyId = track.source_id || track.id;
@@ -38,7 +39,9 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
 
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-9 h-9 rounded-full bg-[#1DB954]/20 flex items-center justify-center text-[#1DB954]">
-              <Music className="w-5 h-5" />
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-.1.2-1.02-.36-.18-.6.36-1.02.96-1.2 4.2-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z" />
+              </svg>
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-[#1DB954]">Spotify</span>
@@ -86,13 +89,17 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 15, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-            className="pointer-events-auto bg-[#121212] border border-[#1DB954]/40 text-white px-4 py-3 rounded-full shadow-[0_15px_40px_rgba(0,0,0,0.6)] flex items-center gap-3 w-[280px]"
+            className="pointer-events-auto bg-[#121212] border border-[#1DB954]/40 text-white px-4 py-3 rounded-full shadow-[0_15px_40px_rgba(0,0,0,0.6)] flex items-center gap-3 w-[290px]"
           >
-            <div className="w-8 h-8 rounded-full bg-[#1DB954]/20 flex items-center justify-center text-[#1DB954] flex-shrink-0 animate-pulse">
-              <Music className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-full bg-[#1DB954]/20 flex items-center justify-center text-[#1DB954] flex-shrink-0">
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-.1.2-1.02-.36-.18-.6.36-1.02.96-1.2 4.2-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z" />
+              </svg>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[#1DB954] block leading-none">Reproduciendo</span>
+            <div className="flex-1 overflow-hidden cursor-pointer" onClick={() => setIsPlaying(!isPlaying)} title="Haz clic para alternar estado">
+              <span className={`text-[10px] font-bold uppercase tracking-widest block leading-none ${isPlaying ? 'text-[#1DB954]' : 'text-amber-400'}`}>
+                {isPlaying ? 'Reproduciendo' : 'Pausado'}
+              </span>
               <p className="text-xs font-medium text-white truncate">{track.name}</p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">

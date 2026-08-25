@@ -183,7 +183,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({
               </svg>
               <span className="text-xs font-extrabold uppercase tracking-widest text-[#1DB954]">Spotify</span>
             </div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold truncate text-white drop-shadow-sm">Música para Pollos</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold truncate text-white drop-shadow-sm">Música</h1>
             <p className="text-gray-300 dark:text-gray-400 font-semibold text-xs sm:text-sm">Música y Playlists de Spotify</p>
           </div>
           <div className="absolute top-2 right-2 flex items-center gap-2">
