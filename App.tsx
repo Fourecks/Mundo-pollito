@@ -1478,18 +1478,20 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     </div>
                 </div>
 
-                <div className={activeTab === 'habits' ? 'h-full flex flex-col' : 'hidden'}>
-                     <div className="h-full pt-8">
-                        <HabitTracker 
-                            habits={habits} 
-                            records={habitRecords} 
-                            onOpenHabitCreator={onOpenHabitCreator}
-                            onOpenHabitEditor={onOpenHabitEditor}
-                            onDeleteHabit={handleDeleteHabit} 
-                            onToggleRecord={handleToggleHabitRecord}
-                        />
+                {activeTab === 'habits' && (
+                    <div className="h-full flex flex-col">
+                         <div className="h-full pt-8">
+                            <HabitTracker 
+                                habits={habits} 
+                                records={habitRecords} 
+                                onOpenHabitCreator={onOpenHabitCreator}
+                                onOpenHabitEditor={onOpenHabitEditor}
+                                onDeleteHabit={handleDeleteHabit} 
+                                onToggleRecord={handleToggleHabitRecord}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className={activeTab === 'notes' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full pt-8">
@@ -1497,18 +1499,20 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     </div>
                 </div>
 
-                <div className={activeTab === 'progreso' ? 'h-full flex flex-col' : 'hidden'}>
-                    <div className="flex flex-col h-full">
-                        <ProgressView 
-                            allTodos={allTodos} 
-                            projects={projects} 
-                            habits={habits} 
-                            habitRecords={habitRecords}
-                            focusSessions={focusSessions}
-                            onBack={() => setActiveTab('home')}
-                        />
+                {activeTab === 'progreso' && (
+                    <div className="h-full flex flex-col">
+                        <div className="flex flex-col h-full">
+                            <ProgressView 
+                                allTodos={allTodos} 
+                                projects={projects} 
+                                habits={habits} 
+                                habitRecords={habitRecords}
+                                focusSessions={focusSessions}
+                                onBack={() => setActiveTab('home')}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className={activeTab === 'more' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="p-4 pt-8">

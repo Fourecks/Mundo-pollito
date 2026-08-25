@@ -352,7 +352,7 @@ const GlobalHabitsOverview: React.FC<{ habits: Habit[], records: HabitRecord[] }
       </div>
 
       <div className="w-full h-40 pt-1">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <AreaChart data={globalTrendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
             <defs>
               <linearGradient id="emeraldArea" x1="0" y1="0" x2="0" y2="1">
@@ -483,7 +483,7 @@ const HabitStats: React.FC<{ habit: Habit, records: HabitRecord[] }> = ({ habit,
           </h5>
         </div>
         <div className="w-full h-28">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <LineChart data={weeklyComplianceData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
               <XAxis dataKey="Semana" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />

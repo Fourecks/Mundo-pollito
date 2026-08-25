@@ -513,7 +513,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
           </div>
 
           <div className="w-full h-60 pt-1">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               {chartMode === 'area' ? (
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                   <defs>
@@ -639,7 +639,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
           </div>
 
           <div className="w-full h-60 pt-1">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={focusChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="indigoGradient" x1="0" y1="0" x2="0" y2="1">
@@ -691,7 +691,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
             {projectFocusData.length > 0 ? (
               <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
                 <div className="w-32 h-32 relative flex-shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <PieChart>
                       <Pie
                         data={projectFocusData}
