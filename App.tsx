@@ -2444,9 +2444,12 @@ const App: React.FC = () => {
 
           if (eventType === 'INSERT') {
             const insertProj = newRecord as Project;
-            const isBelonging = insertProj.user_id === user.id || 
-              (insertProj.members && Array.isArray(insertProj.members) && 
-               insertProj.members.some((m: any) => m.email === user.email));
+            const isOwner = insertProj.user_id === user.id;
+            const isInMembersList = insertProj.members && Array.isArray(insertProj.members) && insertProj.members.some((m: any) => {
+              const email = typeof m === 'string' ? m : m.email;
+              return email && email.toLowerCase() === user.email.toLowerCase();
+            });
+            const isBelonging = isOwner || isInMembersList;
             if (isBelonging) {
               setProjects(prev => {
                 if (prev.some(p => p.id === insertProj.id)) return prev;
@@ -2459,10 +2462,22 @@ const App: React.FC = () => {
             }
           } else if (eventType === 'UPDATE') {
             const updateProj = newRecord as Project;
-            const isBelonging = updateProj.user_id === user.id || 
-              (updateProj.members && Array.isArray(updateProj.members) && 
-               updateProj.members.some((m: any) => m.email === user.email));
-            if (isBelonging) {
+            const isOwner = updateProj.user_id === user.id;
+            const hasMembersList = updateProj.members && Array.isArray(updateProj.members);
+            const isInMembersList = hasMembersList && updateProj.members.some((m: any) => {
+              const email = typeof m === 'string' ? m : m.email;
+              return email && email.toLowerCase() === user.email.toLowerCase();
+            });
+
+            let belongs = isOwner || isInMembersList;
+
+            // If the UPDATE payload does not specify members or has it empty/undefined,
+            // but we already have the project in our list, we should preserve it.
+            if (!belongs && !hasMembersList) {
+              belongs = true;
+            }
+
+            if (belongs) {
               setProjects(prev => {
                 return prev.map(p => p.id === updateProj.id ? { ...p, ...updateProj } : p)
                   .sort((a, b) => a.name.localeCompare(b.name));
