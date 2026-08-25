@@ -63,7 +63,7 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'recurrence', 'reminder_offset', 'reminder_at', 'notification_sent',
         'kanban_column', 'story_points', 'sprint_id', 'milestone_id', 'tags',
         'dependencies', 'comments', 'attachments', 'assignee', 'calendar_provider',
-        'calendar_event_link', 'notion_page_id', 'notion_url'
+        'calendar_event_link', 'notion_page_id', 'notion_url', 'list_id'
     ]),
     subtasks: new Set([
         'id', 'todo_id', 'created_at', 'text', 'completed'

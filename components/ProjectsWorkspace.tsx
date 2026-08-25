@@ -179,6 +179,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [newChannelIsPrivate, setNewChannelIsPrivate] = useState(false);
 
     // Channel Edit/Delete States
+    const [isConfirmClearChannelOpen, setIsConfirmClearChannelOpen] = useState(false);
     const [editingChannel, setEditingChannel] = useState<ProjectChannel | null>(null);
     const [editingChannelName, setEditingChannelName] = useState('');
     const [editingChannelDescription, setEditingChannelDescription] = useState('');
@@ -330,6 +331,26 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const currentUserEmail = currentUser?.email || 'usuario@local.com';
     const currentUserName = currentUser?.user_metadata?.full_name || currentUserEmail.split('@')[0] || 'Tú';
 
+    const checkIsUser = (msgEmail?: string, msgId?: string) => {
+        if (msgId && currentUser?.id && msgId === currentUser.id) {
+            return true;
+        }
+        if (!msgEmail) return false;
+        
+        const emailLower = msgEmail.toLowerCase().trim();
+        const currentEmailLower = currentUser?.email?.toLowerCase().trim();
+        
+        if (emailLower === 'usuario@local.com') {
+            return !currentEmailLower; // Only match if the local user is also using the local fallback email
+        }
+        
+        if (currentEmailLower) {
+            return emailLower === currentEmailLower;
+        }
+        
+        return emailLower === currentUserEmail.toLowerCase().trim();
+    };
+
     const projectOwnerEmail = useMemo(() => {
         if (!activeProject) return currentUserEmail;
         if (activeProject.owner_email && activeProject.owner_email.includes('@')) {
@@ -390,7 +411,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         return activeProject.chat_messages.filter(m => {
             const chanId = m.channel_id || 'general';
             const lastRead = lastReadTimes[chanId];
-            if (m.sender_email === currentUserEmail) return false;
+            if (checkIsUser(m.sender_email, m.sender_id)) return false;
             if (!lastRead) return true;
             return m.created_at > lastRead;
         }).length;
@@ -472,6 +493,24 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
         return activeProject.channels;
     }, [activeProject]);
+
+    const currentChannel = useMemo(() => {
+        if (!activeChannels || activeChannels.length === 0) {
+            return { id: 'general', name: 'general', emoji: '💬', description: 'Canal principal' };
+        }
+        return activeChannels.find(c => c.id === selectedChannelId) || activeChannels[0] || { id: 'general', name: 'general', emoji: '💬', description: 'Canal principal' };
+    }, [activeChannels, selectedChannelId]);
+
+    const handleClearChannelMessages = () => {
+        if (!activeProject || !isProjectCreator) return;
+        const messages = activeProject.chat_messages || [];
+        const filteredMessages = messages.filter(m => {
+            const isChan = (m.channel_id || 'general') === currentChannel.id;
+            return !isChan;
+        });
+        onUpdateProject(activeProject.id, { chat_messages: filteredMessages });
+        setIsConfirmClearChannelOpen(false);
+    };
 
     const activePolls = useMemo(() => {
         if (!activeProject) return [];
@@ -1963,6 +2002,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 id: crypto.randomUUID(),
                 project_id: activeProject.id,
                 channel_id: currentChannel.id,
+                sender_id: currentUser?.id,
                 sender_name: currentUserName,
                 sender_email: currentUserEmail,
                 text: chatText.trim(),
@@ -1998,6 +2038,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 id: crypto.randomUUID(),
                 project_id: activeProject.id,
                 channel_id: currentChannel.id,
+                sender_id: currentUser?.id,
                 sender_name: currentUserName,
                 sender_email: currentUserEmail,
                 text: threadInputText.trim(),
@@ -2307,7 +2348,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 // Check dynamic unread status for the channel
                                 const hasUnread = !isSelected && (activeProject.chat_messages || []).some(m => {
                                     if ((m.channel_id || 'general') !== chan.id) return false;
-                                    if (m.sender_email === currentUserEmail) return false;
+                                    if (checkIsUser(m.sender_email, m.sender_id)) return false;
                                     const lastRead = lastReadTimes[chan.id];
                                     if (!lastRead) return true;
                                     return m.created_at > lastRead;
@@ -2461,6 +2502,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     </button>
                                 )}
 
+                                {/* Clear Channel Messages - Only visible to Project Owner/Creator */}
+                                {isProjectCreator && (
+                                    <button 
+                                        id="clear-channel-btn"
+                                        onClick={() => setIsConfirmClearChannelOpen(true)}
+                                        className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                                        title="Vaciar todos los mensajes de este canal permanentemente"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span className="hidden md:inline">Vaciar Canal</span>
+                                    </button>
+                                )}
+
                             </div>
                         </div>
 
@@ -2579,7 +2633,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     ) : (
                                         channelMessages.map(msg => {
                                             const isSystem = msg.sender_name.includes('Sistema');
-                                            const isUser = msg.sender_email === currentUserEmail;
+                                            const isUser = checkIsUser(msg.sender_email, msg.sender_id);
                                             const reactions = msg.reactions || {};
                                             const isPinned = msg.is_pinned;
 
@@ -2622,7 +2676,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         {/* Replying Context Bar */}
                                                         {msg.reply_to && (
                                                             <div className="p-2 mb-1.5 bg-gray-100 dark:bg-gray-800/60 rounded border-l-2 border-blue-500 text-[11px] text-gray-600 dark:text-gray-300">
-                                                                <strong className="block text-[10px] text-blue-500">Respondiendo a {msg.reply_to.sender_email === currentUserEmail ? 'Tú' : msg.reply_to.sender_name}:</strong>
+                                                                <strong className="block text-[10px] text-blue-500">Respondiendo a {checkIsUser(msg.reply_to.sender_email) ? 'Tú' : msg.reply_to.sender_name}:</strong>
                                                                 {msg.reply_to.text}
                                                             </div>
                                                         )}
@@ -2891,7 +2945,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             {activeThreadMessage.sender_name.charAt(0).toUpperCase()}
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-[11px] font-bold text-gray-900 dark:text-white truncate">{activeThreadMessage.sender_email === currentUserEmail ? 'Tú' : activeThreadMessage.sender_name}</p>
+                                            <p className="text-[11px] font-bold text-gray-900 dark:text-white truncate">{checkIsUser(activeThreadMessage.sender_email, activeThreadMessage.sender_id) ? 'Tú' : activeThreadMessage.sender_name}</p>
                                             <p className="text-[8px] text-gray-400">{format(parseISO(activeThreadMessage.created_at), 'HH:mm', { locale: es })}</p>
                                         </div>
                                     </div>
@@ -2916,7 +2970,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 mb-0.5">
-                                                        <span className="text-[11px] font-bold text-gray-900 dark:text-white">{reply.sender_email === currentUserEmail ? 'Tú' : reply.sender_name}</span>
+                                                        <span className="text-[11px] font-bold text-gray-900 dark:text-white">{checkIsUser(reply.sender_email, reply.sender_id) ? 'Tú' : reply.sender_name}</span>
                                                         <span className="text-[8px] text-gray-400">{format(parseISO(reply.created_at), 'HH:mm', { locale: es })}</span>
                                                     </div>
                                                     <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{reply.text}</p>
@@ -3992,6 +4046,46 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* CONFIRM CLEAR CHANNEL MODAL */}
+            <Modal 
+                isOpen={isConfirmClearChannelOpen} 
+                onClose={() => setIsConfirmClearChannelOpen(false)} 
+                title="¿Vaciar este canal?"
+            >
+                <div className="space-y-4">
+                    <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl flex items-start gap-2.5">
+                        <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                        <div>
+                            <h4 className="text-xs font-bold text-red-800 dark:text-red-300">Acción Irreversible</h4>
+                            <p className="text-[11px] text-red-700 dark:text-red-400 leading-relaxed mt-0.5">
+                                Esta acción eliminará de forma permanente todos los mensajes, encuestas e hilos compartidos en este canal tanto de la aplicación local como de la base de datos remota para todo el equipo.
+                            </p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                        ¿Estás seguro de que deseas vaciar por completo el canal <strong>#{activeChannels.find(c => c.id === selectedChannelId)?.name || 'general'}</strong>? Solo tú, como creador del proyecto, tienes permiso para realizar esta acción.
+                    </p>
+                    <div className="flex items-center justify-end gap-2.5 pt-2">
+                        <button
+                            id="cancel-clear-channel-btn"
+                            type="button"
+                            onClick={() => setIsConfirmClearChannelOpen(false)}
+                            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl text-xs transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            id="confirm-clear-channel-btn"
+                            type="button"
+                            onClick={handleClearChannelMessages}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-sm transition-colors"
+                        >
+                            Sí, vaciar canal permanentemente
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* SPRINT MODAL */}
             <Modal isOpen={sprintModal.isOpen} onClose={() => setSprintModal({ isOpen: false, sprint: null })} title={sprintModal.sprint ? 'Editar Sprint' : 'Nuevo Sprint'}>

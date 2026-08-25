@@ -193,6 +193,7 @@ CREATE TABLE IF NOT EXISTS todos (
     comments jsonb DEFAULT '[]'::jsonb,
     attachments jsonb DEFAULT '[]'::jsonb,
     assignee text,
+    list_id text,
     notion_page_id text,
     notion_url text
 );
@@ -208,6 +209,7 @@ ALTER TABLE todos ADD COLUMN IF NOT EXISTS dependencies jsonb DEFAULT '[]'::json
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS comments jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS attachments jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS assignee text;
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS list_id text;
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS calendar_provider text;
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS calendar_event_link text;
 ALTER TABLE todos ADD COLUMN IF NOT EXISTS notion_page_id text;
