@@ -640,7 +640,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (chanId) {
             setActiveTab('chat');
             setSelectedChannelId(chanId);
-            pendingRedirectChannelRef.current = chanId;
+            pendingRedirectChannelRef.current = null;
             try {
                 delete (window as any).__pendingProjectChannel;
             } catch (e) {}
@@ -1014,15 +1014,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <h1 className="text-base font-bold text-gray-900 dark:text-white tracking-tight truncate">
                                     {activeProject.name}
                                 </h1>
-                                {activeProject.priority && (
-                                    <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
-                                        activeProject.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60' :
-                                        activeProject.priority === 'low' ? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-800/60' :
-                                        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60'
-                                    }`}>
-                                        {activeProject.priority === 'high' ? 'Alta' : activeProject.priority === 'low' ? 'Baja' : 'Media'}
-                                    </span>
-                                )}
                             </div>
                             {activeProject.description && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 max-w-2xl line-clamp-1 mt-0.5">{activeProject.description}</p>
@@ -1722,6 +1713,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             <button onClick={() => setSprintModal({ isOpen: true, sprint })} className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg">
                                                 <Edit2 className="w-3.5 h-3.5" />
                                             </button>
+                                            {isProjectCreator && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm(`¿Estás seguro de eliminar el sprint "${sprint.name}"?`)) {
+                                                            const updated = sprints.filter(s => s.id !== sprint.id);
+                                                            onUpdateProject(activeProject.id, { sprints: updated });
+                                                        }
+                                                    }}
+                                                    className="p-1 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
+                                                    title="Eliminar Sprint (Solo Propietario)"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1820,6 +1825,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 <button onClick={() => setMilestoneModal({ isOpen: true, milestone: ms })} className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md">
                                                     <Edit2 className="w-3.5 h-3.5" />
                                                 </button>
+                                                {isProjectCreator && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`¿Estás seguro de eliminar el hito "${ms.name}"?`)) {
+                                                                const updated = milestones.filter(m => m.id !== ms.id);
+                                                                onUpdateProject(activeProject.id, { milestones: updated });
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
+                                                        title="Eliminar Hito (Solo Propietario)"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
 
@@ -2982,6 +3001,21 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         >
                                                             <Share2 className="w-3.5 h-3.5 rotate-180" />
                                                         </button>
+
+                                                        {((msg.sender_email && msg.sender_email.toLowerCase() === currentUserEmail.toLowerCase()) || isProjectCreator) && (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    if (confirm('¿Deseas eliminar este mensaje?')) {
+                                                                        const updated = messages.filter(m => m.id !== msg.id);
+                                                                        onUpdateProject(activeProject.id, { chat_messages: updated });
+                                                                    }
+                                                                }}
+                                                                className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-gray-400 hover:text-red-500 transition-all"
+                                                                title="Eliminar mensaje"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
                                                     </div>
 
                                                 </div>
@@ -4290,31 +4324,25 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </form>
             </Modal>
 
-            {/* CLOSE SPRINT RETROSPECTIVE MODAL */}
-            <Modal isOpen={closeSprintModal.isOpen} onClose={() => setCloseSprintModal({ isOpen: false, sprint: null })} title="Cerrar Sprint y Retrospectiva">
+            {/* CLOSE SPRINT MODAL */}
+            <Modal isOpen={closeSprintModal.isOpen} onClose={() => setCloseSprintModal({ isOpen: false, sprint: null })} title="Finalizar Sprint">
                 <form onSubmit={e => {
                     e.preventDefault();
                     if (!activeProject || !closeSprintModal.sprint) return;
-                    const formData = new FormData(e.currentTarget);
-                    const retro = formData.get('retrospective') as string;
 
                     const updatedSprints = (activeProject.sprints || []).map(s => 
-                        s.id === closeSprintModal.sprint!.id ? { ...s, status: 'completed' as const, retrospective: retro } : s
+                        s.id === closeSprintModal.sprint!.id ? { ...s, status: 'completed' as const } : s
                     );
 
                     onUpdateProject(activeProject.id, { sprints: updatedSprints });
                     setCloseSprintModal({ isOpen: false, sprint: null });
                 }} className="space-y-4">
-                    <p className="text-xs text-gray-500">
-                        Escribe un resumen de aprendizajes y progresos para el equipo antes de marcar este Sprint como completado.
+                    <p className="text-xs text-gray-600 dark:text-gray-300">
+                        ¿Deseas marcar el sprint <strong>{closeSprintModal.sprint?.name}</strong> como completado?
                     </p>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Retrospectiva del Sprint</label>
-                        <textarea name="retrospective" rows={4} required placeholder="¿Qué salió bien? ¿Qué se puede mejorar en la siguiente iteración?" className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
-                    </div>
                     <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
                         <button type="button" onClick={() => setCloseSprintModal({ isOpen: false, sprint: null })} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
-                        <button type="submit" className="px-4 py-1.5 text-xs bg-emerald-600 text-white font-semibold rounded-lg">Finalizar Sprint</button>
+                        <button type="submit" className="px-4 py-1.5 text-xs bg-emerald-600 text-white font-semibold rounded-lg">Sí, Finalizar Sprint</button>
                     </div>
                 </form>
             </Modal>

@@ -163,10 +163,108 @@ export const HuddleProvider: React.FC<{
     setIsScreenSharing(false);
   }, []);
 
+  // WebRTC PeerConnection Helper
+  const createPeerConnection = useCallback((peerEmail: string): RTCPeerConnection => {
+    const pc = new RTCPeerConnection(STUN_SERVERS);
+
+    const activeStream = screenStreamRef.current || localStreamRef.current;
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => {
+        pc.addTrack(track, activeStream);
+      });
+    }
+
+    pc.ontrack = (event) => {
+      let currentStream = remoteStreamsRef.current.get(peerEmail);
+      if (!currentStream) {
+        currentStream = new MediaStream();
+      }
+
+      // Remove existing track of same kind if replacing
+      const existingTrack = currentStream.getTracks().find((t) => t.kind === event.track.kind);
+      if (existingTrack && existingTrack.id !== event.track.id) {
+        currentStream.removeTrack(existingTrack);
+      }
+      if (!currentStream.getTracks().some((t) => t.id === event.track.id)) {
+        currentStream.addTrack(event.track);
+      }
+
+      const freshStream = new MediaStream(currentStream.getTracks());
+      remoteStreamsRef.current.set(peerEmail, freshStream);
+
+      setRemoteStreams((prev) => ({
+        ...prev,
+        [peerEmail]: freshStream,
+      }));
+
+      // Play audio track automatically
+      if (event.track.kind === 'audio') {
+        let audioEl = audioElementsRef.current.get(peerEmail);
+        if (!audioEl) {
+          audioEl = document.createElement('audio');
+          audioEl.autoplay = true;
+          audioEl.playsInline = true;
+          audioEl.id = `remote_audio_${peerEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          document.body.appendChild(audioEl);
+          audioElementsRef.current.set(peerEmail, audioEl);
+        }
+        audioEl.srcObject = freshStream;
+        audioEl.play().catch((err) => console.warn('Remote audio autoplay error:', err));
+      }
+
+      setHuddleParticipants((prev) =>
+        prev.map((p) => (p.email === peerEmail ? { ...p, stream: freshStream } : p))
+      );
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'signal',
+          payload: {
+            to: peerEmail,
+            from: userSessionRef.current.email,
+            type: 'ice',
+            candidate: event.candidate,
+          },
+        });
+      }
+    };
+
+    return pc;
+  }, []);
+
+  const initiatePeerConnection = useCallback(async (peerEmail: string) => {
+    let pc = peerConnectionsRef.current.get(peerEmail);
+    if (!pc) {
+      pc = createPeerConnection(peerEmail);
+      peerConnectionsRef.current.set(peerEmail, pc);
+    }
+
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      realtimeChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'signal',
+        payload: {
+          to: peerEmail,
+          from: userSessionRef.current.email,
+          type: 'offer',
+          offer,
+        },
+      });
+    } catch (err) {
+      console.warn('Error creating WebRTC offer:', err);
+    }
+  }, [createPeerConnection]);
+
   // Update peer WebRTC senders with newly available media tracks
   const updatePeerTracks = useCallback((streamToShare: MediaStream | null) => {
     if (!streamToShare) return;
-    peerConnectionsRef.current.forEach((pc) => {
+    peerConnectionsRef.current.forEach((pc, peerEmail) => {
       const senders = pc.getSenders();
       streamToShare.getTracks().forEach((track) => {
         const existingSender = senders.find((s) => s.track?.kind === track.kind);
@@ -180,8 +278,10 @@ export const HuddleProvider: React.FC<{
           }
         }
       });
+      // Trigger WebRTC offer renegotiation so remote peer receives new tracks
+      initiatePeerConnection(peerEmail);
     });
-  }, []);
+  }, [initiatePeerConnection]);
 
   // Sync media tracks with mic/video state
   const syncMedia = useCallback(async (mic: boolean, video: boolean) => {
@@ -232,90 +332,6 @@ export const HuddleProvider: React.FC<{
       return null;
     }
   }, [setUpAudioAnalysis, updatePeerTracks]);
-
-  // WebRTC PeerConnection Helper
-  const createPeerConnection = useCallback((peerEmail: string): RTCPeerConnection => {
-    const pc = new RTCPeerConnection(STUN_SERVERS);
-
-    const activeStream = screenStreamRef.current || localStreamRef.current;
-    if (activeStream) {
-      activeStream.getTracks().forEach((track) => {
-        pc.addTrack(track, activeStream);
-      });
-    }
-
-    pc.ontrack = (event) => {
-      const incomingStream = event.streams[0] || new MediaStream([event.track]);
-      remoteStreamsRef.current.set(peerEmail, incomingStream);
-
-      setRemoteStreams((prev) => ({
-        ...prev,
-        [peerEmail]: incomingStream,
-      }));
-
-      // Play audio track automatically
-      if (event.track.kind === 'audio') {
-        let audioEl = audioElementsRef.current.get(peerEmail);
-        if (!audioEl) {
-          audioEl = document.createElement('audio');
-          audioEl.autoplay = true;
-          audioEl.playsInline = true;
-          audioEl.id = `remote_audio_${peerEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
-          document.body.appendChild(audioEl);
-          audioElementsRef.current.set(peerEmail, audioEl);
-        }
-        audioEl.srcObject = incomingStream;
-        audioEl.play().catch((err) => console.warn('Remote audio autoplay error:', err));
-      }
-
-      setHuddleParticipants((prev) =>
-        prev.map((p) => (p.email === peerEmail ? { ...p, stream: incomingStream } : p))
-      );
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && realtimeChannelRef.current) {
-        realtimeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'signal',
-          payload: {
-            to: peerEmail,
-            from: userSessionRef.current.email,
-            type: 'ice',
-            candidate: event.candidate,
-          },
-        });
-      }
-    };
-
-    return pc;
-  }, []);
-
-  const initiatePeerConnection = useCallback(async (peerEmail: string) => {
-    let pc = peerConnectionsRef.current.get(peerEmail);
-    if (!pc) {
-      pc = createPeerConnection(peerEmail);
-      peerConnectionsRef.current.set(peerEmail, pc);
-    }
-
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      realtimeChannelRef.current?.send({
-        type: 'broadcast',
-        event: 'signal',
-        payload: {
-          to: peerEmail,
-          from: userSessionRef.current.email,
-          type: 'offer',
-          offer,
-        },
-      });
-    } catch (err) {
-      console.warn('Error creating WebRTC offer:', err);
-    }
-  }, [createPeerConnection]);
 
   // Handle incoming Realtime signaling messages
   const handleSignal = useCallback(async (payload: any) => {
@@ -592,8 +608,11 @@ export const HuddleProvider: React.FC<{
     setSpeakingParticipants({});
     setLocalVolume(0);
 
+    const remainingParticipants = huddleParticipants.filter((p) => p.email !== userSessionRef.current.email);
+    const stillActive = remainingParticipants.length > 0;
+
     if (onHuddleStateChange) {
-      onHuddleStateChange(projectId, channelId, false, []);
+      onHuddleStateChange(projectId, channelId, stillActive, remainingParticipants);
     }
 
     try {
