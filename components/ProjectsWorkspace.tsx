@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem, Priority } from '../types';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem, Priority, ProjectExpense } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
 import { useHuddle } from '../src/context/HuddleContext';
 import { 
@@ -631,6 +631,37 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             window.removeEventListener('huddle-ended', handleHuddleEnded);
         };
     }, [activeProject, onUpdateProject]);
+
+    // Handle channel redirection from notifications
+    const pendingRedirectChannelRef = useRef<string | null>(null);
+
+    React.useEffect(() => {
+        const handleRedirect = (e: Event) => {
+            const customEvent = e as CustomEvent<{ projectId: number; channelId: string }>;
+            if (customEvent.detail) {
+                const { channelId } = customEvent.detail;
+                if (channelId) {
+                    pendingRedirectChannelRef.current = channelId;
+                    setActiveTab('chat');
+                    setSelectedChannelId(channelId);
+                }
+            }
+        };
+
+        window.addEventListener('app-redirect-project-channel', handleRedirect);
+        return () => {
+            window.removeEventListener('app-redirect-project-channel', handleRedirect);
+        };
+    }, []);
+
+    React.useEffect(() => {
+        if (pendingRedirectChannelRef.current) {
+            const targetChan = pendingRedirectChannelRef.current;
+            setActiveTab('chat');
+            setSelectedChannelId(targetChan);
+            pendingRedirectChannelRef.current = null;
+        }
+    }, [activeProject?.id]);
 
     // Handle channel selection synchronization
     React.useEffect(() => {
@@ -3488,12 +3519,21 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{exp.category}</span>
                                         <span className="text-[10px] text-gray-400 text-ellipsis overflow-hidden">
                                             Por: {(() => {
-                                                if (!exp.created_by) return 'Desconocido';
-                                                if (exp.created_by === 'Tú' || (currentUserEmail && exp.created_by.toLowerCase() === currentUserEmail.toLowerCase())) {
-                                                    return 'Tú';
+                                                if (exp.created_by_name && exp.created_by_name !== 'Tú') {
+                                                    return exp.created_by_name;
                                                 }
+                                                if (!exp.created_by) return 'Desconocido';
                                                 const member = realMembers.find(m => m.email && m.email.toLowerCase() === exp.created_by.toLowerCase());
-                                                return member ? member.name : exp.created_by;
+                                                if (member && member.name) {
+                                                    return member.name;
+                                                }
+                                                if (exp.created_by.includes('@')) {
+                                                    return exp.created_by.split('@')[0];
+                                                }
+                                                if (exp.created_by === 'Tú') {
+                                                    return currentUserName;
+                                                }
+                                                return exp.created_by;
                                             })()}
                                         </span>
                                     </div>
@@ -4452,7 +4492,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     const date = formData.get('date') as string;
                     
                     if (desc && amountStr && !isNaN(Number(amountStr))) {
-                        const newExp = {
+                        const newExp: ProjectExpense = {
                             id: crypto.randomUUID(),
                             project_id: activeProject.id,
                             description: desc,
@@ -4460,7 +4500,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             date: date || new Date().toISOString().split('T')[0],
                             category: (cat || 'Other') as any,
                             created_at: new Date().toISOString(),
-                            created_by: currentUserEmail || 'Tú'
+                            created_by: currentUserEmail || 'usuario@local.com',
+                            created_by_name: currentUserName
                         };
                         onUpdateProject(activeProject.id, { expenses: [newExp, ...(activeProject.expenses || [])] });
                         setIsExpenseModalOpen(false);

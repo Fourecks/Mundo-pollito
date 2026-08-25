@@ -269,6 +269,7 @@ export interface ProjectExpense {
   sprint_id?: string;
   created_at: string;
   created_by: string;
+  created_by_name?: string;
 }
 
 export interface ProjectTimeEntry {
