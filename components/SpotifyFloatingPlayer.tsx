@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Playlist } from '../types';
 import { X, ChevronUp, Minus } from 'lucide-react';
@@ -8,16 +8,97 @@ interface SpotifyFloatingPlayerProps {
   onClose: () => void;
 }
 
+// Extend Window interface for Spotify IFrame API
+declare global {
+  interface Window {
+    onSpotifyIframeApiReady?: (IFrameAPI: any) => void;
+    Spotify?: {
+      IFrameAPI?: any;
+    };
+  }
+}
+
 const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, onClose }) => {
   const [spotifySessionConfirmed, setSpotifySessionConfirmed] = useState<boolean>(() => {
     return localStorage.getItem('spotify_session_active') === 'true';
   });
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  
+  const embedContainerRef = useRef<HTMLDivElement>(null);
+  const controllerRef = useRef<any>(null);
 
   const spotifyId = track.source_id || track.id;
-  const embedUrl = `https://open.spotify.com/embed/${track.type || 'playlist'}/${spotifyId}?utm_source=generator`;
+  const spotifyUri = `spotify:${track.type || 'playlist'}:${spotifyId}`;
+
+  // Initialize Spotify IFrame API when session is confirmed
+  useEffect(() => {
+    if (!spotifySessionConfirmed) return;
+
+    let isMounted = true;
+
+    const initPlayer = () => {
+      const element = embedContainerRef.current;
+      if (!element) return;
+
+      // If controller already exists, load new URI
+      if (controllerRef.current) {
+        try {
+          controllerRef.current.loadUri(spotifyUri);
+          return;
+        } catch (e) {
+          // fallback to recreate
+        }
+      }
+
+      if (window.Spotify && window.Spotify.IFrameAPI) {
+        createSpotifyController(window.Spotify.IFrameAPI, element);
+      } else {
+        // Load script if not present
+        if (!document.getElementById('spotify-iframe-api')) {
+          const script = document.createElement('script');
+          script.id = 'spotify-iframe-api';
+          script.src = 'https://open.spotify.com/embed/iframe-api/v1.js';
+          script.async = true;
+          document.body.appendChild(script);
+        }
+
+        window.onSpotifyIframeApiReady = (IFrameAPI) => {
+          if (isMounted && embedContainerRef.current) {
+            createSpotifyController(IFrameAPI, embedContainerRef.current);
+          }
+        };
+      }
+    };
+
+    const createSpotifyController = (IFrameAPI: any, element: HTMLElement) => {
+      // Clear container first if needed
+      element.innerHTML = '';
+      
+      const options = {
+        width: '100%',
+        height: '100%',
+        uri: spotifyUri
+      };
+
+      IFrameAPI.createController(element, options, (EmbedController: any) => {
+        if (!isMounted) return;
+        controllerRef.current = EmbedController;
+
+        EmbedController.addListener('playback_update', (e: any) => {
+          if (isMounted && e.data) {
+            setIsPlaying(!e.data.isPaused);
+          }
+        });
+      });
+    };
+
+    initPlayer();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [spotifySessionConfirmed, spotifyUri]);
 
   if (!spotifySessionConfirmed) {
     return (
@@ -96,7 +177,7 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
                 <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-.1.2-1.02-.36-.18-.6.36-1.02.96-1.2 4.2-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.56.3z" />
               </svg>
             </div>
-            <div className="flex-1 overflow-hidden cursor-pointer" onClick={() => setIsPlaying(!isPlaying)} title="Haz clic para alternar estado">
+            <div className="flex-1 overflow-hidden cursor-pointer" onClick={() => setIsMinimized(false)} title="Haz clic para abrir">
               <span className={`text-[10px] font-bold uppercase tracking-widest block leading-none ${isPlaying ? 'text-[#1DB954]' : 'text-amber-400'}`}>
                 {isPlaying ? 'Reproduciendo' : 'Pausado'}
               </span>
@@ -122,10 +203,15 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
         )}
       </AnimatePresence>
 
-      {/* Full Player Modal */}
+      {/* Full Player Modal - Always mounted in DOM to prevent stopping playback when minimized */}
       <motion.div 
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: isMinimized ? 0 : 1, y: isMinimized ? 20 : 0, scale: isMinimized ? 0.95 : 1, pointerEvents: isMinimized ? 'none' : 'auto' }}
+        animate={{ 
+          opacity: isMinimized ? 0 : 1, 
+          y: isMinimized ? 20 : 0, 
+          scale: isMinimized ? 0.95 : 1, 
+          pointerEvents: isMinimized ? 'none' : 'auto' 
+        }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         style={{ display: isMinimized ? 'none' : 'block' }}
         className="pointer-events-auto relative bg-black rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.5)] overflow-hidden w-[340px] h-[420px] border border-white/10"
@@ -159,18 +245,8 @@ const SpotifyFloatingPlayer: React.FC<SpotifyFloatingPlayerProps> = ({ track, on
           </button>
         </div>
 
-        <iframe
-          ref={iframeRef}
-          src={embedUrl}
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          allowFullScreen
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          loading="lazy"
-          title="Spotify Player"
-          className="w-full h-full"
-        />
+        {/* Spotify iFrame Embed Container */}
+        <div ref={embedContainerRef} className="w-full h-full bg-black" />
       </motion.div>
     </div>
   );
