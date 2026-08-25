@@ -13,20 +13,18 @@ import ModalWindow from './components/ModalWindow';
 import TodoListModule from './components/TodoListModule';
 import NotesSection from './components/NotesSection';
 import MusicPlayer from './components/MusicPlayer';
-import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
+import SpotifyPlayerModal from './components/SpotifyPlayerModal';
 import TaskDetailsModal from './components/TaskDetailsModal';
 import ParticleLayer from './components/ParticleLayer';
 import { useBatteryStatus } from './utils/battery';
 import { initDB, getAll, get, set, syncableCreate, syncableUpdate, syncableDelete, syncableDeleteAll, processSyncQueue, syncableDeleteMultiple, clearAndPutAll } from './db';
 import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
-import Browser from './components/Browser';
 import BackgroundTimer from './components/BackgroundTimer';
 import TodaysAgenda from './components/TodaysAgenda';
 import { rainSoundSrc, forestSoundSrc, coffeeShopSrc, oceanSoundSrc } from './assets/sounds';
 import MobileNav from './components/MobileNav';
 import MobileHeader from './components/MobileHeader';
-import ChickenIcon from './components/ChickenIcon';
 import MobileMusicPlayer from './components/MobileMusicPlayer';
 import MobilePomodoroWidget from './components/MobilePomodoroWidget';
 import ThemeToggleButton from './components/ThemeToggleButton';
@@ -57,7 +55,7 @@ import ChevronLeftIcon from './components/icons/ChevronLeftIcon';
 import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
 import { NotionService } from './services/notionService';
-import { Settings } from 'lucide-react';
+import { Settings, Loader2 } from 'lucide-react';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -1023,7 +1021,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               </ModalWindow>
           )}
           {openWindows.includes('notes') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas del Pollito" isDraggable isResizable zIndex={getWindowZIndex('notes')} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStatesRef.current.notes} onStateChange={s => handleWindowStateChange('notes', s)} allowFullscreen>
+              <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas" isDraggable isResizable zIndex={getWindowZIndex('notes')} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStatesRef.current.notes} onStateChange={s => handleWindowStateChange('notes', s)} allowFullscreen>
                   <NotesSection folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
               </ModalWindow>
           )}
@@ -1051,11 +1049,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
            {openWindows.includes('music') && (
               <ModalWindow isOpen onClose={() => toggleWindow('music')} frameless isDraggable isResizable zIndex={getWindowZIndex('music')} onFocus={() => bringToFront('music')} className="w-[600px] h-[450px]" windowState={windowStatesRef.current.music} onStateChange={s => handleWindowStateChange('music', s)}>
                   <MusicPlayer playlists={playlists} onAddPlaylist={handleAddPlaylist} onUpdatePlaylist={handleUpdatePlaylist} onDeletePlaylist={handleDeletePlaylist} onSelectTrack={handleSelectTrack} onClose={() => toggleWindow('music')} />
-              </ModalWindow>
-          )}
-          {openWindows.includes('browser') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('browser')} title="IA Pollito" isDraggable isResizable zIndex={getWindowZIndex('browser')} onFocus={() => bringToFront('browser')} className="w-full max-w-xl h-[85vh]" windowState={windowStatesRef.current.browser} onStateChange={s => handleWindowStateChange('browser', s)} allowFullscreen>
-                  <Browser session={browserSession} setSession={setBrowserSession} currentUser={currentUser} />
               </ModalWindow>
           )}
           {openWindows.includes('projects') && (
@@ -1105,9 +1098,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           onSyncToCalendar={onSyncToCalendar}
         />
         {(activeSpotifyTrack || activeTrack) && (
-            <SpotifyFloatingPlayer 
+            <SpotifyPlayerModal 
               track={activeSpotifyTrack || activeTrack!} 
               onClose={() => { setActiveSpotifyTrack(null); setActiveTrack(null); }} 
+              zIndex={getWindowZIndex('spotify')}
+              onFocus={() => bringToFront('spotify')}
+              windowState={windowStatesRef.current.spotify}
+              onStateChange={s => handleWindowStateChange('spotify', s)}
             />
         )}
         <ProjectEditorPanel
@@ -1170,7 +1167,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
     const [completionQuote, setCompletionQuote] = useState('');
     const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
     const [isPomodoroModalOpen, setIsPomodoroModalOpen] = useState(false);
-    const [isAiBrowserOpen, setIsAiBrowserOpen] = useState(false);
     const [isCustomizationPanelOpen, setIsCustomizationPanelOpen] = useState(false);
     const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
     const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
@@ -1644,12 +1640,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 {renderContent()}
             </main>
             
-            {activeTab !== 'tasks' && activeTab !== 'notes' && (
-              <button onClick={() => setIsAiBrowserOpen(true)} className="mobile-ai-button fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40">
-                  <ChickenIcon className="w-6 h-6" />
-              </button>
-            )}
-            
              {(activeTrack || activeSpotifyTrack) && (
                 <div className="fixed bottom-[76px] left-0 right-0 z-50">
                     <MobileMusicPlayer
@@ -1779,12 +1769,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 onRemoveFromCalendar={onRemoveFromCalendar}
                 onSyncToCalendar={onSyncToCalendar}
             />
-            
-            {isAiBrowserOpen && (
-                <div className="fixed inset-0 bg-secondary-lighter/90 dark:bg-gray-900 z-[100] animate-deploy">
-                    <Browser session={browserSession} setSession={setBrowserSession} onClose={() => setIsAiBrowserOpen(false)} currentUser={currentUser} />
-                </div>
-            )}
 
             <MobilePomodoroPanel
                 isOpen={isPomodoroModalOpen}
@@ -4949,15 +4933,10 @@ const App: React.FC = () => {
   if (authLoading || (user && !dataLoaded) || (user && !uiSettings)) {
     return (
         <div className="min-h-screen bg-gradient-to-br from-secondary-light via-primary-light to-secondary-lighter dark:from-gray-800 dark:via-primary/50 dark:to-gray-900 flex flex-col items-center justify-center text-center">
-            <div className="relative w-40 h-32">
-                <div className="absolute inset-x-0 bottom-8 h-24">
-                    <div className="animate-walk-cycle w-24 h-24 mx-auto">
-                        <ChickenIcon className="w-full h-full text-pink-400" />
-                    </div>
-                </div>
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-16 h-3 bg-black rounded-full animate-shadow-cycle"></div>
+            <div className="mb-6">
+                <Loader2 className="w-16 h-16 text-primary animate-spin mx-auto" />
             </div>
-             <p className="text-xl font-semibold text-gray-600 dark:text-gray-300 -mt-4 animate-pulse">
+             <p className="text-xl font-semibold text-gray-600 dark:text-gray-300 animate-pulse">
                 Cargando...
             </p>
         </div>

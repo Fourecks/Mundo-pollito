@@ -852,7 +852,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                           return (
                             <div 
                               key={dateKey} 
-                              className={`flex flex-col items-center gap-1 flex-1 min-w-[38px] transition-all ${
+                              className={`flex flex-col items-center gap-1 w-full transition-all ${
                                 isToday ? 'py-1 px-0.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30' : ''
                               }`}
                             >

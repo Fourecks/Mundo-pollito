@@ -54,6 +54,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
       windowState?.pos && 
       typeof windowState.pos.x === 'number' && 
       typeof windowState.pos.y === 'number' &&
+      (windowState.pos.x !== 0 || windowState.pos.y !== 0) &&
       typeof window.innerWidth === 'number'
     ) {
       const safeX = Math.max(0, Math.min(window.innerWidth - 80, windowState.pos.x));
@@ -132,7 +133,8 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
         typeof windowState.size.width === 'number' && 
         typeof windowState.size.height === 'number' &&
         windowState.size.width >= 150 && 
-        windowState.size.height >= 100
+        windowState.size.height >= 100 &&
+        (windowState.pos.x !== 0 || windowState.pos.y !== 0)
       ) {
         const safeWidth = Math.min(window.innerWidth - 30, Math.max(minWidth, windowState.size.width));
         const safeHeight = Math.min(window.innerHeight - 30, Math.max(minHeight, windowState.size.height));

@@ -329,18 +329,6 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
 
     return (
         <div ref={containerRef} className="flex flex-col h-full overflow-hidden">
-            {/* Top Navigation Tabs */}
-            <div className="flex-shrink-0 px-4 pt-2.5 pb-2 border-b border-secondary-light/30 dark:border-gray-700/50 bg-secondary-lighter/40 dark:bg-gray-800/40 flex items-center justify-between">
-                <div className="flex items-center gap-1 bg-black/5 dark:bg-black/20 p-0.5 rounded-lg">
-                    <button
-                        onClick={() => { setActiveTab('tasks'); setViewingProject(null); }}
-                        className={`px-4 py-1 text-xs font-bold rounded-md transition-all bg-white dark:bg-gray-800 text-primary-dark dark:text-primary shadow-xs`}
-                    >
-                        Tareas
-                    </button>
-                </div>
-            </div>
-
             <div className="flex-grow overflow-hidden">
                 {activeTab === 'tasks' && (
                      <div className="flex flex-col md:flex-row h-full">
