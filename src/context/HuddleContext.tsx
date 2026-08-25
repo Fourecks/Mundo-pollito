@@ -79,6 +79,9 @@ export const HuddleProvider: React.FC<{
   const isMicOnRef = useRef(true);
   const isVideoOnRef = useRef(false);
   const isScreenSharingRef = useRef(false);
+  const lastHeartbeatRef = useRef<Map<string, number>>(new Map());
+  const allSessionParticipantsRef = useRef<Set<string>>(new Set());
+  const huddleStartTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     isMicOnRef.current = isMicOn;
@@ -263,16 +266,20 @@ export const HuddleProvider: React.FC<{
 
   // Update peer WebRTC senders with newly available media tracks
   const updatePeerTracks = useCallback((streamToShare: MediaStream | null) => {
-    if (!streamToShare) return;
     peerConnectionsRef.current.forEach((pc, peerEmail) => {
+      const activeStream = streamToShare || screenStreamRef.current || localStreamRef.current;
+      if (!activeStream) return;
+
       const senders = pc.getSenders();
-      streamToShare.getTracks().forEach((track) => {
+      const tracksToShare = activeStream.getTracks();
+
+      tracksToShare.forEach((track) => {
         const existingSender = senders.find((s) => s.track?.kind === track.kind);
         if (existingSender) {
           existingSender.replaceTrack(track).catch((err) => console.warn('Replace track error:', err));
         } else {
           try {
-            pc.addTrack(track, streamToShare);
+            pc.addTrack(track, activeStream);
           } catch (e) {
             console.warn('Add track error:', e);
           }
@@ -450,8 +457,23 @@ export const HuddleProvider: React.FC<{
     });
     realtimeChannelRef.current = channel;
 
+    huddleStartTimeRef.current = Date.now();
+    allSessionParticipantsRef.current = new Set([initialParticipant.name]);
+
     channel
+      .on('broadcast', { event: 'heartbeat' }, ({ payload }) => {
+        if (payload && payload.email) {
+          lastHeartbeatRef.current.set(payload.email, Date.now());
+          if (payload.name) {
+            allSessionParticipantsRef.current.add(payload.name);
+          }
+        }
+      })
       .on('broadcast', { event: 'join' }, ({ payload }) => {
+        if (payload && payload.name) {
+          allSessionParticipantsRef.current.add(payload.name);
+        }
+        lastHeartbeatRef.current.set(payload.email, Date.now());
         setHuddleParticipants((prev) => {
           if (prev.some((p) => p.email === payload.email)) return prev;
           return [
@@ -485,6 +507,10 @@ export const HuddleProvider: React.FC<{
       })
       .on('broadcast', { event: 'presence_announce' }, ({ payload }) => {
         if (payload.to === userSessionRef.current.email) {
+          if (payload && payload.name) {
+            allSessionParticipantsRef.current.add(payload.name);
+          }
+          lastHeartbeatRef.current.set(payload.email, Date.now());
           setHuddleParticipants((prev) => {
             if (prev.some((p) => p.email === payload.email)) return prev;
             return [
@@ -504,6 +530,9 @@ export const HuddleProvider: React.FC<{
         handleSignal(payload);
       })
       .on('broadcast', { event: 'state_update' }, ({ payload }) => {
+        if (payload && payload.email) {
+          lastHeartbeatRef.current.set(payload.email, Date.now());
+        }
         setHuddleParticipants((prev) =>
           prev.map((p) =>
             p.email === payload.email
@@ -518,6 +547,7 @@ export const HuddleProvider: React.FC<{
         );
       })
       .on('broadcast', { event: 'leave' }, ({ payload }) => {
+        lastHeartbeatRef.current.delete(payload.email);
         setHuddleParticipants((prev) => prev.filter((p) => p.email !== payload.email));
 
         const pc = peerConnectionsRef.current.get(payload.email);
@@ -568,6 +598,19 @@ export const HuddleProvider: React.FC<{
 
     const projectId = activeHuddle.projectId;
     const channelId = activeHuddle.channelId;
+
+    // Calculate call duration & participant summary
+    const durationMs = huddleStartTimeRef.current ? Date.now() - huddleStartTimeRef.current : 0;
+    const totalSeconds = Math.max(1, Math.floor(durationMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const durationText = minutes > 0 ? `${minutes} min ${seconds} seg` : `${seconds} seg`;
+
+    const participantsList = Array.from(allSessionParticipantsRef.current);
+    if (participantsList.length === 0) {
+      participantsList.push(userSessionRef.current.name || 'Usuario');
+    }
+    const participantsStr = participantsList.join(', ');
 
     // Send leave signal
     if (realtimeChannelRef.current) {
@@ -621,10 +664,20 @@ export const HuddleProvider: React.FC<{
           detail: { projectId, channelId },
         })
       );
+      window.dispatchEvent(
+        new CustomEvent('huddle-call-summary', {
+          detail: {
+            projectId,
+            channelId,
+            durationText,
+            participantsStr,
+          },
+        })
+      );
     } catch (e) {
       console.log('Error dispatching huddle-ended event:', e);
     }
-  }, [activeHuddle, stopLocalStream, stopScreenStream, onHuddleStateChange]);
+  }, [activeHuddle, huddleParticipants, stopLocalStream, stopScreenStream, onHuddleStateChange]);
 
   const toggleMic = useCallback(() => {
     setIsMicOn((prev) => {
@@ -783,6 +836,85 @@ export const HuddleProvider: React.FC<{
 
     return () => clearInterval(interval);
   }, [isHuddleActive, huddleParticipants, isMicOn, localVolume]);
+
+  // Heartbeat & Pruning of inactive/disconnected participants
+  useEffect(() => {
+    if (!isHuddleActive) return;
+
+    const interval = setInterval(() => {
+      // Send heartbeat to channel
+      if (realtimeChannelRef.current) {
+        try {
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'heartbeat',
+            payload: {
+              email: userSessionRef.current.email,
+              name: userSessionRef.current.name,
+              timestamp: Date.now(),
+            },
+          });
+        } catch (e) {}
+      }
+
+      // Prune participants who haven't sent a heartbeat for > 25 seconds
+      const now = Date.now();
+      lastHeartbeatRef.current.forEach((lastTime, email) => {
+        if (email !== userSessionRef.current.email && now - lastTime > 25000) {
+          lastHeartbeatRef.current.delete(email);
+          setHuddleParticipants((prev) => prev.filter((p) => p.email !== email));
+
+          const pc = peerConnectionsRef.current.get(email);
+          if (pc) {
+            pc.close();
+            peerConnectionsRef.current.delete(email);
+          }
+
+          const audioEl = audioElementsRef.current.get(email);
+          if (audioEl) {
+            audioEl.pause();
+            audioEl.srcObject = null;
+            audioEl.remove();
+            audioElementsRef.current.delete(email);
+          }
+
+          remoteStreamsRef.current.delete(email);
+          setRemoteStreams((prev) => {
+            const next = { ...prev };
+            delete next[email];
+            return next;
+          });
+        }
+      });
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [isHuddleActive]);
+
+  // Clean up on page close/reload
+  useEffect(() => {
+    if (!isHuddleActive) return;
+
+    const handleUnload = () => {
+      if (realtimeChannelRef.current) {
+        try {
+          realtimeChannelRef.current.send({
+            type: 'broadcast',
+            event: 'leave',
+            payload: { email: userSessionRef.current.email },
+          });
+        } catch (e) {}
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+    };
+  }, [isHuddleActive]);
 
   // Clean up on unmount
   useEffect(() => {

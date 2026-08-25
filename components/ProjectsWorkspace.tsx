@@ -657,9 +657,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             if (customEvent.detail) {
                 const { channelId } = customEvent.detail;
                 if (channelId) {
-                    pendingRedirectChannelRef.current = channelId;
                     setActiveTab('chat');
                     setSelectedChannelId(channelId);
+                    pendingRedirectChannelRef.current = null;
                 }
             }
         };
@@ -670,17 +670,48 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         };
     }, []);
 
+    // Listen for huddle call summaries and post system record to channel chat
+    React.useEffect(() => {
+        const handleHuddleSummary = (e: any) => {
+            const detail = e.detail;
+            if (activeProject && detail) {
+                const { projectId, channelId, durationText, participantsStr } = detail;
+                if (!projectId || projectId === activeProject.id) {
+                    const targetChanId = channelId || selectedChannelId || 'general';
+                    const summaryMsg: ProjectChatMessage = {
+                        id: crypto.randomUUID(),
+                        project_id: activeProject.id,
+                        channel_id: targetChanId,
+                        sender_name: 'Sistema 📞',
+                        sender_email: 'sistema@pollito.com',
+                        text: `📞 **Llamada Huddle Finalizada**\n• Duración: ${durationText}\n• Participantes: ${participantsStr}`,
+                        created_at: new Date().toISOString()
+                    };
+                    const currentMsgs = activeProject.chat_messages || [];
+                    const isDuplicate = currentMsgs.some(m => 
+                        m.sender_name === 'Sistema 📞' && 
+                        m.channel_id === targetChanId &&
+                        m.text.includes(durationText) &&
+                        (new Date().getTime() - new Date(m.created_at).getTime() < 10000)
+                    );
+                    if (!isDuplicate) {
+                        onUpdateProject(activeProject.id, { 
+                            chat_messages: [...currentMsgs, summaryMsg] 
+                        });
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('huddle-call-summary', handleHuddleSummary);
+        return () => {
+            window.removeEventListener('huddle-call-summary', handleHuddleSummary);
+        };
+    }, [activeProject, selectedChannelId, onUpdateProject]);
+
     // Handle channel selection synchronization
     React.useEffect(() => {
         if (activeChannels.length > 0) {
-            const pendingChan = pendingRedirectChannelRef.current;
-            if (pendingChan && activeChannels.some(c => c.id === pendingChan)) {
-                if (selectedChannelId !== pendingChan) {
-                    setSelectedChannelId(pendingChan);
-                }
-                return;
-            }
-
             const exists = activeChannels.some(c => c.id === selectedChannelId);
             if (!exists) {
                 setSelectedChannelId(activeChannels[0].id);
@@ -688,7 +719,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         } else {
             setSelectedChannelId('general');
         }
-    }, [activeProject, activeChannels, selectedChannelId]);
+    }, [activeChannels, selectedChannelId]);
 
     // Scroll to bottom when opening chat or changing channel
     React.useEffect(() => {
@@ -2432,9 +2463,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         const handleToggleHuddle = () => {
             if (isCurrentChannelHuddleActive) {
+                const isMultiUser = huddleParticipants.length > 1;
                 leaveHuddle();
-                const updatedHuddles = activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: false, participants: [] } : h);
-                onUpdateProject(activeProject.id, { huddles: updatedHuddles });
+                if (!isMultiUser) {
+                    const updatedHuddles = activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: false, participants: [] } : h);
+                    onUpdateProject(activeProject.id, { huddles: updatedHuddles });
+                }
             } else {
                 startHuddle(activeProject.id, activeProject.name, currentChannel.id, currentChannel.name, activeProject.emoji);
                 const updatedHuddles = activeHuddles.some(h => h.channel_id === currentChannel.id)
@@ -2652,7 +2686,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         }`}
                                     >
                                         <Video className="w-3.5 h-3.5" />
-                                        {isCurrentChannelHuddleActive ? 'Salir del Huddle' : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active) ? 'Unirse' : 'Iniciar Huddle'}
+                                        {isCurrentChannelHuddleActive 
+                                            ? (huddleParticipants.length > 1 ? 'Salirse' : 'Colgar') 
+                                            : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active || isGlobalHuddleActive) 
+                                                ? 'Unirse al Huddle 🎙️' 
+                                                : 'Iniciar Huddle'}
                                     </button>
                                 )}
 
@@ -2696,7 +2734,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         onClick={handleToggleHuddle}
                                         className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors"
                                     >
-                                        Colgar 📞
+                                        {huddleParticipants.length > 1 ? 'Salirse' : 'Colgar'} 📞
                                     </button>
                                 </div>
                             </div>
@@ -3592,8 +3630,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         </span>
                                     </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right flex items-center gap-3">
                                     <span className="text-base font-bold text-gray-900 dark:text-white">${exp.amount.toFixed(2)}</span>
+                                    {isProjectCreator && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm(`¿Estás seguro de eliminar el gasto "${exp.description}"?`)) {
+                                                    const updated = allExpenses.filter(e => e.id !== exp.id);
+                                                    onUpdateProject(activeProject.id, { expenses: updated });
+                                                }
+                                            }}
+                                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+                                            title="Eliminar gasto (Solo Propietario)"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -3674,8 +3726,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         <span className="text-[10px] text-gray-400 text-ellipsis overflow-hidden">Por: {t.user_name}</span>
                                     </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right flex items-center gap-3">
                                     <span className="text-sm font-bold text-gray-900 dark:text-white">{Math.floor(t.duration_minutes / 60)}h {t.duration_minutes % 60}m</span>
+                                    {isProjectCreator && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm(`¿Estás seguro de eliminar este registro de tiempo?`)) {
+                                                    const updated = allTimeEntries.filter(entry => entry.id !== t.id);
+                                                    onUpdateProject(activeProject.id, { time_entries: updated });
+                                                }
+                                            }}
+                                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+                                            title="Eliminar tiempo (Solo Propietario)"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
