@@ -698,7 +698,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
 
         {viewMode === 'week' && (
           <div className="space-y-4 max-w-5xl mx-auto w-full pb-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100">Vista Semanal</h3>
               <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-lg shadow-sm">
                 <button onClick={() => setWeekOffset(weekOffset - 1)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
@@ -750,20 +750,20 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                 const streak = calculateStreak(habit, records);
 
                 return (
-                  <div key={habit.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div key={habit.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow min-w-0">
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl flex-shrink-0">
                           {habit.emoji}
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">{habit.name}</h3>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">{habit.name}</h3>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
                             {getFrequencyText(habit.frequency)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 relative">
+                      <div className="flex items-center gap-2 relative flex-shrink-0">
                         {streak > 0 && (
                           <div className="flex items-center gap-1 text-[11px] font-bold text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded-lg">
                             <span>🔥</span>
@@ -782,36 +782,38 @@ export const HabitTracker: React.FC<HabitTrackerProps> = (props) => {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between mt-1">
-                      {weekDates.map((date, index) => {
-                        const dateKey = formatDateKey(date);
-                        const isCompleted = completedRecords.has(`${habit.id}-${dateKey}`);
-                        const todayObj = new Date();
-                        todayObj.setHours(0, 0, 0, 0);
-                        const isFuture = date > todayObj;
-                        const isApplicable = isDayApplicable(date, habit.frequency);
+                    <div className="w-full overflow-x-auto custom-scrollbar -mx-1 px-1 py-1">
+                      <div className="flex items-center justify-between min-w-[260px] sm:min-w-[280px] gap-2">
+                        {weekDates.map((date, index) => {
+                          const dateKey = formatDateKey(date);
+                          const isCompleted = completedRecords.has(`${habit.id}-${dateKey}`);
+                          const todayObj = new Date();
+                          todayObj.setHours(0, 0, 0, 0);
+                          const isFuture = date > todayObj;
+                          const isApplicable = isDayApplicable(date, habit.frequency);
 
-                        return (
-                          <div key={dateKey} className="flex flex-col items-center gap-2">
-                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{weekDayLabels[index]}</span>
-                            <button 
-                              onClick={() => onToggleRecord(habit.id, dateKey)}
-                              disabled={isFuture || (!isApplicable && !isCompleted && habit.frequency.type !== 'times_per_week')} 
-                              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-                                isCompleted 
-                                  ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 scale-110' 
-                                  : isFuture
-                                    ? 'bg-transparent text-transparent cursor-not-allowed'
-                                    : (!isApplicable && habit.frequency.type !== 'times_per_week')
-                                      ? 'bg-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300'
-                              }`}
-                            >
-                              {isCompleted ? <CheckIcon className="w-4 h-4" strokeWidth={3} /> : (!isApplicable && !isFuture && habit.frequency.type !== 'times_per_week') ? <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" /> : null}
-                            </button>
-                          </div>
-                        );
-                      })}
+                          return (
+                            <div key={dateKey} className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{weekDayLabels[index]}</span>
+                              <button 
+                                onClick={() => onToggleRecord(habit.id, dateKey)}
+                                disabled={isFuture || (!isApplicable && !isCompleted && habit.frequency.type !== 'times_per_week')} 
+                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                                  isCompleted 
+                                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 scale-110' 
+                                    : isFuture
+                                      ? 'bg-transparent text-transparent cursor-not-allowed'
+                                      : (!isApplicable && habit.frequency.type !== 'times_per_week')
+                                        ? 'bg-transparent text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300'
+                                }`}
+                              >
+                                {isCompleted ? <CheckIcon className="w-4 h-4" strokeWidth={3} /> : (!isApplicable && !isFuture && habit.frequency.type !== 'times_per_week') ? <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" /> : null}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1">
