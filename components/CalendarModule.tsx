@@ -113,24 +113,27 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
 
   uniqueTasks.forEach(task => {
     if (!task.completed && task.due_date && task.end_date && task.end_date > task.due_date) {
-      const start = new Date(task.due_date + 'T00:00:00');
-      const end = new Date(task.end_date + 'T00:00:00');
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
-        let curr = new Date(start);
-        curr.setDate(curr.getDate() + 1);
-        while (curr <= end) {
-          const year = curr.getFullYear();
-          const month = String(curr.getMonth() + 1).padStart(2, '0');
-          const day = String(curr.getDate()).padStart(2, '0');
-          const dateKey = `${year}-${month}-${day}`;
-          if (!expanded[dateKey]) {
-            expanded[dateKey] = [];
-          }
-          if (!expanded[dateKey].some(t => t.id === task.id)) {
-            expanded[dateKey].push(task);
-          }
-          curr.setDate(curr.getDate() + 1);
-        }
+      // 1. Always add to due_date
+      const startKey = task.due_date;
+      if (!expanded[startKey]) expanded[startKey] = [];
+      if (!expanded[startKey].some(t => t.id === task.id)) {
+        expanded[startKey].push(task);
+      }
+
+      // 2. Add to today if within range
+      const today = new Date();
+      // Adjust today to start of day for comparison
+      const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      const startDate = new Date(task.due_date + 'T00:00:00');
+      const endDate = new Date(task.end_date + 'T00:00:00');
+      
+      if (todayNormalized > startDate && todayNormalized <= endDate) {
+         const todayKey = formatDateKey(today);
+         if (!expanded[todayKey]) expanded[todayKey] = [];
+         if (!expanded[todayKey].some(t => t.id === task.id)) {
+           expanded[todayKey].push(task);
+         }
       }
     }
   });
