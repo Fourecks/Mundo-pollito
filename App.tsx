@@ -366,6 +366,47 @@ interface AppComponentProps {
   onDeclineInvitation: (invitationId: string) => Promise<void>;
 }
 
+const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
+  const expanded: { [key: string]: Todo[] } = {};
+  for (const key of Object.keys(todosMap)) {
+    expanded[key] = [...(todosMap[key] || [])];
+  }
+  const allTasks = Object.values(todosMap).flat();
+  const seenIds = new Set<number>();
+  const uniqueTasks: Todo[] = [];
+  allTasks.forEach(t => {
+    if (!seenIds.has(t.id)) {
+      seenIds.add(t.id);
+      uniqueTasks.push(t);
+    }
+  });
+
+  uniqueTasks.forEach(task => {
+    if (!task.completed && task.due_date && task.end_date && task.end_date > task.due_date) {
+      const start = new Date(task.due_date + 'T00:00:00');
+      const end = new Date(task.end_date + 'T00:00:00');
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
+        let curr = new Date(start);
+        curr.setDate(curr.getDate() + 1);
+        while (curr <= end) {
+          const year = curr.getFullYear();
+          const month = String(curr.getMonth() + 1).padStart(2, '0');
+          const day = String(curr.getDate()).padStart(2, '0');
+          const dateKey = `${year}-${month}-${day}`;
+          if (!expanded[dateKey]) {
+            expanded[dateKey] = [];
+          }
+          if (!expanded[dateKey].some(t => t.id === task.id)) {
+            expanded[dateKey].push(task);
+          }
+          curr.setDate(curr.getDate() + 1);
+        }
+      }
+    }
+  });
+  return expanded;
+};
+
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
     isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
@@ -575,6 +616,50 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     });
     return list;
   }, [allTodos]);
+
+  const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
+    const expanded: { [key: string]: Todo[] } = {};
+    for (const key of Object.keys(todosMap)) {
+      expanded[key] = [...(todosMap[key] || [])];
+    }
+    const allTasks = Object.values(todosMap).flat();
+    const seenIds = new Set<number>();
+    const uniqueTasks: Todo[] = [];
+    allTasks.forEach(t => {
+      if (!seenIds.has(t.id)) {
+        seenIds.add(t.id);
+        uniqueTasks.push(t);
+      }
+    });
+
+    uniqueTasks.forEach(task => {
+      if (!task.completed && task.due_date && task.end_date && task.end_date > task.due_date) {
+        const start = new Date(task.due_date + 'T00:00:00');
+        const end = new Date(task.end_date + 'T00:00:00');
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
+          let curr = new Date(start);
+          curr.setDate(curr.getDate() + 1);
+          while (curr <= end) {
+            const year = curr.getFullYear();
+            const month = String(curr.getMonth() + 1).padStart(2, '0');
+            const day = String(curr.getDate()).padStart(2, '0');
+            const dateKey = `${year}-${month}-${day}`;
+            if (!expanded[dateKey]) {
+              expanded[dateKey] = [];
+            }
+            if (!expanded[dateKey].some(t => t.id === task.id)) {
+              expanded[dateKey].push(task);
+            }
+            curr.setDate(curr.getDate() + 1);
+          }
+        }
+      }
+    });
+    return expanded;
+  };
+
+  const expandedAllTodos = useMemo(() => getExpandedAllTodos(allTodos), [allTodos]);
+
   const datesWithTasks = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0)), [allTodos]);
   const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
   const todayKey = formatDateKey(new Date());
@@ -4943,10 +5028,12 @@ const App: React.FC = () => {
     return <Login />;
   }
   
+  const expandedAllTodos = useMemo(() => getExpandedAllTodos(allTodos), [allTodos]);
+
   const appProps: AppComponentProps = {
     isOnline, isSyncing, currentUser: user, onLogout: () => setIsLogoutConfirmOpen(true), 
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
-    allTodos, folders: foldersWithNotes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos: expandedAllTodos, folders: foldersWithNotes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, 
     uiSettings,
     activeTrack, activeSpotifyTrack, 

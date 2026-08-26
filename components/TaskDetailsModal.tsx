@@ -276,11 +276,17 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     e.preventDefault();
     if (!todo || !text.trim()) return;
 
+    let currentSubtasks = [...subtasks];
+    if (newSubtaskText.trim() !== '') {
+      currentSubtasks.push({ id: Date.now(), text: newSubtaskText.trim(), completed: false });
+      setNewSubtaskText('');
+    }
+
     const updatedTodoPayload: Partial<Todo> = { ...todo };
 
     updatedTodoPayload.text = text.trim();
     updatedTodoPayload.priority = priority;
-    updatedTodoPayload.subtasks = subtasks;
+    updatedTodoPayload.subtasks = currentSubtasks;
     updatedTodoPayload.project_id = projectId;
 
     updatedTodoPayload.due_date = due_date;
