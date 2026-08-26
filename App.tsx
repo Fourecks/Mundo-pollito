@@ -5026,8 +5026,6 @@ const App: React.FC = () => {
     return <Login />;
   }
   
-  const expandedAllTodos = useMemo(() => getExpandedAllTodos(allTodos), [allTodos]);
-
   const appProps: AppComponentProps = {
     isOnline, isSyncing, currentUser: user, onLogout: () => setIsLogoutConfirmOpen(true), 
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
