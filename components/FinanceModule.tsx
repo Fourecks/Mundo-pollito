@@ -432,38 +432,46 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     };
 
     const renderTabs = () => (
-        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800/50 p-1 rounded-xl mb-6 overflow-x-auto hide-scrollbar">
+        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-zinc-800 mb-8 overflow-x-auto hide-scrollbar pb-px">
             {[
-                { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
+                { id: 'overview', icon: LayoutDashboard, label: 'Resumen' },
                 { id: 'transactions', icon: ListOrdered, label: 'Movimientos' },
                 { id: 'budgets', icon: PieChart, label: 'Presupuestos' },
                 { id: 'planning', icon: CalendarDays, label: 'Planificación' },
                 { id: 'savings', icon: CheckCircle2, label: 'Metas' },
                 { id: 'shopping', icon: ShoppingCart, label: 'Compras' },
-                { id: 'stats', icon: BarChart3, label: 'Estadísticas' },
-                { id: 'closing', icon: Archive, label: 'Cierre Mensual' },
+                { id: 'debts', icon: Banknote, label: 'Deudas' },
+                { id: 'stats', icon: BarChart3, label: 'Análisis' },
+                { id: 'closing', icon: Archive, label: 'Cierre' },
                 { id: 'settings', icon: Settings, label: 'Ajustes' }
             ].map(tab => (
                 <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as TabType)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    className={`relative flex items-center gap-2 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
                         activeTab === tab.id 
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                        ? 'text-gray-900 dark:text-gray-100' 
+                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'
                     }`}
                 >
                     <tab.icon className="w-4 h-4" />
                     {tab.label}
+                    {activeTab === tab.id && (
+                        <motion.div
+                            layoutId="finance-active-tab"
+                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-gray-100"
+                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        />
+                    )}
                 </button>
             ))}
         </div>
     );
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden">
+        <div className="flex flex-col h-full bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 shrink-0">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-zinc-800 shrink-0">
                 <div className="flex items-center gap-3">
                     <Wallet className="w-6 h-6 text-primary" />
                     <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
@@ -483,33 +491,40 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     {renderTabs()}
 
                     {isLoading ? (
-                        <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
+                        <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div></div>
                     ) : (
-                        <>
-                            {/* OVERVIEW TAB */}
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={activeTab}
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                                transition={{ duration: 0.2, ease: "easeOut" }}
+                            >
+                                {/* OVERVIEW TAB */}
                             {activeTab === 'overview' && (
                                 <div className="space-y-8">
                                     {/* Stats Grid */}
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                        <div className="md:col-span-2 p-6 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+                                        <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
                                             <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Balance Total</h2>
                                             <div className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
                                                 {formatCurrency(totalBalanceCents)}
                                             </div>
                                         </div>
-                                        <div className="p-6 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30">
-                                            <h2 className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mb-1 flex items-center gap-2">
-                                                <TrendingUp className="w-4 h-4" /> Ingresos mes
+                                        <div className="p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
+                                            <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-2">
+                                                <TrendingUp className="w-4 h-4 text-emerald-500" /> Ingresos mes
                                             </h2>
-                                            <div className="text-2xl font-semibold text-emerald-700 dark:text-emerald-300">
+                                            <div className="text-2xl font-semibold text-gray-900 dark:text-white">
                                                 {formatCurrency(incomeThisMonth)}
                                             </div>
                                         </div>
-                                        <div className="p-6 rounded-2xl bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30">
-                                            <h2 className="text-sm font-medium text-red-600 dark:text-red-400 mb-1 flex items-center gap-2">
-                                                <TrendingDown className="w-4 h-4" /> Gastos mes
+                                        <div className="p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
+                                            <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-2">
+                                                <TrendingDown className="w-4 h-4 text-red-500" /> Gastos mes
                                             </h2>
-                                            <div className="text-2xl font-semibold text-red-700 dark:text-red-300">
+                                            <div className="text-2xl font-semibold text-gray-900 dark:text-white">
                                                 {formatCurrency(expensesThisMonth)}
                                             </div>
                                         </div>
@@ -517,13 +532,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                     {/* Quick Actions */}
                                     <div className="flex gap-4">
-                                        <button onClick={() => { setTxType('EXPENSE'); setShowTxModal(true); }} className="flex-1 flex items-center justify-center gap-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity shadow-sm">
+                                        <button onClick={() => { setTxType('EXPENSE'); setShowTxModal(true); }} className="flex-1 flex items-center justify-center gap-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-4 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity shadow-sm">
                                             <TrendingDown className="w-5 h-5" /> Gasto
                                         </button>
-                                        <button onClick={() => { setTxType('INCOME'); setShowTxModal(true); }} className="flex-1 flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shadow-sm border border-gray-200 dark:border-gray-700">
+                                        <button onClick={() => { setTxType('INCOME'); setShowTxModal(true); }} className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white px-4 py-3 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors shadow-sm border border-gray-200 dark:border-zinc-800">
                                             <TrendingUp className="w-5 h-5" /> Ingreso
                                         </button>
-                                        <button onClick={() => { setTxType('TRANSFER_OUT'); setShowTxModal(true); }} className="flex-1 hidden sm:flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shadow-sm border border-gray-200 dark:border-gray-700">
+                                        <button onClick={() => { setTxType('TRANSFER_OUT'); setShowTxModal(true); }} className="flex-1 hidden sm:flex items-center justify-center gap-2 bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white px-4 py-3 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors shadow-sm border border-gray-200 dark:border-zinc-800">
                                             <ArrowRightLeft className="w-5 h-5" /> Transferir
                                         </button>
                                     </div>
@@ -535,16 +550,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             {transactions.length === 0 ? (
                                                 <p className="text-gray-500 text-sm">No hay movimientos recientes.</p>
                                             ) : (
-                                                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+                                                <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
                                                     {transactions.slice(0, 5).map(tx => (
-                                                        <div key={tx.id} className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800/50 last:border-0">
-                                                            <div className="flex items-center gap-3">
+                                                        <div key={tx.id} className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-zinc-800/50 last:border-0">
+                                                            <div className="flex items-center gap-4">
                                                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'EXPENSE' ? 'bg-red-50 dark:bg-red-500/10 text-red-500' : tx.type === 'INCOME' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500'}`}>
                                                                     {tx.type === 'EXPENSE' ? <TrendingDown className="w-5 h-5" /> : tx.type === 'INCOME' ? <TrendingUp className="w-5 h-5" /> : <ArrowRightLeft className="w-5 h-5"/>}
                                                                 </div>
                                                                 <div>
-                                                                    <div className="font-medium">{tx.description || categories.find(c => c.id === tx.category_id)?.name || 'Movimiento'}</div>
-                                                                    <div className="text-xs text-gray-500">{accounts.find(a => a.id === tx.account_id)?.name} • {tx.date}</div>
+                                                                    <div className="font-medium text-gray-900 dark:text-gray-100">{tx.description || categories.find(c => c.id === tx.category_id)?.name || 'Movimiento'}</div>
+                                                                    <div className="text-xs text-gray-500 mt-0.5">{accounts.find(a => a.id === tx.account_id)?.name} • {tx.date}</div>
                                                                 </div>
                                                             </div>
                                                             <div className={`font-semibold ${tx.type === 'EXPENSE' || tx.type === 'TRANSFER_OUT' ? 'text-gray-900 dark:text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>
@@ -559,22 +574,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         {/* Budget Preview */}
                                         <div className="space-y-4">
                                             <h3 className="text-lg font-semibold">Presupuesto {currentMonthName}</h3>
-                                            <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+                                            <div className="p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
                                                 {currentBudget ? (
                                                     <>
-                                                        <div className="flex justify-between text-sm mb-2">
+                                                        <div className="flex justify-between text-sm mb-3">
                                                             <span className="text-gray-500">Gastado</span>
-                                                            <span className="font-medium">{formatCurrency(expensesThisMonth)} / {formatCurrency(currentBudget.total_amount_cents)}</span>
+                                                            <span className="font-medium">{formatCurrency(expensesThisMonth)} <span className="text-gray-400 font-normal">/ {formatCurrency(currentBudget.total_amount_cents)}</span></span>
                                                         </div>
-                                                        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
-                                                            <div className={`h-full rounded-full ${budgetProgress > 90 ? 'bg-red-500' : budgetProgress > 75 ? 'bg-amber-500' : 'bg-primary'}`} style={{ width: `${budgetProgress}%` }}></div>
+                                                        <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-3">
+                                                            <div className={`h-full rounded-full ${budgetProgress > 90 ? 'bg-red-500' : budgetProgress > 75 ? 'bg-amber-500' : 'bg-gray-900 dark:bg-gray-100'}`} style={{ width: `${budgetProgress}%` }}></div>
                                                         </div>
                                                         <p className="text-xs text-right text-gray-500">{budgetProgress}% utilizado</p>
                                                     </>
                                                 ) : (
-                                                    <div className="text-center">
+                                                    <div className="text-center py-4">
                                                         <p className="text-sm text-gray-500 mb-3">No has definido un presupuesto para este mes.</p>
-                                                        <button onClick={() => setActiveTab('budgets')} className="text-primary text-sm font-medium hover:underline">Crear presupuesto</button>
+                                                        <button onClick={() => setActiveTab('budgets')} className="text-gray-900 dark:text-white text-sm font-medium hover:underline">Crear presupuesto</button>
                                                     </div>
                                                 )}
                                             </div>
@@ -591,18 +606,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
 
                                     {/* Filters */}
-                                    <div className="flex flex-col sm:flex-row gap-3 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <div className="flex flex-col sm:flex-row gap-3 bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-gray-100 dark:border-gray-800">
                                         <input 
                                             type="text" 
                                             placeholder="Buscar descripción..." 
                                             value={txFilterSearch}
                                             onChange={(e) => setTxFilterSearch(e.target.value)}
-                                            className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm"
+                                            className="flex-1 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm"
                                         />
                                         <select 
                                             value={txFilterType} 
                                             onChange={(e) => setTxFilterType(e.target.value as any)}
-                                            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm"
+                                            className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm"
                                         >
                                             <option value="ALL">Todos los tipos</option>
                                             <option value="EXPENSE">Gastos</option>
@@ -612,7 +627,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         <select 
                                             value={txFilterAccount} 
                                             onChange={(e) => setTxFilterAccount(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
-                                            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm"
+                                            className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm"
                                         >
                                             <option value="ALL">Todas las cuentas</option>
                                             {accounts.map(acc => (
@@ -621,7 +636,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         </select>
                                     </div>
 
-                                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+                                    <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
                                         {transactions
                                             .filter(tx => {
                                                 if (txFilterType !== 'ALL' && tx.type !== txFilterType) return false;
@@ -630,7 +645,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 return true;
                                             })
                                             .map(tx => (
-                                                <div key={tx.id} className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 group">
+                                                <div key={tx.id} className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 group">
                                                 <div className="flex items-center gap-4">
                                                     <div className="text-2xl w-8 text-center">{categories.find(c => c.id === tx.category_id)?.emoji || '💸'}</div>
                                                     <div>
@@ -664,11 +679,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         <p className="text-gray-500">{currentMonthName}</p>
                                     </div>
 
-                                    <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                                    <div className="bg-white dark:bg-[#0a0a0a] p-8 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm">
                                         <form onSubmit={handleSetBudget} className="flex gap-4 items-end mb-8">
                                             <div className="flex-1">
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto del presupuesto</label>
-                                                <input type="number" step="0.01" value={budgetAmount} onChange={e => setBudgetAmount(e.target.value)} placeholder={currentBudget ? (currentBudget.total_amount_cents/100).toString() : "0.00"} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl" />
+                                                <input type="number" step="0.01" value={budgetAmount} onChange={e => setBudgetAmount(e.target.value)} placeholder={currentBudget ? (currentBudget.total_amount_cents/100).toString() : "0.00"} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl" />
                                             </div>
                                             <button type="submit" className="bg-primary text-white px-6 py-3 rounded-xl font-medium hover:bg-primary-dark">
                                                 {currentBudget ? 'Actualizar' : 'Crear'}
@@ -687,7 +702,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         <p className="text-xl font-medium text-gray-400">{formatCurrency(currentBudget.total_amount_cents)}</p>
                                                     </div>
                                                 </div>
-                                                <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                <div className="h-4 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                     <div className={`h-full rounded-full transition-all duration-500 ${budgetProgress > 90 ? 'bg-red-500' : budgetProgress > 75 ? 'bg-amber-500' : 'bg-primary'}`} style={{ width: `${budgetProgress}%` }}></div>
                                                 </div>
                                                 <p className="text-center text-sm font-medium text-gray-500">
@@ -706,19 +721,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         {/* Recurring Form */}
                                         <div>
                                             <h3 className="text-lg font-semibold mb-4">Añadir Suscripción / Pago</h3>
-                                            <form onSubmit={handleCreateRecurring} className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+                                            <form onSubmit={handleCreateRecurring} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                                                 <div>
                                                     <label className="block text-sm mb-1">Descripción</label>
-                                                    <input required type="text" value={recDesc} onChange={e => setRecDesc(e.target.value)} placeholder="Netflix, Gimnasio..." className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                    <input required type="text" value={recDesc} onChange={e => setRecDesc(e.target.value)} placeholder="Netflix, Gimnasio..." className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                 </div>
                                                 <div className="flex gap-4">
                                                     <div className="flex-1">
                                                         <label className="block text-sm mb-1">Monto</label>
-                                                        <input required type="number" step="0.01" value={recAmount} onChange={e => setRecAmount(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                        <input required type="number" step="0.01" value={recAmount} onChange={e => setRecAmount(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                     </div>
                                                     <div className="flex-1">
                                                         <label className="block text-sm mb-1">Frecuencia</label>
-                                                        <select value={recFrequency} onChange={e => setRecFrequency(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                                        <select value={recFrequency} onChange={e => setRecFrequency(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg">
                                                             <option value="monthly">Mensual</option>
                                                             <option value="yearly">Anual</option>
                                                             <option value="weekly">Semanal</option>
@@ -727,7 +742,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm mb-1">Próximo cobro</label>
-                                                    <input required type="date" value={recNextDate} onChange={e => setRecNextDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                    <input required type="date" value={recNextDate} onChange={e => setRecNextDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                 </div>
                                                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-lg font-medium">Añadir recurrente</button>
                                             </form>
@@ -738,7 +753,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <h3 className="text-lg font-semibold mb-4">Próximos Pagos</h3>
                                             <div className="space-y-3">
                                                 {recurring.length === 0 ? <p className="text-gray-500">No hay pagos programados.</p> : recurring.map(r => (
-                                                    <div key={r.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl">
+                                                    <div key={r.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl">
                                                         <div className="flex items-center gap-3">
                                                             <Calendar className="w-5 h-5 text-gray-400" />
                                                             <div>
@@ -770,7 +785,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 savingsGoals.map(goal => {
                                                     const progress = Math.min(100, Math.round((goal.current_amount_cents / goal.target_amount_cents) * 100));
                                                     return (
-                                                        <div key={goal.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-5 rounded-2xl shadow-sm">
+                                                        <div key={goal.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm">
                                                             <div className="flex justify-between items-start mb-3">
                                                                 <div>
                                                                     <h3 className="font-semibold text-lg">{goal.name}</h3>
@@ -781,12 +796,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     <p className="text-xs text-gray-500">de {formatCurrency(goal.target_amount_cents)}</p>
                                                                 </div>
                                                             </div>
-                                                            <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-2">
+                                                            <div className="h-3 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-2">
                                                                 <div className={`h-full rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${progress}%` }}></div>
                                                             </div>
                                                             <div className="flex justify-between items-center mt-4">
                                                                 <p className="text-xs text-gray-500 font-medium">{progress}% completado</p>
-                                                                <button onClick={() => setShowContributeModal(goal.id)} className="text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1.5 rounded-lg font-medium transition-colors">Aportar</button>
+                                                                <button onClick={() => setShowContributeModal(goal.id)} className="text-sm bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1.5 rounded-lg font-medium transition-colors">Aportar</button>
                                                             </div>
                                                         </div>
                                                     );
@@ -795,22 +810,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         </div>
                                         {/* Create Goal Form */}
                                         <div>
-                                            <form onSubmit={handleCreateSavingsGoal} className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-4 sticky top-6">
+                                            <form onSubmit={handleCreateSavingsGoal} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6">
                                                 <h3 className="font-semibold text-lg mb-4">Nueva Meta</h3>
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">Nombre</label>
-                                                    <input required type="text" value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="Ej. Viaje a Japón" className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                    <input required type="text" value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="Ej. Viaje a Japón" className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">Monto Objetivo</label>
                                                     <div className="relative">
                                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500">$</span></div>
-                                                        <input required type="number" step="0.01" value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                        <input required type="number" step="0.01" value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                     </div>
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">Fecha límite (Opcional)</label>
-                                                    <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                    <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                 </div>
                                                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-lg font-medium hover:opacity-90">Crear Meta</button>
                                             </form>
@@ -837,15 +852,15 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
                                                     
                                                     return (
-                                                        <div key={list.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-5 rounded-2xl shadow-sm">
-                                                            <div className="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-gray-800/50 pb-3">
+                                                        <div key={list.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm">
+                                                            <div className="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-zinc-800/50 pb-3">
                                                                 <h3 className="font-semibold text-lg">{list.name}</h3>
                                                                 <div className="flex items-center gap-4">
                                                                     <span className="text-sm text-gray-500 font-medium">{completed} / {total}</span>
                                                                     <button onClick={() => handleDeleteShoppingList(list.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                                                                 </div>
                                                             </div>
-                                                            <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-4">
+                                                            <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-4">
                                                                 <div className={`h-full rounded-full transition-all duration-300 ${progress === 100 ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${progress}%` }}></div>
                                                             </div>
                                                             
@@ -861,7 +876,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             </div>
 
                                                             <form onSubmit={(e) => handleAddShoppingItem(e, list.id)} className="flex gap-2">
-                                                                <input type="text" value={newItemNames[list.id] || ''} onChange={e => setNewItemNames(prev => ({ ...prev, [list.id]: e.target.value }))} placeholder="Añadir artículo..." className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                                <input type="text" value={newItemNames[list.id] || ''} onChange={e => setNewItemNames(prev => ({ ...prev, [list.id]: e.target.value }))} placeholder="Añadir artículo..." className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                                 <button type="submit" className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-sm font-medium">Añadir</button>
                                                             </form>
                                                         </div>
@@ -870,11 +885,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             )}
                                         </div>
                                         <div>
-                                            <form onSubmit={handleCreateShoppingList} className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-4 sticky top-6">
+                                            <form onSubmit={handleCreateShoppingList} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6">
                                                 <h3 className="font-semibold text-lg mb-4">Nueva Lista</h3>
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">Nombre</label>
-                                                    <input required type="text" value={newListName} onChange={e => setNewListName(e.target.value)} placeholder="Ej. Supermercado" className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                    <input required type="text" value={newListName} onChange={e => setNewListName(e.target.value)} placeholder="Ej. Supermercado" className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                 </div>
                                                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-lg font-medium hover:opacity-90">Crear Lista</button>
                                             </form>
@@ -897,7 +912,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     const progress = Math.min(100, Math.round(((debt.amount_cents - debt.remaining_cents) / debt.amount_cents) * 100));
                                                     
                                                     return (
-                                                        <div key={debt.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-5 rounded-2xl shadow-sm">
+                                                        <div key={debt.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm">
                                                             <div className="flex justify-between items-start mb-3">
                                                                 <div>
                                                                     <div className="flex items-center gap-2 mb-1">
@@ -920,12 +935,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 <span>{formatCurrency(debt.amount_cents - debt.remaining_cents)} pagado</span>
                                                                 <span>Total: {formatCurrency(debt.amount_cents)}</span>
                                                             </div>
-                                                            <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-4">
+                                                            <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-4">
                                                                 <div className={`h-full rounded-full transition-all duration-500 ${isOwed ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${progress}%` }}></div>
                                                             </div>
                                                             
                                                             {debt.remaining_cents > 0 && (
-                                                                <button onClick={() => handlePayDebt(debt.id, debt.remaining_cents)} className="text-sm w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-2 rounded-lg font-medium transition-colors">
+                                                                <button onClick={() => handlePayDebt(debt.id, debt.remaining_cents)} className="text-sm w-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-2 rounded-lg font-medium transition-colors">
                                                                     Registrar {isOwed ? 'Cobro' : 'Pago'}
                                                                 </button>
                                                             )}
@@ -935,7 +950,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             )}
                                         </div>
                                         <div>
-                                            <form onSubmit={handleAddDebt} className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-4 sticky top-6">
+                                            <form onSubmit={handleAddDebt} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6">
                                                 <h3 className="font-semibold text-lg mb-4">Nuevo Registro</h3>
                                                 
                                                 <div className="flex gap-2 p-1 bg-gray-200 dark:bg-gray-700/50 rounded-lg">
@@ -945,18 +960,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">Nombre/Persona</label>
-                                                    <input required type="text" value={debtName} onChange={e => setDebtName(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                    <input required type="text" value={debtName} onChange={e => setDebtName(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">Monto Total</label>
                                                     <div className="relative">
                                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500">$</span></div>
-                                                        <input required type="number" step="0.01" value={debtAmount} onChange={e => setDebtAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                        <input required type="number" step="0.01" value={debtAmount} onChange={e => setDebtAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                     </div>
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">Fecha límite (Opcional)</label>
-                                                    <input type="date" value={debtDueDate} onChange={e => setDebtDueDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg" />
+                                                    <input type="date" value={debtDueDate} onChange={e => setDebtDueDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
                                                 </div>
                                                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-lg font-medium hover:opacity-90">Guardar</button>
                                             </form>
@@ -971,7 +986,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <h2 className="text-xl font-bold">Estadísticas y Análisis</h2>
                                     
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                                        <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm">
                                             <h3 className="text-lg font-semibold mb-6 text-center">Gastos por Categoría</h3>
                                             <div className="h-64">
                                                 {transactions.filter(t => t.type === 'EXPENSE').length > 0 ? (
@@ -1003,7 +1018,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             </div>
                                         </div>
 
-                                        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                                        <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm">
                                             <h3 className="text-lg font-semibold mb-6 text-center">Flujo de Caja (Últimos meses)</h3>
                                             <div className="h-64">
                                                 <ResponsiveContainer width="100%" height="100%">
@@ -1039,7 +1054,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             {activeTab === 'closing' && (
                                 <div className="space-y-8 max-w-3xl mx-auto">
                                     <h2 className="text-xl font-bold text-center">Cierre Mensual</h2>
-                                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-8 rounded-3xl shadow-sm text-center">
+                                    <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-8 rounded-3xl shadow-sm text-center">
                                         <Archive className="w-12 h-12 text-primary mx-auto mb-4 opacity-80" />
                                         <h3 className="text-2xl font-semibold mb-2">
                                             {new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
@@ -1047,21 +1062,21 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         <p className="text-gray-500 mb-8">Resumen de tu desempeño financiero en el mes actual.</p>
                                         
                                         <div className="grid grid-cols-2 gap-4 mb-8 text-left">
-                                            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-100 dark:border-zinc-800/50">
                                                 <p className="text-sm text-gray-500 font-medium mb-1">Ingresos Totales</p>
                                                 <p className="text-xl font-bold text-emerald-600">{formatCurrency(incomeThisMonth)}</p>
                                             </div>
-                                            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-100 dark:border-zinc-800/50">
                                                 <p className="text-sm text-gray-500 font-medium mb-1">Gastos Totales</p>
                                                 <p className="text-xl font-bold text-red-600">{formatCurrency(expensesThisMonth)}</p>
                                             </div>
-                                            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-100 dark:border-zinc-800/50">
                                                 <p className="text-sm text-gray-500 font-medium mb-1">Balance Actual</p>
                                                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
                                                     {formatCurrency(totalBalanceCents)}
                                                 </p>
                                             </div>
-                                            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-100 dark:border-zinc-800/50">
                                                 <p className="text-sm text-gray-500 font-medium mb-1">Flujo Neto (Mes)</p>
                                                 <p className={`text-xl font-bold ${(incomeThisMonth - expensesThisMonth) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                                     {(incomeThisMonth - expensesThisMonth) >= 0 ? '+' : ''}{formatCurrency(incomeThisMonth - expensesThisMonth)}
@@ -1071,7 +1086,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                         <button 
                                             onClick={exportToCSV}
-                                            className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-xl font-semibold hover:opacity-90 transition-opacity"
+                                            className="w-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 py-3 rounded-xl font-semibold hover:opacity-90 transition-opacity"
                                         >
                                             Exportar Movimientos (CSV)
                                         </button>
@@ -1086,10 +1101,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         
                                         {/* ACCOUNTS */}
                                         <div className="space-y-4">
-                                            <h3 className="text-lg font-semibold border-b border-gray-200 dark:border-gray-800 pb-2">Tus Cuentas</h3>
+                                            <h3 className="text-lg font-semibold border-b border-gray-200 dark:border-zinc-800 pb-2">Tus Cuentas</h3>
                                             <div className="space-y-2 mb-4">
                                                 {accounts.map(acc => (
-                                                    <div key={acc.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                                    <div key={acc.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#121212] rounded-lg border border-gray-100 dark:border-gray-800">
                                                         <div className="flex items-center gap-3">
                                                             <div className="p-2 bg-white dark:bg-gray-700 rounded-md shadow-sm text-gray-600 dark:text-gray-300">
                                                                 {getAccountIcon(acc.type)}
@@ -1100,16 +1115,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     </div>
                                                 ))}
                                             </div>
-                                            <form onSubmit={handleCreateAccount} className="bg-gray-50 dark:bg-gray-800/30 p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 space-y-3">
+                                            <form onSubmit={handleCreateAccount} className="bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 space-y-3">
                                                 <h4 className="text-sm font-medium mb-2">Añadir nueva cuenta</h4>
-                                                <input required type="text" placeholder="Nombre (Ej. Efectivo, Banco...)" value={newAccountName} onChange={e=>setNewAccountName(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm" />
+                                                <input required type="text" placeholder="Nombre (Ej. Efectivo, Banco...)" value={newAccountName} onChange={e=>setNewAccountName(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
                                                 <div className="flex gap-2">
-                                                    <select value={newAccountType} onChange={e=>setNewAccountType(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                                    <select value={newAccountType} onChange={e=>setNewAccountType(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm">
                                                         <option value="bank">Banco</option>
                                                         <option value="cash">Efectivo</option>
                                                         <option value="wallet">Wallet</option>
                                                     </select>
-                                                    <input required type="number" step="0.01" placeholder="Saldo inicial" value={newAccountBalance} onChange={e=>setNewAccountBalance(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm" />
+                                                    <input required type="number" step="0.01" placeholder="Saldo inicial" value={newAccountBalance} onChange={e=>setNewAccountBalance(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
                                                 </div>
                                                 <button type="submit" className="w-full bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">Guardar Cuenta</button>
                                             </form>
@@ -1117,19 +1132,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                         {/* CATEGORIES */}
                                         <div className="space-y-4">
-                                            <h3 className="text-lg font-semibold border-b border-gray-200 dark:border-gray-800 pb-2">Categorías</h3>
+                                            <h3 className="text-lg font-semibold border-b border-gray-200 dark:border-zinc-800 pb-2">Categorías</h3>
                                             <div className="flex flex-wrap gap-2 mb-4">
                                                 {categories.map(cat => (
-                                                    <span key={cat.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full text-sm font-medium">
+                                                    <span key={cat.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full text-sm font-medium">
                                                         {cat.emoji} {cat.name}
                                                     </span>
                                                 ))}
                                             </div>
-                                            <form onSubmit={handleCreateCategory} className="bg-gray-50 dark:bg-gray-800/30 p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 space-y-3">
+                                            <form onSubmit={handleCreateCategory} className="bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 space-y-3">
                                                 <h4 className="text-sm font-medium mb-2">Añadir categoría</h4>
                                                 <div className="flex gap-2">
-                                                    <input required type="text" placeholder="🍔" value={newCatEmoji} onChange={e=>setNewCatEmoji(e.target.value)} className="w-16 text-center px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm" />
-                                                    <input required type="text" placeholder="Nombre (Alimentación...)" value={newCatName} onChange={e=>setNewCatName(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm" />
+                                                    <input required type="text" placeholder="🍔" value={newCatEmoji} onChange={e=>setNewCatEmoji(e.target.value)} className="w-16 text-center px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
+                                                    <input required type="text" placeholder="Nombre (Alimentación...)" value={newCatName} onChange={e=>setNewCatName(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
                                                 </div>
                                                 <button type="submit" className="w-full bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">Guardar Categoría</button>
                                             </form>
@@ -1138,7 +1153,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
                                 </div>
                             )}
-                        </>
+                            </motion.div>
+                        </AnimatePresence>
                     )}
                 </div>
             </div>
@@ -1147,7 +1163,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {showTxModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowTxModal(false)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-gray-800">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800">
                             
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold">Registrar {txType === 'EXPENSE' ? 'Gasto' : txType === 'INCOME' ? 'Ingreso' : 'Transferencia'}</h3>
@@ -1159,7 +1175,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <label className="block text-sm font-medium mb-1">Monto</label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-lg">$</span></div>
-                                        <input type="number" step="0.01" required autoFocus value={txAmount} onChange={(e) => setTxAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
+                                        <input type="number" step="0.01" required autoFocus value={txAmount} onChange={(e) => setTxAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
                                     </div>
                                 </div>
 
@@ -1167,14 +1183,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <>
                                         <div>
                                             <label className="block text-sm font-medium mb-1">Cuenta</label>
-                                            <select required value={txAccountId} onChange={(e) => setTxAccountId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+                                            <select required value={txAccountId} onChange={(e) => setTxAccountId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
                                                 <option value="" disabled>Selecciona una cuenta</option>
                                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance_cents)})</option>)}
                                             </select>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1">Categoría</label>
-                                            <select required value={txCategoryId} onChange={(e) => setTxCategoryId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+                                            <select required value={txCategoryId} onChange={(e) => setTxCategoryId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
                                                 <option value="" disabled>Selecciona una categoría</option>
                                                 {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>)}
                                             </select>
@@ -1184,14 +1200,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <div className="flex gap-2">
                                         <div className="flex-1">
                                             <label className="block text-sm font-medium mb-1">Desde</label>
-                                            <select required value={txAccountId} onChange={(e) => setTxAccountId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm">
+                                            <select required value={txAccountId} onChange={(e) => setTxAccountId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
                                                 <option value="" disabled>Origen</option>
                                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                                             </select>
                                         </div>
                                         <div className="flex-1">
                                             <label className="block text-sm font-medium mb-1">Hacia</label>
-                                            <select required value={txToAccountId} onChange={(e) => setTxToAccountId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm">
+                                            <select required value={txToAccountId} onChange={(e) => setTxToAccountId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
                                                 <option value="" disabled>Destino</option>
                                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                                             </select>
@@ -1210,11 +1226,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="space-y-4 overflow-hidden">
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">Fecha</label>
-                                                <input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl" />
+                                                <input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl" />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">Descripción</label>
-                                                <input type="text" value={txDescription} onChange={(e) => setTxDescription(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl" placeholder="Ej. Almuerzo con cliente" />
+                                                <input type="text" value={txDescription} onChange={(e) => setTxDescription(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl" placeholder="Ej. Almuerzo con cliente" />
                                             </div>
                                         </motion.div>
                                     )}
@@ -1235,7 +1251,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {showContributeModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowContributeModal(null)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-gray-800">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold">Aportar a Meta</h3>
                                 <button onClick={() => setShowContributeModal(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
@@ -1245,7 +1261,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <label className="block text-sm font-medium mb-1">Monto a aportar</label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-lg">$</span></div>
-                                        <input type="number" step="0.01" required autoFocus value={contributeAmount} onChange={(e) => setContributeAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
+                                        <input type="number" step="0.01" required autoFocus value={contributeAmount} onChange={(e) => setContributeAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
                                     </div>
                                 </div>
                                 <button type="submit" className="w-full bg-emerald-500 text-white px-4 py-3.5 rounded-xl font-medium shadow-sm hover:bg-emerald-600 transition-colors">
