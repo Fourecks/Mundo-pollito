@@ -658,8 +658,6 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     return expanded;
   };
 
-  const expandedAllTodos = useMemo(() => getExpandedAllTodos(allTodos), [allTodos]);
-
   const datesWithTasks = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0)), [allTodos]);
   const datesWithAllTasksCompleted = useMemo(() => new Set(Object.keys(allTodos).filter(key => allTodos[key].length > 0 && allTodos[key].every(t => t.completed))), [allTodos]);
   const todayKey = formatDateKey(new Date());
@@ -5033,7 +5031,7 @@ const App: React.FC = () => {
   const appProps: AppComponentProps = {
     isOnline, isSyncing, currentUser: user, onLogout: () => setIsLogoutConfirmOpen(true), 
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
-    allTodos: expandedAllTodos, folders: foldersWithNotes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos: allTodos, folders: foldersWithNotes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, 
     uiSettings,
     activeTrack, activeSpotifyTrack, 

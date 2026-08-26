@@ -55,11 +55,52 @@ const formatDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
+  const expanded: { [key: string]: Todo[] } = {};
+  for (const key of Object.keys(todosMap)) {
+    expanded[key] = [...(todosMap[key] || [])];
+  }
+  const allTasks = Object.values(todosMap).flat();
+  const seenIds = new Set<number>();
+  const uniqueTasks: Todo[] = [];
+  allTasks.forEach(t => {
+    if (!seenIds.has(t.id)) {
+      seenIds.add(t.id);
+      uniqueTasks.push(t);
+    }
+  });
+
+  uniqueTasks.forEach(task => {
+    if (!task.completed && task.due_date && task.end_date && task.end_date > task.due_date) {
+      const start = new Date(task.due_date + 'T00:00:00');
+      const end = new Date(task.end_date + 'T00:00:00');
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
+        let curr = new Date(start);
+        curr.setDate(curr.getDate() + 1);
+        while (curr <= end) {
+          const year = curr.getFullYear();
+          const month = String(curr.getMonth() + 1).padStart(2, '0');
+          const day = String(curr.getDate()).padStart(2, '0');
+          const dateKey = `${year}-${month}-${day}`;
+          if (!expanded[dateKey]) {
+            expanded[dateKey] = [];
+          }
+          if (!expanded[dateKey].some(t => t.id === task.id)) {
+            expanded[dateKey].push(task);
+          }
+          curr.setDate(curr.getDate() + 1);
+        }
+      }
+    }
+  });
+  return expanded;
+};
+
 const priorityOrder: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
 
 const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const {
-        allTodos, addTodo, toggleTodo, toggleSubtask, deleteTodo, updateTodo, onEditTodo,
+        allTodos: rawAllTodos, addTodo, toggleTodo, toggleSubtask, deleteTodo, updateTodo, onEditTodo,
         selectedDate, setSelectedDate, datesWithTasks, datesWithAllTasksCompleted,
         isMobile = false, onClearPastTodos, projects, onAddProject, onUpdateProject, handleArchiveProject,
         onDeleteProject, onDeleteProjectAndTasks, onViewProjectChange, calendarEvents,
@@ -69,6 +110,8 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         focusSessions = [],
         isFocusTimerRunning = false
     } = props;
+
+    const allTodos = useMemo(() => getExpandedAllTodos(rawAllTodos), [rawAllTodos]);
     // Common State
     const containerRef = useRef<HTMLDivElement>(null);
     const [activeTab, setActiveTab] = useState<'tasks' | 'projects'>('tasks');
