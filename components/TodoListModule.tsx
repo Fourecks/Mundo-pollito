@@ -75,8 +75,8 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
         // Inside or past start, show today
         targetKey = todayKey;
       } else {
-        // Before start, show at start date
-        targetKey = task.due_date;
+        // Before start, don't show it yet
+        targetKey = '';
       }
     }
 
