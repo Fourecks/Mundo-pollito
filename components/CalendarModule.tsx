@@ -113,13 +113,6 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
 
   uniqueTasks.forEach(task => {
     if (!task.completed && task.due_date && task.end_date && task.end_date > task.due_date) {
-      // 1. Always add to due_date
-      const startKey = task.due_date;
-      if (!expanded[startKey]) expanded[startKey] = [];
-      if (!expanded[startKey].some(t => t.id === task.id)) {
-        expanded[startKey].push(task);
-      }
-
       // 2. Add to today if within range
       const today = new Date();
       // Adjust today to start of day for comparison
@@ -128,7 +121,7 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
       const startDate = new Date(task.due_date + 'T00:00:00');
       const endDate = new Date(task.end_date + 'T00:00:00');
       
-      if (todayNormalized > startDate && todayNormalized <= endDate) {
+      if (todayNormalized >= startDate && todayNormalized <= endDate) {
          const todayKey = formatDateKey(today);
          if (!expanded[todayKey]) expanded[todayKey] = [];
          if (!expanded[todayKey].some(t => t.id === task.id)) {
