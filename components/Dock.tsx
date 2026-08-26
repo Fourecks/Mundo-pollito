@@ -7,7 +7,7 @@ import ClockIcon from './icons/ClockIcon';
 import { WindowType } from '../types';
 import CheckBadgeIcon from './icons/CheckBadgeIcon';
 import BriefcaseIcon from './icons/BriefcaseIcon';
-import { FolderKanban } from 'lucide-react';
+import { FolderKanban, Wallet } from 'lucide-react';
 
 interface DockProps {
   onButtonClick: (window: WindowType) => void;
@@ -18,6 +18,10 @@ const ProjectsIcon: React.FC = () => (
   <FolderKanban className="w-5 h-5" />
 );
 
+const FinanceIcon: React.FC = () => (
+  <Wallet className="w-5 h-5" />
+);
+
 const dockItems: { id: WindowType; label: string; icon: React.FC }[] = [
   { id: 'todo', label: 'Tareas', icon: ListIcon },
   { id: 'projects', label: 'Proyectos', icon: ProjectsIcon },
@@ -25,6 +29,7 @@ const dockItems: { id: WindowType; label: string; icon: React.FC }[] = [
   { id: 'habits', label: 'Hábitos', icon: CheckBadgeIcon },
   { id: 'pomodoro', label: 'Pomodoro', icon: ClockIcon },
   { id: 'notes', label: 'Notas', icon: NotesIcon },
+  { id: 'finance', label: 'Finanzas', icon: FinanceIcon },
   { id: 'music', label: 'Música', icon: MusicIcon },
 ];
 

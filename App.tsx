@@ -11,6 +11,7 @@ import FocusModeButton from './components/FocusModeButton';
 import Dock from './components/Dock';
 import ModalWindow from './components/ModalWindow';
 import TodoListModule from './components/TodoListModule';
+import { FinanceModule } from './components/FinanceModule';
 import NotesSection from './components/NotesSection';
 import MusicPlayer from './components/MusicPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
@@ -22,6 +23,7 @@ import Login from './components/Login';
 import LogoutIcon from './components/icons/LogoutIcon';
 import BackgroundTimer from './components/BackgroundTimer';
 import TodaysAgenda from './components/TodaysAgenda';
+import FinanceSummaryWidget from './components/FinanceSummaryWidget';
 import { rainSoundSrc, forestSoundSrc, coffeeShopSrc, oceanSoundSrc } from './assets/sounds';
 import MobileNav from './components/MobileNav';
 import MobileHeader from './components/MobileHeader';
@@ -1011,6 +1013,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
             habitRecords={habitRecords}
             onOpenHabits={() => toggleWindow('habits')}
           />
+          <FinanceSummaryWidget onClick={() => toggleWindow('finance')} />
       </div>
       
         <main className={`${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -1123,7 +1126,12 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                   />
               </ModalWindow>
           )}
-           {openWindows.includes('music') && (
+           {openWindows.includes('finance') && (
+              <ModalWindow isOpen onClose={() => toggleWindow('finance')} title="Finanzas" isDraggable isResizable zIndex={getWindowZIndex('finance')} onFocus={() => bringToFront('finance')} className="w-full max-w-4xl h-[85vh]" windowState={windowStatesRef.current.finance} onStateChange={s => handleWindowStateChange('finance', s)} allowFullscreen>
+                  <FinanceModule onClose={() => toggleWindow('finance')} />
+              </ModalWindow>
+          )}
+          {openWindows.includes('music') && (
               <ModalWindow isOpen onClose={() => toggleWindow('music')} frameless isDraggable isResizable zIndex={getWindowZIndex('music')} onFocus={() => bringToFront('music')} className="w-[600px] h-[450px]" windowState={windowStatesRef.current.music} onStateChange={s => handleWindowStateChange('music', s)}>
                   <MusicPlayer playlists={playlists} onAddPlaylist={handleAddPlaylist} onUpdatePlaylist={handleUpdatePlaylist} onDeletePlaylist={handleDeletePlaylist} onSelectTrack={handleSelectTrack} onClose={() => toggleWindow('music')} />
               </ModalWindow>
@@ -1504,6 +1512,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             habitRecords={habitRecords}
                             onOpenHabits={() => setActiveTab('habits')}
                         />
+                        <FinanceSummaryWidget onClick={() => setActiveTab('finance')} />
                     </div>
                 </div>
 
@@ -1625,6 +1634,12 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 <div className={activeTab === 'notes' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full pt-8">
                       <NotesSection isMobile={true} folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
+                    </div>
+                </div>
+
+                <div className={activeTab === 'finance' ? 'h-full flex flex-col' : 'hidden'}>
+                    <div className="h-full pt-8">
+                        <FinanceModule />
                     </div>
                 </div>
 

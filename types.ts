@@ -7,7 +7,7 @@ export interface WindowState {
 
 export type Priority = 'low' | 'medium' | 'high';
 
-export type WindowType = 'todo' | 'calendar' | 'notes' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso' | 'projects' | 'spotify';
+export type WindowType = 'todo' | 'calendar' | 'notes' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso' | 'projects' | 'spotify' | 'finance';
 
 export interface TaskComment {
   id: string;
@@ -579,6 +579,129 @@ export interface AppNotification {
   isPrivate: boolean;
   timestamp: string;
   read: boolean;
+}
+
+// --- Finance Types ---
+export type FinanceAccountType = 'bank' | 'cash' | 'savings' | 'wallet' | 'investment';
+export type FinanceTransactionType = 'EXPENSE' | 'INCOME' | 'TRANSFER_OUT' | 'TRANSFER_IN' | 'REFUND';
+
+export interface FinanceAccount {
+  id: number;
+  user_id: string;
+  name: string;
+  type: FinanceAccountType;
+  balance_cents: number;
+  currency: string;
+  is_archived: boolean;
+  created_at: string;
+}
+
+export interface FinanceCategory {
+  id: number;
+  user_id: string;
+  name: string;
+  emoji?: string;
+  color?: string;
+  parent_id?: number;
+  is_archived: boolean;
+}
+
+export interface FinanceTransaction {
+  id: number;
+  user_id: string;
+  account_id: number;
+  type: FinanceTransactionType;
+  amount_cents: number;
+  currency: string;
+  category_id?: number;
+  date: string; // YYYY-MM-DD
+  time?: string;
+  description?: string;
+  notes?: string;
+  merchant?: string;
+  payment_method?: string;
+  related_transfer_id?: number;
+  tags: string[];
+  is_recurring_instance: boolean;
+  recurring_transaction_id?: number;
+  created_at: string;
+}
+
+export interface FinanceRecurringTransaction {
+    id: number;
+    user_id: string;
+    account_id: number;
+    type: FinanceTransactionType;
+    amount_cents: number;
+    currency: string;
+    category_id?: number;
+    description?: string;
+    frequency: 'weekly' | 'monthly' | 'yearly' | 'custom';
+    frequency_interval: number;
+    start_date: string;
+    next_date: string;
+    end_date?: string;
+    auto_create: boolean;
+    is_active: boolean;
+}
+
+export interface FinanceBudget {
+    id: number;
+    user_id: string;
+    month: string; // YYYY-MM
+    total_amount_cents: number;
+}
+
+export interface FinanceCategoryBudget {
+    id: number;
+    user_id: string;
+    budget_id: number;
+    category_id: number;
+    amount_cents: number;
+}
+
+export interface FinanceSavingsGoal {
+    id: number;
+    user_id: string;
+    name: string;
+    target_amount_cents: number;
+    current_amount_cents: number;
+    target_date?: string;
+    account_id?: number;
+    notes?: string;
+    is_completed: boolean;
+}
+
+export interface FinanceShoppingList {
+    id: number;
+    user_id: string;
+    name: string;
+    is_archived: boolean;
+    created_at: string;
+}
+
+export interface FinanceShoppingItem {
+    id: number;
+    user_id: string;
+    list_id: number;
+    name: string;
+    is_purchased: boolean;
+    estimated_amount_cents?: number;
+    actual_amount_cents?: number;
+    created_at: string;
+}
+
+export interface FinanceDebt {
+    id: number;
+    user_id: string;
+    name: string;
+    type: 'OWE' | 'OWED';
+    amount_cents: number;
+    remaining_cents: number;
+    due_date?: string;
+    notes?: string;
+    is_archived: boolean;
+    created_at: string;
 }
 
 // Centralized YouTube IFrame API type definitions.
