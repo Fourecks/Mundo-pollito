@@ -327,7 +327,10 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
             const { data: updatedRecord, error } = await supabase.from(tableName).update(updateData).eq('id', id).select().single();
             if (error) throw error;
             
-            let finalRecord = { ...payload, ...updatedRecord, subtasks: payload.subtasks || [] };
+            const existingSubtasks = payload.subtasks !== undefined 
+                ? payload.subtasks 
+                : (((await get('todos', id)) as any)?.subtasks || []);
+            let finalRecord = { ...payload, ...updatedRecord, subtasks: existingSubtasks };
             
             if (subtasksToSync !== null) {
                 await supabase.from('subtasks').delete().eq('todo_id', id);
@@ -336,6 +339,8 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
                     const { data: newSubtasks, error: subtaskError } = await supabase.from('subtasks').insert(subtaskPayloads).select();
                      if (subtaskError) console.error("Online UPDATE: Failed to sync subtasks.", subtaskError);
                      else finalRecord.subtasks = newSubtasks;
+                } else {
+                    finalRecord.subtasks = [];
                 }
             }
 
