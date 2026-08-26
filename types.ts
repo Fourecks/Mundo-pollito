@@ -582,7 +582,7 @@ export interface AppNotification {
 }
 
 // --- Finance Types ---
-export type FinanceAccountType = 'bank' | 'cash' | 'savings' | 'wallet' | 'investment';
+export type FinanceAccountType = 'bank' | 'cash' | 'savings' | 'wallet' | 'investment' | 'debit' | 'credit';
 export type FinanceTransactionType = 'EXPENSE' | 'INCOME' | 'TRANSFER_OUT' | 'TRANSFER_IN' | 'REFUND';
 
 export interface FinanceAccount {
@@ -590,9 +590,29 @@ export interface FinanceAccount {
   user_id: string;
   name: string;
   type: FinanceAccountType;
-  balance_cents: number;
+  balance_cents: number; // For credit cards, balance_cents can represent current used debt or remaining available
+  credit_limit_cents?: number; // Total credit limit for credit cards
+  cutoff_day?: number; // e.g., 15th of month
+  due_day?: number; // e.g., 5th of following month
+  card_number_last4?: string; // e.g., "4821"
+  card_color?: string; // 'slate' | 'emerald' | 'indigo' | 'rose' | 'amber' | 'purple' | 'zinc'
   currency: string;
   is_archived: boolean;
+  created_at: string;
+}
+
+export interface FinanceInstallment {
+  id: number;
+  user_id: string;
+  name: string;
+  total_amount_cents: number;
+  total_installments: number;
+  paid_installments: number;
+  installment_amount_cents: number;
+  account_id?: number; // Card or account used
+  start_date: string; // YYYY-MM-DD
+  start_month: string; // YYYY-MM
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
 }
 
