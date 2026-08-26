@@ -71,6 +71,9 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
       // If current day is within range, map to today
       if (todayNormalized >= startDate && todayNormalized <= endDate) {
         targetKey = todayKey;
+      } else {
+        // If not in range, do not show it
+        targetKey = '';
       }
     }
 
