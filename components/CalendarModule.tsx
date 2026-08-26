@@ -103,18 +103,21 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
   const todayKey = formatDateKey(today);
 
   Object.values(todosMap).flat().forEach(task => {
-    let targetKey = task.due_date || ''; // Default to due_date
+    let targetKey = task.due_date || '';
 
     if (!task.completed && task.due_date && task.end_date) {
       const startDate = new Date(task.due_date + 'T00:00:00');
       const endDate = new Date(task.end_date + 'T00:00:00');
 
-      // If current day is within range, map to today
-      if (todayNormalized >= startDate && todayNormalized <= endDate) {
+      if (todayNormalized > endDate) {
+        // Past the range, don't show
+        targetKey = '';
+      } else if (todayNormalized >= startDate) {
+        // Inside or past start, show today
         targetKey = todayKey;
       } else {
-        // If not in range, do not show it
-        targetKey = '';
+        // Before start, show at start date
+        targetKey = task.due_date;
       }
     }
 
