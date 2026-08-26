@@ -56,40 +56,32 @@ const formatDateKey = (date: Date): string => {
 };
 
 const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
-  const expanded: { [key: string]: Todo[] } = {};
-  for (const key of Object.keys(todosMap)) {
-    expanded[key] = [...(todosMap[key] || [])];
-  }
-  const allTasks = Object.values(todosMap).flat();
-  const seenIds = new Set<number>();
-  const uniqueTasks: Todo[] = [];
-  allTasks.forEach(t => {
-    if (!seenIds.has(t.id)) {
-      seenIds.add(t.id);
-      uniqueTasks.push(t);
-    }
-  });
+  const normalized: { [key: string]: Todo[] } = {};
+  const today = new Date();
+  const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayKey = formatDateKey(today);
 
-  uniqueTasks.forEach(task => {
-    if (!task.completed && task.due_date && task.end_date && task.end_date > task.due_date) {
-      // 2. Add to today if within range
-      const today = new Date();
-      // Adjust today to start of day for comparison
-      const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
+  Object.values(todosMap).flat().forEach(task => {
+    let targetKey = task.due_date || ''; // Default to due_date
+
+    if (!task.completed && task.due_date && task.end_date) {
       const startDate = new Date(task.due_date + 'T00:00:00');
       const endDate = new Date(task.end_date + 'T00:00:00');
-      
+
+      // If current day is within range, map to today
       if (todayNormalized >= startDate && todayNormalized <= endDate) {
-         const todayKey = formatDateKey(today);
-         if (!expanded[todayKey]) expanded[todayKey] = [];
-         if (!expanded[todayKey].some(t => t.id === task.id)) {
-           expanded[todayKey].push(task);
-         }
+        targetKey = todayKey;
+      }
+    }
+
+    if (targetKey) {
+      if (!normalized[targetKey]) normalized[targetKey] = [];
+      if (!normalized[targetKey].some(t => t.id === task.id)) {
+        normalized[targetKey].push(task);
       }
     }
   });
-  return expanded;
+  return normalized;
 };
 
 const priorityOrder: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
