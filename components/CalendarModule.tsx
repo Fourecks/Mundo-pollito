@@ -102,21 +102,20 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
   const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayKey = formatDateKey(today);
 
-  Object.values(todosMap).flat().forEach(task => {
-    let targetKey = task.due_date || '';
+  Object.values(todosMap || {}).flat().forEach(task => {
+    let targetKey = task.due_date || 'undated';
 
     if (!task.completed && task.due_date && task.end_date) {
-      const startDate = new Date(task.due_date + 'T00:00:00');
-      const endDate = new Date(task.end_date + 'T00:00:00');
+      const startParts = task.due_date.split('-').map(Number);
+      const endParts = task.end_date.split('-').map(Number);
+      const startDate = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+      const endDate = new Date(endParts[0], endParts[1] - 1, endParts[2]);
 
       if (todayNormalized > endDate) {
-        // Past the range, don't show
         targetKey = '';
       } else if (todayNormalized >= startDate) {
-        // Inside or past start, show today
         targetKey = todayKey;
       } else {
-        // Before start, don't show it yet
         targetKey = '';
       }
     }

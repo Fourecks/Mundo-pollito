@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Todo, Priority, Subtask, FocusSession } from '../types';
 import SubtaskIcon from './icons/SubtaskIcon';
 import ChevronDownIcon from './icons/ChevronDownIcon';
@@ -65,13 +65,14 @@ const TodoItem: React.FC<TodoItemProps> = ({
   focusSessions = [],
   isFocusTimerRunning = false
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const handleSubtaskToggle = (subtaskId: number) => {
-    onToggleSubtask(todo.id, subtaskId);
-  };
-
   const hasSubtasks = todo.subtasks && todo.subtasks.length > 0;
+  const [isExpanded, setIsExpanded] = useState(hasSubtasks);
+
+  useEffect(() => {
+    if (hasSubtasks) {
+      setIsExpanded(true);
+    }
+  }, [todo.subtasks?.length]);
   const dueDateText = formatDueDate(todo);
   const isFocused = activeFocusTaskId === todo.id;
 
@@ -178,7 +179,7 @@ const TodoItem: React.FC<TodoItemProps> = ({
                               <input
                                   type="checkbox"
                                   checked={subtask.completed}
-                                  onChange={() => handleSubtaskToggle(subtask.id)}
+                                  onChange={() => onToggleSubtask(todo.id, subtask.id)}
                                   className="sr-only"
                               />
                               <div className={`w-5 h-5 rounded-md border-2 transition-all duration-200 ${subtask.completed ? 'bg-primary/70 border-primary/70' : 'bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500'}`}>
