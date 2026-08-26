@@ -545,7 +545,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     };
 
     const renderTabs = () => (
-        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-zinc-800 mb-8 overflow-x-auto hide-scrollbar pb-px">
+        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-zinc-800 mb-6 overflow-x-auto hide-scrollbar pb-px">
             {[
                 { id: 'overview', icon: LayoutDashboard, label: 'Resumen' },
                 { id: 'transactions', icon: ListOrdered, label: 'Movimientos' },
@@ -583,23 +583,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-zinc-800 shrink-0">
-                <div className="flex items-center gap-3">
-                    <Wallet className="w-6 h-6 text-primary" />
-                    <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
-                    <button 
-                        onClick={() => setIsPrivacyMode(!isPrivacyMode)}
-                        className="ml-2 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                        title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
-                    >
-                        {isPrivacyMode ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                    </button>
-                </div>
-            </div>
-
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                 <div className="max-w-5xl mx-auto">
                     {renderTabs()}
 
@@ -621,8 +606,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
                                             <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Balance Total</h2>
-                                            <div className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                                {formatCurrency(totalBalanceCents)}
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                                    {formatCurrency(totalBalanceCents)}
+                                                </div>
+                                                <button 
+                                                    onClick={() => setIsPrivacyMode(!isPrivacyMode)}
+                                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                    title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+                                                >
+                                                    {isPrivacyMode ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                                </button>
                                             </div>
                                         </div>
                                         <div className="p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
