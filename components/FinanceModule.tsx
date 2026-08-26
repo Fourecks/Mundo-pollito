@@ -37,6 +37,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [txFilterSearch, setTxFilterSearch] = useState('');
     const [txFilterType, setTxFilterType] = useState<TransactionType | 'ALL'>('ALL');
     const [txFilterAccount, setTxFilterAccount] = useState<number | 'ALL'>('ALL');
+    const [txFilterDateRange, setTxFilterDateRange] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_YEAR'>('THIS_MONTH');
 
     // --- Modal States ---
     const [showTxModal, setShowTxModal] = useState(false);
@@ -45,6 +46,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     
     const [showContributeModal, setShowContributeModal] = useState<number | null>(null);
     const [contributeAmount, setContributeAmount] = useState('');
+    const [contributeAccountId, setContributeAccountId] = useState<number | ''>('');
+
+    const [showPayDebtModal, setShowPayDebtModal] = useState<any | null>(null);
+    const [payDebtAmount, setPayDebtAmount] = useState('');
+    const [payDebtAccountId, setPayDebtAccountId] = useState<number | ''>('');
 
     // --- Form States (Transaction) ---
     const [txAmount, setTxAmount] = useState('');
@@ -259,6 +265,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         fetchFinanceData();
     };
 
+    const handleDeleteAccount = async (id: number) => {
+        if (!confirm('¿Eliminar esta cuenta? Se eliminarán también sus movimientos.')) return;
+        await supabase.from('finance_accounts').delete().eq('id', id);
+        fetchFinanceData();
+    };
+
     const handleCreateCategory = async (e: React.FormEvent) => {
         e.preventDefault();
         const { data: { user } } = await supabase.auth.getUser();
@@ -266,6 +278,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
         await supabase.from('finance_categories').insert([{ user_id: user.id, name: newCatName, emoji: newCatEmoji }]);
         setNewCatName(''); setNewCatEmoji('💰');
+        fetchFinanceData();
+    };
+
+    const handleDeleteCategory = async (id: number) => {
+        if (!confirm('¿Eliminar esta categoría?')) return;
+        await supabase.from('finance_categories').delete().eq('id', id);
         fetchFinanceData();
     };
 
@@ -303,6 +321,48 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         fetchFinanceData();
     };
 
+    const handleProcessRecurring = async (rec: FinanceRecurringTransaction) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const targetAccId = rec.account_id || accounts[0]?.id;
+        if (!targetAccId) return alert('Necesitas tener al menos una cuenta para registrar el pago.');
+
+        const today = new Date().toISOString().split('T')[0];
+        
+        await supabase.from('finance_transactions').insert([{
+            user_id: user.id,
+            account_id: targetAccId,
+            type: rec.type || 'EXPENSE',
+            amount_cents: rec.amount_cents,
+            date: today,
+            description: `Cobro recurrente: ${rec.description || 'Suscripción'}`
+        }]);
+
+        const currAcc = accounts.find(a => a.id === targetAccId);
+        if (currAcc) {
+            const newBalance = (rec.type === 'INCOME') 
+                ? currAcc.balance_cents + rec.amount_cents 
+                : currAcc.balance_cents - rec.amount_cents;
+            await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', targetAccId);
+        }
+
+        const currentNext = new Date(rec.next_date || today);
+        if (rec.frequency === 'weekly') currentNext.setDate(currentNext.getDate() + 7);
+        else if (rec.frequency === 'yearly') currentNext.setFullYear(currentNext.getFullYear() + 1);
+        else currentNext.setMonth(currentNext.getMonth() + 1);
+
+        const newNextDateStr = currentNext.toISOString().split('T')[0];
+        await supabase.from('finance_recurring_transactions').update({ next_date: newNextDateStr }).eq('id', rec.id);
+
+        fetchFinanceData();
+    };
+
+    const handleDeleteRecurring = async (id: number) => {
+        if (!confirm('¿Eliminar esta suscripción / pago recurrente?')) return;
+        await supabase.from('finance_recurring_transactions').delete().eq('id', id);
+        fetchFinanceData();
+    };
+
     const handleCreateSavingsGoal = async (e: React.FormEvent) => {
         e.preventDefault();
         const { data: { user } } = await supabase.auth.getUser();
@@ -322,6 +382,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         fetchFinanceData();
     };
 
+    const handleDeleteGoal = async (id: number) => {
+        if (!confirm('¿Eliminar esta meta de ahorro?')) return;
+        await supabase.from('finance_savings_goals').delete().eq('id', id);
+        fetchFinanceData();
+    };
+
     const handleContribute = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!showContributeModal) return;
@@ -329,6 +395,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         if (!user) return;
 
         const amountCents = Math.round(parseFloat(contributeAmount) * 100);
+        const goal = savingsGoals.find(g => g.id === showContributeModal);
+        if (!goal) return;
         
         await supabase.from('finance_savings_contributions').insert([{
             user_id: user.id,
@@ -337,14 +405,29 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             date: new Date().toISOString().split('T')[0]
         }]);
 
-        const goal = savingsGoals.find(g => g.id === showContributeModal);
-        if (goal) {
-            await supabase.from('finance_savings_goals').update({
-                current_amount_cents: goal.current_amount_cents + amountCents
-            }).eq('id', goal.id);
+        await supabase.from('finance_savings_goals').update({
+            current_amount_cents: goal.current_amount_cents + amountCents
+        }).eq('id', goal.id);
+
+        if (contributeAccountId) {
+            const targetAcc = accounts.find(a => a.id === Number(contributeAccountId));
+            if (targetAcc) {
+                await supabase.from('finance_transactions').insert([{
+                    user_id: user.id,
+                    account_id: targetAcc.id,
+                    type: 'EXPENSE',
+                    amount_cents: amountCents,
+                    date: new Date().toISOString().split('T')[0],
+                    description: `Aporte a meta: ${goal.name}`
+                }]);
+                await supabase.from('finance_accounts').update({
+                    balance_cents: targetAcc.balance_cents - amountCents
+                }).eq('id', targetAcc.id);
+            }
         }
 
         setContributeAmount('');
+        setContributeAccountId('');
         setShowContributeModal(null);
         fetchFinanceData();
     };
@@ -399,14 +482,44 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         fetchFinanceData();
     };
 
-    const handlePayDebt = async (debtId: number, currentRemaining: number) => {
-        const amountStr = prompt('¿Cuánto deseas registrar como pagado/abonado?');
-        if (!amountStr) return;
-        const amountCents = Math.round(parseFloat(amountStr) * 100);
+    const handlePayDebtConfirm = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!showPayDebtModal || !payDebtAmount) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const amountCents = Math.round(parseFloat(payDebtAmount) * 100);
         if (isNaN(amountCents) || amountCents <= 0) return alert('Monto inválido');
 
-        const newRemaining = Math.max(0, currentRemaining - amountCents);
-        await supabase.from('finance_debts').update({ remaining_cents: newRemaining }).eq('id', debtId);
+        const debt = showPayDebtModal;
+        const newRemaining = Math.max(0, debt.remaining_cents - amountCents);
+        await supabase.from('finance_debts').update({ remaining_cents: newRemaining }).eq('id', debt.id);
+
+        if (payDebtAccountId) {
+            const targetAcc = accounts.find(a => a.id === Number(payDebtAccountId));
+            if (targetAcc) {
+                const isOwe = debt.type === 'OWE';
+                const txType = isOwe ? 'EXPENSE' : 'INCOME';
+                const newBalance = isOwe 
+                    ? targetAcc.balance_cents - amountCents 
+                    : targetAcc.balance_cents + amountCents;
+
+                await supabase.from('finance_transactions').insert([{
+                    user_id: user.id,
+                    account_id: targetAcc.id,
+                    type: txType,
+                    amount_cents: amountCents,
+                    date: new Date().toISOString().split('T')[0],
+                    description: `${isOwe ? 'Abono a deuda' : 'Cobro de préstamo'}: ${debt.name}`
+                }]);
+
+                await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', targetAcc.id);
+            }
+        }
+
+        setShowPayDebtModal(null);
+        setPayDebtAmount('');
+        setPayDebtAccountId('');
         fetchFinanceData();
     };
 
@@ -634,6 +747,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 <option key={acc.id} value={acc.id}>{acc.name}</option>
                                             ))}
                                         </select>
+                                        <select 
+                                            value={txFilterDateRange} 
+                                            onChange={(e) => setTxFilterDateRange(e.target.value as any)}
+                                            className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm font-medium"
+                                        >
+                                            <option value="THIS_MONTH">Este mes</option>
+                                            <option value="LAST_MONTH">Mes anterior</option>
+                                            <option value="THIS_YEAR">Este año</option>
+                                            <option value="ALL">Todo el historial</option>
+                                        </select>
                                     </div>
 
                                     <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
@@ -642,6 +765,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 if (txFilterType !== 'ALL' && tx.type !== txFilterType) return false;
                                                 if (txFilterAccount !== 'ALL' && tx.account_id !== txFilterAccount) return false;
                                                 if (txFilterSearch && !tx.description?.toLowerCase().includes(txFilterSearch.toLowerCase())) return false;
+                                                
+                                                const txDateObj = new Date(tx.date);
+                                                const now = new Date();
+                                                if (txFilterDateRange === 'THIS_MONTH') {
+                                                    if (txDateObj.getMonth() !== now.getMonth() || txDateObj.getFullYear() !== now.getFullYear()) return false;
+                                                } else if (txFilterDateRange === 'LAST_MONTH') {
+                                                    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                                                    if (txDateObj.getMonth() !== lastMonth.getMonth() || txDateObj.getFullYear() !== lastMonth.getFullYear()) return false;
+                                                } else if (txFilterDateRange === 'THIS_YEAR') {
+                                                    if (txDateObj.getFullYear() !== now.getFullYear()) return false;
+                                                }
+
                                                 return true;
                                             })
                                             .map(tx => (
@@ -753,15 +888,30 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <h3 className="text-lg font-semibold mb-4">Próximos Pagos</h3>
                                             <div className="space-y-3">
                                                 {recurring.length === 0 ? <p className="text-gray-500">No hay pagos programados.</p> : recurring.map(r => (
-                                                    <div key={r.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl">
+                                                    <div key={r.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl group">
                                                         <div className="flex items-center gap-3">
                                                             <Calendar className="w-5 h-5 text-gray-400" />
                                                             <div>
                                                                 <p className="font-medium">{r.description}</p>
-                                                                <p className="text-xs text-gray-500">Se cobra el {r.next_date}</p>
+                                                                <p className="text-xs text-gray-500">Próximo: {r.next_date} ({r.frequency})</p>
                                                             </div>
                                                         </div>
-                                                        <span className="font-semibold text-red-500">-{formatCurrency(r.amount_cents)}</span>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="font-semibold text-red-500">-{formatCurrency(r.amount_cents)}</span>
+                                                            <button 
+                                                                onClick={() => handleProcessRecurring(r)} 
+                                                                title="Registrar pago inmediatamente" 
+                                                                className="text-xs font-medium bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 px-2.5 py-1.5 rounded-lg text-gray-900 dark:text-white transition-colors"
+                                                            >
+                                                                Procesar
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDeleteRecurring(r.id)} 
+                                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -791,9 +941,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     <h3 className="font-semibold text-lg">{goal.name}</h3>
                                                                     {goal.target_date && <p className="text-xs text-gray-500 flex items-center gap-1 mt-1"><Calendar className="w-3 h-3" /> Meta para: {goal.target_date}</p>}
                                                                 </div>
-                                                                <div className="text-right">
-                                                                    <p className="font-bold text-lg text-emerald-600 dark:text-emerald-400">{formatCurrency(goal.current_amount_cents)}</p>
-                                                                    <p className="text-xs text-gray-500">de {formatCurrency(goal.target_amount_cents)}</p>
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="text-right">
+                                                                        <p className="font-bold text-lg text-emerald-600 dark:text-emerald-400">{formatCurrency(goal.current_amount_cents)}</p>
+                                                                        <p className="text-xs text-gray-500">de {formatCurrency(goal.target_amount_cents)}</p>
+                                                                    </div>
+                                                                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"><Trash2 className="w-4 h-4" /></button>
                                                                 </div>
                                                             </div>
                                                             <div className="h-3 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-2">
@@ -940,7 +1093,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             </div>
                                                             
                                                             {debt.remaining_cents > 0 && (
-                                                                <button onClick={() => handlePayDebt(debt.id, debt.remaining_cents)} className="text-sm w-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-2 rounded-lg font-medium transition-colors">
+                                                                <button onClick={() => setShowPayDebtModal(debt.id)} className="text-sm w-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-2 rounded-lg font-medium transition-colors">
                                                                     Registrar {isOwed ? 'Cobro' : 'Pago'}
                                                                 </button>
                                                             )}
