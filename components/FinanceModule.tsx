@@ -132,6 +132,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [editAccountMaintFeeFreq, setEditAccountMaintFeeFreq] = useState<'monthly' | 'yearly'>('monthly');
     const [editAccountTransferFeeType, setEditAccountTransferFeeType] = useState<'none' | 'fixed' | 'percent'>('none');
     const [editAccountTransferFeeValue, setEditAccountTransferFeeValue] = useState('');
+    const [showNewAccountExtras, setShowNewAccountExtras] = useState(false);
+    const [showEditAccountExtras, setShowEditAccountExtras] = useState(false);
 
     const [editingDebt, setEditingDebt] = useState<any | null>(null);
     const [editDebtName, setEditDebtName] = useState('');
@@ -629,8 +631,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
         const fromAcc = accounts.find(a => a.id === Number(payCardFromAccountId));
         if (!fromAcc) return alert('Cuenta de origen no encontrada');
-        if (fromAcc.balance_cents < amountCents) {
-            return alert(`Fondos insuficientes en ${fromAcc.name}. Disponible: $${(fromAcc.balance_cents/100).toFixed(2)}.`);
+
+        // Calculate transfer fee if origin account has one
+        let feeCents = 0;
+        if (fromAcc.transfer_fee_type === 'fixed' && fromAcc.transfer_fee_value) {
+            feeCents = Math.round(fromAcc.transfer_fee_value * 100);
+        } else if (fromAcc.transfer_fee_type === 'percent' && fromAcc.transfer_fee_value) {
+            feeCents = Math.round(amountCents * (fromAcc.transfer_fee_value / 100));
+        }
+
+        const totalDebitedCents = amountCents + feeCents;
+
+        if (fromAcc.balance_cents < totalDebitedCents) {
+            return alert(`Fondos insuficientes en ${fromAcc.name}. Monto + Comisión ($${(feeCents/100).toFixed(2)}): $${(totalDebitedCents/100).toFixed(2)}, Disponible: $${(fromAcc.balance_cents/100).toFixed(2)}.`);
         }
 
         const cardAcc = accounts.find(a => a.id === showPayCardModal.id) || showPayCardModal;
@@ -644,8 +657,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             description: `Abono a tarjeta de crédito: ${cardAcc.name}`
         }]);
 
+        if (feeCents > 0) {
+            await supabase.from('finance_transactions').insert([{
+                user_id: user.id,
+                account_id: fromAcc.id,
+                type: 'EXPENSE',
+                amount_cents: feeCents,
+                date: new Date().toISOString().split('T')[0],
+                description: `Comisión por transferencia desde ${fromAcc.name}`
+            }]);
+        }
+
         await supabase.from('finance_accounts').update({
-            balance_cents: fromAcc.balance_cents - amountCents
+            balance_cents: fromAcc.balance_cents - totalDebitedCents
         }).eq('id', fromAcc.id);
 
         const newCardBalance = Math.max(0, cardAcc.balance_cents - amountCents);
@@ -825,6 +849,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         if (!user) return;
         
         try {
+            const isEligible = ['bank', 'credit', 'debit'].includes(newAccountType);
             const accountPayload: any = {
                 user_id: user.id,
                 name: newAccountName,
@@ -835,11 +860,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 due_day: newAccountType === 'credit' ? (Number(newAccountDueDay) || 5) : null,
                 card_number_last4: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardLast4 : null,
                 card_color: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardColor : 'slate',
-                maintenance_fee_type: newAccountMaintFeeType,
-                maintenance_fee_value: newAccountMaintFeeValue ? parseFloat(newAccountMaintFeeValue) : 0,
-                maintenance_fee_freq: newAccountMaintFeeFreq,
-                transfer_fee_type: newAccountTransferFeeType,
-                transfer_fee_value: newAccountTransferFeeValue ? parseFloat(newAccountTransferFeeValue) : 0
+                maintenance_fee_type: isEligible ? newAccountMaintFeeType : 'none',
+                maintenance_fee_value: isEligible && newAccountMaintFeeValue ? parseFloat(newAccountMaintFeeValue) : 0,
+                maintenance_fee_freq: isEligible ? newAccountMaintFeeFreq : 'monthly',
+                transfer_fee_type: isEligible ? newAccountTransferFeeType : 'none',
+                transfer_fee_value: isEligible && newAccountTransferFeeValue ? parseFloat(newAccountTransferFeeValue) : 0
             };
 
             let { error } = await supabase.from('finance_accounts').insert([accountPayload]);
@@ -1196,6 +1221,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
         const balanceCents = Math.round(parseFloat(editAccountBalance) * 100);
         const limitCents = editAccountCreditLimit ? Math.round(parseFloat(editAccountCreditLimit) * 100) : null;
+        const isEligible = ['bank', 'credit', 'debit'].includes(editAccountType);
 
         await supabase.from('finance_accounts').update({
             name: editAccountName,
@@ -1206,11 +1232,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             cutoff_day: editAccountCutoffDay ? Number(editAccountCutoffDay) : null,
             due_day: editAccountDueDay ? Number(editAccountDueDay) : null,
             card_number_last4: editAccountCardNumberLast4 || null,
-            maintenance_fee_type: editAccountMaintFeeType,
-            maintenance_fee_value: editAccountMaintFeeValue ? parseFloat(editAccountMaintFeeValue) : 0,
-            maintenance_fee_freq: editAccountMaintFeeFreq,
-            transfer_fee_type: editAccountTransferFeeType,
-            transfer_fee_value: editAccountTransferFeeValue ? parseFloat(editAccountTransferFeeValue) : 0
+            maintenance_fee_type: isEligible ? editAccountMaintFeeType : 'none',
+            maintenance_fee_value: isEligible && editAccountMaintFeeValue ? parseFloat(editAccountMaintFeeValue) : 0,
+            maintenance_fee_freq: isEligible ? editAccountMaintFeeFreq : 'monthly',
+            transfer_fee_type: isEligible ? editAccountTransferFeeType : 'none',
+            transfer_fee_value: isEligible && editAccountTransferFeeValue ? parseFloat(editAccountTransferFeeValue) : 0
         }).eq('id', editingAccount.id);
 
         setEditingAccount(null);
@@ -2795,7 +2821,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 <p className="text-[10px] text-gray-500 uppercase font-bold">
                                                                     {acc.type === 'credit' ? `Tarjeta de Crédito ${acc.card_number_last4 ? `•••• ${acc.card_number_last4}` : ''}` : acc.type === 'wallet' ? 'Wallet digital' : acc.type}
                                                                 </p>
-                                                                {(acc.maintenance_fee_type !== 'none' || acc.transfer_fee_type !== 'none') && (
+                                                                {['bank', 'credit', 'debit'].includes(acc.type) && (acc.maintenance_fee_type !== 'none' || acc.transfer_fee_type !== 'none') && (
                                                                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                                         {acc.maintenance_fee_type !== 'none' && (
                                                                             <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 rounded">
@@ -2831,6 +2857,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                         setEditAccountMaintFeeFreq(acc.maintenance_fee_freq || 'monthly');
                                                                         setEditAccountTransferFeeType(acc.transfer_fee_type || 'none');
                                                                         setEditAccountTransferFeeValue((acc.transfer_fee_value || 0).toString());
+                                                                        setShowEditAccountExtras(
+                                                                            (acc.maintenance_fee_type && acc.maintenance_fee_type !== 'none') ||
+                                                                            (acc.transfer_fee_type && acc.transfer_fee_type !== 'none')
+                                                                        );
                                                                     }}
                                                                     className="text-gray-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-all shrink-0"
                                                                 >
@@ -3325,50 +3355,63 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
                                 )}
 
-                                {/* Fees & Commissions Section */}
-                                <div className="space-y-3 border-t border-gray-100 dark:border-zinc-800 pt-3">
-                                    <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Mantenimiento y Comisiones</h4>
-                                    
-                                    <div className="space-y-2">
-                                        <label className="block text-xs font-semibold text-gray-500">Mantenimiento / Anualidad</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            <select value={editAccountMaintFeeType} onChange={e => setEditAccountMaintFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
-                                                <option value="none">Sin Cuota</option>
-                                                <option value="fixed">Monto Fijo ($)</option>
-                                                <option value="percent">Porcentaje (%)</option>
-                                            </select>
-                                            {editAccountMaintFeeType !== 'none' ? (
-                                                <>
-                                                    <input type="number" step="0.01" placeholder="Valor" value={editAccountMaintFeeValue} onChange={e => setEditAccountMaintFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
-                                                    <select value={editAccountMaintFeeFreq} onChange={e => setEditAccountMaintFeeFreq(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
-                                                        <option value="monthly">Mensual</option>
-                                                        <option value="yearly">Anual</option>
-                                                    </select>
-                                                </>
-                                            ) : (
-                                                <div className="col-span-2 text-xs text-gray-400 self-center pl-2">Sin mantenimiento</div>
-                                            )}
-                                        </div>
-                                    </div>
+                                 {/* Fees & Commissions Section (Opciones Extras - Only for bank, credit, debit) */}
+                                {['bank', 'credit', 'debit'].includes(editAccountType) && (
+                                    <div className="border-t border-gray-100 dark:border-zinc-800 pt-3 space-y-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowEditAccountExtras(!showEditAccountExtras)}
+                                            className="flex items-center justify-between w-full py-2 px-3 bg-gray-50 dark:bg-[#121212] rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                        >
+                                            <span className="flex items-center gap-1.5">⚙️ Opciones extras (Mantenimiento y Comisiones)</span>
+                                            {showEditAccountExtras ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                                        </button>
 
-                                    <div className="space-y-2">
-                                        <label className="block text-xs font-semibold text-gray-500">Comisión por Transferencia / Salida</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <select value={editAccountTransferFeeType} onChange={e => setEditAccountTransferFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
-                                                <option value="none">Sin Comisión</option>
-                                                <option value="fixed">Monto Fijo ($)</option>
-                                                <option value="percent">Porcentaje (%)</option>
-                                            </select>
-                                            {editAccountTransferFeeType !== 'none' ? (
-                                                <input type="number" step="0.01" placeholder={editAccountTransferFeeType === 'fixed' ? "Monto $" : "Porcentaje %"} value={editAccountTransferFeeValue} onChange={e => setEditAccountTransferFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
-                                            ) : (
-                                                <div className="text-xs text-gray-400 self-center pl-2">Sin comisión</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                                        {showEditAccountExtras && (
+                                            <div className="space-y-3 pl-1 pt-1">
+                                                <div className="space-y-2">
+                                                    <label className="block text-xs font-semibold text-gray-500">Mantenimiento / Anualidad</label>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <select value={editAccountMaintFeeType} onChange={e => setEditAccountMaintFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                            <option value="none">Sin Cuota</option>
+                                                            <option value="fixed">Monto Fijo ($)</option>
+                                                            <option value="percent">Porcentaje (%)</option>
+                                                        </select>
+                                                        {editAccountMaintFeeType !== 'none' ? (
+                                                            <>
+                                                                <input type="number" step="0.01" placeholder="Valor" value={editAccountMaintFeeValue} onChange={e => setEditAccountMaintFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
+                                                                <select value={editAccountMaintFeeFreq} onChange={e => setEditAccountMaintFeeFreq(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                                    <option value="monthly">Mensual</option>
+                                                                    <option value="yearly">Anual</option>
+                                                                </select>
+                                                            </>
+                                                        ) : (
+                                                            <div className="col-span-2 text-xs text-gray-400 self-center pl-2">Sin mantenimiento</div>
+                                                        )}
+                                                    </div>
+                                                </div>
 
-                                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+                                                <div className="space-y-2">
+                                                    <label className="block text-xs font-semibold text-gray-500">Comisión por Transferencia / Salida</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <select value={editAccountTransferFeeType} onChange={e => setEditAccountTransferFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                            <option value="none">Sin Comisión</option>
+                                                            <option value="fixed">Monto Fijo ($)</option>
+                                                            <option value="percent">Porcentaje (%)</option>
+                                                        </select>
+                                                        {editAccountTransferFeeType !== 'none' ? (
+                                                            <input type="number" step="0.01" placeholder={editAccountTransferFeeType === 'fixed' ? "Monto $" : "Porcentaje %"} value={editAccountTransferFeeValue} onChange={e => setEditAccountTransferFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
+                                                        ) : (
+                                                            <div className="text-xs text-gray-400 self-center pl-2">Sin comisión</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
                                     Guardar Cambios
                                 </button>
                             </form>
@@ -3454,48 +3497,61 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
                                 )}
 
-                                {/* Fees & Commissions Section */}
-                                <div className="space-y-3 border-t border-gray-100 dark:border-zinc-800 pt-3">
-                                    <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Mantenimiento y Comisiones</h4>
-                                    
-                                    <div className="space-y-2">
-                                        <label className="block text-xs font-semibold text-gray-500">Mantenimiento / Anualidad</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            <select value={newAccountMaintFeeType} onChange={e => setNewAccountMaintFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
-                                                <option value="none">Sin Cuota</option>
-                                                <option value="fixed">Monto Fijo ($)</option>
-                                                <option value="percent">Porcentaje (%)</option>
-                                            </select>
-                                            {newAccountMaintFeeType !== 'none' ? (
-                                                <>
-                                                    <input type="number" step="0.01" placeholder="Valor" value={newAccountMaintFeeValue} onChange={e => setNewAccountMaintFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
-                                                    <select value={newAccountMaintFeeFreq} onChange={e => setNewAccountMaintFeeFreq(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
-                                                        <option value="monthly">Mensual</option>
-                                                        <option value="yearly">Anual</option>
-                                                    </select>
-                                                </>
-                                            ) : (
-                                                <div className="col-span-2 text-xs text-gray-400 self-center pl-2">Sin mantenimiento</div>
-                                            )}
-                                        </div>
-                                    </div>
+                                {/* Fees & Commissions Section (Opciones Extras - Only for bank, credit, debit) */}
+                                {['bank', 'credit', 'debit'].includes(newAccountType) && (
+                                    <div className="border-t border-gray-100 dark:border-zinc-800 pt-3 space-y-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewAccountExtras(!showNewAccountExtras)}
+                                            className="flex items-center justify-between w-full py-2 px-3 bg-gray-50 dark:bg-[#121212] rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                        >
+                                            <span className="flex items-center gap-1.5">⚙️ Opciones extras (Mantenimiento y Comisiones)</span>
+                                            {showNewAccountExtras ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                                        </button>
 
-                                    <div className="space-y-2">
-                                        <label className="block text-xs font-semibold text-gray-500">Comisión por Transferencia / Salida</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <select value={newAccountTransferFeeType} onChange={e => setNewAccountTransferFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
-                                                <option value="none">Sin Comisión</option>
-                                                <option value="fixed">Monto Fijo ($)</option>
-                                                <option value="percent">Porcentaje (%)</option>
-                                            </select>
-                                            {newAccountTransferFeeType !== 'none' ? (
-                                                <input type="number" step="0.01" placeholder={newAccountTransferFeeType === 'fixed' ? "Monto $" : "Porcentaje %"} value={newAccountTransferFeeValue} onChange={e => setNewAccountTransferFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
-                                            ) : (
-                                                <div className="text-xs text-gray-400 self-center pl-2">Sin comisión</div>
-                                            )}
-                                        </div>
+                                        {showNewAccountExtras && (
+                                            <div className="space-y-3 pl-1 pt-1">
+                                                <div className="space-y-2">
+                                                    <label className="block text-xs font-semibold text-gray-500">Mantenimiento / Anualidad</label>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <select value={newAccountMaintFeeType} onChange={e => setNewAccountMaintFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                            <option value="none">Sin Cuota</option>
+                                                            <option value="fixed">Monto Fijo ($)</option>
+                                                            <option value="percent">Porcentaje (%)</option>
+                                                        </select>
+                                                        {newAccountMaintFeeType !== 'none' ? (
+                                                            <>
+                                                                <input type="number" step="0.01" placeholder="Valor" value={newAccountMaintFeeValue} onChange={e => setNewAccountMaintFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
+                                                                <select value={newAccountMaintFeeFreq} onChange={e => setNewAccountMaintFeeFreq(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                                    <option value="monthly">Mensual</option>
+                                                                    <option value="yearly">Anual</option>
+                                                                </select>
+                                                            </>
+                                                        ) : (
+                                                            <div className="col-span-2 text-xs text-gray-400 self-center pl-2">Sin mantenimiento</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <label className="block text-xs font-semibold text-gray-500">Comisión por Transferencia / Salida</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <select value={newAccountTransferFeeType} onChange={e => setNewAccountTransferFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                            <option value="none">Sin Comisión</option>
+                                                            <option value="fixed">Monto Fijo ($)</option>
+                                                            <option value="percent">Porcentaje (%)</option>
+                                                        </select>
+                                                        {newAccountTransferFeeType !== 'none' ? (
+                                                            <input type="number" step="0.01" placeholder={newAccountTransferFeeType === 'fixed' ? "Monto $" : "Porcentaje %"} value={newAccountTransferFeeValue} onChange={e => setNewAccountTransferFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
+                                                        ) : (
+                                                            <div className="text-xs text-gray-400 self-center pl-2">Sin comisión</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
+                                )}
 
                                 <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
                                     Crear Cuenta / Tarjeta
