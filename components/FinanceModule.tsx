@@ -8,7 +8,7 @@ import {
     CreditCard, Landmark, CheckCircle2, ChevronDown, ChevronUp, Calendar, Banknote, ShoppingCart, BarChart3, Archive,
     ChevronLeft, ChevronRight, Download, AlertTriangle, Layers, ShieldCheck, Clock, Receipt, Pencil
 } from 'lucide-react';
-import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
 interface FinanceModuleProps {
     onClose?: () => void;
@@ -69,6 +69,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [instTotalInstallments, setInstTotalInstallments] = useState('12');
     const [instAccountId, setInstAccountId] = useState<number | ''>('');
     const [instStartDate, setInstStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [instPaymentDay, setInstPaymentDay] = useState(new Date().getDate().toString());
+
+    // --- Create Account Modal & System Alerts ---
+    const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
+    const [financialAlerts, setFinancialAlerts] = useState<string[]>([]);
 
     // --- Planning Sub-tab & Calendar ---
     const [planningSubTab, setPlanningSubTab] = useState<'calendar' | 'subscriptions' | 'installments'>('calendar');
@@ -205,25 +210,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const autoProcessDueInstallments = async (instList: FinanceInstallment[], accountsList: any[]) => {
         const todayStr = new Date().toISOString().split('T')[0];
         const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+        const currentDay = today.getDate();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        let alertsAdded: string[] = [];
         let dataChanged = false;
 
         for (const inst of instList) {
             if (inst.status !== 'ACTIVE') continue;
 
             const start = new Date(inst.start_date);
-            if (start > today) continue;
+            const payDay = inst.payment_day || start.getDate() || 15;
 
-            let expectedPaid = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
-            if (today.getDate() >= start.getDate()) {
-                expectedPaid += 1;
+            let totalMonthsElapsed = (currentYear - start.getFullYear()) * 12 + (currentMonth - start.getMonth());
+            if (currentDay >= payDay) {
+                totalMonthsElapsed += 1;
             }
 
-            expectedPaid = Math.min(expectedPaid, inst.total_installments);
+            const expectedPaid = Math.min(Math.max(0, totalMonthsElapsed), inst.total_installments);
 
-            // While we have unpaid installments that should be paid up to today, process them one by one
             while (inst.paid_installments < expectedPaid) {
                 const nextPaid = inst.paid_installments + 1;
                 const newStatus = nextPaid >= inst.total_installments ? 'COMPLETED' : 'ACTIVE';
@@ -234,7 +242,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 const currAcc = accountsList.find(a => a.id === targetAccId);
                 if (!currAcc) break;
 
-                // Process payment in DB
+                if (currAcc.type === 'credit') {
+                    const limit = currAcc.credit_limit_cents || 0;
+                    const used = currAcc.balance_cents;
+                    if (limit > 0 && (used + inst.installment_amount_cents) > limit) {
+                        alertsAdded.push(`⚠️ Tarjeta sobregirada: La cuota "${inst.name}" ($${(inst.installment_amount_cents/100).toFixed(2)}) excedió el límite de crédito en '${currAcc.name}'.`);
+                    }
+                } else {
+                    if (currAcc.balance_cents < inst.installment_amount_cents) {
+                        alertsAdded.push(`⚠️ Fondos insuficientes: Se cobró la cuota "${inst.name}" ($${(inst.installment_amount_cents/100).toFixed(2)}) en '${currAcc.name}' dejando la cuenta con saldo negativo ($${((currAcc.balance_cents - inst.installment_amount_cents)/100).toFixed(2)}).`);
+                    }
+                }
+
                 await supabase.from('finance_installments').update({
                     paid_installments: nextPaid,
                     status: newStatus
@@ -246,7 +265,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     type: 'EXPENSE',
                     amount_cents: inst.installment_amount_cents,
                     date: todayStr,
-                    description: `Pago automático cuota ${nextPaid}/${inst.total_installments}: ${inst.name}`
+                    description: `Pago automático cuota ${nextPaid}/${inst.total_installments} (Día ${payDay}): ${inst.name}`
                 }]);
 
                 const newBal = currAcc.type === 'credit'
@@ -262,8 +281,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             }
         }
 
+        if (alertsAdded.length > 0) {
+            setFinancialAlerts(prev => Array.from(new Set([...prev, ...alertsAdded])));
+        }
+
         if (dataChanged) {
-            // Re-fetch everything cleanly
             fetchFinanceData();
         }
     };
@@ -535,6 +557,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             const instAmountCents = Math.round(totalCents / totalInst);
             const startDate = instStartDate || new Date().toISOString().split('T')[0];
             const startMonth = startDate.substring(0, 7);
+            const pDay = Math.min(31, Math.max(1, parseInt(instPaymentDay) || parseInt(startDate.split('-')[2]) || 15));
+
+            // Check card limit or funds if account selected
+            if (instAccountId) {
+                const targetAcc = accounts.find(a => a.id === Number(instAccountId));
+                if (targetAcc) {
+                    if (targetAcc.type === 'credit') {
+                        const limit = targetAcc.credit_limit_cents || 0;
+                        const used = targetAcc.balance_cents;
+                        if (limit > 0 && (used + instAmountCents) > limit) {
+                            alert(`⚠️ Advertencia de Crédito: Al agregar esta cuota ($${(instAmountCents/100).toFixed(2)}/mes), superará el límite de crédito disponible en tu tarjeta '${targetAcc.name}' ($${(Math.max(0, limit - used)/100).toFixed(2)} disponible).`);
+                        }
+                    } else {
+                        if (targetAcc.balance_cents < instAmountCents) {
+                            alert(`⚠️ Advertencia de Fondos: La cuenta '${targetAcc.name}' tiene $${(targetAcc.balance_cents/100).toFixed(2)} y la cuota mensual es de $${(instAmountCents/100).toFixed(2)}.`);
+                        }
+                    }
+                }
+            }
 
             let { error } = await supabase.from('finance_installments').insert([{
                 user_id: user.id,
@@ -546,11 +587,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 account_id: instAccountId ? Number(instAccountId) : null,
                 start_date: startDate,
                 start_month: startMonth,
+                payment_day: pDay,
                 status: 'ACTIVE'
             }]);
 
-            if (error && error.message && error.message.includes('start_month')) {
-                console.log("start_month column not found, retrying insertion without start_month");
+            if (error) {
+                console.log("Retrying insertion without extra columns if schema mismatch");
                 const { error: retryError } = await supabase.from('finance_installments').insert([{
                     user_id: user.id,
                     name: instName,
@@ -1096,7 +1138,33 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     {isLoading ? (
                         <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div></div>
                     ) : (
-                        <AnimatePresence mode="wait">
+                        <>
+                            {financialAlerts.length > 0 && (
+                                <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl shadow-sm space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                            Avisos de Fondos y Crédito ({financialAlerts.length})
+                                        </div>
+                                        <button
+                                            onClick={() => setFinancialAlerts([])}
+                                            className="text-xs text-amber-700 dark:text-amber-400 hover:underline font-semibold"
+                                        >
+                                            Entendido / Limpiar
+                                        </button>
+                                    </div>
+                                    <ul className="space-y-1.5 pl-1">
+                                        {financialAlerts.map((alert, idx) => (
+                                            <li key={idx} className="text-xs text-amber-900 dark:text-amber-200 font-medium flex items-start gap-1.5">
+                                                <span className="shrink-0 text-amber-600">•</span>
+                                                <span>{alert}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            <AnimatePresence mode="wait">
                             <motion.div
                                 key={activeTab}
                                 initial={{ opacity: 0, y: 8 }}
@@ -2410,79 +2478,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 ))}
                                             </div>
 
-                                            <form onSubmit={handleCreateAccount} className="bg-gray-50 dark:bg-[#121212] p-5 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 space-y-4">
-                                                <h4 className="text-sm font-bold">Añadir Nueva Cuenta / Tarjeta</h4>
-                                                <div>
-                                                    <label className="block text-xs font-semibold mb-1">Nombre</label>
-                                                    <input required type="text" placeholder="Ej. Visa Santander, Banco Principal..." value={newAccountName} onChange={e=>setNewAccountName(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <div className="flex-1">
-                                                        <label className="block text-xs font-semibold mb-1">Tipo</label>
-                                                        <select value={newAccountType} onChange={e=>setNewAccountType(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
-                                                            <option value="bank">Cuenta Bancaria</option>
-                                                            <option value="cash">Efectivo</option>
-                                                            <option value="wallet">Wallet Digital</option>
-                                                            <option value="credit">Tarjeta de Crédito</option>
-                                                            <option value="debit">Tarjeta de Débito</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <label className="block text-xs font-semibold mb-1">Saldo / Deuda Inicial</label>
-                                                        <input required type="number" step="0.01" placeholder="0.00" value={newAccountBalance} onChange={e=>setNewAccountBalance(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                    </div>
-                                                </div>
-
-                                                {/* Card Specific Fields (Credit & Debit) */}
-                                                {(newAccountType === 'credit' || newAccountType === 'debit') && (
-                                                    <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-zinc-800">
-                                                        {newAccountType === 'credit' && (
-                                                            <div className="space-y-3">
-                                                                <div>
-                                                                    <label className="block text-xs font-semibold mb-1">Límite de Crédito ($)</label>
-                                                                    <input required type="number" step="0.01" placeholder="Ej. 2000.00" value={newAccountCreditLimit} onChange={e=>setNewAccountCreditLimit(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                                </div>
-                                                                <div className="flex gap-2">
-                                                                    <div className="flex-1">
-                                                                        <label className="block text-xs font-semibold mb-1">Día de Corte (1-31)</label>
-                                                                        <input type="number" min="1" max="31" placeholder="Ej. 15" value={newAccountCutoffDay} onChange={e=>setNewAccountCutoffDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                                    </div>
-                                                                    <div className="flex-1">
-                                                                        <label className="block text-xs font-semibold mb-1">Día Límite de Pago (1-31)</label>
-                                                                        <input type="number" min="1" max="31" placeholder="Ej. 5" value={newAccountDueDay} onChange={e=>setNewAccountDueDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        <div className="flex gap-2">
-                                                            <div className="flex-1">
-                                                                <label className="block text-xs font-semibold mb-1">Últimos 4 Dígitos</label>
-                                                                <input type="text" maxLength={4} placeholder="4242" value={newAccountCardLast4} onChange={e=>setNewAccountCardLast4(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <label className="block text-xs font-semibold mb-1">Color de la Tarjeta</label>
-                                                                <select value={newAccountCardColor} onChange={e=>setNewAccountCardColor(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
-                                                                    <option value="slate">Carbono (Gris Oscuro)</option>
-                                                                    <option value="indigo">Índigo Royale</option>
-                                                                    <option value="blue">Azul Océano</option>
-                                                                    <option value="emerald">Verde Esmeralda</option>
-                                                                    <option value="rose">Rosa Cuarzo</option>
-                                                                    <option value="amber">Oro Ámbar</option>
-                                                                    <option value="violet">Amatista Violácea</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">Guardar Cuenta</button>
-                                            </form>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowCreateAccountModal(true)}
+                                                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 dark:bg-[#121212] dark:hover:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-800 hover:border-gray-400 dark:hover:border-zinc-700 rounded-2xl text-xs font-bold text-gray-800 dark:text-zinc-200 transition-all shadow-sm cursor-pointer"
+                                            >
+                                                <PlusIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+                                                Añadir Nueva Cuenta o Tarjeta
+                                            </button>
                                         </div>
 
                                         {/* CATEGORIES */}
                                         <div className="space-y-4">
                                             <h3 className="text-lg font-semibold border-b border-gray-200 dark:border-zinc-800 pb-2">Categorías</h3>
-                                            <div className="flex flex-wrap gap-2 mb-4">
+                                            <div className="flex flex-wrap gap-2 mb-4 max-h-48 overflow-y-auto">
                                                 {categories.map(cat => (
                                                     <span key={cat.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full text-sm font-medium">
                                                         {cat.emoji} {cat.name}
@@ -2498,8 +2507,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 
                                                 <div className="space-y-1">
                                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selector de Emojis</label>
-                                                    <div className="grid grid-cols-10 gap-1.5 p-2 bg-white dark:bg-[#0a0a0a] border border-gray-150 dark:border-zinc-800 rounded-lg max-h-24 overflow-y-auto">
-                                                        {['💰', '🍔', '🛒', '🚗', '🏠', '📈', '🩺', '🎓', '🍿', '✈️', '🎁', '🔌', '👕', '🐾', '⚽', '📱', '💈', '☕', '🍷', '🛠️', '💸', '💳', '🏦', '💎', '🔑', '💼', '⛽', '🚌', '🍕', '🍺', '🎉', '🔥', '💡', '🎮', '❤️', '🚲', '🍿', '🧹', '🥗', '🏋️'].map(emoji => (
+                                                    <div className="grid grid-cols-10 gap-1.5 p-2 bg-white dark:bg-[#0a0a0a] border border-gray-150 dark:border-zinc-800 rounded-lg max-h-36 overflow-y-auto">
+                                                        {['💰', '💵', '💳', '🏦', '💎', '💸', '💼', '📈', '🍔', '🍕', '🍣', '🌮', '🥗', '☕', '🍺', '🍷', '🛒', '🛍️', '👕', '👠', '🚗', '⛽', '🚌', '✈️', '🚕', '🚲', '🏠', '🔑', '🔌', '🧹', '🛋️', '🩺', '💊', '🏋️', '🎓', '📚', '📱', '💻', '🍿', '🎮', '🎉', '🎁', '🐾', '⚽', '💈', '🛠️', '🔥', '💡', '❤️', '🏖️', '🎬', '🎧', '🎸', '🎨', '🏨', '🎟️', '🍼', '👶', '🐶', '🐱', '🌾', '🧼', '📦', '🧰', '🪙', '🧾', '⚖️', '📮'].map(emoji => (
                                                             <button
                                                                 key={emoji}
                                                                 type="button"
@@ -2508,7 +2517,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             >
                                                                 {emoji}
                                                             </button>
-                                                        ))}
+                                                         ))}
                                                     </div>
                                                 </div>
 
@@ -2521,6 +2530,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             )}
                             </motion.div>
                         </AnimatePresence>
+                        </>
                     )}
                 </div>
             </div>
@@ -2927,8 +2937,94 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
                                 )}
 
-                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+                                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
                                     Guardar Cambios
+                                </button>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Create Account Modal */}
+            <AnimatePresence>
+                {showCreateAccountModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreateAccountModal(false)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                <h3 className="text-lg font-bold">Añadir Nueva Cuenta / Tarjeta</h3>
+                                <button type="button" onClick={() => setShowCreateAccountModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
+                                    <XIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <form onSubmit={(e) => {
+                                handleCreateAccount(e);
+                                setShowCreateAccountModal(false);
+                            }} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1">Nombre de la Cuenta / Tarjeta</label>
+                                    <input required type="text" placeholder="Ej. Visa BBVA, Nomina Banamex, Efectivo..." value={newAccountName} onChange={e=>setNewAccountName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-1">Tipo</label>
+                                        <select value={newAccountType} onChange={e=>setNewAccountType(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                            <option value="bank">Cuenta Bancaria</option>
+                                            <option value="cash">Efectivo</option>
+                                            <option value="wallet">Wallet Digital</option>
+                                            <option value="credit">Tarjeta de Crédito</option>
+                                            <option value="debit">Tarjeta de Débito</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-1">Saldo / Deuda Inicial ($)</label>
+                                        <input required type="number" step="0.01" placeholder="0.00" value={newAccountBalance} onChange={e=>setNewAccountBalance(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                    </div>
+                                </div>
+
+                                {(newAccountType === 'credit' || newAccountType === 'debit') && (
+                                    <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-zinc-800">
+                                        {newAccountType === 'credit' && (
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-xs font-semibold mb-1">Límite de Crédito Total ($)</label>
+                                                    <input required type="number" step="0.01" placeholder="Ej. 25000.00" value={newAccountCreditLimit} onChange={e=>setNewAccountCreditLimit(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-xs font-semibold mb-1">Día de Corte (1-31)</label>
+                                                        <input type="number" min="1" max="31" placeholder="Ej. 15" value={newAccountCutoffDay} onChange={e=>setNewAccountCutoffDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-semibold mb-1">Día Límite de Pago (1-31)</label>
+                                                        <input type="number" min="1" max="31" placeholder="Ej. 5" value={newAccountDueDay} onChange={e=>setNewAccountDueDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-xs font-semibold mb-1">Últimos 4 Dígitos</label>
+                                                <input type="text" maxLength={4} placeholder="4242" value={newAccountCardLast4} onChange={e=>setNewAccountCardLast4(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold mb-1">Color de Tarjeta</label>
+                                                <select value={newAccountCardColor} onChange={e=>setNewAccountCardColor(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                                    <option value="slate">Carbono (Gris Oscuro)</option>
+                                                    <option value="indigo">Índigo Royale</option>
+                                                    <option value="blue">Azul Océano</option>
+                                                    <option value="emerald">Verde Esmeralda</option>
+                                                    <option value="rose">Rosa Cuarzo</option>
+                                                    <option value="amber">Oro Ámbar</option>
+                                                    <option value="violet">Amatista Violácea</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                                    Crear Cuenta / Tarjeta
                                 </button>
                             </form>
                         </motion.div>

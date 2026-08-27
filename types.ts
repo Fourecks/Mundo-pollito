@@ -612,6 +612,8 @@ export interface FinanceInstallment {
   account_id?: number; // Card or account used
   start_date: string; // YYYY-MM-DD
   start_month?: string; // YYYY-MM
+  payment_day?: number; // Day of month (1-31) for auto-deduction
+  last_paid_month?: string; // YYYY-MM of the last auto-processed month
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
 }
