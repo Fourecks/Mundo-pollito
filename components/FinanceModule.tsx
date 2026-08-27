@@ -562,7 +562,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         if (!user) return;
         
         try {
-            const { error } = await supabase.from('finance_accounts').insert([{
+            const accountPayload: any = {
                 user_id: user.id,
                 name: newAccountName,
                 type: newAccountType,
@@ -572,7 +572,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 due_day: newAccountType === 'credit' ? (Number(newAccountDueDay) || 5) : null,
                 card_number_last4: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardLast4 : null,
                 card_color: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardColor : 'slate'
-            }]);
+            };
+
+            let { error } = await supabase.from('finance_accounts').insert([accountPayload]);
+
+            if (error && error.message && (
+                error.message.includes('card_number_last4') ||
+                error.message.includes('card_color') ||
+                error.message.includes('cutoff_day') ||
+                error.message.includes('due_day') ||
+                error.message.includes('credit_limit_cents')
+            )) {
+                console.log("Card-specific columns not found in database schema, retrying with core columns only.");
+                const { error: retryError } = await supabase.from('finance_accounts').insert([{
+                    user_id: user.id,
+                    name: newAccountName,
+                    type: newAccountType,
+                    balance_cents: Math.round(parseFloat(newAccountBalance || '0') * 100)
+                }]);
+                error = retryError;
+            }
 
             if (error) {
                 console.error("Error creating account:", error);
