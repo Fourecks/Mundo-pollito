@@ -871,21 +871,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         
         try {
             const isEligible = ['bank', 'credit', 'debit'].includes(newAccountType);
+            const rawBal = Math.abs(parseFloat(newAccountBalance || '0'));
+            const balanceCents = Math.round(rawBal * 100);
+            const isCredit = newAccountType === 'credit';
+            const limitCents = isCredit && newAccountCreditLimit ? Math.round(Math.abs(parseFloat(newAccountCreditLimit)) * 100) : null;
+
             const accountPayload: any = {
                 user_id: user.id,
                 name: newAccountName,
                 type: newAccountType,
-                balance_cents: Math.round(parseFloat(newAccountBalance || '0') * 100),
-                credit_limit_cents: newAccountType === 'credit' && newAccountCreditLimit ? Math.round(parseFloat(newAccountCreditLimit) * 100) : null,
-                cutoff_day: newAccountType === 'credit' ? (Number(newAccountCutoffDay) || 15) : null,
-                due_day: newAccountType === 'credit' ? (Number(newAccountDueDay) || 5) : null,
+                balance_cents: balanceCents,
+                credit_limit_cents: limitCents,
+                cutoff_day: isCredit ? (Number(newAccountCutoffDay) || 15) : null,
+                due_day: isCredit ? (Number(newAccountDueDay) || 5) : null,
                 card_number_last4: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardLast4 : null,
                 card_color: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardColor : 'slate',
                 maintenance_fee_type: isEligible ? newAccountMaintFeeType : 'none',
-                maintenance_fee_value: isEligible && newAccountMaintFeeValue ? parseFloat(newAccountMaintFeeValue) : 0,
+                maintenance_fee_value: isEligible && newAccountMaintFeeValue ? Math.abs(parseFloat(newAccountMaintFeeValue)) : 0,
                 maintenance_fee_freq: isEligible ? newAccountMaintFeeFreq : 'monthly',
+                maintenance_fee_date: isEligible ? newAccountMaintFeeDate || null : null,
                 transfer_fee_type: isEligible ? newAccountTransferFeeType : 'none',
-                transfer_fee_value: isEligible && newAccountTransferFeeValue ? parseFloat(newAccountTransferFeeValue) : 0
+                transfer_fee_value: isEligible && newAccountTransferFeeValue ? Math.abs(parseFloat(newAccountTransferFeeValue)) : 0
             };
 
             let { error } = await supabase.from('finance_accounts').insert([accountPayload]);
@@ -895,14 +901,15 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 error.message.includes('card_color') ||
                 error.message.includes('cutoff_day') ||
                 error.message.includes('due_day') ||
-                error.message.includes('credit_limit_cents')
+                error.message.includes('credit_limit_cents') ||
+                error.message.includes('maintenance_fee_date')
             )) {
-                console.log("Card-specific columns not found in database schema, retrying with core columns only.");
+                console.log("Extended columns not found in database schema, retrying with core columns only.");
                 const { error: retryError } = await supabase.from('finance_accounts').insert([{
                     user_id: user.id,
                     name: newAccountName,
                     type: newAccountType,
-                    balance_cents: Math.round(parseFloat(newAccountBalance || '0') * 100)
+                    balance_cents: balanceCents
                 }]);
                 error = retryError;
             }
@@ -919,6 +926,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             setNewAccountBalance('');
             setNewAccountCreditLimit('');
             setNewAccountCardLast4('');
+            setNewAccountMaintFeeType('none');
+            setNewAccountMaintFeeValue('');
+            setNewAccountMaintFeeFreq('monthly');
+            setNewAccountMaintFeeDate('');
+            setNewAccountTransferFeeType('none');
+            setNewAccountTransferFeeValue('');
+            setShowNewAccountExtras(false);
+            setShowCreateAccountModal(false);
             
             fetchFinanceData();
 
@@ -1240,8 +1255,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         e.preventDefault();
         if (!editingAccount) return;
 
-        const balanceCents = Math.round(parseFloat(editAccountBalance) * 100);
-        const limitCents = editAccountCreditLimit ? Math.round(parseFloat(editAccountCreditLimit) * 100) : null;
+        const rawBal = Math.abs(parseFloat(editAccountBalance || '0'));
+        const balanceCents = Math.round(rawBal * 100);
+        const limitCents = editAccountType === 'credit' && editAccountCreditLimit ? Math.round(Math.abs(parseFloat(editAccountCreditLimit)) * 100) : null;
         const isEligible = ['bank', 'credit', 'debit'].includes(editAccountType);
 
         await supabase.from('finance_accounts').update({
@@ -1250,17 +1266,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             balance_cents: balanceCents,
             card_color: editAccountCardColor,
             credit_limit_cents: limitCents,
-            cutoff_day: editAccountCutoffDay ? Number(editAccountCutoffDay) : null,
-            due_day: editAccountDueDay ? Number(editAccountDueDay) : null,
-            card_number_last4: editAccountCardNumberLast4 || null,
+            cutoff_day: editAccountType === 'credit' && editAccountCutoffDay ? Number(editAccountCutoffDay) : null,
+            due_day: editAccountType === 'credit' && editAccountDueDay ? Number(editAccountDueDay) : null,
+            card_number_last4: (editAccountType === 'credit' || editAccountType === 'debit') ? editAccountCardNumberLast4 || null : null,
             maintenance_fee_type: isEligible ? editAccountMaintFeeType : 'none',
-            maintenance_fee_value: isEligible && editAccountMaintFeeValue ? parseFloat(editAccountMaintFeeValue) : 0,
+            maintenance_fee_value: isEligible && editAccountMaintFeeValue ? Math.abs(parseFloat(editAccountMaintFeeValue)) : 0,
             maintenance_fee_freq: isEligible ? editAccountMaintFeeFreq : 'monthly',
             maintenance_fee_date: isEligible ? editAccountMaintFeeDate || null : null,
+            transfer_fee_type: isEligible ? editAccountTransferFeeType : 'none',
+            transfer_fee_value: isEligible && editAccountTransferFeeValue ? Math.abs(parseFloat(editAccountTransferFeeValue)) : 0,
         }).eq('id', editingAccount.id);
 
         setEditingAccount(null);
         fetchFinanceData();
+    };
+
+    // Prevent negative sign and exponential notation in numeric inputs across all financial forms
+    const blockNegativeKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
+            e.preventDefault();
+        }
     };
 
     // --- Render Helpers ---
@@ -1613,7 +1638,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         <form onSubmit={handleSetBudget} className="flex gap-4 items-end mb-8">
                                             <div className="flex-1">
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto del presupuesto</label>
-                                                <input type="number" step="0.01" value={budgetAmount} onChange={e => setBudgetAmount(e.target.value)} placeholder={currentBudget ? (currentBudget.total_amount_cents/100).toString() : "0.00"} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl" />
+                                                <input type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={budgetAmount} onChange={e => setBudgetAmount(e.target.value.replace(/-/g, ''))} placeholder={currentBudget ? (currentBudget.total_amount_cents/100).toString() : "0.00"} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl" />
                                             </div>
                                             <button type="submit" className="bg-primary text-white px-6 py-3 rounded-xl font-medium hover:bg-primary-dark">
                                                 {currentBudget ? 'Actualizar' : 'Crear'}
@@ -1841,7 +1866,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <div>
                                                             <label className="block text-xs font-semibold mb-1 text-gray-500">Monto</label>
-                                                            <input required type="number" step="0.01" value={recAmount} onChange={e => setRecAmount(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                            <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={recAmount} onChange={e => setRecAmount(e.target.value.replace(/-/g, ''))} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                                         </div>
                                                         <div>
                                                             <label className="block text-xs font-semibold mb-1 text-gray-500">Frecuencia</label>
@@ -2082,7 +2107,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     <label className="block text-xs font-semibold text-gray-500 mb-1">Monto Objetivo</label>
                                                     <div className="relative">
                                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
-                                                        <input required type="number" step="0.01" value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
+                                                        <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
                                                     </div>
                                                 </div>
                                                 <div>
@@ -2396,7 +2421,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         <label className="block text-xs font-semibold text-gray-500 mb-1">Monto Total</label>
                                                         <div className="relative">
                                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
-                                                            <input required type="number" step="0.01" value={debtAmount} onChange={e => setDebtAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
+                                                            <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={debtAmount} onChange={e => setDebtAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
                                                         </div>
                                                     </div>
                                                     <div>
@@ -2971,7 +2996,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <label className="block text-sm font-medium mb-1">Monto</label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-lg">$</span></div>
-                                        <input type="number" step="0.01" required autoFocus value={txAmount} onChange={(e) => setTxAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
+                                        <input type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} required autoFocus value={txAmount} onChange={(e) => setTxAmount(e.target.value.replace(/-/g, ''))} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
                                     </div>
                                 </div>
 
@@ -3144,7 +3169,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             <form onSubmit={handleQuickAddFunds} className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-semibold mb-1">Monto a depositar ($)</label>
-                                    <input required type="number" step="0.01" autoFocus value={addFundsAmount} onChange={e => setAddFundsAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-lg font-bold" />
+                                    <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} autoFocus value={addFundsAmount} onChange={e => setAddFundsAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-lg font-bold" />
                                 </div>
                                 <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
                                     Añadir Fondos a la Cuenta
@@ -3173,7 +3198,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             <form onSubmit={handlePayCreditCard} className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-semibold mb-1">Monto a abonar ($)</label>
-                                    <input required type="number" step="0.01" autoFocus value={payCardAmount} onChange={e => setPayCardAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-lg font-bold" />
+                                    <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} autoFocus value={payCardAmount} onChange={e => setPayCardAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-lg font-bold" />
                                 </div>
 
                                 <div>
@@ -3214,11 +3239,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 <div className="flex gap-2">
                                     <div className="flex-1">
                                         <label className="block text-xs font-semibold mb-1">Monto Total ($)</label>
-                                        <input required type="number" step="0.01" value={instTotalAmount} onChange={e => setInstTotalAmount(e.target.value)} placeholder="1200.00" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                        <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={instTotalAmount} onChange={e => setInstTotalAmount(e.target.value.replace(/-/g, ''))} placeholder="1200.00" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                     </div>
                                     <div className="flex-1">
                                         <label className="block text-xs font-semibold mb-1">Cant. Cuotas</label>
-                                        <input required type="number" min="1" max="72" value={instTotalInstallments} onChange={e => setInstTotalInstallments(e.target.value)} placeholder="12" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                        <input required type="number" min="1" max="72" onKeyDown={blockNegativeKeys} value={instTotalInstallments} onChange={e => setInstTotalInstallments(e.target.value.replace(/-/g, ''))} placeholder="12" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                     </div>
                                 </div>
 
@@ -3240,9 +3265,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 type="number"
                                                 step="0.01"
                                                 min="0"
+                                                onKeyDown={blockNegativeKeys}
                                                 placeholder="0.00 %"
                                                 value={instInterestPercent}
-                                                onChange={e => setInstInterestPercent(e.target.value)}
+                                                onChange={e => setInstInterestPercent(e.target.value.replace(/-/g, ''))}
                                                 className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
                                             />
                                             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-gray-400 font-bold">
@@ -3300,7 +3326,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
                                     <div className="flex-1">
                                         <label className="block text-xs font-semibold mb-1">Día de Cobro (1-31)</label>
-                                        <input required type="number" min="1" max="31" value={instPaymentDay} onChange={e => setInstPaymentDay(e.target.value)} placeholder="Ej. 15" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                        <input required type="number" min="1" max="31" onKeyDown={blockNegativeKeys} value={instPaymentDay} onChange={e => setInstPaymentDay(e.target.value.replace(/-/g, ''))} placeholder="Ej. 15" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                     </div>
                                 </div>
 
@@ -3327,7 +3353,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <label className="block text-sm font-medium mb-1">Monto a aportar</label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-lg">$</span></div>
-                                        <input type="number" step="0.01" required autoFocus value={contributeAmount} onChange={(e) => setContributeAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
+                                        <input type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} required autoFocus value={contributeAmount} onChange={(e) => setContributeAmount(e.target.value.replace(/-/g, ''))} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
                                     </div>
                                 </div>
                                 <div>
@@ -3371,7 +3397,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <label className="block text-xs font-semibold mb-1 text-gray-500">Monto del abono</label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
-                                        <input required type="number" step="0.01" min="0.01" value={payDebtAmount} onChange={e => setPayDebtAmount(e.target.value)} className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" placeholder="0.00" />
+                                        <input required type="number" step="0.01" min="0.01" onKeyDown={blockNegativeKeys} value={payDebtAmount} onChange={e => setPayDebtAmount(e.target.value.replace(/-/g, ''))} className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" placeholder="0.00" />
                                     </div>
                                 </div>
                                 <div>
@@ -3425,11 +3451,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
                                         <label className="block text-xs font-semibold mb-1 text-gray-500">Monto Inicial</label>
-                                        <input required type="number" step="0.01" value={editDebtAmount} onChange={e => setEditDebtAmount(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                        <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={editDebtAmount} onChange={e => setEditDebtAmount(e.target.value.replace(/-/g, ''))} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-semibold mb-1 text-gray-500">Monto Restante</label>
-                                        <input required type="number" step="0.01" value={editDebtRemaining} onChange={e => setEditDebtRemaining(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                        <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={editDebtRemaining} onChange={e => setEditDebtRemaining(e.target.value.replace(/-/g, ''))} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                     </div>
                                 </div>
                                 <div>
@@ -3449,34 +3475,45 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {editingAccount && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingAccount(null)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800">
-                            <div className="flex justify-between items-center mb-4">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[85vh] overflow-y-auto space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Editar Cuenta / Tarjeta</h3>
-                                <button onClick={() => setEditingAccount(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
+                                <button type="button" onClick={() => setEditingAccount(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
                             </div>
                             <form onSubmit={handleUpdateAccount} className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Nombre de la cuenta / tarjeta</label>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Nombre de la cuenta / tarjeta</label>
                                     <input required type="text" value={editAccountName} onChange={e => setEditAccountName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Tipo</label>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Tipo de Cuenta</label>
                                     <select value={editAccountType} onChange={e => setEditAccountType(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
                                         <option value="bank">Cuenta Bancaria</option>
                                         <option value="cash">Efectivo</option>
                                         <option value="credit">Tarjeta de Crédito</option>
-                                        <option value="wallet">Wallet digital</option>
+                                        <option value="debit">Tarjeta de Débito</option>
+                                        <option value="wallet">Wallet Digital</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold mb-1 text-gray-500">
-                                        {editAccountType === 'credit' ? 'Deuda Actual Cargada en Tarjeta ($)' : 'Saldo Disponible ($)'}
+                                    <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">
+                                        {editAccountType === 'credit' ? 'Deuda Actual Cargada en Tarjeta ($)' : 'Saldo Disponible en la Cuenta ($)'}
                                     </label>
-                                    <input required type="number" step="0.01" value={editAccountBalance} onChange={e => setEditAccountBalance(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                    <input 
+                                        required 
+                                        type="number" 
+                                        step="0.01" 
+                                        min="0"
+                                        onKeyDown={blockNegativeKeys}
+                                        placeholder={editAccountType === 'credit' ? "0.00 (sin deuda)" : "0.00"} 
+                                        value={editAccountBalance} 
+                                        onChange={e => setEditAccountBalance(e.target.value.replace(/-/g, ''))} 
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" 
+                                    />
                                     <p className="text-[10px] text-gray-400 mt-1">
                                         {editAccountType === 'credit' 
-                                            ? "Indica la deuda acumulada utilizada (0.00 si está sin uso). No ingresar saldo positivo."
-                                            : "Saldo real disponible en la cuenta."}
+                                            ? "Monto que debes actualmente en la tarjeta (ingresa en positivo). 0.00 si no tienes deuda."
+                                            : "Dinero real disponible actualmente en esta cuenta."}
                                     </p>
                                 </div>
                                 
@@ -3484,38 +3521,73 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <div className="space-y-3.5 border-t border-gray-100 dark:border-zinc-800 pt-3">
                                         <div className="grid grid-cols-2 gap-2">
                                             <div>
-                                                <label className="block text-xs font-semibold mb-1 text-gray-500">Límite Crédito ($)</label>
-                                                <input required type="number" step="0.01" value={editAccountCreditLimit} onChange={e => setEditAccountCreditLimit(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Límite Crédito ($)</label>
+                                                <input 
+                                                    required 
+                                                    type="number" 
+                                                    step="0.01" 
+                                                    min="0"
+                                                    onKeyDown={blockNegativeKeys}
+                                                    placeholder="Ej. 25000.00"
+                                                    value={editAccountCreditLimit} 
+                                                    onChange={e => setEditAccountCreditLimit(e.target.value.replace(/-/g, ''))} 
+                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" 
+                                                />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold mb-1 text-gray-500">Últimos 4 dígitos</label>
+                                                <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Últimos 4 dígitos</label>
                                                 <input maxLength={4} type="text" placeholder="1234" value={editAccountCardNumberLast4} onChange={e => setEditAccountCardNumberLast4(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
                                             <div>
-                                                <label className="block text-xs font-semibold mb-1 text-gray-500">Día de Corte</label>
-                                                <input required type="number" min={1} max={31} value={editAccountCutoffDay} onChange={e => setEditAccountCutoffDay(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Día de Corte (1-31)</label>
+                                                <input required type="number" min={1} max={31} onKeyDown={blockNegativeKeys} value={editAccountCutoffDay} onChange={e => setEditAccountCutoffDay(e.target.value.replace(/-/g, ''))} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold mb-1 text-gray-500">Día de Pago</label>
-                                                <input required type="number" min={1} max={31} value={editAccountDueDay} onChange={e => setEditAccountDueDay(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Día de Pago (1-31)</label>
+                                                <input required type="number" min={1} max={31} onKeyDown={blockNegativeKeys} value={editAccountDueDay} onChange={e => setEditAccountDueDay(e.target.value.replace(/-/g, ''))} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold mb-1 text-gray-500">Color Tarjeta</label>
+                                            <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Color Tarjeta</label>
                                             <select value={editAccountCardColor} onChange={e => setEditAccountCardColor(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
-                                                <option value="slate">Gris Oscuro</option>
+                                                <option value="slate">Carbono (Gris Oscuro)</option>
+                                                <option value="indigo">Índigo Royale</option>
+                                                <option value="blue">Azul Océano</option>
                                                 <option value="emerald">Verde Esmeralda</option>
-                                                <option value="indigo">Violeta Índigo</option>
-                                                <option value="rose">Rosa Fucsia</option>
-                                                <option value="amber">Ámbar Dorado</option>
+                                                <option value="rose">Rosa Cuarzo</option>
+                                                <option value="amber">Oro Ámbar</option>
+                                                <option value="violet">Amatista Violácea</option>
                                             </select>
                                         </div>
                                     </div>
                                 )}
 
-                                 {/* Fees Section (Opciones Extras - Only for bank, credit, debit) */}
+                                {editAccountType === 'debit' && (
+                                    <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-zinc-800">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Últimos 4 dígitos</label>
+                                                <input maxLength={4} type="text" placeholder="1234" value={editAccountCardNumberLast4} onChange={e => setEditAccountCardNumberLast4(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Color Tarjeta</label>
+                                                <select value={editAccountCardColor} onChange={e => setEditAccountCardColor(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                                    <option value="slate">Carbono (Gris Oscuro)</option>
+                                                    <option value="indigo">Índigo Royale</option>
+                                                    <option value="blue">Azul Océano</option>
+                                                    <option value="emerald">Verde Esmeralda</option>
+                                                    <option value="rose">Rosa Cuarzo</option>
+                                                    <option value="amber">Oro Ámbar</option>
+                                                    <option value="violet">Amatista Violácea</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Fees Section (Opciones Extras - Only for bank, credit, debit) */}
                                 {['bank', 'credit', 'debit'].includes(editAccountType) && (
                                     <div className="border-t border-gray-100 dark:border-zinc-800 pt-3 space-y-3">
                                         <button
@@ -3582,9 +3654,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     <input
                                                                         type="number"
                                                                         step="0.01"
+                                                                        min="0"
+                                                                        onKeyDown={blockNegativeKeys}
                                                                         placeholder={editAccountMaintFeeType === 'fixed' ? "0.00" : "0.00 %"}
                                                                         value={editAccountMaintFeeValue}
-                                                                        onChange={e => setEditAccountMaintFeeValue(e.target.value)}
+                                                                        onChange={e => setEditAccountMaintFeeValue(e.target.value.replace(/-/g, ''))}
                                                                         className="w-full pl-6 pr-2 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs"
                                                                     />
                                                                 </div>
@@ -3631,17 +3705,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {showCreateAccountModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreateAccountModal(false)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[85vh] overflow-y-auto">
                             <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                                 <h3 className="text-lg font-bold">Añadir Nueva Cuenta / Tarjeta</h3>
                                 <button type="button" onClick={() => setShowCreateAccountModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
                                     <XIcon className="w-5 h-5" />
                                 </button>
                             </div>
-                            <form onSubmit={(e) => {
-                                handleCreateAccount(e);
-                                setShowCreateAccountModal(false);
-                            }} className="space-y-4">
+                            <form onSubmit={handleCreateAccount} className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-semibold mb-1">Nombre de la Cuenta / Tarjeta</label>
                                     <input required type="text" placeholder="Ej. Visa BBVA, Nomina Banamex, Efectivo..." value={newAccountName} onChange={e=>setNewAccountName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
@@ -3658,10 +3729,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold mb-1">Saldo / Deuda Inicial ($)</label>
-                                        <input required type="number" step="0.01" placeholder="0.00" value={newAccountBalance} onChange={e=>setNewAccountBalance(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                        <label className="block text-xs font-semibold mb-1">
+                                            {newAccountType === 'credit' ? 'Deuda Actual ($)' : 'Saldo Disponible ($)'}
+                                        </label>
+                                        <input 
+                                            required 
+                                            type="number" 
+                                            step="0.01" 
+                                            min="0"
+                                            onKeyDown={blockNegativeKeys}
+                                            placeholder={newAccountType === 'credit' ? "0.00 (sin deuda)" : "0.00"} 
+                                            value={newAccountBalance} 
+                                            onChange={e=>setNewAccountBalance(e.target.value.replace(/-/g, ''))} 
+                                            className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" 
+                                        />
                                     </div>
                                 </div>
+                                <p className="text-[10px] text-gray-400">
+                                    {newAccountType === 'credit' 
+                                        ? "Deuda actual cargada en la tarjeta (ingresa en positivo). Si la tarjeta está sin uso ingresa 0."
+                                        : "Dinero total disponible en esta cuenta."}
+                                </p>
 
                                 {(newAccountType === 'credit' || newAccountType === 'debit') && (
                                     <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-zinc-800">
@@ -3669,16 +3757,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="block text-xs font-semibold mb-1">Límite de Crédito Total ($)</label>
-                                                    <input required type="number" step="0.01" placeholder="Ej. 25000.00" value={newAccountCreditLimit} onChange={e=>setNewAccountCreditLimit(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                    <input 
+                                                        required 
+                                                        type="number" 
+                                                        step="0.01" 
+                                                        min="0"
+                                                        onKeyDown={blockNegativeKeys}
+                                                        placeholder="Ej. 25000.00" 
+                                                        value={newAccountCreditLimit} 
+                                                        onChange={e=>setNewAccountCreditLimit(e.target.value.replace(/-/g, ''))} 
+                                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" 
+                                                    />
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div>
                                                         <label className="block text-xs font-semibold mb-1">Día de Corte (1-31)</label>
-                                                        <input type="number" min="1" max="31" placeholder="Ej. 15" value={newAccountCutoffDay} onChange={e=>setNewAccountCutoffDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                        <input type="number" min="1" max="31" onKeyDown={blockNegativeKeys} placeholder="Ej. 15" value={newAccountCutoffDay} onChange={e=>setNewAccountCutoffDay(e.target.value ? Number(e.target.value.replace(/-/g, '')) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                                     </div>
                                                     <div>
                                                         <label className="block text-xs font-semibold mb-1">Día Límite de Pago (1-31)</label>
-                                                        <input type="number" min="1" max="31" placeholder="Ej. 5" value={newAccountDueDay} onChange={e=>setNewAccountDueDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                        <input type="number" min="1" max="31" onKeyDown={blockNegativeKeys} placeholder="Ej. 5" value={newAccountDueDay} onChange={e=>setNewAccountDueDay(e.target.value ? Number(e.target.value.replace(/-/g, '')) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                                     </div>
                                                 </div>
                                             </div>
@@ -3771,9 +3869,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     <input
                                                                         type="number"
                                                                         step="0.01"
+                                                                        min="0"
+                                                                        onKeyDown={blockNegativeKeys}
                                                                         placeholder={newAccountMaintFeeType === 'fixed' ? "0.00" : "0.00 %"}
                                                                         value={newAccountMaintFeeValue}
-                                                                        onChange={e => setNewAccountMaintFeeValue(e.target.value)}
+                                                                        onChange={e => setNewAccountMaintFeeValue(e.target.value.replace(/-/g, ''))}
                                                                         className="w-full pl-6 pr-2 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs"
                                                                     />
                                                                 </div>
