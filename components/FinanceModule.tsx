@@ -79,6 +79,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [planningSubTab, setPlanningSubTab] = useState<'calendar' | 'subscriptions' | 'installments'>('calendar');
     const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
     const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(new Date().toISOString().split('T')[0]);
+    const [includeAvailableCredit, setIncludeAvailableCredit] = useState(false);
 
     // --- Form States (Transaction) ---
     const [txAmount, setTxAmount] = useState('');
@@ -423,7 +424,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const currentMonthName = new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' });
     
     // --- Computed Values ---
-    const totalBalanceCents = accounts.reduce((acc, account) => acc + account.balance_cents, 0);
+    const liquidCashCents = accounts
+        .filter(a => a.type !== 'credit')
+        .reduce((acc, a) => acc + a.balance_cents, 0);
+
+    const totalCreditCardDebtCents = accounts
+        .filter(a => a.type === 'credit')
+        .reduce((acc, a) => acc + Math.max(0, a.balance_cents), 0);
+
+    const totalAvailableCreditCents = accounts
+        .filter(a => a.type === 'credit')
+        .reduce((acc, a) => {
+            const limit = a.credit_limit_cents || 0;
+            const used = Math.max(0, a.balance_cents);
+            return acc + Math.max(0, limit - used);
+        }, 0);
+
+    const netWorthCents = liquidCashCents - totalCreditCardDebtCents;
+
+    const totalBalanceCents = includeAvailableCredit 
+        ? netWorthCents + totalAvailableCreditCents 
+        : netWorthCents;
     
     const thisMonthTransactions = transactions.filter(t => t.date.startsWith(currentMonthPrefix));
     const incomeThisMonth = thisMonthTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount_cents, 0);
@@ -584,13 +605,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             description: `Recarga de fondos en ${targetAcc.name}`
         }]);
 
+        const newBal = targetAcc.type === 'credit' 
+            ? Math.max(0, targetAcc.balance_cents - amountCents)
+            : targetAcc.balance_cents + amountCents;
+
         await supabase.from('finance_accounts').update({
-            balance_cents: targetAcc.balance_cents + amountCents
+            balance_cents: newBal
         }).eq('id', targetAcc.id);
 
         setShowAddFundsModal(null);
         setAddFundsAmount('');
-        fetchFinanceData();
+        await fetchFinanceData();
     };
 
     const handlePayCreditCard = async (e: React.FormEvent) => {
@@ -608,7 +633,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             return alert(`Fondos insuficientes en ${fromAcc.name}. Disponible: $${(fromAcc.balance_cents/100).toFixed(2)}.`);
         }
 
-        const cardAcc = showPayCardModal;
+        const cardAcc = accounts.find(a => a.id === showPayCardModal.id) || showPayCardModal;
 
         await supabase.from('finance_transactions').insert([{
             user_id: user.id,
@@ -631,7 +656,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         setShowPayCardModal(null);
         setPayCardAmount('');
         setPayCardFromAccountId('');
-        fetchFinanceData();
+        await fetchFinanceData();
     };
 
     const handleCreateInstallment = async (e: React.FormEvent) => {
@@ -1294,7 +1319,37 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     {/* Stats Grid */}
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
-                                            <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Balance Total</h2>
+                                            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                                                <div>
+                                                    <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">Balance Total</h2>
+                                                    <p className="text-[11px] text-gray-400">
+                                                        {includeAvailableCredit 
+                                                            ? "Incluyendo crédito disponible de tarjetas" 
+                                                            : "Efectivo y bancos netos (sin crédito disponible)"}
+                                                    </p>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIncludeAvailableCredit(!includeAvailableCredit)}
+                                                    className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-900 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
+                                                >
+                                                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                                                        + Crédito disp. ({formatCurrency(totalAvailableCreditCents)})
+                                                    </span>
+                                                    <div
+                                                        className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out ${
+                                                            includeAvailableCredit ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-zinc-700'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                                includeAvailableCredit ? 'translate-x-4' : 'translate-x-0'
+                                                            }`}
+                                                        />
+                                                    </div>
+                                                </button>
+                                            </div>
                                             <div className="flex items-center gap-3">
                                                 <div className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
                                                     {formatCurrency(totalBalanceCents)}
@@ -3212,9 +3267,15 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Saldo o Deuda de Tarjeta (en $)</label>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">
+                                        {editAccountType === 'credit' ? 'Deuda Actual Cargada en Tarjeta ($)' : 'Saldo Disponible ($)'}
+                                    </label>
                                     <input required type="number" step="0.01" value={editAccountBalance} onChange={e => setEditAccountBalance(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                    <p className="text-[10px] text-gray-400 mt-1">Nota: Las tarjetas de crédito deben tener saldo negativo indicando la deuda (ej: -150).</p>
+                                    <p className="text-[10px] text-gray-400 mt-1">
+                                        {editAccountType === 'credit' 
+                                            ? "Indica la deuda acumulada utilizada (0.00 si está sin uso). No ingresar saldo positivo."
+                                            : "Saldo real disponible en la cuenta."}
+                                    </p>
                                 </div>
                                 
                                 {editAccountType === 'credit' && (
