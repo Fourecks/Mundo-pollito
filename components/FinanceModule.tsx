@@ -1741,7 +1741,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                             </span>
                                                                         </div>
                                                                         <p className="text-xs text-gray-500 mt-0.5">
-                                                                            {targetAcc ? `Tarjeta/Cuenta: ${targetAcc.name}` : 'Sin cuenta asignada'} • Inicio: {inst.start_date}
+                                                                            {targetAcc ? `Tarjeta/Cuenta: ${targetAcc.name}` : 'Sin cuenta asignada'} • Día de cobro: {inst.payment_day || 15} • Inicio: {inst.start_date}
                                                                         </p>
                                                                     </div>
                                                                     <button onClick={() => handleDeleteInstallment(inst.id)} className="text-gray-400 hover:text-red-500 p-1">
@@ -1963,8 +1963,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             </div>
                                             <button
                                                 onClick={() => {
-                                                    setActiveTab('settings');
                                                     setNewAccountType('credit');
+                                                    setShowCreateAccountModal(true);
                                                 }}
                                                 className="text-xs font-semibold bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 px-3 py-2 rounded-xl text-gray-900 dark:text-white transition-colors flex items-center gap-1.5"
                                             >
@@ -2718,17 +2718,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
                                 </div>
 
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1">Asociar Tarjeta / Cuenta</label>
+                                    <select value={instAccountId} onChange={e => setInstAccountId(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                        <option value="">Ninguna</option>
+                                        {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.type === 'credit' ? 'Crédito' : 'Débito/Banco'})</option>)}
+                                    </select>
+                                </div>
+
                                 <div className="flex gap-2">
                                     <div className="flex-1">
-                                        <label className="block text-xs font-semibold mb-1">Asociar Tarjeta / Cuenta</label>
-                                        <select value={instAccountId} onChange={e => setInstAccountId(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
-                                            <option value="">Ninguna</option>
-                                            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                        </select>
+                                        <label className="block text-xs font-semibold mb-1">Fecha de Inicio</label>
+                                        <input required type="date" value={instStartDate} onChange={e => {
+                                            setInstStartDate(e.target.value);
+                                            if (e.target.value) {
+                                                const d = e.target.value.split('-')[2];
+                                                if (d) setInstPaymentDay(parseInt(d).toString());
+                                            }
+                                        }} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                     </div>
                                     <div className="flex-1">
-                                        <label className="block text-xs font-semibold mb-1">Fecha de Inicio</label>
-                                        <input required type="date" value={instStartDate} onChange={e => setInstStartDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                        <label className="block text-xs font-semibold mb-1">Día de Cobro (1-31)</label>
+                                        <input required type="number" min="1" max="31" value={instPaymentDay} onChange={e => setInstPaymentDay(e.target.value)} placeholder="Ej. 15" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                     </div>
                                 </div>
 
