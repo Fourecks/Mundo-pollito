@@ -835,9 +835,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 due_day: newAccountType === 'credit' ? (Number(newAccountDueDay) || 5) : null,
                 card_number_last4: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardLast4 : null,
                 card_color: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardColor : 'slate',
-                maintenance_fee_type: newAccountType === 'credit' ? newAccountMaintFeeType : 'none',
-                maintenance_fee_value: newAccountType === 'credit' && newAccountMaintFeeValue ? parseFloat(newAccountMaintFeeValue) : 0,
-                maintenance_fee_freq: newAccountType === 'credit' ? newAccountMaintFeeFreq : 'monthly',
+                maintenance_fee_type: newAccountMaintFeeType,
+                maintenance_fee_value: newAccountMaintFeeValue ? parseFloat(newAccountMaintFeeValue) : 0,
+                maintenance_fee_freq: newAccountMaintFeeFreq,
                 transfer_fee_type: newAccountTransferFeeType,
                 transfer_fee_value: newAccountTransferFeeValue ? parseFloat(newAccountTransferFeeValue) : 0
             };
@@ -1206,9 +1206,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             cutoff_day: editAccountCutoffDay ? Number(editAccountCutoffDay) : null,
             due_day: editAccountDueDay ? Number(editAccountDueDay) : null,
             card_number_last4: editAccountCardNumberLast4 || null,
-            maintenance_fee_type: editAccountType === 'credit' ? editAccountMaintFeeType : 'none',
-            maintenance_fee_value: editAccountType === 'credit' && editAccountMaintFeeValue ? parseFloat(editAccountMaintFeeValue) : 0,
-            maintenance_fee_freq: editAccountType === 'credit' ? editAccountMaintFeeFreq : 'monthly',
+            maintenance_fee_type: editAccountMaintFeeType,
+            maintenance_fee_value: editAccountMaintFeeValue ? parseFloat(editAccountMaintFeeValue) : 0,
+            maintenance_fee_freq: editAccountMaintFeeFreq,
             transfer_fee_type: editAccountTransferFeeType,
             transfer_fee_value: editAccountTransferFeeValue ? parseFloat(editAccountTransferFeeValue) : 0
         }).eq('id', editingAccount.id);
@@ -1318,50 +1318,48 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 <div className="space-y-8">
                                     {/* Stats Grid */}
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                        <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
-                                            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                                                <div>
-                                                    <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">Balance Total</h2>
-                                                    <p className="text-[11px] text-gray-400">
-                                                        {includeAvailableCredit 
-                                                            ? "Incluyendo crédito disponible de tarjetas" 
-                                                            : "Efectivo y bancos netos (sin crédito disponible)"}
-                                                    </p>
-                                                </div>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIncludeAvailableCredit(!includeAvailableCredit)}
-                                                    className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-900 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
-                                                >
-                                                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
-                                                        + Crédito disp. ({formatCurrency(totalAvailableCreditCents)})
-                                                    </span>
-                                                    <div
-                                                        className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out ${
-                                                            includeAvailableCredit ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-zinc-700'
-                                                        }`}
-                                                    >
-                                                        <span
-                                                            className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                                includeAvailableCredit ? 'translate-x-4' : 'translate-x-0'
-                                                            }`}
-                                                        />
+                                        <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm flex items-center justify-between gap-4">
+                                            <div className="space-y-1">
+                                                <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">Balance Total</h2>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                                        {formatCurrency(totalBalanceCents)}
                                                     </div>
-                                                </button>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                                    {formatCurrency(totalBalanceCents)}
+                                                    <button 
+                                                        onClick={() => setIsPrivacyMode(!isPrivacyMode)}
+                                                        className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                        title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+                                                    >
+                                                        {isPrivacyMode ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                                    </button>
                                                 </div>
-                                                <button 
-                                                    onClick={() => setIsPrivacyMode(!isPrivacyMode)}
-                                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                                    title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
-                                                >
-                                                    {isPrivacyMode ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                                                </button>
+                                                <p className="text-[11px] text-gray-400">
+                                                    {includeAvailableCredit 
+                                                        ? "Incluye crédito disponible de tarjetas" 
+                                                        : "Efectivo y bancos netos (sin crédito disponible)"}
+                                                </p>
                                             </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setIncludeAvailableCredit(!includeAvailableCredit)}
+                                                className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-900 px-3.5 py-2 rounded-2xl border border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700 transition-all cursor-pointer shrink-0 self-center"
+                                            >
+                                                <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+                                                    + Crédito disp. ({formatCurrency(totalAvailableCreditCents)})
+                                                </span>
+                                                <div
+                                                    className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out ${
+                                                        includeAvailableCredit ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-zinc-700'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                            includeAvailableCredit ? 'translate-x-4' : 'translate-x-0'
+                                                        }`}
+                                                    />
+                                                </div>
+                                            </button>
                                         </div>
                                         <div className="p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm">
                                             <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-2">
@@ -2797,6 +2795,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 <p className="text-[10px] text-gray-500 uppercase font-bold">
                                                                     {acc.type === 'credit' ? `Tarjeta de Crédito ${acc.card_number_last4 ? `•••• ${acc.card_number_last4}` : ''}` : acc.type === 'wallet' ? 'Wallet digital' : acc.type}
                                                                 </p>
+                                                                {(acc.maintenance_fee_type !== 'none' || acc.transfer_fee_type !== 'none') && (
+                                                                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                                        {acc.maintenance_fee_type !== 'none' && (
+                                                                            <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 rounded">
+                                                                                Mantenimiento: {acc.maintenance_fee_type === 'fixed' ? `$${acc.maintenance_fee_value}` : `${acc.maintenance_fee_value}%`} ({acc.maintenance_fee_freq === 'yearly' ? 'Anual' : 'Mensual'})
+                                                                            </span>
+                                                                        )}
+                                                                        {acc.transfer_fee_type !== 'none' && (
+                                                                            <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-indigo-100 text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 rounded">
+                                                                                Comisión Transf: {acc.transfer_fee_type === 'fixed' ? `$${acc.transfer_fee_value}` : `${acc.transfer_fee_value}%`}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-3">
@@ -3313,6 +3325,49 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
                                 )}
 
+                                {/* Fees & Commissions Section */}
+                                <div className="space-y-3 border-t border-gray-100 dark:border-zinc-800 pt-3">
+                                    <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Mantenimiento y Comisiones</h4>
+                                    
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-semibold text-gray-500">Mantenimiento / Anualidad</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <select value={editAccountMaintFeeType} onChange={e => setEditAccountMaintFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                <option value="none">Sin Cuota</option>
+                                                <option value="fixed">Monto Fijo ($)</option>
+                                                <option value="percent">Porcentaje (%)</option>
+                                            </select>
+                                            {editAccountMaintFeeType !== 'none' ? (
+                                                <>
+                                                    <input type="number" step="0.01" placeholder="Valor" value={editAccountMaintFeeValue} onChange={e => setEditAccountMaintFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
+                                                    <select value={editAccountMaintFeeFreq} onChange={e => setEditAccountMaintFeeFreq(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                        <option value="monthly">Mensual</option>
+                                                        <option value="yearly">Anual</option>
+                                                    </select>
+                                                </>
+                                            ) : (
+                                                <div className="col-span-2 text-xs text-gray-400 self-center pl-2">Sin mantenimiento</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-semibold text-gray-500">Comisión por Transferencia / Salida</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <select value={editAccountTransferFeeType} onChange={e => setEditAccountTransferFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                <option value="none">Sin Comisión</option>
+                                                <option value="fixed">Monto Fijo ($)</option>
+                                                <option value="percent">Porcentaje (%)</option>
+                                            </select>
+                                            {editAccountTransferFeeType !== 'none' ? (
+                                                <input type="number" step="0.01" placeholder={editAccountTransferFeeType === 'fixed' ? "Monto $" : "Porcentaje %"} value={editAccountTransferFeeValue} onChange={e => setEditAccountTransferFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
+                                            ) : (
+                                                <div className="text-xs text-gray-400 self-center pl-2">Sin comisión</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
                                  <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
                                     Guardar Cambios
                                 </button>
@@ -3398,6 +3453,49 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Fees & Commissions Section */}
+                                <div className="space-y-3 border-t border-gray-100 dark:border-zinc-800 pt-3">
+                                    <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Mantenimiento y Comisiones</h4>
+                                    
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-semibold text-gray-500">Mantenimiento / Anualidad</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <select value={newAccountMaintFeeType} onChange={e => setNewAccountMaintFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                <option value="none">Sin Cuota</option>
+                                                <option value="fixed">Monto Fijo ($)</option>
+                                                <option value="percent">Porcentaje (%)</option>
+                                            </select>
+                                            {newAccountMaintFeeType !== 'none' ? (
+                                                <>
+                                                    <input type="number" step="0.01" placeholder="Valor" value={newAccountMaintFeeValue} onChange={e => setNewAccountMaintFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
+                                                    <select value={newAccountMaintFeeFreq} onChange={e => setNewAccountMaintFeeFreq(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                        <option value="monthly">Mensual</option>
+                                                        <option value="yearly">Anual</option>
+                                                    </select>
+                                                </>
+                                            ) : (
+                                                <div className="col-span-2 text-xs text-gray-400 self-center pl-2">Sin mantenimiento</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-semibold text-gray-500">Comisión por Transferencia / Salida</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <select value={newAccountTransferFeeType} onChange={e => setNewAccountTransferFeeType(e.target.value as any)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                                                <option value="none">Sin Comisión</option>
+                                                <option value="fixed">Monto Fijo ($)</option>
+                                                <option value="percent">Porcentaje (%)</option>
+                                            </select>
+                                            {newAccountTransferFeeType !== 'none' ? (
+                                                <input type="number" step="0.01" placeholder={newAccountTransferFeeType === 'fixed' ? "Monto $" : "Porcentaje %"} value={newAccountTransferFeeValue} onChange={e => setNewAccountTransferFeeValue(e.target.value)} className="px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs" />
+                                            ) : (
+                                                <div className="text-xs text-gray-400 self-center pl-2">Sin comisión</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
 
                                 <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
                                     Crear Cuenta / Tarjeta
