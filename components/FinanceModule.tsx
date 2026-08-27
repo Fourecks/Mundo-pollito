@@ -6,7 +6,7 @@ import {
     PlusIcon, XIcon, ArrowRightLeft, TrendingUp, TrendingDown, EyeIcon, EyeOffIcon, 
     LayoutDashboard, ListOrdered, PieChart, CalendarDays, Settings, Trash2, Wallet, 
     CreditCard, Landmark, CheckCircle2, ChevronDown, ChevronUp, Calendar, Banknote, ShoppingCart, BarChart3, Archive,
-    ChevronLeft, ChevronRight, Download, AlertTriangle, Layers, ShieldCheck, Clock, Receipt
+    ChevronLeft, ChevronRight, Download, AlertTriangle, Layers, ShieldCheck, Clock, Receipt, Pencil
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -73,7 +73,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     // --- Planning Sub-tab & Calendar ---
     const [planningSubTab, setPlanningSubTab] = useState<'calendar' | 'subscriptions' | 'installments'>('calendar');
     const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
-    const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
+    const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(new Date().toISOString().split('T')[0]);
 
     // --- Form States (Transaction) ---
     const [txAmount, setTxAmount] = useState('');
@@ -104,6 +104,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [recDesc, setRecDesc] = useState('');
     const [recFrequency, setRecFrequency] = useState('monthly');
     const [recNextDate, setRecNextDate] = useState(new Date().toISOString().split('T')[0]);
+    const [recAccountId, setRecAccountId] = useState<number | ''>('');
+
+    // --- Edit States ---
+    const [editingAccount, setEditingAccount] = useState<FinanceAccount | null>(null);
+    const [editAccountName, setEditAccountName] = useState('');
+    const [editAccountType, setEditAccountType] = useState('bank');
+    const [editAccountBalance, setEditAccountBalance] = useState('');
+    const [editAccountCardColor, setEditAccountCardColor] = useState('slate');
+    const [editAccountCreditLimit, setEditAccountCreditLimit] = useState('');
+    const [editAccountCutoffDay, setEditAccountCutoffDay] = useState('');
+    const [editAccountDueDay, setEditAccountDueDay] = useState('');
+    const [editAccountCardNumberLast4, setEditAccountCardNumberLast4] = useState('');
+
+    const [editingDebt, setEditingDebt] = useState<any | null>(null);
+    const [editDebtName, setEditDebtName] = useState('');
+    const [editDebtType, setEditDebtType] = useState<'OWE' | 'OWED'>('OWE');
+    const [editDebtAmount, setEditDebtAmount] = useState('');
+    const [editDebtRemaining, setEditDebtRemaining] = useState('');
+    const [editDebtDueDate, setEditDebtDueDate] = useState('');
 
     // --- Form States (Savings Goals) ---
     const [goalName, setGoalName] = useState('');
@@ -183,6 +202,72 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         }
     };
 
+    const autoProcessDueInstallments = async (instList: FinanceInstallment[], accountsList: any[]) => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const today = new Date();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        let dataChanged = false;
+
+        for (const inst of instList) {
+            if (inst.status !== 'ACTIVE') continue;
+
+            const start = new Date(inst.start_date);
+            if (start > today) continue;
+
+            let expectedPaid = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
+            if (today.getDate() >= start.getDate()) {
+                expectedPaid += 1;
+            }
+
+            expectedPaid = Math.min(expectedPaid, inst.total_installments);
+
+            // While we have unpaid installments that should be paid up to today, process them one by one
+            while (inst.paid_installments < expectedPaid) {
+                const nextPaid = inst.paid_installments + 1;
+                const newStatus = nextPaid >= inst.total_installments ? 'COMPLETED' : 'ACTIVE';
+
+                const targetAccId = inst.account_id || accountsList[0]?.id;
+                if (!targetAccId) break;
+
+                const currAcc = accountsList.find(a => a.id === targetAccId);
+                if (!currAcc) break;
+
+                // Process payment in DB
+                await supabase.from('finance_installments').update({
+                    paid_installments: nextPaid,
+                    status: newStatus
+                }).eq('id', inst.id);
+
+                await supabase.from('finance_transactions').insert([{
+                    user_id: user.id,
+                    account_id: targetAccId,
+                    type: 'EXPENSE',
+                    amount_cents: inst.installment_amount_cents,
+                    date: todayStr,
+                    description: `Pago automático cuota ${nextPaid}/${inst.total_installments}: ${inst.name}`
+                }]);
+
+                const newBal = currAcc.type === 'credit'
+                    ? currAcc.balance_cents + inst.installment_amount_cents
+                    : currAcc.balance_cents - inst.installment_amount_cents;
+
+                await supabase.from('finance_accounts').update({ balance_cents: newBal }).eq('id', targetAccId);
+
+                currAcc.balance_cents = newBal;
+                inst.paid_installments = nextPaid;
+                inst.status = newStatus;
+                dataChanged = true;
+            }
+        }
+
+        if (dataChanged) {
+            // Re-fetch everything cleanly
+            fetchFinanceData();
+        }
+    };
+
     const fetchFinanceData = async () => {
         setIsLoading(true);
         try {
@@ -219,7 +304,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 if (listsRes.data) setShoppingLists(listsRes.data);
                 if (itemsRes.data) setShoppingItems(itemsRes.data);
                 if (debtsRes.data) setDebts(debtsRes.data);
-                if (instRes.data) setInstallments(instRes.data);
+                if (instRes.data) {
+                    setInstallments(instRes.data);
+                    if (accRes.data) {
+                        autoProcessDueInstallments(instRes.data, accRes.data);
+                    }
+                }
             } catch (err) {
                 console.log('Extra tables not ready yet', err);
             }
@@ -670,9 +760,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             description: recDesc,
             frequency: recFrequency,
             start_date: new Date().toISOString().split('T')[0],
-            next_date: recNextDate
+            next_date: recNextDate,
+            account_id: recAccountId ? Number(recAccountId) : null
         }]);
-        setRecAmount(''); setRecDesc('');
+        setRecAmount(''); setRecDesc(''); setRecAccountId('');
         fetchFinanceData();
     };
 
@@ -899,6 +990,47 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const handleDeleteDebt = async (debtId: number) => {
         if (!confirm('¿Eliminar este registro de deuda/préstamo?')) return;
         await supabase.from('finance_debts').delete().eq('id', debtId);
+        fetchFinanceData();
+    };
+
+    const handleUpdateDebt = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingDebt) return;
+
+        const amountCents = Math.round(parseFloat(editDebtAmount) * 100);
+        const remainingCents = Math.round(parseFloat(editDebtRemaining) * 100);
+
+        await supabase.from('finance_debts').update({
+            name: editDebtName,
+            type: editDebtType,
+            amount_cents: amountCents,
+            remaining_cents: remainingCents,
+            due_date: editDebtDueDate || null
+        }).eq('id', editingDebt.id);
+
+        setEditingDebt(null);
+        fetchFinanceData();
+    };
+
+    const handleUpdateAccount = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingAccount) return;
+
+        const balanceCents = Math.round(parseFloat(editAccountBalance) * 100);
+        const limitCents = editAccountCreditLimit ? Math.round(parseFloat(editAccountCreditLimit) * 100) : null;
+
+        await supabase.from('finance_accounts').update({
+            name: editAccountName,
+            type: editAccountType,
+            balance_cents: balanceCents,
+            card_color: editAccountCardColor,
+            credit_limit_cents: limitCents,
+            cutoff_day: editAccountCutoffDay ? Number(editAccountCutoffDay) : null,
+            due_day: editAccountDueDay ? Number(editAccountDueDay) : null,
+            card_number_last4: editAccountCardNumberLast4 || null
+        }).eq('id', editingAccount.id);
+
+        setEditingAccount(null);
         fetchFinanceData();
     };
 
@@ -1234,24 +1366,24 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             {activeTab === 'planning' && (
                                 <div className="space-y-6">
                                     {/* Planning Sub-nav */}
-                                    <div className="flex gap-2 p-1 bg-gray-100 dark:bg-zinc-800 rounded-xl max-w-md">
+                                    <div className="flex gap-1.5 p-1 bg-gray-100 dark:bg-zinc-800 rounded-xl overflow-x-auto scrollbar-none">
                                         <button
                                             onClick={() => setPlanningSubTab('calendar')}
-                                            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${planningSubTab === 'calendar' ? 'bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'}`}
+                                            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === 'calendar' ? 'bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'}`}
                                         >
                                             <CalendarDays className="w-3.5 h-3.5" />
                                             Calendario de Pagos
                                         </button>
                                         <button
                                             onClick={() => setPlanningSubTab('subscriptions')}
-                                            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${planningSubTab === 'subscriptions' ? 'bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'}`}
+                                            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === 'subscriptions' ? 'bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'}`}
                                         >
                                             <Calendar className="w-3.5 h-3.5" />
                                             Suscripciones ({recurring.length})
                                         </button>
                                         <button
                                             onClick={() => setPlanningSubTab('installments')}
-                                            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${planningSubTab === 'installments' ? 'bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'}`}
+                                            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === 'installments' ? 'bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'}`}
                                         >
                                             <Layers className="w-3.5 h-3.5" />
                                             Cuotas ({installments.length})
@@ -1446,6 +1578,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         <label className="block text-xs font-semibold mb-1 text-gray-500">Próximo cobro</label>
                                                         <input required type="date" value={recNextDate} onChange={e => setRecNextDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                                     </div>
+                                                    <div>
+                                                        <label className="block text-xs font-semibold mb-1 text-gray-500">Pagar con Cuenta / Tarjeta</label>
+                                                        <select 
+                                                            required
+                                                            value={recAccountId} 
+                                                            onChange={e => setRecAccountId(e.target.value ? Number(e.target.value) : '')} 
+                                                            className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                                                        >
+                                                            <option value="">Selecciona cuenta...</option>
+                                                            {accounts.map(acc => (
+                                                                <option key={acc.id} value={acc.id}>
+                                                                    {acc.name} ({formatCurrency(acc.balance_cents)})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
                                                     <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">Añadir recurrente</button>
                                                 </form>
                                             </div>
@@ -1455,28 +1603,31 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 <div className="space-y-2.5">
                                                     {recurring.length === 0 ? (
                                                         <p className="text-gray-500 text-xs py-4">No hay suscripciones activas.</p>
-                                                    ) : recurring.map(r => (
-                                                        <div key={r.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-gray-200 dark:hover:border-zinc-700 transition-all">
-                                                            <div className="flex items-center gap-3.5 min-w-0">
-                                                                <div className="p-2 bg-gray-100 dark:bg-zinc-900 text-gray-500 dark:text-zinc-400 rounded-xl">
-                                                                    <Receipt className="w-4 h-4" />
+                                                    ) : recurring.map(r => {
+                                                        const targetAcc = accounts.find(a => a.id === r.account_id);
+                                                        return (
+                                                            <div key={r.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-gray-200 dark:hover:border-zinc-700 transition-all">
+                                                                <div className="flex items-center gap-3.5 min-w-0">
+                                                                    <div className="p-2 bg-gray-100 dark:bg-zinc-900 text-gray-500 dark:text-zinc-400 rounded-xl">
+                                                                        <Receipt className="w-4 h-4" />
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{r.description}</p>
+                                                                        <p className="text-xs text-gray-400">Próximo cobro: {r.next_date} • {r.frequency === 'monthly' ? 'Mensual' : r.frequency === 'yearly' ? 'Anual' : 'Semanal'}{targetAcc ? ` • Tarjeta: ${targetAcc.name}` : ''}</p>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="min-w-0">
-                                                                    <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{r.description}</p>
-                                                                    <p className="text-xs text-gray-400">Próximo cobro: {r.next_date} • {r.frequency === 'monthly' ? 'Mensual' : r.frequency === 'yearly' ? 'Anual' : 'Semanal'}</p>
+                                                                <div className="flex items-center gap-4 shrink-0">
+                                                                    <span className="font-semibold text-sm text-gray-900 dark:text-white">-{formatCurrency(r.amount_cents)}</span>
+                                                                    <button 
+                                                                        onClick={() => handleDeleteRecurring(r.id)} 
+                                                                        className="text-gray-400 hover:text-red-500 p-1.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center gap-4 shrink-0">
-                                                                <span className="font-semibold text-sm text-gray-900 dark:text-white">-{formatCurrency(r.amount_cents)}</span>
-                                                                <button 
-                                                                    onClick={() => handleDeleteRecurring(r.id)} 
-                                                                    className="text-gray-400 hover:text-red-500 p-1.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         </div>
@@ -1881,12 +2032,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                             </p>
                                                                         )}
                                                                     </div>
-                                                                    <div className="flex items-center gap-4 shrink-0">
-                                                                        <div className="text-right">
+                                                                    <div className="flex items-center gap-2.5 shrink-0">
+                                                                        <div className="text-right mr-1.5">
                                                                             <p className="text-[10px] text-gray-400 font-medium">Restante</p>
                                                                             <p className="font-bold text-sm text-gray-950 dark:text-white">{formatCurrency(debt.remaining_cents)}</p>
                                                                         </div>
                                                                         <button 
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setEditingDebt(debt);
+                                                                                setEditDebtName(debt.name);
+                                                                                setEditDebtType(debt.type);
+                                                                                setEditDebtAmount((debt.amount_cents / 100).toString());
+                                                                                setEditDebtRemaining((debt.remaining_cents / 100).toString());
+                                                                                setEditDebtDueDate(debt.due_date || '');
+                                                                            }} 
+                                                                            className="text-gray-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-1 rounded-xl transition-colors shrink-0"
+                                                                        >
+                                                                            <Pencil className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                        <button 
+                                                                            type="button"
                                                                             onClick={() => handleDeleteDebt(debt.id)} 
                                                                             className="text-gray-400 hover:text-red-500 p-1 rounded-xl transition-colors shrink-0"
                                                                         >
@@ -1894,7 +2060,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                         </button>
                                                                     </div>
                                                                 </div>
-
+ 
                                                                 <div className="space-y-1">
                                                                     <div className="h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                                         <div 
@@ -1908,7 +2074,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                         </span>
                                                                         {debt.remaining_cents > 0 && (
                                                                             <button 
-                                                                                onClick={() => setShowPayDebtModal(debt.id)} 
+                                                                                onClick={() => { setShowPayDebtModal(debt); setPayDebtAmount(''); setPayDebtAccountId(''); }} 
                                                                                 className="text-[11px] font-semibold bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white px-3 py-1.5 rounded-lg transition-colors"
                                                                             >
                                                                                 Abonar {isOwed ? 'Cobro' : 'Pago'}
@@ -2206,10 +2372,40 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             </div>
                                                             <div>
                                                                 <p className="font-semibold text-sm">{acc.name}</p>
-                                                                <p className="text-[10px] text-gray-500 uppercase font-bold">{acc.type}</p>
+                                                                <p className="text-[10px] text-gray-500 uppercase font-bold">
+                                                                    {acc.type === 'credit' ? `Tarjeta de Crédito ${acc.card_number_last4 ? `•••• ${acc.card_number_last4}` : ''}` : acc.type === 'wallet' ? 'Wallet digital' : acc.type}
+                                                                </p>
                                                             </div>
                                                         </div>
-                                                        <span className="font-bold text-sm text-gray-700 dark:text-gray-300">{formatCurrency(acc.balance_cents)}</span>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="font-bold text-sm text-gray-700 dark:text-gray-300">{formatCurrency(acc.balance_cents)}</span>
+                                                            <div className="flex items-center gap-1">
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditingAccount(acc);
+                                                                        setEditAccountName(acc.name);
+                                                                        setEditAccountType(acc.type);
+                                                                        setEditAccountBalance((acc.balance_cents / 100).toString());
+                                                                        setEditAccountCardColor(acc.card_color || 'slate');
+                                                                        setEditAccountCreditLimit(((acc.credit_limit_cents || 0) / 100).toString());
+                                                                        setEditAccountCutoffDay((acc.cutoff_day || '').toString());
+                                                                        setEditAccountDueDay((acc.due_day || '').toString());
+                                                                        setEditAccountCardNumberLast4(acc.card_number_last4 || '');
+                                                                    }}
+                                                                    className="text-gray-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-all shrink-0"
+                                                                >
+                                                                    <Pencil className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteAccount(acc.id)} 
+                                                                    className="text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-all shrink-0"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -2294,11 +2490,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 ))}
                                             </div>
                                             <form onSubmit={handleCreateCategory} className="bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 space-y-3">
-                                                <h4 className="text-sm font-medium mb-2">Añadir categoría</h4>
+                                                <h4 className="text-sm font-medium mb-1">Añadir categoría</h4>
                                                 <div className="flex gap-2">
                                                     <input required type="text" placeholder="🍔" value={newCatEmoji} onChange={e=>setNewCatEmoji(e.target.value)} className="w-16 text-center px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
                                                     <input required type="text" placeholder="Nombre (Alimentación...)" value={newCatName} onChange={e=>setNewCatName(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
                                                 </div>
+                                                
+                                                <div className="space-y-1">
+                                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selector de Emojis</label>
+                                                    <div className="grid grid-cols-10 gap-1.5 p-2 bg-white dark:bg-[#0a0a0a] border border-gray-150 dark:border-zinc-800 rounded-lg max-h-24 overflow-y-auto">
+                                                        {['💰', '🍔', '🛒', '🚗', '🏠', '📈', '🩺', '🎓', '🍿', '✈️', '🎁', '🔌', '👕', '🐾', '⚽', '📱', '💈', '☕', '🍷', '🛠️', '💸', '💳', '🏦', '💎', '🔑', '💼', '⛽', '🚌', '🍕', '🍺', '🎉', '🔥', '💡', '🎮', '❤️', '🚲', '🍿', '🧹', '🥗', '🏋️'].map(emoji => (
+                                                            <button
+                                                                key={emoji}
+                                                                type="button"
+                                                                onClick={() => setNewCatEmoji(emoji)}
+                                                                className={`p-1 hover:bg-gray-150 dark:hover:bg-zinc-800 rounded transition-all text-sm flex items-center justify-center ${newCatEmoji === emoji ? 'bg-gray-100 dark:bg-zinc-800 scale-110 border border-gray-200 dark:border-zinc-700 font-bold' : ''}`}
+                                                            >
+                                                                {emoji}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
                                                 <button type="submit" className="w-full bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">Guardar Categoría</button>
                                             </form>
                                         </div>
@@ -2548,6 +2761,174 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 </div>
                                 <button type="submit" className="w-full bg-emerald-500 text-white px-4 py-3.5 rounded-xl font-medium shadow-sm hover:bg-emerald-600 transition-colors">
                                     Confirmar Aporte
+                                </button>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Pay/Abonar Debt Modal */}
+            <AnimatePresence>
+                {showPayDebtModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPayDebtModal(null)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Abonar Préstamo / Deuda</h3>
+                                <button onClick={() => setShowPayDebtModal(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
+                            </div>
+                            <form onSubmit={handlePayDebtConfirm} className="space-y-4">
+                                <div>
+                                    <div className="text-xs text-gray-500 space-y-1 bg-gray-50 dark:bg-zinc-900 p-3 rounded-xl border border-gray-100 dark:border-zinc-800">
+                                        <div>Préstamo: <strong className="text-gray-900 dark:text-white">{showPayDebtModal.name}</strong></div>
+                                        <div>Monto total: <strong className="text-gray-900 dark:text-white">{formatCurrency(showPayDebtModal.amount_cents)}</strong></div>
+                                        <div>Monto restante: <strong className="text-red-500">{formatCurrency(showPayDebtModal.remaining_cents)}</strong></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Monto del abono</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
+                                        <input required type="number" step="0.01" min="0.01" value={payDebtAmount} onChange={e => setPayDebtAmount(e.target.value)} className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" placeholder="0.00" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">
+                                        {showPayDebtModal.type === 'OWED' ? 'Cuenta donde se deposita el cobro' : 'Cuenta de donde se descuenta el pago'}
+                                    </label>
+                                    <select 
+                                        required
+                                        value={payDebtAccountId} 
+                                        onChange={e => setPayDebtAccountId(e.target.value ? Number(e.target.value) : '')} 
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                                    >
+                                        <option value="">Selecciona cuenta...</option>
+                                        {accounts.filter(a => a.type !== 'credit').map(acc => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.name} ({formatCurrency(acc.balance_cents)})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+                                    Confirmar Abono
+                                </button>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Edit Debt Modal */}
+            <AnimatePresence>
+                {editingDebt && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingDebt(null)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Editar Préstamo / Deuda</h3>
+                                <button onClick={() => setEditingDebt(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
+                            </div>
+                            <form onSubmit={handleUpdateDebt} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Nombre del Préstamo / Deudor</label>
+                                    <input required type="text" value={editDebtName} onChange={e => setEditDebtName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Tipo</label>
+                                    <select value={editDebtType} onChange={e => setEditDebtType(e.target.value as 'OWE' | 'OWED')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                        <option value="OWE">Yo debo (Deuda)</option>
+                                        <option value="OWED">Me deben (Préstamo)</option>
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-1 text-gray-500">Monto Inicial</label>
+                                        <input required type="number" step="0.01" value={editDebtAmount} onChange={e => setEditDebtAmount(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold mb-1 text-gray-500">Monto Restante</label>
+                                        <input required type="number" step="0.01" value={editDebtRemaining} onChange={e => setEditDebtRemaining(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Fecha de Vencimiento</label>
+                                    <input type="date" value={editDebtDueDate} onChange={e => setEditDebtDueDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                </div>
+                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+                                    Guardar Cambios
+                                </button>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Edit Account Modal */}
+            <AnimatePresence>
+                {editingAccount && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingAccount(null)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Editar Cuenta / Tarjeta</h3>
+                                <button onClick={() => setEditingAccount(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
+                            </div>
+                            <form onSubmit={handleUpdateAccount} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Nombre de la cuenta / tarjeta</label>
+                                    <input required type="text" value={editAccountName} onChange={e => setEditAccountName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Tipo</label>
+                                    <select value={editAccountType} onChange={e => setEditAccountType(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                        <option value="bank">Cuenta Bancaria</option>
+                                        <option value="cash">Efectivo</option>
+                                        <option value="credit">Tarjeta de Crédito</option>
+                                        <option value="wallet">Wallet digital</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-gray-500">Saldo o Deuda de Tarjeta (en $)</label>
+                                    <input required type="number" step="0.01" value={editAccountBalance} onChange={e => setEditAccountBalance(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                    <p className="text-[10px] text-gray-400 mt-1">Nota: Las tarjetas de crédito deben tener saldo negativo indicando la deuda (ej: -150).</p>
+                                </div>
+                                
+                                {editAccountType === 'credit' && (
+                                    <div className="space-y-3.5 border-t border-gray-100 dark:border-zinc-800 pt-3">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-xs font-semibold mb-1 text-gray-500">Límite Crédito ($)</label>
+                                                <input required type="number" step="0.01" value={editAccountCreditLimit} onChange={e => setEditAccountCreditLimit(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold mb-1 text-gray-500">Últimos 4 dígitos</label>
+                                                <input maxLength={4} type="text" placeholder="1234" value={editAccountCardNumberLast4} onChange={e => setEditAccountCardNumberLast4(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-xs font-semibold mb-1 text-gray-500">Día de Corte</label>
+                                                <input required type="number" min={1} max={31} value={editAccountCutoffDay} onChange={e => setEditAccountCutoffDay(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold mb-1 text-gray-500">Día de Pago</label>
+                                                <input required type="number" min={1} max={31} value={editAccountDueDay} onChange={e => setEditAccountDueDay(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold mb-1 text-gray-500">Color Tarjeta</label>
+                                            <select value={editAccountCardColor} onChange={e => setEditAccountCardColor(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                                <option value="slate">Gris Oscuro</option>
+                                                <option value="emerald">Verde Esmeralda</option>
+                                                <option value="indigo">Violeta Índigo</option>
+                                                <option value="rose">Rosa Fucsia</option>
+                                                <option value="amber">Ámbar Dorado</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+                                    Guardar Cambios
                                 </button>
                             </form>
                         </motion.div>
