@@ -446,7 +446,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             const startDate = instStartDate || new Date().toISOString().split('T')[0];
             const startMonth = startDate.substring(0, 7);
 
-            const { error } = await supabase.from('finance_installments').insert([{
+            let { error } = await supabase.from('finance_installments').insert([{
                 user_id: user.id,
                 name: instName,
                 total_amount_cents: totalCents,
@@ -458,6 +458,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 start_month: startMonth,
                 status: 'ACTIVE'
             }]);
+
+            if (error && error.message && error.message.includes('start_month')) {
+                console.log("start_month column not found, retrying insertion without start_month");
+                const { error: retryError } = await supabase.from('finance_installments').insert([{
+                    user_id: user.id,
+                    name: instName,
+                    total_amount_cents: totalCents,
+                    total_installments: totalInst,
+                    paid_installments: 0,
+                    installment_amount_cents: instAmountCents,
+                    account_id: instAccountId ? Number(instAccountId) : null,
+                    start_date: startDate,
+                    status: 'ACTIVE'
+                }]);
+                error = retryError;
+            }
 
             if (error) {
                 console.error("Error creating installment:", error);

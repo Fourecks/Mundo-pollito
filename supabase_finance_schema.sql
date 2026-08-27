@@ -171,6 +171,15 @@ CREATE TABLE IF NOT EXISTS public.finance_installments (
     status TEXT NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'COMPLETED', 'CANCELLED'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Asegurar que la columna 'start_month' existe si la tabla ya había sido creada anteriormente
+ALTER TABLE public.finance_installments ADD COLUMN IF NOT EXISTS start_month TEXT;
+
+-- Rellenar valores nulos para filas existentes basados en la fecha de inicio
+UPDATE public.finance_installments 
+SET start_month = substring(start_date::text from 1 for 7) 
+WHERE start_month IS NULL;
+
 ALTER TABLE public.finance_installments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "finance_installments_all" ON public.finance_installments;
 CREATE POLICY "finance_installments_all" ON public.finance_installments FOR ALL USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());

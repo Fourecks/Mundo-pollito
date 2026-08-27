@@ -611,7 +611,7 @@ export interface FinanceInstallment {
   installment_amount_cents: number;
   account_id?: number; // Card or account used
   start_date: string; // YYYY-MM-DD
-  start_month: string; // YYYY-MM
+  start_month?: string; // YYYY-MM
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
 }
