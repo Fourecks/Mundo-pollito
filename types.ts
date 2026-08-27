@@ -590,7 +590,7 @@ export interface FinanceAccount {
   user_id: string;
   name: string;
   type: FinanceAccountType;
-  balance_cents: number; // For credit cards, balance_cents can represent current used debt or remaining available
+  balance_cents: number; // For credit cards, balance_cents represents current used debt
   credit_limit_cents?: number; // Total credit limit for credit cards
   cutoff_day?: number; // e.g., 15th of month
   due_day?: number; // e.g., 5th of following month
@@ -599,6 +599,11 @@ export interface FinanceAccount {
   currency: string;
   is_archived: boolean;
   created_at: string;
+  maintenance_fee_type?: 'none' | 'fixed' | 'percent';
+  maintenance_fee_value?: number;
+  maintenance_fee_freq?: 'monthly' | 'yearly';
+  transfer_fee_type?: 'none' | 'fixed' | 'percent';
+  transfer_fee_value?: number;
 }
 
 export interface FinanceInstallment {
@@ -615,6 +620,7 @@ export interface FinanceInstallment {
   payment_day?: number; // Day of month (1-31) for auto-deduction
   last_paid_month?: string; // YYYY-MM of the last auto-processed month
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  is_past_due?: boolean;
   created_at: string;
 }
 
@@ -665,6 +671,7 @@ export interface FinanceRecurringTransaction {
     end_date?: string;
     auto_create: boolean;
     is_active: boolean;
+    is_past_due?: boolean;
 }
 
 export interface FinanceBudget {

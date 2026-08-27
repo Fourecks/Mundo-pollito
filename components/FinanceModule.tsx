@@ -97,6 +97,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [newAccountDueDay, setNewAccountDueDay] = useState<number | ''>(5);
     const [newAccountCardLast4, setNewAccountCardLast4] = useState('');
     const [newAccountCardColor, setNewAccountCardColor] = useState('slate');
+    const [newAccountMaintFeeType, setNewAccountMaintFeeType] = useState<'none' | 'fixed' | 'percent'>('none');
+    const [newAccountMaintFeeValue, setNewAccountMaintFeeValue] = useState('');
+    const [newAccountMaintFeeFreq, setNewAccountMaintFeeFreq] = useState<'monthly' | 'yearly'>('monthly');
+    const [newAccountTransferFeeType, setNewAccountTransferFeeType] = useState<'none' | 'fixed' | 'percent'>('none');
+    const [newAccountTransferFeeValue, setNewAccountTransferFeeValue] = useState('');
     
     const [newCatName, setNewCatName] = useState('');
     const [newCatEmoji, setNewCatEmoji] = useState('💰');
@@ -121,6 +126,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [editAccountCutoffDay, setEditAccountCutoffDay] = useState('');
     const [editAccountDueDay, setEditAccountDueDay] = useState('');
     const [editAccountCardNumberLast4, setEditAccountCardNumberLast4] = useState('');
+    const [editAccountMaintFeeType, setEditAccountMaintFeeType] = useState<'none' | 'fixed' | 'percent'>('none');
+    const [editAccountMaintFeeValue, setEditAccountMaintFeeValue] = useState('');
+    const [editAccountMaintFeeFreq, setEditAccountMaintFeeFreq] = useState<'monthly' | 'yearly'>('monthly');
+    const [editAccountTransferFeeType, setEditAccountTransferFeeType] = useState<'none' | 'fixed' | 'percent'>('none');
+    const [editAccountTransferFeeValue, setEditAccountTransferFeeValue] = useState('');
 
     const [editingDebt, setEditingDebt] = useState<any | null>(null);
     const [editDebtName, setEditDebtName] = useState('');
@@ -157,13 +167,38 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         if (!user) return;
 
         let dataChanged = false;
+        let alertsAdded: string[] = [];
 
         for (const rec of due) {
             const targetAccId = rec.account_id || accountsList[0]?.id;
             if (!targetAccId) continue;
 
+            const currAcc = accountsList.find(a => a.id === targetAccId);
+            if (!currAcc) continue;
+
             const txAmount = rec.amount_cents;
-            
+            let hasSufficient = true;
+
+            if (currAcc.type === 'credit') {
+                const limit = currAcc.credit_limit_cents || 0;
+                const used = currAcc.balance_cents;
+                const available = limit - used;
+                if (limit > 0 && txAmount > available) {
+                    hasSufficient = false;
+                    alertsAdded.push(`⚠️ Pago Tardío / Cupo Insuficiente: La suscripción '${rec.description || 'Suscripción'}' ($${(txAmount/100).toFixed(2)}) no se cobró en '${currAcc.name}' por falta de cupo de crédito.`);
+                }
+            } else {
+                if (currAcc.balance_cents < txAmount) {
+                    hasSufficient = false;
+                    alertsAdded.push(`⚠️ Pago Tardío / Sin Fondos: La suscripción '${rec.description || 'Suscripción'}' ($${(txAmount/100).toFixed(2)}) no se cobró en '${currAcc.name}' por falta de saldo disponible.`);
+                }
+            }
+
+            if (!hasSufficient) {
+                rec.is_past_due = true;
+                continue;
+            }
+
             // Insert transaction
             await supabase.from('finance_transactions').insert([{
                 user_id: user.id,
@@ -171,18 +206,15 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 type: rec.type || 'EXPENSE',
                 amount_cents: txAmount,
                 date: today,
-                description: `Cobro recurrente: ${rec.description || 'Suscripción'}`
+                description: `Cobro automático suscripción: ${rec.description || 'Suscripción'}`
             }]);
 
             // Update Account Balance
-            const currAcc = accountsList.find(a => a.id === targetAccId);
-            if (currAcc) {
-                const newBalance = (rec.type === 'INCOME') 
-                    ? currAcc.balance_cents + txAmount 
-                    : currAcc.balance_cents - txAmount;
-                await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', targetAccId);
-                currAcc.balance_cents = newBalance; // Update in-memory for the loop
-            }
+            const newBalance = (rec.type === 'INCOME') 
+                ? currAcc.balance_cents + txAmount 
+                : (currAcc.type === 'credit' ? currAcc.balance_cents + txAmount : currAcc.balance_cents - txAmount);
+            await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', targetAccId);
+            currAcc.balance_cents = newBalance;
 
             // Update Next Date
             const currentNext = new Date(rec.next_date || today);
@@ -193,6 +225,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             const newNextDateStr = currentNext.toISOString().split('T')[0];
             await supabase.from('finance_recurring_transactions').update({ next_date: newNextDateStr }).eq('id', rec.id);
             dataChanged = true;
+        }
+
+        if (alertsAdded.length > 0) {
+            setFinancialAlerts(prev => Array.from(new Set([...prev, ...alertsAdded])));
         }
 
         if (dataChanged) {
@@ -213,6 +249,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         const currentYear = today.getFullYear();
         const currentMonth = today.getMonth();
         const currentDay = today.getDate();
+        const currentMonthKey = todayStr.substring(0, 7);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -225,6 +262,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             const start = new Date(inst.start_date);
             const payDay = inst.payment_day || start.getDate() || 15;
 
+            // Calculate expected payments up to current date
             let totalMonthsElapsed = (currentYear - start.getFullYear()) * 12 + (currentMonth - start.getMonth());
             if (currentDay >= payDay) {
                 totalMonthsElapsed += 1;
@@ -232,30 +270,36 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
             const expectedPaid = Math.min(Math.max(0, totalMonthsElapsed), inst.total_installments);
 
-            while (inst.paid_installments < expectedPaid) {
+            if (inst.paid_installments < expectedPaid) {
                 const nextPaid = inst.paid_installments + 1;
                 const newStatus = nextPaid >= inst.total_installments ? 'COMPLETED' : 'ACTIVE';
 
                 const targetAccId = inst.account_id || accountsList[0]?.id;
-                if (!targetAccId) break;
+                if (!targetAccId) continue;
 
                 const currAcc = accountsList.find(a => a.id === targetAccId);
-                if (!currAcc) break;
+                if (!currAcc) continue;
 
+                let hasSufficient = true;
                 if (currAcc.type === 'credit') {
-                    const limit = currAcc.credit_limit_cents || 0;
-                    const used = currAcc.balance_cents;
-                    if (limit > 0 && (used + inst.installment_amount_cents) > limit) {
-                        alertsAdded.push(`⚠️ Tarjeta sobregirada: La cuota "${inst.name}" ($${(inst.installment_amount_cents/100).toFixed(2)}) excedió el límite de crédito en '${currAcc.name}'.`);
-                    }
+                    // For credit card installment payments: total was retained at purchase creation.
+                    // Monthly payment releases debt back into available limit!
+                    // Checking available limit is not blocking release, but check if card is frozen/overdue
                 } else {
                     if (currAcc.balance_cents < inst.installment_amount_cents) {
-                        alertsAdded.push(`⚠️ Fondos insuficientes: Se cobró la cuota "${inst.name}" ($${(inst.installment_amount_cents/100).toFixed(2)}) en '${currAcc.name}' dejando la cuenta con saldo negativo ($${((currAcc.balance_cents - inst.installment_amount_cents)/100).toFixed(2)}).`);
+                        hasSufficient = false;
+                        alertsAdded.push(`⚠️ Pago Tardío / Sin Fondos: No se pudo cobrar la cuota "${inst.name}" ($${(inst.installment_amount_cents/100).toFixed(2)}) en '${currAcc.name}' por falta de saldo disponible.`);
                     }
+                }
+
+                if (!hasSufficient) {
+                    inst.is_past_due = true;
+                    continue;
                 }
 
                 await supabase.from('finance_installments').update({
                     paid_installments: nextPaid,
+                    last_paid_month: currentMonthKey,
                     status: newStatus
                 }).eq('id', inst.id);
 
@@ -265,17 +309,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     type: 'EXPENSE',
                     amount_cents: inst.installment_amount_cents,
                     date: todayStr,
-                    description: `Pago automático cuota ${nextPaid}/${inst.total_installments} (Día ${payDay}): ${inst.name}`
+                    description: `Cobro automático cuota ${nextPaid}/${inst.total_installments} (Día ${payDay}): ${inst.name}`
                 }]);
 
+                // On credit cards, paying monthly installment lowers total used debt, releasing credit limit!
                 const newBal = currAcc.type === 'credit'
-                    ? currAcc.balance_cents + inst.installment_amount_cents
+                    ? Math.max(0, currAcc.balance_cents - inst.installment_amount_cents)
                     : currAcc.balance_cents - inst.installment_amount_cents;
 
                 await supabase.from('finance_accounts').update({ balance_cents: newBal }).eq('id', targetAccId);
 
                 currAcc.balance_cents = newBal;
                 inst.paid_installments = nextPaid;
+                inst.last_paid_month = currentMonthKey;
                 inst.status = newStatus;
                 dataChanged = true;
             }
@@ -433,6 +479,32 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             if (txType === 'TRANSFER_OUT') {
                 if (!txAccountId || !txToAccountId) return alert("Selecciona cuenta de origen y destino");
                 
+                const fromAcc = accounts.find(a => a.id === Number(txAccountId))!;
+                const toAcc = accounts.find(a => a.id === Number(txToAccountId))!;
+
+                // Calculate transfer fee if applicable
+                let feeCents = 0;
+                if (fromAcc.transfer_fee_type === 'fixed' && fromAcc.transfer_fee_value) {
+                    feeCents = Math.round(fromAcc.transfer_fee_value * 100);
+                } else if (fromAcc.transfer_fee_type === 'percent' && fromAcc.transfer_fee_value) {
+                    feeCents = Math.round(amountCents * (fromAcc.transfer_fee_value / 100));
+                }
+
+                const totalDebitedCents = amountCents + feeCents;
+
+                // Validate funds
+                if (fromAcc.type === 'credit') {
+                    const limit = fromAcc.credit_limit_cents || 0;
+                    const available = limit - fromAcc.balance_cents;
+                    if (limit > 0 && available < totalDebitedCents) {
+                        return alert(`⚠️ Cupo insuficiente en '${fromAcc.name}'. Monto + Comisión ($${(feeCents/100).toFixed(2)}): $${(totalDebitedCents/100).toFixed(2)}, Cupo Disponible: $${(available/100).toFixed(2)}.`);
+                    }
+                } else {
+                    if (fromAcc.balance_cents < totalDebitedCents) {
+                        return alert(`⚠️ Fondos insuficientes en '${fromAcc.name}'. Monto + Comisión ($${(feeCents/100).toFixed(2)}): $${(totalDebitedCents/100).toFixed(2)}, Disponible: $${(fromAcc.balance_cents/100).toFixed(2)}.`);
+                    }
+                }
+
                 const txOut = { user_id: user.id, account_id: txAccountId, type: 'TRANSFER_OUT', amount_cents: amountCents, date: txDate, description: txDescription || 'Transferencia enviada' };
                 const { data: outData } = await supabase.from('finance_transactions').insert([txOut]).select();
                 
@@ -440,11 +512,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     const txIn = { user_id: user.id, account_id: txToAccountId, type: 'TRANSFER_IN', amount_cents: amountCents, date: txDate, description: txDescription || 'Transferencia recibida', related_transfer_id: outData[0].id };
                     await supabase.from('finance_transactions').insert([txIn]);
                     
-                    const fromAcc = accounts.find(a => a.id === Number(txAccountId))!;
-                    const toAcc = accounts.find(a => a.id === Number(txToAccountId))!;
-                    
-                    await supabase.from('finance_accounts').update({ balance_cents: fromAcc.balance_cents - amountCents }).eq('id', txAccountId);
-                    await supabase.from('finance_accounts').update({ balance_cents: toAcc.balance_cents + amountCents }).eq('id', txToAccountId);
+                    if (feeCents > 0) {
+                        await supabase.from('finance_transactions').insert([{
+                            user_id: user.id,
+                            account_id: txAccountId,
+                            type: 'EXPENSE',
+                            amount_cents: feeCents,
+                            date: txDate,
+                            description: `Comisión de transferencia desde ${fromAcc.name}`
+                        }]);
+                    }
+
+                    const newFromBal = fromAcc.type === 'credit'
+                        ? fromAcc.balance_cents + totalDebitedCents
+                        : fromAcc.balance_cents - totalDebitedCents;
+
+                    const newToBal = toAcc.type === 'credit'
+                        ? Math.max(0, toAcc.balance_cents - amountCents)
+                        : toAcc.balance_cents + amountCents;
+
+                    await supabase.from('finance_accounts').update({ balance_cents: newFromBal }).eq('id', txAccountId);
+                    await supabase.from('finance_accounts').update({ balance_cents: newToBal }).eq('id', txToAccountId);
                 }
             } else {
                 const newTx = {
@@ -559,16 +647,34 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             const startMonth = startDate.substring(0, 7);
             const pDay = Math.min(31, Math.max(1, parseInt(instPaymentDay) || parseInt(startDate.split('-')[2]) || 15));
 
-            // Check card limit or funds if account selected
+            // CRITICAL CREDIT CARD LIMIT RETENTION CHECK
             if (instAccountId) {
                 const targetAcc = accounts.find(a => a.id === Number(instAccountId));
                 if (targetAcc) {
                     if (targetAcc.type === 'credit') {
                         const limit = targetAcc.credit_limit_cents || 0;
                         const used = targetAcc.balance_cents;
-                        if (limit > 0 && (used + instAmountCents) > limit) {
-                            alert(`⚠️ Advertencia de Crédito: Al agregar esta cuota ($${(instAmountCents/100).toFixed(2)}/mes), superará el límite de crédito disponible en tu tarjeta '${targetAcc.name}' ($${(Math.max(0, limit - used)/100).toFixed(2)} disponible).`);
+                        const available = limit - used;
+                        
+                        // Check if total purchase price exceeds available limit
+                        if (limit > 0 && totalCents > available) {
+                            alert(`❌ Cupo Insuficiente: La compra a cuotas por un total de $${(totalCents/100).toFixed(2)} excede tu cupo disponible en la tarjeta '${targetAcc.name}' ($${(available/100).toFixed(2)}). En tarjetas de crédito, el cupo retiene el valor TOTAL de la compra.`);
+                            return;
                         }
+
+                        // Retain total purchase amount in credit card debt immediately
+                        const newDebt = used + totalCents;
+                        await supabase.from('finance_accounts').update({ balance_cents: newDebt }).eq('id', targetAcc.id);
+                        
+                        // Register expense transaction on card for total purchase
+                        await supabase.from('finance_transactions').insert([{
+                            user_id: user.id,
+                            account_id: targetAcc.id,
+                            type: 'EXPENSE',
+                            amount_cents: totalCents,
+                            date: startDate,
+                            description: `Compra a cuotas retenida en límite: ${instName} (${totalInst} cuotas)`
+                        }]);
                     } else {
                         if (targetAcc.balance_cents < instAmountCents) {
                             alert(`⚠️ Advertencia de Fondos: La cuenta '${targetAcc.name}' tiene $${(targetAcc.balance_cents/100).toFixed(2)} y la cuota mensual es de $${(instAmountCents/100).toFixed(2)}.`);
@@ -703,7 +809,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 cutoff_day: newAccountType === 'credit' ? (Number(newAccountCutoffDay) || 15) : null,
                 due_day: newAccountType === 'credit' ? (Number(newAccountDueDay) || 5) : null,
                 card_number_last4: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardLast4 : null,
-                card_color: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardColor : 'slate'
+                card_color: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardColor : 'slate',
+                maintenance_fee_type: newAccountType === 'credit' ? newAccountMaintFeeType : 'none',
+                maintenance_fee_value: newAccountType === 'credit' && newAccountMaintFeeValue ? parseFloat(newAccountMaintFeeValue) : 0,
+                maintenance_fee_freq: newAccountType === 'credit' ? newAccountMaintFeeFreq : 'monthly',
+                transfer_fee_type: newAccountTransferFeeType,
+                transfer_fee_value: newAccountTransferFeeValue ? parseFloat(newAccountTransferFeeValue) : 0
             };
 
             let { error } = await supabase.from('finance_accounts').insert([accountPayload]);
@@ -1069,7 +1180,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             credit_limit_cents: limitCents,
             cutoff_day: editAccountCutoffDay ? Number(editAccountCutoffDay) : null,
             due_day: editAccountDueDay ? Number(editAccountDueDay) : null,
-            card_number_last4: editAccountCardNumberLast4 || null
+            card_number_last4: editAccountCardNumberLast4 || null,
+            maintenance_fee_type: editAccountType === 'credit' ? editAccountMaintFeeType : 'none',
+            maintenance_fee_value: editAccountType === 'credit' && editAccountMaintFeeValue ? parseFloat(editAccountMaintFeeValue) : 0,
+            maintenance_fee_freq: editAccountType === 'credit' ? editAccountMaintFeeFreq : 'monthly',
+            transfer_fee_type: editAccountTransferFeeType,
+            transfer_fee_value: editAccountTransferFeeValue ? parseFloat(editAccountTransferFeeValue) : 0
         }).eq('id', editingAccount.id);
 
         setEditingAccount(null);
@@ -1579,12 +1695,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     </div>
                                                                     <span className="font-bold text-red-500 text-sm">-{formatCurrency(r.amount_cents)}</span>
                                                                 </div>
-                                                                <button
-                                                                    onClick={() => handleProcessRecurring(r)}
-                                                                    className="w-full text-xs bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-1.5 rounded-lg font-medium hover:opacity-90"
-                                                                >
-                                                                    Procesar Pago Ahora
-                                                                </button>
+                                                                <div className="text-[11px] text-gray-500 bg-gray-50 dark:bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+                                                                    <span>Estado de cobro:</span>
+                                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">⚡ Cobro Automático</span>
+                                                                </div>
                                                             </div>
                                                         ))}
 
@@ -1597,12 +1711,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     </div>
                                                                     <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{formatCurrency(inst.installment_amount_cents)}</span>
                                                                 </div>
-                                                                <button
-                                                                    onClick={() => handlePayInstallment(inst)}
-                                                                    className="w-full text-xs bg-indigo-600 text-white py-1.5 rounded-lg font-medium hover:bg-indigo-700"
-                                                                >
-                                                                    Pagar Cuota
-                                                                </button>
+                                                                <div className="text-[11px] text-gray-500 bg-indigo-50/50 dark:bg-indigo-950/30 px-2.5 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-900/50 flex items-center justify-between">
+                                                                    <span>Cobro automático:</span>
+                                                                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">Día {inst.payment_day || inst.start_date.substring(8, 10)} de cada mes</span>
+                                                                </div>
                                                             </div>
                                                         ))}
 
@@ -1774,13 +1886,15 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     </div>
                                                                 </div>
 
-                                                                {inst.status === 'ACTIVE' && (
-                                                                    <button
-                                                                        onClick={() => handlePayInstallment(inst)}
-                                                                        className="w-full bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white py-2 rounded-xl font-semibold text-xs transition-colors"
-                                                                    >
-                                                                        Pagar Cuota ({formatCurrency(inst.installment_amount_cents)})
-                                                                    </button>
+                                                                {inst.status === 'ACTIVE' ? (
+                                                                    <div className="bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 text-gray-500 text-[11px] p-2 rounded-xl text-center flex items-center justify-center gap-1.5 font-medium">
+                                                                        <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                                                                        <span>Descuento automático el día {inst.payment_day || 15} de cada mes</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[11px] p-2 rounded-xl text-center font-medium">
+                                                                        ✅ Todas las cuotas han sido pagadas
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         );
@@ -2200,74 +2314,259 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             )}
 
                             {/* STATS TAB */}
-                            {activeTab === 'stats' && (
-                                <div className="space-y-8">
-                                    <h2 className="text-xl font-bold">Estadísticas y Análisis</h2>
-                                    
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm">
-                                            <h3 className="text-lg font-semibold mb-6 text-center">Gastos por Categoría</h3>
-                                            <div className="h-64">
-                                                {transactions.filter(t => t.type === 'EXPENSE').length > 0 ? (
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <RechartsPieChart>
-                                                            <Pie
-                                                                data={Object.entries(
-                                                                    transactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => {
-                                                                        const cat = categories.find(c => c.id === t.category_id)?.name || 'Otros';
-                                                                        acc[cat] = (acc[cat] || 0) + (t.amount_cents / 100);
-                                                                        return acc;
-                                                                    }, {} as Record<string, number>)
-                                                                ).map(([name, value]) => ({ name, value }))}
-                                                                cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value"
-                                                            >
-                                                                {Object.keys(transactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => {
-                                                                        const cat = categories.find(c => c.id === t.category_id)?.name || 'Otros';
-                                                                        acc[cat] = (acc[cat] || 0) + (t.amount_cents / 100);
-                                                                        return acc;
-                                                                    }, {} as Record<string, number>)).map((entry, index) => (
-                                                                    <Cell key={`cell-${index}`} fill={['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'][index % 7]} />
-                                                                ))}
-                                                            </Pie>
-                                                            <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
-                                                            <Legend />
-                                                        </RechartsPieChart>
-                                                    </ResponsiveContainer>
-                                                ) : <p className="text-center text-gray-500 mt-20">No hay suficientes datos</p>}
+                            {activeTab === 'stats' && (() => {
+                                // Calculate analytics metrics
+                                const totalIncome = transactions.filter(t => t.type === 'INCOME').reduce((a, b) => a + b.amount_cents, 0);
+                                const totalExpenses = transactions.filter(t => t.type === 'EXPENSE').reduce((a, b) => a + b.amount_cents, 0);
+                                const netSavings = totalIncome - totalExpenses;
+                                const savingsRate = totalIncome > 0 ? Math.max(0, Math.round((netSavings / totalIncome) * 100)) : 0;
+
+                                const today = new Date();
+                                const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+                                const currentDay = Math.max(1, today.getDate());
+                                const dailyAverageExpense = Math.round(expensesThisMonth / currentDay);
+                                const projectedMonthlyExpense = dailyAverageExpense * daysInMonth;
+
+                                const creditAccounts = accounts.filter(a => a.type === 'credit');
+                                const totalCreditLimit = creditAccounts.reduce((a, b) => a + (b.credit_limit_cents || 0), 0);
+                                const totalCreditUsed = creditAccounts.reduce((a, b) => a + b.balance_cents, 0);
+                                const creditUtilization = totalCreditLimit > 0 ? Math.min(100, Math.round((totalCreditUsed / totalCreditLimit) * 100)) : 0;
+
+                                // Daily expenses for line chart
+                                const currentMonthPrefix = today.toISOString().substring(0, 7);
+                                const dailyData = Array.from({ length: currentDay }).map((_, i) => {
+                                    const dayNum = i + 1;
+                                    const dayStr = `${currentMonthPrefix}-${dayNum.toString().padStart(2, '0')}`;
+                                    const dayTx = transactions.filter(t => t.date === dayStr);
+                                    const exp = dayTx.filter(t => t.type === 'EXPENSE').reduce((a, b) => a + (b.amount_cents / 100), 0);
+                                    const inc = dayTx.filter(t => t.type === 'INCOME').reduce((a, b) => a + (b.amount_cents / 100), 0);
+                                    return {
+                                        day: `${dayNum}`,
+                                        Gasto: exp,
+                                        Ingreso: inc
+                                    };
+                                });
+
+                                // 6 Months historical line chart data
+                                const sixMonthsData = Array.from({ length: 6 }).map((_, i) => {
+                                    const d = new Date();
+                                    d.setMonth(d.getMonth() - (5 - i));
+                                    const prefix = d.toISOString().substring(0, 7);
+                                    const mTx = transactions.filter(t => t.date.startsWith(prefix));
+                                    const inc = mTx.filter(t => t.type === 'INCOME').reduce((a, b) => a + (b.amount_cents / 100), 0);
+                                    const exp = mTx.filter(t => t.type === 'EXPENSE').reduce((a, b) => a + (b.amount_cents / 100), 0);
+                                    return {
+                                        month: d.toLocaleString('es-ES', { month: 'short' }),
+                                        Ingresos: inc,
+                                        Gastos: exp,
+                                        Ahorro: inc - exp
+                                    };
+                                });
+
+                                // Category breakdown with percentages
+                                const catExpenseMap: Record<string, { amount: number; emoji: string }> = {};
+                                transactions.filter(t => t.type === 'EXPENSE').forEach(t => {
+                                    const cat = categories.find(c => c.id === t.category_id);
+                                    const catName = cat?.name || 'Sin Categoría';
+                                    const catEmoji = cat?.emoji || '📦';
+                                    if (!catExpenseMap[catName]) {
+                                        catExpenseMap[catName] = { amount: 0, emoji: catEmoji };
+                                    }
+                                    catExpenseMap[catName].amount += (t.amount_cents / 100);
+                                });
+                                const sortedCategoryBreakdown = Object.entries(catExpenseMap)
+                                    .map(([name, data]) => ({ name, ...data }))
+                                    .sort((a, b) => b.amount - a.amount);
+                                const totalCatExpense = sortedCategoryBreakdown.reduce((a, b) => a + b.amount, 0);
+
+                                return (
+                                    <div className="space-y-8">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <div>
+                                                <h2 className="text-xl font-bold">Estadísticas y Análisis Financiero</h2>
+                                                <p className="text-xs text-gray-500 mt-1">Métricas en tiempo real, tendencias de gastos y evolución de saldo</p>
                                             </div>
                                         </div>
 
-                                        <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm">
-                                            <h3 className="text-lg font-semibold mb-6 text-center">Flujo de Caja (Últimos meses)</h3>
-                                            <div className="h-64">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart
-                                                        data={Array.from({length: 4}).map((_, i) => {
-                                                            const d = new Date();
-                                                            d.setMonth(d.getMonth() - (3 - i));
-                                                            const prefix = d.toISOString().substring(0, 7);
-                                                            const mTx = transactions.filter(t => t.date.startsWith(prefix));
-                                                            return {
-                                                                name: d.toLocaleString('es-ES', { month: 'short' }),
-                                                                Ingresos: mTx.filter(t => t.type === 'INCOME').reduce((a, b) => a + (b.amount_cents/100), 0),
-                                                                Gastos: mTx.filter(t => t.type === 'EXPENSE').reduce((a, b) => a + (b.amount_cents/100), 0)
-                                                            }
+                                        {/* KPI Metrics Grid */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            {/* Savings Rate Card */}
+                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-semibold text-gray-500">Tasa de Ahorro</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${savingsRate >= 20 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : savingsRate > 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400'}`}>
+                                                        {savingsRate >= 20 ? 'Saludable' : savingsRate > 0 ? 'Regular' : 'Atención'}
+                                                    </span>
+                                                </div>
+                                                <div className="text-2xl font-bold tracking-tight">{savingsRate}%</div>
+                                                <div className="space-y-1">
+                                                    <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                        <div className={`h-full rounded-full ${savingsRate >= 20 ? 'bg-emerald-500' : savingsRate > 0 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, savingsRate)}%` }} />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400">Superávit: {formatCurrency(netSavings)}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Daily Average Expense Card */}
+                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-semibold text-gray-500">Promedio Diario (Mes)</span>
+                                                    <TrendingDown className="w-4 h-4 text-red-500" />
+                                                </div>
+                                                <div className="text-2xl font-bold tracking-tight">{formatCurrency(dailyAverageExpense)}</div>
+                                                <p className="text-[10px] text-gray-400">Basado en {currentDay} días transcurridos este mes</p>
+                                            </div>
+
+                                            {/* Projected Monthly Expense Card */}
+                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-semibold text-gray-500">Proyección Fin de Mes</span>
+                                                    <BarChart3 className="w-4 h-4 text-blue-500" />
+                                                </div>
+                                                <div className="text-2xl font-bold tracking-tight">{formatCurrency(projectedMonthlyExpense)}</div>
+                                                <p className="text-[10px] text-gray-400">Ritmo proyectado para {daysInMonth} días del mes</p>
+                                            </div>
+
+                                            {/* Credit Utilization Card */}
+                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-semibold text-gray-500">Uso Crédito Total</span>
+                                                    <CreditCard className="w-4 h-4 text-purple-500" />
+                                                </div>
+                                                <div className="text-2xl font-bold tracking-tight">{creditUtilization}%</div>
+                                                <div className="space-y-1">
+                                                    <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                        <div className={`h-full rounded-full ${creditUtilization > 80 ? 'bg-red-500' : creditUtilization > 50 ? 'bg-amber-500' : 'bg-purple-500'}`} style={{ width: `${creditUtilization}%` }} />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400">{formatCurrency(totalCreditUsed)} de {formatCurrency(totalCreditLimit)} límite</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Line Charts Grid */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                            {/* Real Daily Expense Line/Area Chart */}
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <h3 className="text-base font-bold">Gasto Diario (Este Mes)</h3>
+                                                        <p className="text-xs text-gray-500">Gráfica de tendencia día por día</p>
+                                                    </div>
+                                                    <span className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-zinc-800 rounded-lg">Línea Real</span>
+                                                </div>
+                                                <div className="h-64">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <AreaChart data={dailyData}>
+                                                            <defs>
+                                                                <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                                                                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
+                                                                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                                                                </linearGradient>
+                                                                <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                                                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                                                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                                                </linearGradient>
+                                                            </defs>
+                                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                                                            <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} tick={{ fontSize: 11 }} />
+                                                            <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
+                                                            <Legend />
+                                                            <Area type="monotone" dataKey="Gasto" stroke="#ef4444" strokeWidth={2.5} fillOpacity={1} fill="url(#expenseGradient)" />
+                                                            <Area type="monotone" dataKey="Ingreso" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#incomeGradient)" />
+                                                        </AreaChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            </div>
+
+                                            {/* 6 Months Trend Line Chart */}
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <h3 className="text-base font-bold">Evolución de Ingresos y Gastos (6 Meses)</h3>
+                                                        <p className="text-xs text-gray-500">Comparativa histórica de tendencias</p>
+                                                    </div>
+                                                    <span className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-zinc-800 rounded-lg">Tendencia</span>
+                                                </div>
+                                                <div className="h-64">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <LineChart data={sixMonthsData}>
+                                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                                                            <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} tick={{ fontSize: 11 }} />
+                                                            <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
+                                                            <Legend />
+                                                            <Line type="monotone" dataKey="Ingresos" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                                            <Line type="monotone" dataKey="Gastos" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                                            <Line type="monotone" dataKey="Ahorro" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+                                                        </LineChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Category Breakdown & Progress Gauges */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                            {/* Category Progress Bars */}
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
+                                                <h3 className="text-base font-bold">Desglose de Gastos por Categoría</h3>
+                                                {sortedCategoryBreakdown.length === 0 ? (
+                                                    <p className="text-sm text-gray-500 text-center py-8">No hay gastos registrados para analizar.</p>
+                                                ) : (
+                                                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                                                        {sortedCategoryBreakdown.map((cat, idx) => {
+                                                            const pct = totalCatExpense > 0 ? Math.round((cat.amount / totalCatExpense) * 100) : 0;
+                                                            return (
+                                                                <div key={idx} className="space-y-1">
+                                                                    <div className="flex justify-between items-center text-xs">
+                                                                        <span className="font-semibold flex items-center gap-1.5">
+                                                                            <span>{cat.emoji}</span>
+                                                                            <span>{cat.name}</span>
+                                                                        </span>
+                                                                        <span className="font-bold">{formatCurrency(Math.round(cat.amount * 100))} <span className="text-gray-400 font-normal">({pct}%)</span></span>
+                                                                    </div>
+                                                                    <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                                        <div 
+                                                                            className="h-full rounded-full transition-all duration-500" 
+                                                                            style={{ 
+                                                                                width: `${pct}%`,
+                                                                                backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#3b82f6'][idx % 8]
+                                                                            }} 
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            );
                                                         })}
-                                                    >
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                                        <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `$${value}`} />
-                                                        <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
-                                                        <Legend />
-                                                        <Bar dataKey="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                                        <Bar dataKey="Gastos" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                                                    </BarChart>
-                                                </ResponsiveContainer>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Category Pie Chart */}
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
+                                                <h3 className="text-base font-bold text-center">Distribución Porcentual</h3>
+                                                <div className="h-64">
+                                                    {sortedCategoryBreakdown.length > 0 ? (
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <RechartsPieChart>
+                                                                <Pie
+                                                                    data={sortedCategoryBreakdown.map(c => ({ name: `${c.emoji} ${c.name}`, value: c.amount }))}
+                                                                    cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value"
+                                                                >
+                                                                    {sortedCategoryBreakdown.map((_, index) => (
+                                                                        <Cell key={`cell-${index}`} fill={['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#3b82f6'][index % 8]} />
+                                                                    ))}
+                                                                </Pie>
+                                                                <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
+                                                                <Legend />
+                                                            </RechartsPieChart>
+                                                        </ResponsiveContainer>
+                                                    ) : <p className="text-center text-gray-500 mt-20">No hay suficientes datos</p>}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {/* CLOSING TAB */}
                             {activeTab === 'closing' && (
@@ -2460,6 +2759,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                         setEditAccountCutoffDay((acc.cutoff_day || '').toString());
                                                                         setEditAccountDueDay((acc.due_day || '').toString());
                                                                         setEditAccountCardNumberLast4(acc.card_number_last4 || '');
+                                                                        setEditAccountMaintFeeType(acc.maintenance_fee_type || 'none');
+                                                                        setEditAccountMaintFeeValue((acc.maintenance_fee_value || 0).toString());
+                                                                        setEditAccountMaintFeeFreq(acc.maintenance_fee_freq || 'monthly');
+                                                                        setEditAccountTransferFeeType(acc.transfer_fee_type || 'none');
+                                                                        setEditAccountTransferFeeValue((acc.transfer_fee_value || 0).toString());
                                                                     }}
                                                                     className="text-gray-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-all shrink-0"
                                                                 >
@@ -2508,7 +2812,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 <div className="space-y-1">
                                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selector de Emojis</label>
                                                     <div className="grid grid-cols-10 gap-1.5 p-2 bg-white dark:bg-[#0a0a0a] border border-gray-150 dark:border-zinc-800 rounded-lg max-h-36 overflow-y-auto">
-                                                        {['💰', '💵', '💳', '🏦', '💎', '💸', '💼', '📈', '🍔', '🍕', '🍣', '🌮', '🥗', '☕', '🍺', '🍷', '🛒', '🛍️', '👕', '👠', '🚗', '⛽', '🚌', '✈️', '🚕', '🚲', '🏠', '🔑', '🔌', '🧹', '🛋️', '🩺', '💊', '🏋️', '🎓', '📚', '📱', '💻', '🍿', '🎮', '🎉', '🎁', '🐾', '⚽', '💈', '🛠️', '🔥', '💡', '❤️', '🏖️', '🎬', '🎧', '🎸', '🎨', '🏨', '🎟️', '🍼', '👶', '🐶', '🐱', '🌾', '🧼', '📦', '🧰', '🪙', '🧾', '⚖️', '📮'].map(emoji => (
+                                                        {['💰', '💵', '💳', '🏦', '💎', '💸', '💼', '📈', '📊', '🏧', '🏷️', '🪙', '🧾', '⚖️', '🍔', '🍕', '🍣', '🌮', '🥗', '☕', '🍺', '🍷', '🍩', '🥐', '🍏', '🍟', '🍜', '🍦', '🍫', '🛒', '🛍️', '👕', '👠', '👓', '👗', '💍', '💄', '🎒', '🚗', '⛽', '🚌', '✈️', '🚕', '🚲', '🛴', '🛵', '🚂', '⛵', '🏠', '🔑', '🔌', '🧹', '🛋️', '🛏️', '🚿', '🪴', '📺', '📻', '🩺', '💊', '🏋️', '🧘', '🚴', '⚽', '🏀', '🎾', '🥊', '🏊', '🎓', '📚', '🎒', '✏️', '💻', '📱', '🎧', '📸', '⌚', '🖥️', '🍿', '🎮', '🎉', '🎁', '🎬', '🎸', '🎨', '🎟️', '🎪', '🐾', '🐶', '🐱', '🐴', '🦜', '💈', '🛠️', '🔥', '💡', '❤️', '🏖️', '🏨', '🍼', '👶', '🌾', '🧼', '📦', '🧰', '📮', '✈️', '🗺️', '⛰️', '⛺', '🗿', '🔮', '🎲', '🎰', '🎯', '🧼', '🧻', '🪥', '🧺', '🛡️', '🔒', '📜', '🚑', '🚨', '🚒', '🏢', '🏗️', '🚜', '⚙️', '⚡', '💧', '☀️', '🌙', '🌐', '📡', '📢', '💬', '📮'].map(emoji => (
                                                             <button
                                                                 key={emoji}
                                                                 type="button"
