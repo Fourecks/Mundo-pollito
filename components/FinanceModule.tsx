@@ -124,6 +124,65 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         fetchFinanceData();
     }, []);
 
+    const autoProcessDueSubscriptions = async (recList: FinanceRecurringTransaction[], accountsList: any[]) => {
+        const today = new Date().toISOString().split('T')[0];
+        const due = recList.filter(r => r.next_date && r.next_date <= today);
+        if (due.length === 0) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        let dataChanged = false;
+
+        for (const rec of due) {
+            const targetAccId = rec.account_id || accountsList[0]?.id;
+            if (!targetAccId) continue;
+
+            const txAmount = rec.amount_cents;
+            
+            // Insert transaction
+            await supabase.from('finance_transactions').insert([{
+                user_id: user.id,
+                account_id: targetAccId,
+                type: rec.type || 'EXPENSE',
+                amount_cents: txAmount,
+                date: today,
+                description: `Cobro recurrente: ${rec.description || 'Suscripción'}`
+            }]);
+
+            // Update Account Balance
+            const currAcc = accountsList.find(a => a.id === targetAccId);
+            if (currAcc) {
+                const newBalance = (rec.type === 'INCOME') 
+                    ? currAcc.balance_cents + txAmount 
+                    : currAcc.balance_cents - txAmount;
+                await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', targetAccId);
+                currAcc.balance_cents = newBalance; // Update in-memory for the loop
+            }
+
+            // Update Next Date
+            const currentNext = new Date(rec.next_date || today);
+            if (rec.frequency === 'weekly') currentNext.setDate(currentNext.getDate() + 7);
+            else if (rec.frequency === 'yearly') currentNext.setFullYear(currentNext.getFullYear() + 1);
+            else currentNext.setMonth(currentNext.getMonth() + 1);
+
+            const newNextDateStr = currentNext.toISOString().split('T')[0];
+            await supabase.from('finance_recurring_transactions').update({ next_date: newNextDateStr }).eq('id', rec.id);
+            dataChanged = true;
+        }
+
+        if (dataChanged) {
+            const [accRes, txRes, recRes] = await Promise.all([
+                supabase.from('finance_accounts').select('*').order('created_at'),
+                supabase.from('finance_transactions').select('*').order('date', { ascending: false }).limit(200),
+                supabase.from('finance_recurring_transactions').select('*').order('next_date')
+            ]);
+            if (accRes.data) setAccounts(accRes.data);
+            if (txRes.data) setTransactions(txRes.data);
+            if (recRes.data) setRecurring(recRes.data);
+        }
+    };
+
     const fetchFinanceData = async () => {
         setIsLoading(true);
         try {
@@ -145,6 +204,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             if (budRes.data) setBudgets(budRes.data);
             if (recRes.data) setRecurring(recRes.data);
             if (goalsRes.data) setSavingsGoals(goalsRes.data);
+
+            if (recRes.data && accRes.data) {
+                autoProcessDueSubscriptions(recRes.data, accRes.data);
+            }
 
             try {
                 const [listsRes, itemsRes, debtsRes, instRes] = await Promise.all([
@@ -376,31 +439,42 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !instName.trim() || !instTotalAmount) return;
 
-        const totalCents = Math.round(parseFloat(instTotalAmount) * 100);
-        const totalInst = Math.max(1, parseInt(instTotalInstallments) || 1);
-        const instAmountCents = Math.round(totalCents / totalInst);
-        const startDate = instStartDate || new Date().toISOString().split('T')[0];
-        const startMonth = startDate.substring(0, 7);
+        try {
+            const totalCents = Math.round(parseFloat(instTotalAmount) * 100);
+            const totalInst = Math.max(1, parseInt(instTotalInstallments) || 1);
+            const instAmountCents = Math.round(totalCents / totalInst);
+            const startDate = instStartDate || new Date().toISOString().split('T')[0];
+            const startMonth = startDate.substring(0, 7);
 
-        await supabase.from('finance_installments').insert([{
-            user_id: user.id,
-            name: instName,
-            total_amount_cents: totalCents,
-            total_installments: totalInst,
-            paid_installments: 0,
-            installment_amount_cents: instAmountCents,
-            account_id: instAccountId ? Number(instAccountId) : null,
-            start_date: startDate,
-            start_month: startMonth,
-            status: 'ACTIVE'
-        }]);
+            const { error } = await supabase.from('finance_installments').insert([{
+                user_id: user.id,
+                name: instName,
+                total_amount_cents: totalCents,
+                total_installments: totalInst,
+                paid_installments: 0,
+                installment_amount_cents: instAmountCents,
+                account_id: instAccountId ? Number(instAccountId) : null,
+                start_date: startDate,
+                start_month: startMonth,
+                status: 'ACTIVE'
+            }]);
 
-        setInstName('');
-        setInstTotalAmount('');
-        setInstTotalInstallments('12');
-        setInstAccountId('');
-        setShowInstallmentModal(false);
-        fetchFinanceData();
+            if (error) {
+                console.error("Error creating installment:", error);
+                alert(`Error al guardar la compra a cuotas: ${error.message}`);
+                return;
+            }
+
+            setInstName('');
+            setInstTotalAmount('');
+            setInstTotalInstallments('12');
+            setInstAccountId('');
+            setShowInstallmentModal(false);
+            fetchFinanceData();
+        } catch (err: any) {
+            console.error("Unexpected error in handleCreateInstallment:", err);
+            alert(`Ocurrió un error inesperado: ${err.message || err}`);
+        }
     };
 
     const handlePayInstallment = async (inst: FinanceInstallment) => {
@@ -471,22 +545,44 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         
-        await supabase.from('finance_accounts').insert([{
-            user_id: user.id,
-            name: newAccountName,
-            type: newAccountType,
-            balance_cents: Math.round(parseFloat(newAccountBalance || '0') * 100),
-            credit_limit_cents: newAccountType === 'credit' && newAccountCreditLimit ? Math.round(parseFloat(newAccountCreditLimit) * 100) : null,
-            cutoff_day: newAccountType === 'credit' ? (Number(newAccountCutoffDay) || 15) : null,
-            due_day: newAccountType === 'credit' ? (Number(newAccountDueDay) || 5) : null,
-            card_number_last4: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardLast4 : null,
-            card_color: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardColor : 'slate'
-        }]);
-        setNewAccountName(''); 
-        setNewAccountBalance('');
-        setNewAccountCreditLimit('');
-        setNewAccountCardLast4('');
-        fetchFinanceData();
+        try {
+            const { error } = await supabase.from('finance_accounts').insert([{
+                user_id: user.id,
+                name: newAccountName,
+                type: newAccountType,
+                balance_cents: Math.round(parseFloat(newAccountBalance || '0') * 100),
+                credit_limit_cents: newAccountType === 'credit' && newAccountCreditLimit ? Math.round(parseFloat(newAccountCreditLimit) * 100) : null,
+                cutoff_day: newAccountType === 'credit' ? (Number(newAccountCutoffDay) || 15) : null,
+                due_day: newAccountType === 'credit' ? (Number(newAccountDueDay) || 5) : null,
+                card_number_last4: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardLast4 : null,
+                card_color: (newAccountType === 'credit' || newAccountType === 'debit') ? newAccountCardColor : 'slate'
+            }]);
+
+            if (error) {
+                console.error("Error creating account:", error);
+                alert(`Error al crear la cuenta: ${error.message}`);
+                return;
+            }
+
+            const isCard = newAccountType === 'credit' || newAccountType === 'debit';
+            
+            setNewAccountName(''); 
+            setNewAccountBalance('');
+            setNewAccountCreditLimit('');
+            setNewAccountCardLast4('');
+            
+            fetchFinanceData();
+
+            // Redirect dynamically so the user sees their new account/card instantly
+            if (isCard) {
+                setActiveTab('debts');
+            } else {
+                setActiveTab('overview');
+            }
+        } catch (err: any) {
+            console.error("Unexpected error in handleCreateAccount:", err);
+            alert(`Ocurrió un error inesperado: ${err.message || err}`);
+        }
     };
 
     const handleDeleteAccount = async (id: number) => {
@@ -618,9 +714,31 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        if (!contributeAccountId) {
+            alert('Por favor, selecciona una cuenta o tarjeta de origen.');
+            return;
+        }
+
         const amountCents = Math.round(parseFloat(contributeAmount) * 100);
         const goal = savingsGoals.find(g => g.id === showContributeModal);
         if (!goal) return;
+
+        const targetAcc = accounts.find(a => a.id === Number(contributeAccountId));
+        if (!targetAcc) {
+            alert('La cuenta de origen no pudo ser encontrada.');
+            return;
+        }
+
+        if (targetAcc.balance_cents < amountCents) {
+            // Insufficient funds: prompt to add funds directly!
+            setShowAddFundsModal({
+                accountId: targetAcc.id,
+                accountName: targetAcc.name,
+                requiredCents: amountCents - targetAcc.balance_cents
+            });
+            setShowContributeModal(null);
+            return;
+        }
         
         await supabase.from('finance_savings_contributions').insert([{
             user_id: user.id,
@@ -633,22 +751,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             current_amount_cents: goal.current_amount_cents + amountCents
         }).eq('id', goal.id);
 
-        if (contributeAccountId) {
-            const targetAcc = accounts.find(a => a.id === Number(contributeAccountId));
-            if (targetAcc) {
-                await supabase.from('finance_transactions').insert([{
-                    user_id: user.id,
-                    account_id: targetAcc.id,
-                    type: 'EXPENSE',
-                    amount_cents: amountCents,
-                    date: new Date().toISOString().split('T')[0],
-                    description: `Aporte a meta: ${goal.name}`
-                }]);
-                await supabase.from('finance_accounts').update({
-                    balance_cents: targetAcc.balance_cents - amountCents
-                }).eq('id', targetAcc.id);
-            }
-        }
+        await supabase.from('finance_transactions').insert([{
+            user_id: user.id,
+            account_id: targetAcc.id,
+            type: 'EXPENSE',
+            amount_cents: amountCents,
+            date: new Date().toISOString().split('T')[0],
+            description: `Aporte a meta: ${goal.name}`
+        }]);
+
+        await supabase.from('finance_accounts').update({
+            balance_cents: targetAcc.balance_cents - amountCents
+        }).eq('id', targetAcc.id);
 
         setContributeAmount('');
         setContributeAccountId('');
@@ -999,10 +1113,24 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             })
                                             .map(tx => (
                                                 <div key={tx.id} className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 group">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="text-2xl w-8 text-center">{categories.find(c => c.id === tx.category_id)?.emoji || '💸'}</div>
-                                                    <div>
-                                                        <div className="font-medium text-gray-900 dark:text-white">{tx.description || categories.find(c => c.id === tx.category_id)?.name || 'Sin descripción'}</div>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                                                            tx.type === 'EXPENSE' || tx.type === 'TRANSFER_OUT'
+                                                                ? 'bg-red-50 dark:bg-red-500/10 text-red-500'
+                                                                : tx.type === 'INCOME'
+                                                                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500'
+                                                                : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500'
+                                                        }`}>
+                                                            {tx.type === 'EXPENSE' || tx.type === 'TRANSFER_OUT' ? (
+                                                                <TrendingDown className="w-4 h-4" />
+                                                            ) : tx.type === 'INCOME' ? (
+                                                                <TrendingUp className="w-4 h-4" />
+                                                            ) : (
+                                                                <ArrowRightLeft className="w-4 h-4" />
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-medium text-gray-900 dark:text-white">{tx.description || categories.find(c => c.id === tx.category_id)?.name || 'Sin descripción'}</div>
                                                         <div className="text-xs text-gray-500 flex gap-2">
                                                             <span>{tx.date}</span>
                                                             <span>•</span>
@@ -1257,22 +1385,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                     {/* Sub-tab 2: Subscriptions */}
                                     {planningSubTab === 'subscriptions' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div>
-                                                <h3 className="text-lg font-semibold mb-4">Añadir Suscripción / Pago</h3>
-                                                <form onSubmit={handleCreateRecurring} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                            <div className="lg:col-span-4">
+                                                <h3 className="text-base font-semibold mb-3 text-gray-900 dark:text-white">Añadir Suscripción / Pago</h3>
+                                                <form onSubmit={handleCreateRecurring} className="bg-white dark:bg-[#0a0a0a] p-5 rounded-2xl border border-gray-100 dark:border-zinc-800 space-y-4 shadow-sm">
                                                     <div>
-                                                        <label className="block text-sm mb-1 font-medium">Descripción</label>
-                                                        <input required type="text" value={recDesc} onChange={e => setRecDesc(e.target.value)} placeholder="Netflix, Gimnasio, Spotify..." className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
+                                                        <label className="block text-xs font-semibold mb-1 text-gray-500">Descripción</label>
+                                                        <input required type="text" value={recDesc} onChange={e => setRecDesc(e.target.value)} placeholder="Netflix, Gimnasio, Spotify..." className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                                     </div>
-                                                    <div className="flex gap-4">
-                                                        <div className="flex-1">
-                                                            <label className="block text-sm mb-1 font-medium">Monto</label>
-                                                            <input required type="number" step="0.01" value={recAmount} onChange={e => setRecAmount(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs font-semibold mb-1 text-gray-500">Monto</label>
+                                                            <input required type="number" step="0.01" value={recAmount} onChange={e => setRecAmount(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                                         </div>
-                                                        <div className="flex-1">
-                                                            <label className="block text-sm mb-1 font-medium">Frecuencia</label>
-                                                            <select value={recFrequency} onChange={e => setRecFrequency(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg">
+                                                        <div>
+                                                            <label className="block text-xs font-semibold mb-1 text-gray-500">Frecuencia</label>
+                                                            <select value={recFrequency} onChange={e => setRecFrequency(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
                                                                 <option value="monthly">Mensual</option>
                                                                 <option value="yearly">Anual</option>
                                                                 <option value="weekly">Semanal</option>
@@ -1280,38 +1408,34 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm mb-1 font-medium">Próximo cobro</label>
-                                                        <input required type="date" value={recNextDate} onChange={e => setRecNextDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
+                                                        <label className="block text-xs font-semibold mb-1 text-gray-500">Próximo cobro</label>
+                                                        <input required type="date" value={recNextDate} onChange={e => setRecNextDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
                                                     </div>
-                                                    <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-lg font-medium shadow-sm hover:opacity-90 transition-opacity">Añadir recurrente</button>
+                                                    <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">Añadir recurrente</button>
                                                 </form>
                                             </div>
 
-                                            <div>
-                                                <h3 className="text-lg font-semibold mb-4">Suscripciones Registradas</h3>
-                                                <div className="space-y-3">
-                                                    {recurring.length === 0 ? <p className="text-gray-500 text-sm">No hay suscripciones activas.</p> : recurring.map(r => (
-                                                        <div key={r.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl group shadow-sm">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="p-2.5 bg-red-50 dark:bg-red-950/40 text-red-500 rounded-xl">
-                                                                    <Receipt className="w-5 h-5" />
+                                            <div className="lg:col-span-8">
+                                                <h3 className="text-base font-semibold mb-3 text-gray-900 dark:text-white">Suscripciones Registradas</h3>
+                                                <div className="space-y-2.5">
+                                                    {recurring.length === 0 ? (
+                                                        <p className="text-gray-500 text-xs py-4">No hay suscripciones activas.</p>
+                                                    ) : recurring.map(r => (
+                                                        <div key={r.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-gray-200 dark:hover:border-zinc-700 transition-all">
+                                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                                <div className="p-2 bg-gray-100 dark:bg-zinc-900 text-gray-500 dark:text-zinc-400 rounded-xl">
+                                                                    <Receipt className="w-4 h-4" />
                                                                 </div>
-                                                                <div>
-                                                                    <p className="font-semibold text-sm">{r.description}</p>
-                                                                    <p className="text-xs text-gray-500">Próximo cobro: {r.next_date} ({r.frequency})</p>
+                                                                <div className="min-w-0">
+                                                                    <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{r.description}</p>
+                                                                    <p className="text-xs text-gray-400">Próximo cobro: {r.next_date} • {r.frequency === 'monthly' ? 'Mensual' : r.frequency === 'yearly' ? 'Anual' : 'Semanal'}</p>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="font-bold text-red-600 text-sm">-{formatCurrency(r.amount_cents)}</span>
-                                                                <button 
-                                                                    onClick={() => handleProcessRecurring(r)} 
-                                                                    className="text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                                                                >
-                                                                    Procesar
-                                                                </button>
+                                                            <div className="flex items-center gap-4 shrink-0">
+                                                                <span className="font-semibold text-sm text-gray-900 dark:text-white">-{formatCurrency(r.amount_cents)}</span>
                                                                 <button 
                                                                     onClick={() => handleDeleteRecurring(r.id)} 
-                                                                    className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                                    className="text-gray-400 hover:text-red-500 p-1.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                                                                 >
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </button>
@@ -1347,13 +1471,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     <p className="text-xs text-gray-500 max-w-sm mx-auto">Registra tus compras diferidas (ej. Electrodomésticos, viajes, tecnología) para controlar tus pagos mensuales.</p>
                                                 </div>
                                             ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                                                     {installments.map(inst => {
                                                         const pct = Math.min(100, Math.round((inst.paid_installments / inst.total_installments) * 100));
                                                         const targetAcc = accounts.find(a => a.id === inst.account_id);
 
                                                         return (
-                                                            <div key={inst.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-4">
+                                                            <div key={inst.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4 hover:border-gray-200 dark:hover:border-zinc-700 transition-all">
                                                                 <div className="flex justify-between items-start">
                                                                     <div>
                                                                         <div className="flex items-center gap-2">
@@ -1371,37 +1495,37 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     </button>
                                                                 </div>
 
-                                                                <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 dark:bg-[#121212] rounded-2xl text-center">
-                                                                    <div>
-                                                                        <p className="text-[11px] text-gray-400 font-medium">Monto Total</p>
-                                                                        <p className="font-bold text-sm text-gray-900 dark:text-white">{formatCurrency(inst.total_amount_cents)}</p>
+                                                                <div className="grid grid-cols-3 gap-1 p-2.5 bg-gray-50/70 dark:bg-zinc-900/40 border border-gray-100 dark:border-zinc-800/50 rounded-xl text-center">
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-[10px] text-gray-400 font-medium truncate">Monto Total</p>
+                                                                        <p className="font-bold text-xs text-gray-950 dark:text-white truncate">{formatCurrency(inst.total_amount_cents)}</p>
                                                                     </div>
-                                                                    <div>
-                                                                        <p className="text-[11px] text-gray-400 font-medium">Valor Cuota</p>
-                                                                        <p className="font-bold text-sm text-indigo-600 dark:text-indigo-400">{formatCurrency(inst.installment_amount_cents)}</p>
+                                                                    <div className="min-w-0 border-x border-gray-100 dark:border-zinc-800">
+                                                                        <p className="text-[10px] text-gray-400 font-medium truncate">Valor Cuota</p>
+                                                                        <p className="font-bold text-xs text-gray-900 dark:text-white truncate">{formatCurrency(inst.installment_amount_cents)}</p>
                                                                     </div>
-                                                                    <div>
-                                                                        <p className="text-[11px] text-gray-400 font-medium">Cuotas</p>
-                                                                        <p className="font-bold text-sm text-gray-900 dark:text-white">{inst.paid_installments} / {inst.total_installments}</p>
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-[10px] text-gray-400 font-medium truncate">Cuotas</p>
+                                                                        <p className="font-bold text-xs text-gray-950 dark:text-white truncate">{inst.paid_installments}/{inst.total_installments}</p>
                                                                     </div>
                                                                 </div>
 
                                                                 <div>
-                                                                    <div className="flex justify-between text-xs font-semibold mb-1">
-                                                                        <span className="text-gray-500">Progreso ({pct}%)</span>
-                                                                        <span className="text-gray-700 dark:text-gray-300">Restan {inst.total_installments - inst.paid_installments} cuotas</span>
+                                                                    <div className="flex justify-between text-[11px] font-semibold mb-1 text-gray-400">
+                                                                        <span>Progreso ({pct}%)</span>
+                                                                        <span>Restan {inst.total_installments - inst.paid_installments} meses</span>
                                                                     </div>
-                                                                    <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                                                        <div className="h-full bg-indigo-600 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                                                                    <div className="h-1 bg-gray-100 dark:bg-zinc-800/80 rounded-full overflow-hidden">
+                                                                        <div className="h-full bg-zinc-800 dark:bg-white rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                                                                     </div>
                                                                 </div>
 
                                                                 {inst.status === 'ACTIVE' && (
                                                                     <button
                                                                         onClick={() => handlePayInstallment(inst)}
-                                                                        className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl font-semibold text-xs shadow-sm hover:opacity-90"
+                                                                        className="w-full bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white py-2 rounded-xl font-semibold text-xs transition-colors"
                                                                     >
-                                                                        Pagar Cuota de este Mes ({formatCurrency(inst.installment_amount_cents)})
+                                                                        Pagar Cuota ({formatCurrency(inst.installment_amount_cents)})
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -1416,39 +1540,64 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                             {/* SAVINGS TAB */}
                             {activeTab === 'savings' && (
-                                <div className="space-y-8">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-xl font-bold">Metas de Ahorro</h2>
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-3">
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Metas de Ahorro</h2>
+                                            <p className="text-xs text-gray-400">Planifica, realiza aportes y monitorea tus objetivos financieros</p>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                                         {/* Goals List */}
-                                        <div className="md:col-span-2 space-y-4">
+                                        <div className="lg:col-span-8 space-y-3.5">
                                             {savingsGoals.length === 0 ? (
-                                                <p className="text-gray-500">No hay metas de ahorro activas.</p>
+                                                <div className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl p-10 text-center text-gray-400 text-xs">
+                                                    No hay metas de ahorro activas. Crea una meta a la derecha para comenzar.
+                                                </div>
                                             ) : (
                                                 savingsGoals.map(goal => {
                                                     const progress = Math.min(100, Math.round((goal.current_amount_cents / goal.target_amount_cents) * 100));
                                                     return (
-                                                        <div key={goal.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm">
-                                                            <div className="flex justify-between items-start mb-3">
-                                                                <div>
-                                                                    <h3 className="font-semibold text-lg">{goal.name}</h3>
-                                                                    {goal.target_date && <p className="text-xs text-gray-500 flex items-center gap-1 mt-1"><Calendar className="w-3 h-3" /> Meta para: {goal.target_date}</p>}
+                                                        <div key={goal.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 p-5 rounded-2xl shadow-sm hover:border-gray-200 dark:hover:border-zinc-700 transition-all space-y-4">
+                                                            <div className="flex justify-between items-start">
+                                                                <div className="min-w-0">
+                                                                    <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{goal.name}</h3>
+                                                                    {goal.target_date && (
+                                                                        <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
+                                                                            <Calendar className="w-3 h-3 text-gray-400" /> Meta para: {goal.target_date}
+                                                                        </p>
+                                                                    )}
                                                                 </div>
-                                                                <div className="flex items-center gap-3">
+                                                                <div className="flex items-center gap-4 shrink-0">
                                                                     <div className="text-right">
-                                                                        <p className="font-bold text-lg text-emerald-600 dark:text-emerald-400">{formatCurrency(goal.current_amount_cents)}</p>
-                                                                        <p className="text-xs text-gray-500">de {formatCurrency(goal.target_amount_cents)}</p>
+                                                                        <p className="font-bold text-sm text-gray-950 dark:text-white">{formatCurrency(goal.current_amount_cents)}</p>
+                                                                        <p className="text-[10px] text-gray-400">de {formatCurrency(goal.target_amount_cents)}</p>
                                                                     </div>
-                                                                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                                    <button 
+                                                                        onClick={() => handleDeleteGoal(goal.id)} 
+                                                                        className="text-gray-400 hover:text-red-500 p-1 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
                                                                 </div>
                                                             </div>
-                                                            <div className="h-3 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-2">
-                                                                <div className={`h-full rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${progress}%` }}></div>
-                                                            </div>
-                                                            <div className="flex justify-between items-center mt-4">
-                                                                <p className="text-xs text-gray-500 font-medium">{progress}% completado</p>
-                                                                <button onClick={() => setShowContributeModal(goal.id)} className="text-sm bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1.5 rounded-lg font-medium transition-colors">Aportar</button>
+
+                                                            <div className="space-y-1">
+                                                                <div className="h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                                    <div 
+                                                                        className="h-full bg-zinc-800 dark:bg-white rounded-full transition-all duration-500" 
+                                                                        style={{ width: `${progress}%` }}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex justify-between items-center pt-1">
+                                                                    <span className="text-[11px] text-gray-400 font-medium">{progress}% completado</span>
+                                                                    <button 
+                                                                        onClick={() => setShowContributeModal(goal.id)} 
+                                                                        className="text-[11px] font-semibold bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white px-3 py-1.5 rounded-lg transition-colors"
+                                                                    >
+                                                                        Aportar
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
@@ -1456,25 +1605,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             )}
                                         </div>
                                         {/* Create Goal Form */}
-                                        <div>
-                                            <form onSubmit={handleCreateSavingsGoal} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6">
-                                                <h3 className="font-semibold text-lg mb-4">Nueva Meta</h3>
+                                        <div className="lg:col-span-4">
+                                            <form onSubmit={handleCreateSavingsGoal} className="bg-white dark:bg-[#0a0a0a] p-5 rounded-2xl border border-gray-100 dark:border-zinc-800 space-y-4 shadow-sm sticky top-6">
+                                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Nueva Meta</h3>
                                                 <div>
-                                                    <label className="block text-sm font-medium mb-1">Nombre</label>
-                                                    <input required type="text" value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="Ej. Viaje a Japón" className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre</label>
+                                                    <input required type="text" value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="Ej. Viaje a Japón" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium mb-1">Monto Objetivo</label>
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Monto Objetivo</label>
                                                     <div className="relative">
-                                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500">$</span></div>
-                                                        <input required type="number" step="0.01" value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
+                                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
+                                                        <input required type="number" step="0.01" value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium mb-1">Fecha límite (Opcional)</label>
-                                                    <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha límite (Opcional)</label>
+                                                    <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
                                                 </div>
-                                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-lg font-medium hover:opacity-90">Crear Meta</button>
+                                                <button type="submit" className="w-full bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">Crear Meta</button>
                                             </form>
                                         </div>
                                     </div>
@@ -1589,7 +1738,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         <div 
                                                             key={card.id} 
                                                             className={`relative overflow-hidden rounded-3xl p-6 text-white shadow-lg transition-transform hover:-translate-y-1 ${
-                                                                card.color_gradient || (isCredit ? 'bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900' : 'bg-gradient-to-br from-emerald-800 via-teal-900 to-slate-900')
+                                                                card.card_color === 'slate' ? 'bg-gradient-to-br from-zinc-900 via-neutral-950 to-zinc-900' :
+                                                                card.card_color === 'indigo' ? 'bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900' :
+                                                                card.card_color === 'blue' ? 'bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900' :
+                                                                card.card_color === 'emerald' ? 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900' :
+                                                                card.card_color === 'rose' ? 'bg-gradient-to-br from-rose-950 via-rose-900 to-slate-900' :
+                                                                card.card_color === 'amber' ? 'bg-gradient-to-br from-amber-950 via-amber-900 to-slate-900' :
+                                                                card.card_color === 'violet' ? 'bg-gradient-to-br from-violet-950 via-violet-900 to-slate-900' :
+                                                                (isCredit ? 'bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900' : 'bg-gradient-to-br from-emerald-800 via-teal-900 to-slate-900')
                                                             }`}
                                                         >
                                                             {/* Physical Card Chip Graphic */}
@@ -1610,7 +1766,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                                             {/* Card Number Representation */}
                                                             <div className="my-4 font-mono text-base tracking-widest opacity-90">
-                                                                •••• •••• •••• {card.last4 || '4242'}
+                                                                •••• •••• •••• {card.card_number_last4 || '4242'}
                                                             </div>
 
                                                             {/* Balance / Limit Details */}
@@ -1658,80 +1814,115 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
 
                                     {/* Loans & Personal Debts Section */}
-                                    <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-zinc-800">
-                                        <h2 className="text-xl font-bold">Préstamos Personales</h2>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <div className="md:col-span-2 space-y-4">
+                                    <div className="space-y-4 pt-6 border-t border-gray-100 dark:border-zinc-850">
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Préstamos Personales</h2>
+                                            <p className="text-xs text-gray-400">Control de dinero prestado y deudas con terceros</p>
+                                        </div>
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                            <div className="lg:col-span-8 space-y-3.5">
                                                 {debts.length === 0 ? (
-                                                    <p className="text-gray-500 text-sm">No hay registro de préstamos ni deudas personales.</p>
+                                                    <div className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl p-10 text-center text-gray-400 text-xs">
+                                                        No hay registro de préstamos ni deudas personales. Crea uno a la derecha.
+                                                    </div>
                                                 ) : (
                                                     debts.map(debt => {
                                                         const isOwed = debt.type === 'OWED';
                                                         const progress = Math.min(100, Math.round(((debt.amount_cents - debt.remaining_cents) / debt.amount_cents) * 100));
                                                         
                                                         return (
-                                                            <div key={debt.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-3xl shadow-sm">
-                                                                <div className="flex justify-between items-start mb-3">
-                                                                    <div>
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${isOwed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                            <div key={debt.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 p-5 rounded-2xl shadow-sm hover:border-gray-200 dark:hover:border-zinc-700 transition-all space-y-4">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div className="min-w-0">
+                                                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isOwed ? 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200' : 'bg-gray-950 text-white dark:bg-white dark:text-gray-950'}`}>
                                                                                 {isOwed ? 'Me deben' : 'Debo'}
                                                                             </span>
-                                                                            <h3 className="font-semibold text-lg">{debt.name}</h3>
+                                                                            <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{debt.name}</h3>
                                                                         </div>
-                                                                        {debt.due_date && <p className="text-xs text-gray-500 flex items-center gap-1"><Calendar className="w-3 h-3" /> Vence: {debt.due_date}</p>}
+                                                                        {debt.due_date && (
+                                                                            <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
+                                                                                <Calendar className="w-3 h-3 text-gray-400" /> Vence: {debt.due_date}
+                                                                            </p>
+                                                                        )}
                                                                     </div>
-                                                                    <div className="flex items-center gap-3">
+                                                                    <div className="flex items-center gap-4 shrink-0">
                                                                         <div className="text-right">
-                                                                            <p className="text-xs text-gray-500">Restante</p>
-                                                                            <p className={`font-bold text-lg ${isOwed ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(debt.remaining_cents)}</p>
+                                                                            <p className="text-[10px] text-gray-400 font-medium">Restante</p>
+                                                                            <p className="font-bold text-sm text-gray-950 dark:text-white">{formatCurrency(debt.remaining_cents)}</p>
                                                                         </div>
-                                                                        <button onClick={() => handleDeleteDebt(debt.id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
+                                                                        <button 
+                                                                            onClick={() => handleDeleteDebt(debt.id)} 
+                                                                            className="text-gray-400 hover:text-red-500 p-1 rounded-xl transition-colors shrink-0"
+                                                                        >
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex justify-between text-xs text-gray-500 mb-1 font-medium">
-                                                                    <span>{formatCurrency(debt.amount_cents - debt.remaining_cents)} pagado</span>
-                                                                    <span>Total: {formatCurrency(debt.amount_cents)}</span>
+
+                                                                <div className="space-y-1">
+                                                                    <div className="h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                                        <div 
+                                                                            className="h-full bg-zinc-800 dark:bg-white rounded-full transition-all duration-500" 
+                                                                            style={{ width: `${progress}%` }}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex justify-between items-center pt-1">
+                                                                        <span className="text-[11px] text-gray-400 font-medium">
+                                                                            {formatCurrency(debt.amount_cents - debt.remaining_cents)} de {formatCurrency(debt.amount_cents)} pagado ({progress}%)
+                                                                        </span>
+                                                                        {debt.remaining_cents > 0 && (
+                                                                            <button 
+                                                                                onClick={() => setShowPayDebtModal(debt.id)} 
+                                                                                className="text-[11px] font-semibold bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white px-3 py-1.5 rounded-lg transition-colors"
+                                                                            >
+                                                                                Abonar {isOwed ? 'Cobro' : 'Pago'}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                                <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-4">
-                                                                    <div className={`h-full rounded-full transition-all duration-500 ${isOwed ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${progress}%` }}></div>
-                                                                </div>
-                                                                
-                                                                {debt.remaining_cents > 0 && (
-                                                                    <button onClick={() => setShowPayDebtModal(debt.id)} className="text-xs w-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-2 rounded-xl font-medium transition-colors">
-                                                                        Registrar {isOwed ? 'Cobro' : 'Pago'}
-                                                                    </button>
-                                                                )}
                                                             </div>
                                                         );
                                                     })
                                                 )}
                                             </div>
-                                            <div>
-                                                <form onSubmit={handleAddDebt} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-3xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6">
-                                                    <h3 className="font-semibold text-lg mb-4">Nuevo Préstamo</h3>
+                                            <div className="lg:col-span-4">
+                                                <form onSubmit={handleAddDebt} className="bg-white dark:bg-[#0a0a0a] p-5 rounded-2xl border border-gray-100 dark:border-zinc-800 space-y-4 shadow-sm sticky top-6">
+                                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Nuevo Préstamo</h3>
                                                     
-                                                    <div className="flex gap-2 p-1 bg-gray-200 dark:bg-gray-700/50 rounded-lg">
-                                                        <button type="button" onClick={() => setDebtType('OWE')} className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${debtType === 'OWE' ? 'bg-white dark:bg-gray-800 shadow-sm text-red-600' : 'text-gray-500 hover:text-gray-900'}`}>Yo debo</button>
-                                                        <button type="button" onClick={() => setDebtType('OWED')} className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${debtType === 'OWED' ? 'bg-white dark:bg-gray-800 shadow-sm text-emerald-600' : 'text-gray-500 hover:text-gray-900'}`}>Me deben</button>
+                                                    <div className="flex gap-1.5 p-1 bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-xl">
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => setDebtType('OWE')} 
+                                                            className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg transition-colors ${debtType === 'OWE' ? 'bg-white dark:bg-zinc-800 shadow-sm text-gray-950 dark:text-white' : 'text-gray-400 hover:text-gray-900'}`}
+                                                        >
+                                                            Yo debo
+                                                        </button>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => setDebtType('OWED')} 
+                                                            className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg transition-colors ${debtType === 'OWED' ? 'bg-white dark:bg-zinc-800 shadow-sm text-gray-950 dark:text-white' : 'text-gray-400 hover:text-gray-900'}`}
+                                                        >
+                                                            Me deben
+                                                        </button>
                                                     </div>
 
                                                     <div>
-                                                        <label className="block text-sm font-medium mb-1">Nombre/Persona</label>
-                                                        <input required type="text" value={debtName} onChange={e => setDebtName(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
+                                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre/Persona</label>
+                                                        <input required type="text" value={debtName} onChange={e => setDebtName(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium mb-1">Monto Total</label>
+                                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Monto Total</label>
                                                         <div className="relative">
-                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500">$</span></div>
-                                                            <input required type="number" step="0.01" value={debtAmount} onChange={e => setDebtAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
+                                                            <input required type="number" step="0.01" value={debtAmount} onChange={e => setDebtAmount(e.target.value)} placeholder="0.00" className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium mb-1 font-medium">Fecha límite (Opcional)</label>
-                                                        <input type="date" value={debtDueDate} onChange={e => setDebtDueDate(e.target.value)} className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
+                                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha límite (Opcional)</label>
+                                                        <input type="date" value={debtDueDate} onChange={e => setDebtDueDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
                                                     </div>
-                                                    <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-xl font-medium hover:opacity-90">Guardar</button>
+                                                    <button type="submit" className="w-full bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">Guardar</button>
                                                 </form>
                                             </div>
                                         </div>
@@ -2011,25 +2202,43 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     </div>
                                                 </div>
 
-                                                {/* Credit Card Specific Fields */}
-                                                {newAccountType === 'credit' && (
+                                                {/* Card Specific Fields (Credit & Debit) */}
+                                                {(newAccountType === 'credit' || newAccountType === 'debit') && (
                                                     <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-zinc-800">
-                                                        <div>
-                                                            <label className="block text-xs font-semibold mb-1">Límite de Crédito</label>
-                                                            <input required type="number" step="0.01" placeholder="Ej. 2000.00" value={newAccountCreditLimit} onChange={e=>setNewAccountCreditLimit(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                        </div>
+                                                        {newAccountType === 'credit' && (
+                                                            <div className="space-y-3">
+                                                                <div>
+                                                                    <label className="block text-xs font-semibold mb-1">Límite de Crédito ($)</label>
+                                                                    <input required type="number" step="0.01" placeholder="Ej. 2000.00" value={newAccountCreditLimit} onChange={e=>setNewAccountCreditLimit(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <div className="flex-1">
+                                                                        <label className="block text-xs font-semibold mb-1">Día de Corte (1-31)</label>
+                                                                        <input type="number" min="1" max="31" placeholder="Ej. 15" value={newAccountCutoffDay} onChange={e=>setNewAccountCutoffDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <label className="block text-xs font-semibold mb-1">Día Límite de Pago (1-31)</label>
+                                                                        <input type="number" min="1" max="31" placeholder="Ej. 5" value={newAccountDueDay} onChange={e=>setNewAccountDueDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                         <div className="flex gap-2">
-                                                            <div className="flex-1">
-                                                                <label className="block text-xs font-semibold mb-1">Día de Corte</label>
-                                                                <input type="number" min="1" max="31" placeholder="Ej. 15" value={newAccountCutoffDay} onChange={e=>setNewAccountCutoffDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <label className="block text-xs font-semibold mb-1">Día Límite de Pago</label>
-                                                                <input type="number" min="1" max="31" placeholder="Ej. 5" value={newAccountDueDay} onChange={e=>setNewAccountDueDay(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
-                                                            </div>
                                                             <div className="flex-1">
                                                                 <label className="block text-xs font-semibold mb-1">Últimos 4 Dígitos</label>
                                                                 <input type="text" maxLength={4} placeholder="4242" value={newAccountCardLast4} onChange={e=>setNewAccountCardLast4(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm" />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <label className="block text-xs font-semibold mb-1">Color de la Tarjeta</label>
+                                                                <select value={newAccountCardColor} onChange={e=>setNewAccountCardColor(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                                                    <option value="slate">Carbono (Gris Oscuro)</option>
+                                                                    <option value="indigo">Índigo Royale</option>
+                                                                    <option value="blue">Azul Océano</option>
+                                                                    <option value="emerald">Verde Esmeralda</option>
+                                                                    <option value="rose">Rosa Cuarzo</option>
+                                                                    <option value="amber">Oro Ámbar</option>
+                                                                    <option value="violet">Amatista Violácea</option>
+                                                                </select>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2254,7 +2463,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 <div className="flex gap-2">
                                     <div className="flex-1">
                                         <label className="block text-xs font-semibold mb-1">Asociar Tarjeta / Cuenta</label>
-                                        <select value={instAccountId} onChange={e => setInstAccountId(Number(e.target.value))} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                        <select value={instAccountId} onChange={e => setInstAccountId(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
                                             <option value="">Ninguna</option>
                                             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                         </select>
@@ -2290,6 +2499,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-lg">$</span></div>
                                         <input type="number" step="0.01" required autoFocus value={contributeAmount} onChange={(e) => setContributeAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg" placeholder="0.00" />
                                     </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Descontar de la Cuenta</label>
+                                    <select required value={contributeAccountId} onChange={(e) => setContributeAccountId(e.target.value ? Number(e.target.value) : '')} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium">
+                                        <option value="">Selecciona cuenta de origen</option>
+                                        {accounts.filter(a => a.type !== 'credit').map(acc => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.name} (Saldo: {formatCurrency(acc.balance_cents)})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <button type="submit" className="w-full bg-emerald-500 text-white px-4 py-3.5 rounded-xl font-medium shadow-sm hover:bg-emerald-600 transition-colors">
                                     Confirmar Aporte
