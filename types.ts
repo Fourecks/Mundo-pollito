@@ -681,6 +681,29 @@ export interface FinanceBudget {
     total_amount_cents: number;
 }
 
+export interface FinanceBudgetItem {
+    id: number;
+    user_id: string;
+    month: string; // YYYY-MM
+    name: string;
+    icon?: string;
+    color?: string;
+    allocated_cents: number;
+    category_id?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface FinanceSecurity {
+    id: number;
+    user_id: string;
+    pin_hash: string;
+    require_on_enter: boolean;
+    require_on_delete: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface FinanceCategoryBudget {
     id: number;
     user_id: string;

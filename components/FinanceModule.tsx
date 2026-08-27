@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { FinanceAccount, FinanceTransaction, FinanceCategory, FinanceBudget, FinanceRecurringTransaction, FinanceSavingsGoal, FinanceShoppingList, FinanceShoppingItem, FinanceInstallment } from '../types';
+import { FinanceAccount, FinanceTransaction, FinanceCategory, FinanceBudget, FinanceBudgetItem, FinanceSecurity, FinanceRecurringTransaction, FinanceSavingsGoal, FinanceShoppingList, FinanceShoppingItem, FinanceInstallment } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     PlusIcon, XIcon, ArrowRightLeft, TrendingUp, TrendingDown, EyeIcon, EyeOffIcon, 
     LayoutDashboard, ListOrdered, PieChart, CalendarDays, Settings, Trash2, Wallet, 
     CreditCard, Landmark, CheckCircle2, ChevronDown, ChevronUp, Calendar, Banknote, ShoppingCart, BarChart3, Archive,
-    ChevronLeft, ChevronRight, Download, AlertTriangle, Layers, ShieldCheck, Clock, Receipt, Pencil, HelpCircle
+    ChevronLeft, ChevronRight, Download, AlertTriangle, Layers, ShieldCheck, Clock, Receipt, Pencil, HelpCircle,
+    Lock, Unlock, KeyRound, ShieldAlert, Sparkles, FolderPlus, DollarSign, RefreshCw, Copy, Check
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -28,12 +29,41 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [categories, setCategories] = useState<FinanceCategory[]>([]);
     const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
     const [budgets, setBudgets] = useState<FinanceBudget[]>([]);
+    const [budgetItems, setBudgetItems] = useState<FinanceBudgetItem[]>([]);
     const [recurring, setRecurring] = useState<FinanceRecurringTransaction[]>([]);
     const [savingsGoals, setSavingsGoals] = useState<FinanceSavingsGoal[]>([]);
     const [shoppingLists, setShoppingLists] = useState<FinanceShoppingList[]>([]);
     const [shoppingItems, setShoppingItems] = useState<FinanceShoppingItem[]>([]);
     const [debts, setDebts] = useState<any[]>([]);
     const [installments, setInstallments] = useState<FinanceInstallment[]>([]);
+    const [securityConfig, setSecurityConfig] = useState<FinanceSecurity | null>(null);
+
+    // --- Security & PIN States ---
+    const [isUnlocked, setIsUnlocked] = useState<boolean>(true);
+    const [lockPinInput, setLockPinInput] = useState('');
+    const [lockPinError, setLockPinError] = useState('');
+    const [showSetPinModal, setShowSetPinModal] = useState(false);
+    const [newPinValue, setNewPinValue] = useState('');
+    const [confirmPinValue, setConfirmPinValue] = useState('');
+    const [setPinError, setSetPinError] = useState('');
+    const [showDeletePinModal, setShowDeletePinModal] = useState(false);
+    const [deleteTargetAccountId, setDeleteTargetAccountId] = useState<number | null>(null);
+    const [deletePinInput, setDeletePinInput] = useState('');
+    const [deletePinError, setDeletePinError] = useState('');
+    const [showDisablePinModal, setShowDisablePinModal] = useState(false);
+    const [disablePinInput, setDisablePinInput] = useState('');
+    const [disablePinError, setDisablePinError] = useState('');
+
+    // --- Budget Breakdown States ---
+    const [selectedBudgetMonth, setSelectedBudgetMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+    const [showBudgetItemModal, setShowBudgetItemModal] = useState(false);
+    const [editingBudgetItem, setEditingBudgetItem] = useState<FinanceBudgetItem | null>(null);
+    const [budgetItemName, setBudgetItemName] = useState('');
+    const [budgetItemAmount, setBudgetItemAmount] = useState('');
+    const [budgetItemIcon, setBudgetItemIcon] = useState('🍔');
+    const [budgetItemColor, setBudgetItemColor] = useState('#10b981');
+    const [budgetItemCategoryId, setBudgetItemCategoryId] = useState<number | ''>('');
+    const [quickExpenseBudgetItem, setQuickExpenseBudgetItem] = useState<FinanceBudgetItem | null>(null);
 
     // --- Filters (Transactions) ---
     const [txFilterSearch, setTxFilterSearch] = useState('');
@@ -345,8 +375,29 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         }
     };
 
-    const fetchFinanceData = async () => {
-        setIsLoading(true);
+    const hashPin = async (pin: string): Promise<string> => {
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(pin.trim() + '_fin_security_salt_2026');
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch {
+            let hash = 0;
+            const str = pin.trim() + '_fin_security_salt_2026';
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash |= 0;
+            }
+            return Math.abs(hash).toString(16);
+        }
+    };
+
+    const fetchFinanceData = async (silent: boolean = false) => {
+        if (!silent && accounts.length === 0) {
+            setIsLoading(true);
+        }
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -372,15 +423,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             }
 
             try {
-                const [listsRes, itemsRes, debtsRes, instRes] = await Promise.all([
+                const [listsRes, itemsRes, debtsRes, instRes, bItemsRes, secRes] = await Promise.all([
                     supabase.from('finance_shopping_lists').select('*').order('created_at', { ascending: false }),
                     supabase.from('finance_shopping_items').select('*').order('created_at'),
                     supabase.from('finance_debts').select('*').order('created_at', { ascending: false }),
-                    supabase.from('finance_installments').select('*').order('created_at', { ascending: false })
+                    supabase.from('finance_installments').select('*').order('created_at', { ascending: false }),
+                    supabase.from('finance_budget_items').select('*').order('created_at'),
+                    supabase.from('finance_security').select('*').maybeSingle()
                 ]);
                 if (listsRes.data) setShoppingLists(listsRes.data);
                 if (itemsRes.data) setShoppingItems(itemsRes.data);
                 if (debtsRes.data) setDebts(debtsRes.data);
+                if (bItemsRes.data) setBudgetItems(bItemsRes.data);
+                if (secRes.data) {
+                    setSecurityConfig(secRes.data);
+                    if (secRes.data.require_on_enter && secRes.data.pin_hash) {
+                        const isAlreadyUnlocked = sessionStorage.getItem('finance_unlocked_session') === 'true';
+                        if (!isAlreadyUnlocked) {
+                            setIsUnlocked(false);
+                        }
+                    }
+                }
                 if (instRes.data) {
                     setInstallments(instRes.data);
                     if (accRes.data) {
@@ -950,9 +1013,34 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     };
 
     const handleDeleteAccount = async (id: number) => {
-        if (!confirm('¿Eliminar esta cuenta? Se eliminarán también sus movimientos.')) return;
-        await supabase.from('finance_accounts').delete().eq('id', id);
-        fetchFinanceData();
+        if (securityConfig?.require_on_delete && securityConfig?.pin_hash) {
+            setDeleteTargetAccountId(id);
+            setDeletePinInput('');
+            setDeletePinError('');
+            setShowDeletePinModal(true);
+        } else {
+            if (!confirm('¿Eliminar esta cuenta? Se eliminarán también sus movimientos.')) return;
+            await supabase.from('finance_accounts').delete().eq('id', id);
+            fetchFinanceData(true);
+        }
+    };
+
+    const handleConfirmDeleteAccountWithPin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setDeletePinError('');
+        if (!deleteTargetAccountId || !securityConfig) return;
+
+        const enteredHash = await hashPin(deletePinInput);
+        if (enteredHash !== securityConfig.pin_hash) {
+            setDeletePinError('PIN de seguridad incorrecto.');
+            return;
+        }
+
+        await supabase.from('finance_accounts').delete().eq('id', deleteTargetAccountId);
+        setShowDeletePinModal(false);
+        setDeleteTargetAccountId(null);
+        setDeletePinInput('');
+        fetchFinanceData(true);
     };
 
     const handleCreateCategory = async (e: React.FormEvent) => {
@@ -962,13 +1050,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
         await supabase.from('finance_categories').insert([{ user_id: user.id, name: newCatName, emoji: newCatEmoji }]);
         setNewCatName(''); setNewCatEmoji('💰');
-        fetchFinanceData();
+        fetchFinanceData(true);
     };
 
     const handleDeleteCategory = async (id: number) => {
         if (!confirm('¿Eliminar esta categoría?')) return;
         await supabase.from('finance_categories').delete().eq('id', id);
-        fetchFinanceData();
+        fetchFinanceData(true);
     };
 
     const handleSetBudget = async (e: React.FormEvent) => {
@@ -977,14 +1065,265 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         if (!user) return;
 
         const amountCents = Math.round(parseFloat(budgetAmount) * 100);
+        const existingBudget = budgets.find(b => b.month === selectedBudgetMonth);
         
-        if (currentBudget) {
-            await supabase.from('finance_budgets').update({ total_amount_cents: amountCents }).eq('id', currentBudget.id);
+        if (existingBudget) {
+            await supabase.from('finance_budgets').update({ total_amount_cents: amountCents }).eq('id', existingBudget.id);
         } else {
-            await supabase.from('finance_budgets').insert([{ user_id: user.id, month: currentMonthPrefix, total_amount_cents: amountCents }]);
+            await supabase.from('finance_budgets').insert([{ user_id: user.id, month: selectedBudgetMonth, total_amount_cents: amountCents }]);
         }
         setBudgetAmount('');
-        fetchFinanceData();
+        fetchFinanceData(true);
+    };
+
+    const handleSaveBudgetItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const amountCents = Math.round(parseFloat(budgetItemAmount) * 100);
+        if (isNaN(amountCents) || amountCents <= 0) {
+            alert('Por favor introduce un monto válido mayor a 0.');
+            return;
+        }
+
+        if (editingBudgetItem) {
+            await supabase.from('finance_budget_items').update({
+                name: budgetItemName,
+                allocated_cents: amountCents,
+                icon: budgetItemIcon,
+                color: budgetItemColor,
+                category_id: budgetItemCategoryId ? Number(budgetItemCategoryId) : null,
+                updated_at: new Date().toISOString()
+            }).eq('id', editingBudgetItem.id);
+        } else {
+            await supabase.from('finance_budget_items').insert([{
+                user_id: user.id,
+                month: selectedBudgetMonth,
+                name: budgetItemName,
+                allocated_cents: amountCents,
+                icon: budgetItemIcon,
+                color: budgetItemColor,
+                category_id: budgetItemCategoryId ? Number(budgetItemCategoryId) : null
+            }]);
+        }
+
+        setShowBudgetItemModal(false);
+        setEditingBudgetItem(null);
+        setBudgetItemName('');
+        setBudgetItemAmount('');
+        setBudgetItemIcon('🍔');
+        setBudgetItemColor('#10b981');
+        setBudgetItemCategoryId('');
+        fetchFinanceData(true);
+    };
+
+    const handleDeleteBudgetItem = async (id: number) => {
+        if (!confirm('¿Eliminar esta partida del presupuesto?')) return;
+        await supabase.from('finance_budget_items').delete().eq('id', id);
+        fetchFinanceData(true);
+    };
+
+    const handleApplyBudgetTemplate = async (type: '50_30_20' | 'categories') => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const currentBudgetForMonth = budgets.find(b => b.month === selectedBudgetMonth);
+        const totalCents = currentBudgetForMonth ? currentBudgetForMonth.total_amount_cents : 200000;
+
+        if (type === '50_30_20') {
+            const items = [
+                { user_id: user.id, month: selectedBudgetMonth, name: 'Necesidades Básicas (50%)', allocated_cents: Math.round(totalCents * 0.50), icon: '🏠', color: '#3b82f6' },
+                { user_id: user.id, month: selectedBudgetMonth, name: 'Estilo de Vida & Ocio (30%)', allocated_cents: Math.round(totalCents * 0.30), icon: '🎉', color: '#ec4899' },
+                { user_id: user.id, month: selectedBudgetMonth, name: 'Ahorro & Inversión (20%)', allocated_cents: Math.round(totalCents * 0.20), icon: '📈', color: '#10b981' }
+            ];
+            await supabase.from('finance_budget_items').insert(items);
+        } else {
+            const presets = [
+                { name: 'Alimentación y Supermercado', icon: '🛒', color: '#10b981', pct: 0.25 },
+                { name: 'Vivienda y Servicios Básicos', icon: '🏠', color: '#3b82f6', pct: 0.30 },
+                { name: 'Transporte y Movilidad', icon: '🚗', color: '#f59e0b', pct: 0.15 },
+                { name: 'Ahorro y Fondo de Emergencia', icon: '💰', color: '#8b5cf6', pct: 0.15 },
+                { name: 'Entretenimiento y Salidas', icon: '🍿', color: '#ec4899', pct: 0.10 },
+                { name: 'Salud y Cuidado Personal', icon: '🩺', color: '#06b6d4', pct: 0.05 }
+            ];
+            const items = presets.map(p => ({
+                user_id: user.id,
+                month: selectedBudgetMonth,
+                name: p.name,
+                allocated_cents: Math.round(totalCents * p.pct),
+                icon: p.icon,
+                color: p.color
+            }));
+            await supabase.from('finance_budget_items').insert(items);
+        }
+
+        if (!currentBudgetForMonth) {
+            await supabase.from('finance_budgets').insert([{ user_id: user.id, month: selectedBudgetMonth, total_amount_cents: totalCents }]);
+        }
+
+        fetchFinanceData(true);
+    };
+
+    const handleCopyPrevMonthBudget = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const [y, m] = selectedBudgetMonth.split('-');
+        const prevDate = new Date(parseInt(y), parseInt(m) - 2, 1);
+        const prevMonthStr = prevDate.toISOString().substring(0, 7);
+
+        const prevItems = budgetItems.filter(b => b.month === prevMonthStr);
+        if (prevItems.length === 0) {
+            alert(`No se encontraron partidas en el mes anterior (${prevMonthStr}).`);
+            return;
+        }
+
+        const newItems = prevItems.map(item => ({
+            user_id: user.id,
+            month: selectedBudgetMonth,
+            name: item.name,
+            icon: item.icon,
+            color: item.color,
+            allocated_cents: item.allocated_cents,
+            category_id: item.category_id
+        }));
+
+        await supabase.from('finance_budget_items').insert(newItems);
+
+        const prevBudget = budgets.find(b => b.month === prevMonthStr);
+        const currentBudgetForMonth = budgets.find(b => b.month === selectedBudgetMonth);
+        if (prevBudget && !currentBudgetForMonth) {
+            await supabase.from('finance_budgets').insert([{ user_id: user.id, month: selectedBudgetMonth, total_amount_cents: prevBudget.total_amount_cents }]);
+        }
+
+        fetchFinanceData(true);
+    };
+
+    const handleQuickExpenseToBudgetItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!quickExpenseBudgetItem) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const amountCents = Math.round(parseFloat(txAmount) * 100);
+        if (isNaN(amountCents) || amountCents <= 0) return;
+
+        const targetAccount = accounts.find(a => a.id === Number(txAccountId));
+        if (!targetAccount) {
+            alert('Por favor selecciona una cuenta válida');
+            return;
+        }
+
+        const { error: txError } = await supabase.from('finance_transactions').insert([{
+            user_id: user.id,
+            account_id: Number(txAccountId),
+            category_id: quickExpenseBudgetItem.category_id || null,
+            amount_cents: amountCents,
+            type: 'expense',
+            description: txDescription || `Gasto en ${quickExpenseBudgetItem.name}`,
+            date: new Date().toISOString(),
+            status: 'completed'
+        }]);
+
+        if (!txError) {
+            const newBal = targetAccount.type === 'credit'
+                ? targetAccount.balance_cents + amountCents
+                : targetAccount.balance_cents - amountCents;
+            await supabase.from('finance_accounts').update({ balance_cents: newBal }).eq('id', targetAccount.id);
+
+            setQuickExpenseBudgetItem(null);
+            setTxAmount('');
+            setTxDescription('');
+            setTxAccountId('');
+            fetchFinanceData(true);
+        }
+    };
+
+    // --- Security Handlers ---
+    const handleSaveSecurityPin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSetPinError('');
+        if (newPinValue.length < 4) {
+            setSetPinError('El PIN o contraseña debe tener al menos 4 caracteres.');
+            return;
+        }
+        if (newPinValue !== confirmPinValue) {
+            setSetPinError('Las contraseñas / PINs no coinciden.');
+            return;
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const pinHash = await hashPin(newPinValue);
+
+        if (securityConfig) {
+            await supabase.from('finance_security').update({
+                pin_hash: pinHash,
+                updated_at: new Date().toISOString()
+            }).eq('id', securityConfig.id);
+        } else {
+            await supabase.from('finance_security').insert([{
+                user_id: user.id,
+                pin_hash: pinHash,
+                require_on_enter: false,
+                require_on_delete: true
+            }]);
+        }
+
+        setShowSetPinModal(false);
+        setNewPinValue('');
+        setConfirmPinValue('');
+        fetchFinanceData(true);
+    };
+
+    const handleToggleRequireOnEnter = async (val: boolean) => {
+        if (!securityConfig) return;
+        await supabase.from('finance_security').update({ require_on_enter: val }).eq('id', securityConfig.id);
+        setSecurityConfig({ ...securityConfig, require_on_enter: val });
+    };
+
+    const handleToggleRequireOnDelete = async (val: boolean) => {
+        if (!securityConfig) return;
+        await supabase.from('finance_security').update({ require_on_delete: val }).eq('id', securityConfig.id);
+        setSecurityConfig({ ...securityConfig, require_on_delete: val });
+    };
+
+    const handleDisablePin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setDisablePinError('');
+        if (!securityConfig) return;
+
+        const enteredHash = await hashPin(disablePinInput);
+        if (enteredHash !== securityConfig.pin_hash) {
+            setDisablePinError('PIN incorrecto. No se pudo desactivar la seguridad.');
+            return;
+        }
+
+        await supabase.from('finance_security').delete().eq('id', securityConfig.id);
+        setSecurityConfig(null);
+        setShowDisablePinModal(false);
+        setDisablePinInput('');
+        fetchFinanceData(true);
+    };
+
+    const handleUnlockModule = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLockPinError('');
+        if (!securityConfig) {
+            setIsUnlocked(true);
+            return;
+        }
+
+        const enteredHash = await hashPin(lockPinInput);
+        if (enteredHash === securityConfig.pin_hash) {
+            setIsUnlocked(true);
+            sessionStorage.setItem('finance_unlocked_session', 'true');
+            setLockPinInput('');
+        } else {
+            setLockPinError('PIN incorrecto. Intenta de nuevo.');
+        }
     };
 
     const handleCreateRecurring = async (e: React.FormEvent) => {
@@ -1340,12 +1679,56 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                 <div className="max-w-5xl mx-auto">
-                    {renderTabs()}
-
                     {isLoading ? (
                         <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div></div>
+                    ) : !isUnlocked ? (
+                        <div className="min-h-[70vh] flex items-center justify-center p-4">
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.95, y: 12 }} 
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                className="w-full max-w-sm bg-white dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6"
+                            >
+                                <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/60 rounded-2xl flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 shadow-inner">
+                                    <Lock className="w-8 h-8" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">Módulo Protegido</h2>
+                                    <p className="text-xs text-gray-500">Ingresa tu contraseña o PIN de seguridad para acceder a tus finanzas.</p>
+                                </div>
+
+                                <form onSubmit={handleUnlockModule} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <input
+                                            type="password"
+                                            inputMode="numeric"
+                                            autoFocus
+                                            required
+                                            value={lockPinInput}
+                                            onChange={e => setLockPinInput(e.target.value)}
+                                            placeholder="••••"
+                                            className="w-full text-center text-2xl tracking-widest font-mono py-3 px-4 bg-gray-50 dark:bg-[#181818] border border-gray-200 dark:border-zinc-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        {lockPinError && (
+                                            <p className="text-xs font-semibold text-red-500 dark:text-red-400 flex items-center justify-center gap-1">
+                                                <AlertTriangle className="w-3.5 h-3.5" />
+                                                {lockPinError}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition-all active:scale-[0.98]"
+                                    >
+                                        Desbloquear Finanzas
+                                    </button>
+                                </form>
+                            </motion.div>
+                        </div>
                     ) : (
                         <>
+                            {renderTabs()}
+
                             {financialAlerts.length > 0 && (
                                 <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl shadow-sm space-y-2">
                                     <div className="flex items-center justify-between">
@@ -1626,48 +2009,424 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 </div>
                             )}
 
-                            {/* BUDGETS TAB */}
-                            {activeTab === 'budgets' && (
-                                <div className="space-y-6 max-w-2xl mx-auto">
-                                    <div className="text-center mb-8">
-                                        <h2 className="text-2xl font-bold mb-2">Presupuesto Mensual</h2>
-                                        <p className="text-gray-500">{currentMonthName}</p>
-                                    </div>
+                            {/* BUDGETS TAB - Robust Budget Breakdown System */}
+                            {activeTab === 'budgets' && (() => {
+                                const currentSelectedMonthBudget = budgets.find(b => b.month === selectedBudgetMonth);
+                                const monthBudgetItems = budgetItems.filter(b => b.month === selectedBudgetMonth);
+                                const totalAllocatedInItems = monthBudgetItems.reduce((acc, item) => acc + item.allocated_cents, 0);
+                                const totalEffectiveBudget = currentSelectedMonthBudget ? currentSelectedMonthBudget.total_amount_cents : totalAllocatedInItems;
+                                const monthTxs = transactions.filter(t => t.date.startsWith(selectedBudgetMonth));
+                                const monthExpenses = monthTxs.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.amount_cents, 0);
+                                const unallocatedBudget = currentSelectedMonthBudget ? Math.max(0, currentSelectedMonthBudget.total_amount_cents - totalAllocatedInItems) : 0;
+                                const isOverAllocated = currentSelectedMonthBudget && totalAllocatedInItems > currentSelectedMonthBudget.total_amount_cents;
+                                const overAllocatedAmount = isOverAllocated ? totalAllocatedInItems - currentSelectedMonthBudget.total_amount_cents : 0;
+                                const overallPct = totalEffectiveBudget > 0 ? Math.min(100, Math.round((monthExpenses / totalEffectiveBudget) * 100)) : 0;
 
-                                    <div className="bg-white dark:bg-[#0a0a0a] p-8 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm">
-                                        <form onSubmit={handleSetBudget} className="flex gap-4 items-end mb-8">
-                                            <div className="flex-1">
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto del presupuesto</label>
-                                                <input type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={budgetAmount} onChange={e => setBudgetAmount(e.target.value.replace(/-/g, ''))} placeholder={currentBudget ? (currentBudget.total_amount_cents/100).toString() : "0.00"} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl" />
+                                // Format selected month display
+                                const [selYear, selMonth] = selectedBudgetMonth.split('-');
+                                const monthDate = new Date(parseInt(selYear), parseInt(selMonth) - 1, 1);
+                                const monthDisplayTitle = monthDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+                                const handlePrevMonth = () => {
+                                    const prev = new Date(parseInt(selYear), parseInt(selMonth) - 2, 1);
+                                    setSelectedBudgetMonth(prev.toISOString().substring(0, 7));
+                                };
+
+                                const handleNextMonth = () => {
+                                    const next = new Date(parseInt(selYear), parseInt(selMonth), 1);
+                                    setSelectedBudgetMonth(next.toISOString().substring(0, 7));
+                                };
+
+                                return (
+                                    <div className="space-y-8 max-w-5xl mx-auto">
+                                        {/* Header & Month Navigation */}
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-[#0a0a0a] p-6 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <h2 className="text-2xl font-bold capitalize text-gray-900 dark:text-white">{monthDisplayTitle}</h2>
+                                                    {selectedBudgetMonth === currentMonthPrefix && (
+                                                        <span className="text-[10px] uppercase font-bold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full">
+                                                            Mes Actual
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-0.5">Planifica y desglosa tus límites de gasto por partidas y categorías</p>
                                             </div>
-                                            <button type="submit" className="bg-primary text-white px-6 py-3 rounded-xl font-medium hover:bg-primary-dark">
-                                                {currentBudget ? 'Actualizar' : 'Crear'}
-                                            </button>
-                                        </form>
 
-                                        {currentBudget && (
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-end">
+                                            {/* Month Selector Controls */}
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={handlePrevMonth}
+                                                    className="p-2.5 rounded-xl border border-gray-200 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/80 transition-colors text-gray-700 dark:text-gray-300"
+                                                    title="Mes anterior"
+                                                >
+                                                    <ChevronLeft className="w-4 h-4" />
+                                                </button>
+                                                <input
+                                                    type="month"
+                                                    value={selectedBudgetMonth}
+                                                    onChange={e => e.target.value && setSelectedBudgetMonth(e.target.value)}
+                                                    className="px-3 py-2 text-xs font-semibold bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-gray-900 dark:text-white outline-none cursor-pointer"
+                                                />
+                                                <button
+                                                    onClick={handleNextMonth}
+                                                    className="p-2.5 rounded-xl border border-gray-200 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/80 transition-colors text-gray-700 dark:text-gray-300"
+                                                    title="Mes siguiente"
+                                                >
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => setSelectedBudgetMonth(currentMonthPrefix)}
+                                                    className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary transition-colors border border-dashed border-gray-200 dark:border-zinc-800 rounded-xl"
+                                                >
+                                                    Hoy
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Top KPI Cards (Bento style) */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            {/* Presupuesto Total Objetivo */}
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                                <div className="flex justify-between items-start">
                                                     <div>
-                                                        <p className="text-sm text-gray-500">Progreso actual</p>
-                                                        <p className="text-3xl font-bold">{formatCurrency(expensesThisMonth)}</p>
+                                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Presupuesto Global</span>
+                                                        <p className="text-2xl font-black mt-1 text-gray-900 dark:text-white">
+                                                            {formatCurrency(totalEffectiveBudget)}
+                                                        </p>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="text-sm text-gray-500">De un total de</p>
-                                                        <p className="text-xl font-medium text-gray-400">{formatCurrency(currentBudget.total_amount_cents)}</p>
+                                                    <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-2xl">
+                                                        <PieChart className="w-4 h-4" />
                                                     </div>
                                                 </div>
-                                                <div className="h-4 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                                    <div className={`h-full rounded-full transition-all duration-500 ${budgetProgress > 90 ? 'bg-red-500' : budgetProgress > 75 ? 'bg-amber-500' : 'bg-primary'}`} style={{ width: `${budgetProgress}%` }}></div>
+                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+                                                    <span className="text-gray-500">Meta del mes</span>
+                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                                        {currentSelectedMonthBudget ? 'Fijado' : 'Suma de partidas'}
+                                                    </span>
                                                 </div>
-                                                <p className="text-center text-sm font-medium text-gray-500">
-                                                    Quedan {formatCurrency(currentBudget.total_amount_cents - expensesThisMonth)} disponibles
-                                                </p>
                                             </div>
-                                        )}
+
+                                            {/* Total Desglosado / Asignado */}
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Desglosado</span>
+                                                        <p className="text-2xl font-black mt-1 text-indigo-600 dark:text-indigo-400">
+                                                            {formatCurrency(totalAllocatedInItems)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-2xl">
+                                                        <Layers className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+                                                    <span className="text-gray-500">{monthBudgetItems.length} partidas creadas</span>
+                                                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                                                        {totalEffectiveBudget > 0 ? `${Math.round((totalAllocatedInItems / totalEffectiveBudget) * 100)}%` : '0%'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Gastado Real */}
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Gasto Real Mes</span>
+                                                        <p className={`text-2xl font-black mt-1 ${monthExpenses > totalEffectiveBudget && totalEffectiveBudget > 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
+                                                            {formatCurrency(monthExpenses)}
+                                                        </p>
+                                                    </div>
+                                                    <div className={`p-2.5 rounded-2xl ${monthExpenses > totalEffectiveBudget && totalEffectiveBudget > 0 ? 'bg-red-50 dark:bg-red-950/40 text-red-500' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'}`}>
+                                                        <TrendingDown className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+                                                    <span className="text-gray-500">Ejecución</span>
+                                                    <span className={`font-semibold ${overallPct > 90 ? 'text-red-500' : overallPct > 75 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                                                        {overallPct}% gastado
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Disponible / Restante */}
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                                            {currentSelectedMonthBudget ? (isOverAllocated ? 'Sobre-asignado' : 'Por Asignar') : 'Saldo Disponible'}
+                                                        </span>
+                                                        <p className={`text-2xl font-black mt-1 ${isOverAllocated ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                            {currentSelectedMonthBudget 
+                                                                ? (isOverAllocated ? `-${formatCurrency(overAllocatedAmount)}` : formatCurrency(unallocatedBudget))
+                                                                : formatCurrency(Math.max(0, totalEffectiveBudget - monthExpenses))
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                    <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-2xl">
+                                                        <ShieldCheck className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+                                                    <span className="text-gray-500">Estado</span>
+                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                                        {isOverAllocated ? 'Excede límite global' : unallocatedBudget === 0 ? '100% asignado' : 'Margen libre'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Global Budget Progress Bar */}
+                                        <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                            <div className="flex justify-between items-center text-sm font-semibold">
+                                                <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                                    <BarChart3 className="w-4 h-4 text-primary" />
+                                                    Consumo Global del Presupuesto
+                                                </span>
+                                                <span className={`${overallPct > 100 ? 'text-red-500' : overallPct > 80 ? 'text-amber-500' : 'text-primary'}`}>
+                                                    {formatCurrency(monthExpenses)} de {formatCurrency(totalEffectiveBudget)} ({overallPct}%)
+                                                </span>
+                                            </div>
+                                            <div className="h-3.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden flex">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 ${
+                                                        overallPct > 100 ? 'bg-red-500' : overallPct > 85 ? 'bg-amber-500' : 'bg-primary'
+                                                    }`}
+                                                    style={{ width: `${Math.min(100, overallPct)}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between text-xs text-gray-500">
+                                                <span>Disponible restante este mes: <strong>{formatCurrency(Math.max(0, totalEffectiveBudget - monthExpenses))}</strong></span>
+                                                <span>{totalEffectiveBudget > 0 && monthExpenses > totalEffectiveBudget ? `¡Presupuesto superado por ${formatCurrency(monthExpenses - totalEffectiveBudget)}!` : ''}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Action Bar & Templates */}
+                                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingBudgetItem(null);
+                                                        setBudgetItemName('');
+                                                        setBudgetItemAmount('');
+                                                        setBudgetItemIcon('🍔');
+                                                        setBudgetItemColor('#10b981');
+                                                        setBudgetItemCategoryId('');
+                                                        setShowBudgetItemModal(true);
+                                                    }}
+                                                    className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-2xl font-semibold text-xs shadow-sm hover:bg-primary-dark transition-all"
+                                                >
+                                                    <PlusIcon className="w-4 h-4" />
+                                                    Añadir Partida de Desglose
+                                                </button>
+
+                                                <button
+                                                    onClick={() => handleApplyBudgetTemplate('50_30_20')}
+                                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/80 text-xs font-semibold transition-colors"
+                                                    title="Crear desglose basado en la regla 50% Necesidades, 30% Deseos, 20% Ahorro"
+                                                >
+                                                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                                    Plantilla 50/30/20
+                                                </button>
+
+                                                <button
+                                                    onClick={() => handleApplyBudgetTemplate('categories')}
+                                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/80 text-xs font-semibold transition-colors"
+                                                    title="Crear partidas para Alimentación, Vivienda, Transporte, Ahorro, Ocio y Salud"
+                                                >
+                                                    <FolderPlus className="w-3.5 h-3.5 text-blue-500" />
+                                                    Plantilla por Categorías
+                                                </button>
+
+                                                <button
+                                                    onClick={handleCopyPrevMonthBudget}
+                                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/80 text-xs font-semibold transition-colors"
+                                                    title="Copiar todas las partidas del mes anterior"
+                                                >
+                                                    <Copy className="w-3.5 h-3.5 text-indigo-500" />
+                                                    Copiar Mes Anterior
+                                                </button>
+                                            </div>
+
+                                            {/* Set/Edit Global Budget Total Form */}
+                                            <form onSubmit={handleSetBudget} className="flex items-center gap-2 w-full sm:w-auto">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    onKeyDown={blockNegativeKeys}
+                                                    value={budgetAmount}
+                                                    onChange={e => setBudgetAmount(e.target.value.replace(/-/g, ''))}
+                                                    placeholder={currentSelectedMonthBudget ? (currentSelectedMonthBudget.total_amount_cents / 100).toFixed(2) : "Meta global..."}
+                                                    className="w-32 px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold outline-none focus:ring-1 focus:ring-primary"
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                                                >
+                                                    Fijar Meta Global
+                                                </button>
+                                            </form>
+                                        </div>
+
+                                        {/* Breakdown List / Cards */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                                    <Layers className="w-4 h-4 text-primary" />
+                                                    Desglose de Partidas ({monthBudgetItems.length})
+                                                </h3>
+                                                <span className="text-xs text-gray-400">Total presupuestado: {formatCurrency(totalAllocatedInItems)}</span>
+                                            </div>
+
+                                            {monthBudgetItems.length === 0 ? (
+                                                <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-300 dark:border-zinc-800 rounded-3xl p-12 text-center space-y-4">
+                                                    <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto">
+                                                        <PieChart className="w-7 h-7" />
+                                                    </div>
+                                                    <div className="max-w-md mx-auto space-y-1">
+                                                        <h4 className="font-bold text-base text-gray-900 dark:text-white">Sin partidas desglosadas en {monthDisplayTitle}</h4>
+                                                        <p className="text-xs text-gray-500">
+                                                            Crea tus partidas personalizadas (ej. Comida, Ahorro, Ocio, Servicios) o usa una de las plantillas para empezar en un solo clic.
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex justify-center gap-2 pt-2">
+                                                        <button
+                                                            onClick={() => handleApplyBudgetTemplate('categories')}
+                                                            className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold shadow-sm hover:bg-primary-dark transition-all"
+                                                        >
+                                                            Cargar Plantilla Estándar
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleApplyBudgetTemplate('50_30_20')}
+                                                            className="px-4 py-2 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all"
+                                                        >
+                                                            Aplicar Regla 50/30/20
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {monthBudgetItems.map(item => {
+                                                        // Calculate spent for this item
+                                                        let spentCents = 0;
+                                                        if (item.category_id) {
+                                                            spentCents = monthTxs
+                                                                .filter(t => t.type === 'EXPENSE' && t.category_id === item.category_id)
+                                                                .reduce((acc, t) => acc + t.amount_cents, 0);
+                                                        } else {
+                                                            // Match by description keyword or category name
+                                                            const itemLower = item.name.toLowerCase();
+                                                            spentCents = monthTxs
+                                                                .filter(t => {
+                                                                    if (t.type !== 'EXPENSE') return false;
+                                                                    const desc = (t.description || '').toLowerCase();
+                                                                    const catName = (categories.find(c => c.id === t.category_id)?.name || '').toLowerCase();
+                                                                    return desc.includes(itemLower) || catName.includes(itemLower) || itemLower.includes(catName);
+                                                                })
+                                                                .reduce((acc, t) => acc + t.amount_cents, 0);
+                                                        }
+
+                                                        const remainingCents = item.allocated_cents - spentCents;
+                                                        const isExceeded = remainingCents < 0;
+                                                        const itemPct = item.allocated_cents > 0 ? Math.round((spentCents / item.allocated_cents) * 100) : 0;
+                                                        const linkedCat = categories.find(c => c.id === item.category_id);
+
+                                                        return (
+                                                            <div
+                                                                key={item.id}
+                                                                className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm space-y-4 hover:border-gray-300 dark:hover:border-zinc-700 transition-all relative overflow-hidden group"
+                                                            >
+                                                                {/* Top Badge & Header */}
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span
+                                                                            className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-xs"
+                                                                            style={{ backgroundColor: `${item.color || '#3b82f6'}20`, color: item.color || '#3b82f6' }}
+                                                                        >
+                                                                            {item.icon || '🏷️'}
+                                                                        </span>
+                                                                        <div>
+                                                                            <h4 className="font-bold text-sm text-gray-900 dark:text-white leading-tight">{item.name}</h4>
+                                                                            {linkedCat && (
+                                                                                <span className="text-[10px] text-gray-400 font-medium">
+                                                                                    Vinculado: {linkedCat.emoji} {linkedCat.name}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-1">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setEditingBudgetItem(item);
+                                                                                setBudgetItemName(item.name);
+                                                                                setBudgetItemAmount((item.allocated_cents / 100).toString());
+                                                                                setBudgetItemIcon(item.icon || '🍔');
+                                                                                setBudgetItemColor(item.color || '#10b981');
+                                                                                setBudgetItemCategoryId(item.category_id || '');
+                                                                                setShowBudgetItemModal(true);
+                                                                            }}
+                                                                            className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                            title="Editar partida"
+                                                                        >
+                                                                            <Pencil className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDeleteBudgetItem(item.id)}
+                                                                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                                            title="Eliminar partida"
+                                                                        >
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Numbers Grid */}
+                                                                <div className="grid grid-cols-3 gap-2 text-center bg-gray-50 dark:bg-[#121212] p-2.5 rounded-2xl border border-gray-100 dark:border-zinc-800/80">
+                                                                    <div>
+                                                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Asignado</span>
+                                                                        <span className="font-bold text-xs text-gray-900 dark:text-white">{formatCurrency(item.allocated_cents)}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Gastado</span>
+                                                                        <span className={`font-bold text-xs ${isExceeded ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>{formatCurrency(spentCents)}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Restante</span>
+                                                                        <span className={`font-bold text-xs ${isExceeded ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                                            {isExceeded ? `-${formatCurrency(Math.abs(remainingCents))}` : formatCurrency(remainingCents)}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Progress Bar */}
+                                                                <div className="space-y-1.5">
+                                                                    <div className="flex justify-between items-center text-[11px]">
+                                                                        <span className="text-gray-500 font-medium">Ejecución del desglose</span>
+                                                                        <span className={`font-bold ${isExceeded ? 'text-red-500' : itemPct > 80 ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                                            {isExceeded ? `¡Excedido ${itemPct}%!` : `${itemPct}%`}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="h-2.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                                        <div
+                                                                            className="h-full rounded-full transition-all duration-500"
+                                                                            style={{
+                                                                                width: `${Math.min(100, itemPct)}%`,
+                                                                                backgroundColor: isExceeded ? '#ef4444' : itemPct > 85 ? '#f59e0b' : (item.color || '#10b981')
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {/* PLANNING TAB */}
                             {activeTab === 'planning' && (
@@ -1820,7 +2579,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 </div>
                                                                 <div className="text-[11px] text-gray-500 bg-gray-50 dark:bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-zinc-800 flex items-center justify-between">
                                                                     <span>Estado de cobro:</span>
-                                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">⚡ Cobro Automático</span>
+                                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">Cobro Automático</span>
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -2970,6 +3729,125 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             </form>
                                         </div>
 
+                                        {/* SECURITY & PIN PROTECTION */}
+                                        <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-zinc-800">
+                                            <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-zinc-800">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl text-indigo-600 dark:text-indigo-400">
+                                                        <ShieldCheck className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-base font-bold text-gray-900 dark:text-white">Seguridad y Protección con PIN</h3>
+                                                        <p className="text-xs text-gray-500">Protege el ingreso a finanzas y la eliminación de cuentas/tarjetas.</p>
+                                                    </div>
+                                                </div>
+                                                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                                                    securityConfig?.pin_hash 
+                                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' 
+                                                        : 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400'
+                                                }`}>
+                                                    {securityConfig?.pin_hash ? 'PIN Activo' : 'Sin Protección'}
+                                                </span>
+                                            </div>
+
+                                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                                            {securityConfig?.pin_hash ? 'Contraseña / PIN de Seguridad Configurado' : 'No has configurado un PIN de seguridad'}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">
+                                                            {securityConfig?.pin_hash 
+                                                                ? 'Puedes cambiar el código actual o gestionar los bloqueos automáticos.' 
+                                                                : 'Crea un PIN numérico o alfanumérico para asegurar tus registros financieros.'}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setNewPinValue('');
+                                                                setConfirmPinValue('');
+                                                                setSetPinError('');
+                                                                setShowSetPinModal(true);
+                                                            }}
+                                                            className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold shadow-sm transition-all"
+                                                        >
+                                                            <KeyRound className="w-3.5 h-3.5" />
+                                                            {securityConfig?.pin_hash ? 'Cambiar PIN' : 'Establecer PIN'}
+                                                        </button>
+                                                        {securityConfig?.pin_hash && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setDisablePinInput('');
+                                                                    setDisablePinError('');
+                                                                    setShowDisablePinModal(true);
+                                                                }}
+                                                                className="px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl border border-red-200 dark:border-red-900/50 transition-all"
+                                                            >
+                                                                Eliminar PIN
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {securityConfig?.pin_hash && (
+                                                    <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-800">
+                                                        <div className="flex items-center justify-between py-1.5">
+                                                            <div className="space-y-0.5 pr-4">
+                                                                <label htmlFor="toggle-lock-on-enter" className="text-xs font-bold text-gray-900 dark:text-white cursor-pointer">
+                                                                    Solicitar PIN al ingresar al módulo financiero
+                                                                </label>
+                                                                <p className="text-[11px] text-gray-500">
+                                                                    Bloquea la pantalla de finanzas hasta que se introduzca el PIN correcto.
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                id="toggle-lock-on-enter"
+                                                                type="button"
+                                                                role="switch"
+                                                                aria-checked={securityConfig.require_on_enter}
+                                                                onClick={() => handleToggleRequireOnEnter(!securityConfig.require_on_enter)}
+                                                                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+                                                                    securityConfig.require_on_enter ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-zinc-700'
+                                                                }`}
+                                                            >
+                                                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                                                                    securityConfig.require_on_enter ? 'translate-x-5' : 'translate-x-0'
+                                                                }`} />
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between py-1.5">
+                                                            <div className="space-y-0.5 pr-4">
+                                                                <label htmlFor="toggle-lock-on-delete" className="text-xs font-bold text-gray-900 dark:text-white cursor-pointer">
+                                                                    Proteger eliminación de cuentas y tarjetas
+                                                                </label>
+                                                                <p className="text-[11px] text-gray-500">
+                                                                    Exige ingresar el PIN antes de borrar permanentemente cualquier cuenta o tarjeta.
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                id="toggle-lock-on-delete"
+                                                                type="button"
+                                                                role="switch"
+                                                                aria-checked={securityConfig.require_on_delete}
+                                                                onClick={() => handleToggleRequireOnDelete(!securityConfig.require_on_delete)}
+                                                                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+                                                                    securityConfig.require_on_delete ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-zinc-700'
+                                                                }`}
+                                                            >
+                                                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                                                                    securityConfig.require_on_delete ? 'translate-x-5' : 'translate-x-0'
+                                                                }`} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
                                     </div>
                                 </div>
                             )}
@@ -3474,8 +4352,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             {/* Edit Account Modal */}
             <AnimatePresence>
                 {editingAccount && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingAccount(null)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[85vh] overflow-y-auto space-y-4">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setEditingAccount(null)}>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 40 }} 
+                            animate={{ opacity: 1, y: 0 }} 
+                            exit={{ opacity: 0, y: 40 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                            onClick={(e) => e.stopPropagation()} 
+                            className="bg-white dark:bg-[#0a0a0a] rounded-t-[2rem] sm:rounded-3xl p-6 w-full max-w-lg shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[88vh] overflow-y-auto space-y-4"
+                        >
+                            <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-3 cursor-grab" />
                             <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Editar Cuenta / Tarjeta</h3>
                                 <button type="button" onClick={() => setEditingAccount(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
@@ -3704,8 +4590,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             {/* Create Account Modal */}
             <AnimatePresence>
                 {showCreateAccountModal && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreateAccountModal(false)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[85vh] overflow-y-auto">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCreateAccountModal(false)}>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 40 }} 
+                            animate={{ opacity: 1, y: 0 }} 
+                            exit={{ opacity: 0, y: 40 }} 
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                            onClick={(e) => e.stopPropagation()} 
+                            className="bg-white dark:bg-[#0a0a0a] rounded-t-[2rem] sm:rounded-3xl p-6 w-full max-w-lg shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[88vh] overflow-y-auto"
+                        >
+                            <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-3 cursor-grab" />
                             <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                                 <h3 className="text-lg font-bold">Añadir Nueva Cuenta / Tarjeta</h3>
                                 <button type="button" onClick={() => setShowCreateAccountModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
@@ -3948,6 +4842,401 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             >
                                 Entendido
                             </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Set / Change Security PIN Modal */}
+            <AnimatePresence>
+                {showSetPinModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSetPinModal(false)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl text-indigo-600 dark:text-indigo-400">
+                                        <KeyRound className="w-4 h-4" />
+                                    </div>
+                                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                                        {securityConfig?.pin_hash ? 'Cambiar PIN / Contraseña' : 'Crear PIN de Seguridad'}
+                                    </h3>
+                                </div>
+                                <button type="button" onClick={() => setShowSetPinModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
+                                    <XIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSaveSecurityPin} className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nuevo PIN / Contraseña (mínimo 4 caracteres)</label>
+                                    <input
+                                        type="password"
+                                        inputMode="numeric"
+                                        required
+                                        autoFocus
+                                        value={newPinValue}
+                                        onChange={e => setNewPinValue(e.target.value)}
+                                        placeholder="Ej. 1234"
+                                        className="w-full text-center text-xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Confirmar PIN / Contraseña</label>
+                                    <input
+                                        type="password"
+                                        inputMode="numeric"
+                                        required
+                                        value={confirmPinValue}
+                                        onChange={e => setConfirmPinValue(e.target.value)}
+                                        placeholder="Repite el PIN"
+                                        className="w-full text-center text-xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
+                                    />
+                                </div>
+
+                                {setPinError && (
+                                    <p className="text-xs font-semibold text-red-500 flex items-center gap-1">
+                                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                        {setPinError}
+                                    </p>
+                                )}
+
+                                <div className="flex gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowSetPinModal(false)}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm"
+                                    >
+                                        Guardar PIN
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Confirm Account Delete with PIN Modal */}
+            <AnimatePresence>
+                {showDeletePinModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowDeletePinModal(false); setDeleteTargetAccountId(null); }}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 text-center">
+                            <div className="w-12 h-12 bg-red-50 dark:bg-red-950/60 rounded-2xl flex items-center justify-center mx-auto text-red-600 dark:text-red-400">
+                                <ShieldAlert className="w-6 h-6" />
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Confirmación de Seguridad</h3>
+                                <p className="text-xs text-gray-500">Ingresa tu PIN para autorizar la eliminación definitiva de esta cuenta o tarjeta.</p>
+                            </div>
+
+                            <form onSubmit={handleConfirmDeleteAccountWithPin} className="space-y-4">
+                                <div className="space-y-1">
+                                    <input
+                                        type="password"
+                                        inputMode="numeric"
+                                        autoFocus
+                                        required
+                                        value={deletePinInput}
+                                        onChange={e => setDeletePinInput(e.target.value)}
+                                        placeholder="••••"
+                                        className="w-full text-center text-2xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
+                                    />
+                                    {deletePinError && (
+                                        <p className="text-xs font-semibold text-red-500 pt-1">
+                                            {deletePinError}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowDeletePinModal(false); setDeleteTargetAccountId(null); }}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-sm"
+                                    >
+                                        Eliminar
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Disable PIN Modal */}
+            <AnimatePresence>
+                {showDisablePinModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDisablePinModal(false)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 text-center">
+                            <div className="w-12 h-12 bg-amber-50 dark:bg-amber-950/60 rounded-2xl flex items-center justify-center mx-auto text-amber-600 dark:text-amber-400">
+                                <KeyRound className="w-6 h-6" />
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Desactivar PIN de Seguridad</h3>
+                                <p className="text-xs text-gray-500">Ingresa tu PIN actual para confirmar que deseas remover la protección de seguridad.</p>
+                            </div>
+
+                            <form onSubmit={handleDisablePin} className="space-y-4">
+                                <div className="space-y-1">
+                                    <input
+                                        type="password"
+                                        inputMode="numeric"
+                                        autoFocus
+                                        required
+                                        value={disablePinInput}
+                                        onChange={e => setDisablePinInput(e.target.value)}
+                                        placeholder="••••"
+                                        className="w-full text-center text-2xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
+                                    />
+                                    {disablePinError && (
+                                        <p className="text-xs font-semibold text-red-500 pt-1">
+                                            {disablePinError}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDisablePinModal(false)}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-sm"
+                                    >
+                                        Desactivar PIN
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Custom Budget Breakdown Item Modal */}
+            <AnimatePresence>
+                {showBudgetItemModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowBudgetItemModal(false)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[85vh] overflow-y-auto">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 rounded-xl text-emerald-600 dark:text-emerald-400">
+                                        <PieChart className="w-4 h-4" />
+                                    </div>
+                                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                                        {editingBudgetItem ? 'Editar Desglose de Presupuesto' : 'Nuevo Desglose de Presupuesto'}
+                                    </h3>
+                                </div>
+                                <button type="button" onClick={() => setShowBudgetItemModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
+                                    <XIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSaveBudgetItem} className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nombre del Desglose / Destino</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            required
+                                            value={budgetItemIcon}
+                                            onChange={e => setBudgetItemIcon(e.target.value)}
+                                            className="w-14 text-center text-lg py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
+                                        />
+                                        <input
+                                            type="text"
+                                            required
+                                            autoFocus
+                                            value={budgetItemName}
+                                            onChange={e => setBudgetItemName(e.target.value)}
+                                            placeholder="Ej. Comida y Supermercado, Ahorro Mensual, Renta..."
+                                            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Presupuesto Asignado ($)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            required
+                                            onKeyDown={blockNegativeKeys}
+                                            value={budgetItemAmount}
+                                            onChange={e => setBudgetItemAmount(e.target.value.replace(/-/g, ''))}
+                                            placeholder="0.00"
+                                            className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-bold text-emerald-600 dark:text-emerald-400"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Color Distintivo</label>
+                                        <div className="flex items-center gap-2 h-10 px-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
+                                            <input
+                                                type="color"
+                                                value={budgetItemColor}
+                                                onChange={e => setBudgetItemColor(e.target.value)}
+                                                className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent"
+                                            />
+                                            <span className="text-xs font-mono font-medium text-gray-500">{budgetItemColor}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Vincular con Categoría de Gastos (Opcional)</label>
+                                    <select
+                                        value={budgetItemCategoryId}
+                                        onChange={e => setBudgetItemCategoryId(e.target.value ? Number(e.target.value) : '')}
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                                    >
+                                        <option value="">Sin vincular (o vincular por nombre/etiqueta)</option>
+                                        {categories.map(c => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.emoji} {c.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[11px] text-gray-400">
+                                        Si vinculas una categoría, los gastos de esa categoría se contabilizarán automáticamente aquí.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Iconos Sugeridos</label>
+                                    <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 dark:bg-[#121212] border border-gray-150 dark:border-zinc-800 rounded-xl max-h-24 overflow-y-auto">
+                                        {['🍔', '🛒', '🏠', '💡', '🚗', '⛽', '🍿', '💊', '🩺', '🎓', '✈️', '👕', '📱', '💰', '📈', '🎁', '☕', '🐾', '🏋️', '🛠️', '💼', '🧾'].map(emoji => (
+                                            <button
+                                                key={emoji}
+                                                type="button"
+                                                onClick={() => setBudgetItemIcon(emoji)}
+                                                className={`p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-lg text-base transition-all ${budgetItemIcon === emoji ? 'bg-emerald-100 dark:bg-emerald-950/60 scale-110' : ''}`}
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowBudgetItemModal(false)}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm"
+                                    >
+                                        {editingBudgetItem ? 'Actualizar Desglose' : 'Guardar Desglose'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Quick Expense to Budget Breakdown Modal */}
+            <AnimatePresence>
+                {quickExpenseBudgetItem && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setQuickExpenseBudgetItem(null)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 rounded-xl text-white text-sm" style={{ backgroundColor: quickExpenseBudgetItem.color || '#10b981' }}>
+                                        {quickExpenseBudgetItem.icon || '💸'}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-bold text-gray-900 dark:text-white">Registrar Gasto</h3>
+                                        <p className="text-xs text-gray-500">Para: {quickExpenseBudgetItem.name}</p>
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => setQuickExpenseBudgetItem(null)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
+                                    <XIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleQuickExpenseToBudgetItem} className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Monto del Gasto ($)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        autoFocus
+                                        onKeyDown={blockNegativeKeys}
+                                        value={txAmount}
+                                        onChange={e => setTxAmount(e.target.value.replace(/-/g, ''))}
+                                        placeholder="0.00"
+                                        className="w-full text-center text-2xl font-bold py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-red-600 dark:text-red-400"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Cuenta de Origen / Pago</label>
+                                    <select
+                                        required
+                                        value={txAccountId}
+                                        onChange={e => setTxAccountId(e.target.value ? Number(e.target.value) : '')}
+                                        className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                                    >
+                                        <option value="">Selecciona cuenta o tarjeta...</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.name} ({acc.type === 'credit' ? `Deuda: ${formatCurrency(acc.balance_cents)}` : `Disponible: ${formatCurrency(acc.balance_cents)}`})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Descripción (Opcional)</label>
+                                    <input
+                                        type="text"
+                                        value={txDescription}
+                                        onChange={e => setTxDescription(e.target.value)}
+                                        placeholder={`Gasto en ${quickExpenseBudgetItem.name}`}
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                                    />
+                                </div>
+
+                                <div className="flex gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setQuickExpenseBudgetItem(null)}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-sm"
+                                    >
+                                        Registrar Gasto
+                                    </button>
+                                </div>
+                            </form>
                         </motion.div>
                     </motion.div>
                 )}
