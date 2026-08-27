@@ -376,23 +376,93 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     };
 
     const hashPin = async (pin: string): Promise<string> => {
+        const clean = pin.trim();
         try {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(pin.trim() + '_fin_security_salt_2026');
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        } catch {
-            let hash = 0;
-            const str = pin.trim() + '_fin_security_salt_2026';
-            for (let i = 0; i < str.length; i++) {
-                const char = str.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash |= 0;
+            if (window.crypto && window.crypto.subtle) {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(clean + '_fin_security_salt_2026');
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
             }
-            return Math.abs(hash).toString(16);
+        } catch {
+            // fallback
         }
+        let hash = 5381;
+        const str = clean + '_fin_security_salt_2026';
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) + hash) + str.charCodeAt(i);
+            hash = hash & hash;
+        }
+        return Math.abs(hash).toString(16).padStart(16, '0');
     };
+
+    // Auto-carryover of budget items to future / new months
+    useEffect(() => {
+        if (!selectedBudgetMonth || budgetItems.length === 0) return;
+
+        const currentMonthItems = budgetItems.filter(b => b.month === selectedBudgetMonth);
+        if (currentMonthItems.length === 0) {
+            // Find most recent month with configured items
+            const allMonths = Array.from(new Set(budgetItems.map(b => b.month))).sort().reverse();
+            const sourceMonth = allMonths.find(m => m < selectedBudgetMonth) || allMonths[0];
+            
+            if (sourceMonth && sourceMonth !== selectedBudgetMonth) {
+                const sourceItems = budgetItems.filter(b => b.month === sourceMonth);
+                if (sourceItems.length > 0) {
+                    const doAutoCarryover = async () => {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
+
+                        const newItems = sourceItems.map(item => ({
+                            user_id: user.id,
+                            month: selectedBudgetMonth,
+                            name: item.name,
+                            icon: item.icon || '🏷️',
+                            color: item.color || '#3b82f6',
+                            allocated_cents: item.allocated_cents,
+                            category_id: item.category_id || null
+                        }));
+
+                        try {
+                            const { data: inserted, error } = await supabase.from('finance_budget_items').insert(newItems).select();
+                            if (inserted && !error) {
+                                setBudgetItems(prev => [...prev, ...inserted]);
+                            } else {
+                                const localItems = newItems.map((item, idx) => ({ ...item, id: Date.now() + idx } as FinanceBudgetItem));
+                                setBudgetItems(prev => [...prev, ...localItems]);
+                            }
+                        } catch {
+                            const localItems = newItems.map((item, idx) => ({ ...item, id: Date.now() + idx } as FinanceBudgetItem));
+                            setBudgetItems(prev => [...prev, ...localItems]);
+                        }
+
+                        // Also carry over overall monthly budget target if exists
+                        const sourceBudget = budgets.find(b => b.month === sourceMonth);
+                        const curBudget = budgets.find(b => b.month === selectedBudgetMonth);
+                        if (sourceBudget && !curBudget) {
+                            try {
+                                await supabase.from('finance_budgets').insert([{
+                                    user_id: user.id,
+                                    month: selectedBudgetMonth,
+                                    total_amount_cents: sourceBudget.total_amount_cents
+                                }]);
+                                setBudgets(prev => [...prev, {
+                                    id: Date.now(),
+                                    user_id: user.id,
+                                    month: selectedBudgetMonth,
+                                    total_amount_cents: sourceBudget.total_amount_cents
+                                }]);
+                            } catch {
+                                // silent
+                            }
+                        }
+                    };
+                    doAutoCarryover();
+                }
+            }
+        }
+    }, [selectedBudgetMonth, budgetItems.length]);
 
     const fetchFinanceData = async (silent: boolean = false) => {
         if (!silent && accounts.length === 0) {
@@ -401,6 +471,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
+
+            // Immediate local cache restore for PIN security
+            const localSecKey = `finance_sec_${user.id}`;
+            const cachedSec = localStorage.getItem(localSecKey);
+            if (cachedSec) {
+                try {
+                    const parsed = JSON.parse(cachedSec);
+                    if (parsed && parsed.pin_hash) {
+                        setSecurityConfig(parsed);
+                        if ((parsed.require_on_enter || parsed.require_pin_on_entry) && parsed.pin_hash) {
+                            const isAlreadyUnlocked = sessionStorage.getItem('finance_unlocked_session') === 'true';
+                            if (!isAlreadyUnlocked) {
+                                setIsUnlocked(false);
+                            }
+                        }
+                    }
+                } catch {
+                    // silent
+                }
+            }
 
             const [accRes, catRes, txRes, budRes, recRes, goalsRes] = await Promise.all([
                 supabase.from('finance_accounts').select('*').order('created_at'),
@@ -436,12 +526,30 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 if (debtsRes.data) setDebts(debtsRes.data);
                 if (bItemsRes.data) setBudgetItems(bItemsRes.data);
                 if (secRes.data) {
-                    setSecurityConfig(secRes.data);
-                    if (secRes.data.require_on_enter && secRes.data.pin_hash) {
+                    const sec = secRes.data;
+                    setSecurityConfig(sec);
+                    localStorage.setItem(localSecKey, JSON.stringify(sec));
+                    const reqEnter = sec.require_on_enter ?? sec.require_pin_on_entry ?? false;
+                    if (reqEnter && sec.pin_hash) {
                         const isAlreadyUnlocked = sessionStorage.getItem('finance_unlocked_session') === 'true';
                         if (!isAlreadyUnlocked) {
                             setIsUnlocked(false);
                         }
+                    }
+                } else if (cachedSec) {
+                    // Sync local cache back to database if missing
+                    try {
+                        const parsed = JSON.parse(cachedSec);
+                        if (parsed && parsed.pin_hash) {
+                            await supabase.from('finance_security').insert([{
+                                user_id: user.id,
+                                pin_hash: parsed.pin_hash,
+                                require_on_enter: parsed.require_on_enter ?? false,
+                                require_on_delete: parsed.require_on_delete ?? true
+                            }]);
+                        }
+                    } catch {
+                        // silent
                     }
                 }
                 if (instRes.data) {
@@ -1030,6 +1138,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         setDeletePinError('');
         if (!deleteTargetAccountId || !securityConfig) return;
 
+        if (deletePinInput.length !== 4) {
+            setDeletePinError('El PIN debe tener 4 dígitos.');
+            return;
+        }
+
         const enteredHash = await hashPin(deletePinInput);
         if (enteredHash !== securityConfig.pin_hash) {
             setDeletePinError('PIN de seguridad incorrecto.');
@@ -1112,8 +1225,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         setEditingBudgetItem(null);
         setBudgetItemName('');
         setBudgetItemAmount('');
-        setBudgetItemIcon('🍔');
-        setBudgetItemColor('#10b981');
+        setBudgetItemIcon('🏷️');
+        setBudgetItemColor('#3b82f6');
         setBudgetItemCategoryId('');
         fetchFinanceData(true);
     };
@@ -1121,82 +1234,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const handleDeleteBudgetItem = async (id: number) => {
         if (!confirm('¿Eliminar esta partida del presupuesto?')) return;
         await supabase.from('finance_budget_items').delete().eq('id', id);
-        fetchFinanceData(true);
-    };
-
-    const handleApplyBudgetTemplate = async (type: '50_30_20' | 'categories') => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const currentBudgetForMonth = budgets.find(b => b.month === selectedBudgetMonth);
-        const totalCents = currentBudgetForMonth ? currentBudgetForMonth.total_amount_cents : 200000;
-
-        if (type === '50_30_20') {
-            const items = [
-                { user_id: user.id, month: selectedBudgetMonth, name: 'Necesidades Básicas (50%)', allocated_cents: Math.round(totalCents * 0.50), icon: '🏠', color: '#3b82f6' },
-                { user_id: user.id, month: selectedBudgetMonth, name: 'Estilo de Vida & Ocio (30%)', allocated_cents: Math.round(totalCents * 0.30), icon: '🎉', color: '#ec4899' },
-                { user_id: user.id, month: selectedBudgetMonth, name: 'Ahorro & Inversión (20%)', allocated_cents: Math.round(totalCents * 0.20), icon: '📈', color: '#10b981' }
-            ];
-            await supabase.from('finance_budget_items').insert(items);
-        } else {
-            const presets = [
-                { name: 'Alimentación y Supermercado', icon: '🛒', color: '#10b981', pct: 0.25 },
-                { name: 'Vivienda y Servicios Básicos', icon: '🏠', color: '#3b82f6', pct: 0.30 },
-                { name: 'Transporte y Movilidad', icon: '🚗', color: '#f59e0b', pct: 0.15 },
-                { name: 'Ahorro y Fondo de Emergencia', icon: '💰', color: '#8b5cf6', pct: 0.15 },
-                { name: 'Entretenimiento y Salidas', icon: '🍿', color: '#ec4899', pct: 0.10 },
-                { name: 'Salud y Cuidado Personal', icon: '🩺', color: '#06b6d4', pct: 0.05 }
-            ];
-            const items = presets.map(p => ({
-                user_id: user.id,
-                month: selectedBudgetMonth,
-                name: p.name,
-                allocated_cents: Math.round(totalCents * p.pct),
-                icon: p.icon,
-                color: p.color
-            }));
-            await supabase.from('finance_budget_items').insert(items);
-        }
-
-        if (!currentBudgetForMonth) {
-            await supabase.from('finance_budgets').insert([{ user_id: user.id, month: selectedBudgetMonth, total_amount_cents: totalCents }]);
-        }
-
-        fetchFinanceData(true);
-    };
-
-    const handleCopyPrevMonthBudget = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const [y, m] = selectedBudgetMonth.split('-');
-        const prevDate = new Date(parseInt(y), parseInt(m) - 2, 1);
-        const prevMonthStr = prevDate.toISOString().substring(0, 7);
-
-        const prevItems = budgetItems.filter(b => b.month === prevMonthStr);
-        if (prevItems.length === 0) {
-            alert(`No se encontraron partidas en el mes anterior (${prevMonthStr}).`);
-            return;
-        }
-
-        const newItems = prevItems.map(item => ({
-            user_id: user.id,
-            month: selectedBudgetMonth,
-            name: item.name,
-            icon: item.icon,
-            color: item.color,
-            allocated_cents: item.allocated_cents,
-            category_id: item.category_id
-        }));
-
-        await supabase.from('finance_budget_items').insert(newItems);
-
-        const prevBudget = budgets.find(b => b.month === prevMonthStr);
-        const currentBudgetForMonth = budgets.find(b => b.month === selectedBudgetMonth);
-        if (prevBudget && !currentBudgetForMonth) {
-            await supabase.from('finance_budgets').insert([{ user_id: user.id, month: selectedBudgetMonth, total_amount_cents: prevBudget.total_amount_cents }]);
-        }
-
         fetchFinanceData(true);
     };
 
@@ -1244,32 +1281,73 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const handleSaveSecurityPin = async (e: React.FormEvent) => {
         e.preventDefault();
         setSetPinError('');
-        if (newPinValue.length < 4) {
-            setSetPinError('El PIN o contraseña debe tener al menos 4 caracteres.');
+        
+        const cleanPin = newPinValue.trim();
+        const cleanConfirm = confirmPinValue.trim();
+
+        if (cleanPin.length !== 4 || !/^\d{4}$/.test(cleanPin)) {
+            setSetPinError('El PIN debe tener exactamente 4 dígitos numéricos.');
             return;
         }
-        if (newPinValue !== confirmPinValue) {
-            setSetPinError('Las contraseñas / PINs no coinciden.');
+        if (cleanPin !== cleanConfirm) {
+            setSetPinError('Los dos códigos PIN no coinciden.');
             return;
         }
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const pinHash = await hashPin(newPinValue);
+        const pinHash = await hashPin(cleanPin);
+        const localKey = `finance_sec_${user.id}`;
+        
+        try {
+            if (securityConfig?.id && securityConfig.id > 1000000000) {
+                 // Hacky fix if someone has Date.now() saved as id
+                 const { data: inserted } = await supabase.from('finance_security').insert([{
+                    user_id: user.id,
+                    pin_hash: pinHash,
+                    require_on_enter: securityConfig.require_on_enter,
+                    require_on_delete: securityConfig.require_on_delete
+                }]).select().maybeSingle();
+                if (inserted) {
+                    setSecurityConfig(inserted);
+                    localStorage.setItem(localKey, JSON.stringify(inserted));
+                }
+            } else if (securityConfig?.id) {
+                await supabase.from('finance_security').update({
+                    pin_hash: pinHash,
+                    updated_at: new Date().toISOString()
+                }).eq('id', securityConfig.id);
+                
+                const updatedConfig = { ...securityConfig, pin_hash: pinHash, updated_at: new Date().toISOString() };
+                setSecurityConfig(updatedConfig);
+                localStorage.setItem(localKey, JSON.stringify(updatedConfig));
+            } else {
+                const { data: inserted } = await supabase.from('finance_security').insert([{
+                    user_id: user.id,
+                    pin_hash: pinHash,
+                    require_on_enter: false,
+                    require_on_delete: true
+                }]).select().maybeSingle();
 
-        if (securityConfig) {
-            await supabase.from('finance_security').update({
-                pin_hash: pinHash,
-                updated_at: new Date().toISOString()
-            }).eq('id', securityConfig.id);
-        } else {
-            await supabase.from('finance_security').insert([{
+                if (inserted) {
+                    setSecurityConfig(inserted);
+                    localStorage.setItem(localKey, JSON.stringify(inserted));
+                }
+            }
+        } catch (err) {
+            console.error('Error saving PIN to Supabase:', err);
+            // Fallback for offline/errors
+            const fallbackConfig = {
+                id: securityConfig?.id || 0,
                 user_id: user.id,
                 pin_hash: pinHash,
-                require_on_enter: false,
-                require_on_delete: true
-            }]);
+                require_on_enter: securityConfig?.require_on_enter ?? false,
+                require_on_delete: securityConfig?.require_on_delete ?? true,
+                updated_at: new Date().toISOString()
+            };
+            setSecurityConfig(fallbackConfig);
+            localStorage.setItem(localKey, JSON.stringify(fallbackConfig));
         }
 
         setShowSetPinModal(false);
@@ -1280,14 +1358,32 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
     const handleToggleRequireOnEnter = async (val: boolean) => {
         if (!securityConfig) return;
-        await supabase.from('finance_security').update({ require_on_enter: val }).eq('id', securityConfig.id);
-        setSecurityConfig({ ...securityConfig, require_on_enter: val });
+        const { data: { user } } = await supabase.auth.getUser();
+        const updated = { ...securityConfig, require_on_enter: val, require_pin_on_entry: val };
+        setSecurityConfig(updated);
+        if (user) {
+            localStorage.setItem(`finance_sec_${user.id}`, JSON.stringify(updated));
+        }
+        try {
+            await supabase.from('finance_security').update({ require_on_enter: val }).eq('id', securityConfig.id);
+        } catch {
+            // silent
+        }
     };
 
     const handleToggleRequireOnDelete = async (val: boolean) => {
         if (!securityConfig) return;
-        await supabase.from('finance_security').update({ require_on_delete: val }).eq('id', securityConfig.id);
-        setSecurityConfig({ ...securityConfig, require_on_delete: val });
+        const { data: { user } } = await supabase.auth.getUser();
+        const updated = { ...securityConfig, require_on_delete: val, require_pin_on_delete: val };
+        setSecurityConfig(updated);
+        if (user) {
+            localStorage.setItem(`finance_sec_${user.id}`, JSON.stringify(updated));
+        }
+        try {
+            await supabase.from('finance_security').update({ require_on_delete: val }).eq('id', securityConfig.id);
+        } catch {
+            // silent
+        }
     };
 
     const handleDisablePin = async (e: React.FormEvent) => {
@@ -1295,13 +1391,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         setDisablePinError('');
         if (!securityConfig) return;
 
+        if (disablePinInput.length !== 4) {
+            setDisablePinError('El PIN debe tener 4 dígitos.');
+            return;
+        }
+
         const enteredHash = await hashPin(disablePinInput);
         if (enteredHash !== securityConfig.pin_hash) {
             setDisablePinError('PIN incorrecto. No se pudo desactivar la seguridad.');
             return;
         }
 
-        await supabase.from('finance_security').delete().eq('id', securityConfig.id);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            localStorage.removeItem(`finance_sec_${user.id}`);
+        }
+        try {
+            await supabase.from('finance_security').delete().eq('id', securityConfig.id);
+        } catch {
+            // silent
+        }
+
         setSecurityConfig(null);
         setShowDisablePinModal(false);
         setDisablePinInput('');
@@ -1313,6 +1423,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         setLockPinError('');
         if (!securityConfig) {
             setIsUnlocked(true);
+            return;
+        }
+
+        if (lockPinInput.length !== 4) {
+            setLockPinError('Ingresa los 4 dígitos del PIN.');
             return;
         }
 
@@ -1701,10 +1816,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         <input
                                             type="password"
                                             inputMode="numeric"
+                                            maxLength={4}
+                                            pattern="\d{4}"
                                             autoFocus
                                             required
                                             value={lockPinInput}
-                                            onChange={e => setLockPinInput(e.target.value)}
+                                            onChange={e => setLockPinInput(e.target.value.replace(/\D/g, ''))}
                                             placeholder="••••"
                                             className="w-full text-center text-2xl tracking-widest font-mono py-3 px-4 bg-gray-50 dark:bg-[#181818] border border-gray-200 dark:border-zinc-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         />
@@ -1770,47 +1887,48 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm flex items-center justify-between gap-4">
                                             <div className="space-y-1">
                                                 <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">Balance Total</h2>
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-4 flex-wrap">
                                                     <div className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
                                                         {formatCurrency(totalBalanceCents)}
                                                     </div>
-                                                    <button 
-                                                        onClick={() => setIsPrivacyMode(!isPrivacyMode)}
-                                                        className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                                        title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
-                                                    >
-                                                        {isPrivacyMode ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                                                    </button>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setIncludeAvailableCredit(!includeAvailableCredit)}
-                                                        className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700 transition-all cursor-pointer shrink-0"
-                                                    >
-                                                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                                                            + Crédito disp.
-                                                        </span>
-                                                        <div
-                                                            className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out ${
-                                                                includeAvailableCredit ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-zinc-700'
-                                                            }`}
+                                                    <div className="flex items-center gap-2">
+                                                        <button 
+                                                            onClick={() => setIsPrivacyMode(!isPrivacyMode)}
+                                                            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                            title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
                                                         >
-                                                            <span
-                                                                className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                                    includeAvailableCredit ? 'translate-x-3' : 'translate-x-0'
+                                                            {isPrivacyMode ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                                        </button>
+                                                        
+                                                        <div className="h-4 w-px bg-gray-200 dark:bg-zinc-800 mx-1"></div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIncludeAvailableCredit(!includeAvailableCredit)}
+                                                            className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-all cursor-pointer shrink-0"
+                                                            title="Incluir crédito disponible en el balance total"
+                                                        >
+                                                            <div
+                                                                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                                                                    includeAvailableCredit ? 'bg-primary' : 'bg-gray-300 dark:bg-zinc-700'
                                                                 }`}
-                                                            />
-                                                        </div>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowCreditInfoModal(true)}
-                                                        className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                                        title="¿Qué hace este interruptor?"
-                                                    >
-                                                        <HelpCircle className="w-4 h-4" />
-                                                    </button>
+                                                            >
+                                                                <span
+                                                                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out scale-75 ${
+                                                                        includeAvailableCredit ? 'translate-x-3' : 'translate-x-0'
+                                                                    }`}
+                                                                />
+                                                            </div>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowCreditInfoModal(true)}
+                                                            className="p-1.5 text-gray-400 hover:text-primary rounded-full transition-colors"
+                                                            title="¿Qué hace este interruptor?"
+                                                        >
+                                                            <HelpCircle className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2209,8 +2327,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         setEditingBudgetItem(null);
                                                         setBudgetItemName('');
                                                         setBudgetItemAmount('');
-                                                        setBudgetItemIcon('🍔');
-                                                        setBudgetItemColor('#10b981');
+                                                        setBudgetItemIcon('🏷️');
+                                                        setBudgetItemColor('#3b82f6');
                                                         setBudgetItemCategoryId('');
                                                         setShowBudgetItemModal(true);
                                                     }}
@@ -2218,33 +2336,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 >
                                                     <PlusIcon className="w-4 h-4" />
                                                     Añadir Partida de Desglose
-                                                </button>
-
-                                                <button
-                                                    onClick={() => handleApplyBudgetTemplate('50_30_20')}
-                                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/80 text-xs font-semibold transition-colors"
-                                                    title="Crear desglose basado en la regla 50% Necesidades, 30% Deseos, 20% Ahorro"
-                                                >
-                                                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                                                    Plantilla 50/30/20
-                                                </button>
-
-                                                <button
-                                                    onClick={() => handleApplyBudgetTemplate('categories')}
-                                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/80 text-xs font-semibold transition-colors"
-                                                    title="Crear partidas para Alimentación, Vivienda, Transporte, Ahorro, Ocio y Salud"
-                                                >
-                                                    <FolderPlus className="w-3.5 h-3.5 text-blue-500" />
-                                                    Plantilla por Categorías
-                                                </button>
-
-                                                <button
-                                                    onClick={handleCopyPrevMonthBudget}
-                                                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/80 text-xs font-semibold transition-colors"
-                                                    title="Copiar todas las partidas del mes anterior"
-                                                >
-                                                    <Copy className="w-3.5 h-3.5 text-indigo-500" />
-                                                    Copiar Mes Anterior
                                                 </button>
                                             </div>
 
@@ -2285,24 +2376,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         <PieChart className="w-7 h-7" />
                                                     </div>
                                                     <div className="max-w-md mx-auto space-y-1">
-                                                        <h4 className="font-bold text-base text-gray-900 dark:text-white">Sin partidas desglosadas en {monthDisplayTitle}</h4>
+                                                        <h4 className="font-bold text-base text-gray-900 dark:text-white">Sin partidas en {monthDisplayTitle}</h4>
                                                         <p className="text-xs text-gray-500">
-                                                            Crea tus partidas personalizadas (ej. Comida, Ahorro, Ocio, Servicios) o usa una de las plantillas para empezar en un solo clic.
+                                                            Crea tus partidas personalizadas (ej. Comida, Ahorro, Ocio, Servicios) usando el botón de "Añadir Partida".
                                                         </p>
-                                                    </div>
-                                                    <div className="flex justify-center gap-2 pt-2">
-                                                        <button
-                                                            onClick={() => handleApplyBudgetTemplate('categories')}
-                                                            className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold shadow-sm hover:bg-primary-dark transition-all"
-                                                        >
-                                                            Cargar Plantilla Estándar
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleApplyBudgetTemplate('50_30_20')}
-                                                            className="px-4 py-2 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all"
-                                                        >
-                                                            Aplicar Regla 50/30/20
-                                                        </button>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -2341,8 +2418,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 <div className="flex items-start justify-between gap-3">
                                                                     <div className="flex items-center gap-3">
                                                                         <span
-                                                                            className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-xs"
-                                                                            style={{ backgroundColor: `${item.color || '#3b82f6'}20`, color: item.color || '#3b82f6' }}
+                                                                            className="w-8 h-8 rounded-full flex items-center justify-center text-lg"
+                                                                            style={{ backgroundColor: `${item.color || '#3b82f6'}15`, color: item.color || '#3b82f6' }}
                                                                         >
                                                                             {item.icon || '🏷️'}
                                                                         </span>
@@ -2355,26 +2432,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                             )}
                                                                         </div>
                                                                     </div>
-
-                                                                    <div className="flex items-center gap-1">
+                                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                         <button
                                                                             onClick={() => {
                                                                                 setEditingBudgetItem(item);
                                                                                 setBudgetItemName(item.name);
                                                                                 setBudgetItemAmount((item.allocated_cents / 100).toString());
-                                                                                setBudgetItemIcon(item.icon || '🍔');
-                                                                                setBudgetItemColor(item.color || '#10b981');
+                                                                                setBudgetItemIcon(item.icon || '🏷️');
+                                                                                setBudgetItemColor(item.color || '#3b82f6');
                                                                                 setBudgetItemCategoryId(item.category_id || '');
                                                                                 setShowBudgetItemModal(true);
                                                                             }}
-                                                                            className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                            className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl transition-colors"
                                                                             title="Editar partida"
                                                                         >
                                                                             <Pencil className="w-3.5 h-3.5" />
                                                                         </button>
                                                                         <button
                                                                             onClick={() => handleDeleteBudgetItem(item.id)}
-                                                                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-xl transition-colors"
                                                                             title="Eliminar partida"
                                                                         >
                                                                             <Trash2 className="w-3.5 h-3.5" />
@@ -2382,38 +2458,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Numbers Grid */}
-                                                                <div className="grid grid-cols-3 gap-2 text-center bg-gray-50 dark:bg-[#121212] p-2.5 rounded-2xl border border-gray-100 dark:border-zinc-800/80">
-                                                                    <div>
-                                                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Asignado</span>
-                                                                        <span className="font-bold text-xs text-gray-900 dark:text-white">{formatCurrency(item.allocated_cents)}</span>
+                                                                {/* Progress Bar & Simple Stats */}
+                                                                <div className="space-y-2 pt-2">
+                                                                    <div className="flex justify-between items-end text-xs">
+                                                                        <div>
+                                                                            <span className="text-gray-500 block mb-0.5">Gastado / Asignado</span>
+                                                                            <span className="font-semibold text-gray-900 dark:text-white">
+                                                                                {formatCurrency(spentCents)} <span className="text-gray-400 font-normal">/ {formatCurrency(item.allocated_cents)}</span>
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <span className="text-gray-500 block mb-0.5">Restante</span>
+                                                                            <span className={`font-semibold ${isExceeded ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
+                                                                                {isExceeded ? `-${formatCurrency(Math.abs(remainingCents))}` : formatCurrency(remainingCents)}
+                                                                            </span>
+                                                                        </div>
                                                                     </div>
-                                                                    <div>
-                                                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Gastado</span>
-                                                                        <span className={`font-bold text-xs ${isExceeded ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>{formatCurrency(spentCents)}</span>
-                                                                    </div>
-                                                                    <div>
-                                                                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Restante</span>
-                                                                        <span className={`font-bold text-xs ${isExceeded ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                                            {isExceeded ? `-${formatCurrency(Math.abs(remainingCents))}` : formatCurrency(remainingCents)}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Progress Bar */}
-                                                                <div className="space-y-1.5">
-                                                                    <div className="flex justify-between items-center text-[11px]">
-                                                                        <span className="text-gray-500 font-medium">Ejecución del desglose</span>
-                                                                        <span className={`font-bold ${isExceeded ? 'text-red-500' : itemPct > 80 ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                                            {isExceeded ? `¡Excedido ${itemPct}%!` : `${itemPct}%`}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="h-2.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                                    <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                                         <div
                                                                             className="h-full rounded-full transition-all duration-500"
                                                                             style={{
                                                                                 width: `${Math.min(100, itemPct)}%`,
-                                                                                backgroundColor: isExceeded ? '#ef4444' : itemPct > 85 ? '#f59e0b' : (item.color || '#10b981')
+                                                                                backgroundColor: isExceeded ? '#ef4444' : itemPct > 90 ? '#f59e0b' : (item.color || '#3b82f6')
                                                                             }}
                                                                         />
                                                                     </div>
@@ -4868,27 +4934,30 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                             <form onSubmit={handleSaveSecurityPin} className="space-y-4">
                                 <div className="space-y-1.5">
-                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nuevo PIN / Contraseña (mínimo 4 caracteres)</label>
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nuevo PIN (4 dígitos)</label>
                                     <input
                                         type="password"
                                         inputMode="numeric"
+                                        maxLength={4}
+                                        pattern="\d{4}"
                                         required
                                         autoFocus
                                         value={newPinValue}
-                                        onChange={e => setNewPinValue(e.target.value)}
+                                        onChange={e => setNewPinValue(e.target.value.replace(/\D/g, ''))}
                                         placeholder="Ej. 1234"
                                         className="w-full text-center text-xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
                                     />
                                 </div>
-
                                 <div className="space-y-1.5">
-                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Confirmar PIN / Contraseña</label>
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Confirmar PIN</label>
                                     <input
                                         type="password"
                                         inputMode="numeric"
+                                        maxLength={4}
+                                        pattern="\d{4}"
                                         required
                                         value={confirmPinValue}
-                                        onChange={e => setConfirmPinValue(e.target.value)}
+                                        onChange={e => setConfirmPinValue(e.target.value.replace(/\D/g, ''))}
                                         placeholder="Repite el PIN"
                                         className="w-full text-center text-xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
                                     />
@@ -4940,10 +5009,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <input
                                         type="password"
                                         inputMode="numeric"
+                                        maxLength={4}
+                                        pattern="\d{4}"
                                         autoFocus
                                         required
                                         value={deletePinInput}
-                                        onChange={e => setDeletePinInput(e.target.value)}
+                                        onChange={e => setDeletePinInput(e.target.value.replace(/\D/g, ''))}
                                         placeholder="••••"
                                         className="w-full text-center text-2xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
                                     />
@@ -4993,10 +5064,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <input
                                         type="password"
                                         inputMode="numeric"
+                                        maxLength={4}
+                                        pattern="\d{4}"
                                         autoFocus
                                         required
                                         value={disablePinInput}
-                                        onChange={e => setDisablePinInput(e.target.value)}
+                                        onChange={e => setDisablePinInput(e.target.value.replace(/\D/g, ''))}
                                         placeholder="••••"
                                         className="w-full text-center text-2xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
                                     />

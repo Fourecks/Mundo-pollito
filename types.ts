@@ -698,8 +698,10 @@ export interface FinanceSecurity {
     id: number;
     user_id: string;
     pin_hash: string;
-    require_on_enter: boolean;
-    require_on_delete: boolean;
+    require_on_enter?: boolean;
+    require_on_delete?: boolean;
+    require_pin_on_entry?: boolean;
+    require_pin_on_delete?: boolean;
     created_at?: string;
     updated_at?: string;
 }
