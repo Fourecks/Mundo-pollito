@@ -273,7 +273,17 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     const initialW = currentSizeRef.current ? currentSizeRef.current.width : Math.round(rect.width);
     const initialH = currentSizeRef.current ? currentSizeRef.current.height : Math.round(rect.height);
 
-    // Lock element inline styles before attaching listeners so transform changes smoothly
+    const initialPos = { x: initialX, y: initialY };
+    const initialSize = { width: initialW, height: initialH };
+
+    // Update state & refs immediately so isCustomPlaced is active
+    setPos(initialPos);
+    setSize(initialSize);
+    currentPosRef.current = initialPos;
+    currentSizeRef.current = initialSize;
+
+    // Lock element inline styles and cancel CSS keyframe animations
+    modalRef.current.style.animation = 'none';
     modalRef.current.style.left = `${initialX}px`;
     modalRef.current.style.top = `${initialY}px`;
     modalRef.current.style.width = `${initialW}px`;
@@ -405,7 +415,11 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
   const isCustomPlaced = pos !== null && size !== null;
 
   // Single persistent DOM root: NEVER unmounts or remounts children!
-  const computedStyle: React.CSSProperties = isCustomPlaced ? {
+  const computedStyle: React.CSSProperties = isInteracting ? {
+    position: 'fixed',
+    margin: 0,
+    zIndex: zIndex ?? 50,
+  } : (isCustomPlaced ? {
     position: 'fixed',
     left: `${pos.x}px`,
     top: `${pos.y}px`,
@@ -421,7 +435,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     transform: 'translate(-50%, -50%)',
     margin: 0,
     zIndex: zIndex ?? 50,
-  };
+  });
 
   return (
     <ModalWindowContext.Provider value={{ startInteraction }}>

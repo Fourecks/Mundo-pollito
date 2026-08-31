@@ -524,7 +524,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         }
 
         if (dataChanged) {
-            fetchFinanceData();
+            setAccounts([...accountsList]);
+            setInstallments([...instList]);
         }
     };
 
@@ -770,38 +771,54 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         document.body.removeChild(link);
     };
 
-    const currentMonthPrefix = new Date().toISOString().substring(0, 7);
-    const currentMonthName = new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+    const currentMonthPrefix = useMemo(() => new Date().toISOString().substring(0, 7), []);
+    const currentMonthName = useMemo(() => new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' }), []);
     
     // --- Computed Values ---
-    const liquidCashCents = accounts
-        .filter(a => a.type !== 'credit')
-        .reduce((acc, a) => acc + a.balance_cents, 0);
+    const { liquidCashCents, totalCreditCardDebtCents, totalAvailableCreditCents, netWorthCents, totalBalanceCents } = useMemo(() => {
+        const liquid = accounts
+            .filter(a => a.type !== 'credit')
+            .reduce((acc, a) => acc + a.balance_cents, 0);
 
-    const totalCreditCardDebtCents = accounts
-        .filter(a => a.type === 'credit')
-        .reduce((acc, a) => acc + Math.max(0, a.balance_cents), 0);
+        const creditDebt = accounts
+            .filter(a => a.type === 'credit')
+            .reduce((acc, a) => acc + Math.max(0, a.balance_cents), 0);
 
-    const totalAvailableCreditCents = accounts
-        .filter(a => a.type === 'credit')
-        .reduce((acc, a) => {
-            const limit = a.credit_limit_cents || 0;
-            const used = Math.max(0, a.balance_cents);
-            return acc + Math.max(0, limit - used);
-        }, 0);
+        const availableCredit = accounts
+            .filter(a => a.type === 'credit')
+            .reduce((acc, a) => {
+                const limit = a.credit_limit_cents || 0;
+                const used = Math.max(0, a.balance_cents);
+                return acc + Math.max(0, limit - used);
+            }, 0);
 
-    const netWorthCents = liquidCashCents - totalCreditCardDebtCents;
+        const net = liquid - creditDebt;
+        const total = includeAvailableCredit ? net + availableCredit : net;
 
-    const totalBalanceCents = includeAvailableCredit 
-        ? netWorthCents + totalAvailableCreditCents 
-        : netWorthCents;
-    
-    const thisMonthTransactions = transactions.filter(t => t.date.startsWith(currentMonthPrefix));
-    const incomeThisMonth = thisMonthTransactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount_cents, 0);
-    const expensesThisMonth = thisMonthTransactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.amount_cents, 0);
-    
-    const currentBudget = budgets.find(b => b.month === currentMonthPrefix);
-    const budgetProgress = currentBudget ? Math.min(100, Math.round((expensesThisMonth / currentBudget.total_amount_cents) * 100)) : 0;
+        return {
+            liquidCashCents: liquid,
+            totalCreditCardDebtCents: creditDebt,
+            totalAvailableCreditCents: availableCredit,
+            netWorthCents: net,
+            totalBalanceCents: total
+        };
+    }, [accounts, includeAvailableCredit]);
+
+    const { thisMonthTransactions, incomeThisMonth, expensesThisMonth, currentBudget, budgetProgress } = useMemo(() => {
+        const thisMonthTx = transactions.filter(t => t.date.startsWith(currentMonthPrefix));
+        const income = thisMonthTx.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount_cents, 0);
+        const expenses = thisMonthTx.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.amount_cents, 0);
+        const curBudget = budgets.find(b => b.month === currentMonthPrefix);
+        const progress = curBudget ? Math.min(100, Math.round((expenses / curBudget.total_amount_cents) * 100)) : 0;
+
+        return {
+            thisMonthTransactions: thisMonthTx,
+            incomeThisMonth: income,
+            expensesThisMonth: expenses,
+            currentBudget: curBudget,
+            budgetProgress: progress
+        };
+    }, [transactions, budgets, currentMonthPrefix]);
 
     // --- Handlers ---
     const resetTxForm = () => {
