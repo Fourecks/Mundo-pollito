@@ -7,9 +7,117 @@ import {
     LayoutDashboard, ListOrdered, PieChart, CalendarDays, Settings, Trash2, Wallet, 
     CreditCard, Landmark, CheckCircle2, ChevronDown, ChevronUp, Calendar, Banknote, ShoppingCart, BarChart3, Archive,
     ChevronLeft, ChevronRight, Download, AlertTriangle, Layers, ShieldCheck, Clock, Receipt, Pencil, HelpCircle,
-    Lock, Unlock, KeyRound, ShieldAlert, Sparkles, FolderPlus, DollarSign, RefreshCw, Copy, Check
+    Lock, Unlock, KeyRound, ShieldAlert, Sparkles, FolderPlus, DollarSign, RefreshCw, Copy, Check, Search
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+
+interface EmojiPickerPopoverProps {
+    value: string;
+    onChange: (emoji: string) => void;
+    label?: string;
+}
+
+const EMOJI_CATEGORIES = [
+    { name: 'Populares', emojis: ['🛒', '🏠', '💡', '🚗', '⛽', '🍿', '💊', '🩺', '🎓', '✈️', '👕', '📱', '💰', '💼', '💵', '📈', '🎁', '☕', '🐾', '🏋️', '🛠️', '🍕', '🍣', '🌮', '🥗', '🍔', '🚌', '🔑', '🛋️', '📺', '🎨', '🔥', '⚡', '💧', '🔒', '📜', '💳', '🏦', '🧾', '🏥', '🏖️', '🎬', '🎮', '🎧', '📦'] },
+    { name: 'Comida & Bebida', emojis: ['🍕', '🍔', '🍟', '🌭', '🍿', '🥓', '🍳', '🧇', '🥞', '🥐', '🍞', '🥖', '🥨', '🧀', '🥗', '🥪', '🌮', '🌯', '🥙', '🧆', '🥘', '🍲', '🥣', '🍣', '🍱', '🥟', '🍤', '🍙', '🍚', '🍜', '🍝', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭', '🍮', '🍯', '☕', '🍵', '🧃', '🥤', '🍺', '🍷', '🍸', '🍹'] },
+    { name: 'Hogar & Servicios', emojis: ['🏠', '🏡', '🏢', '🛏️', '🛋️', '🚿', '🛁', '🔑', '💡', '⚡', '💧', '🔥', '📶', '📱', '💻', '🖥️', '📺', '🛠️', '🔧', '🔨', '🧹', '🧺', '🧼', '📦', '🚪', '🪴', '🌱'] },
+    { name: 'Transporte & Autos', emojis: ['🚗', '🚘', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🛵', '🏍️', '🚲', '🛴', '⛽', '🚨', '🚥', '✈️', '🛫', '🛬', '🧳', '🛺', '⚓', '🚢', '🚆', '🚇', '🎫', '🗺️', '🏖️', '🏨'] },
+    { name: 'Salud & Cuidado', emojis: ['🩺', '💊', '🏥', '💉', '🩹', '🩸', '🧬', '🔬', '👓', '🕶️', '🧴', '🪒', '💇', '💅', '🧘', '🏋️', '🚴', '🏃', '👟', '⚽', '🏀', '🎾', '🥊', '🎯'] },
+    { name: 'Finanzas & Trabajo', emojis: ['💰', '💵', '💸', '💳', '🪙', '💎', '📈', '📉', '📊', '💼', '📁', '📄', '📜', '🧾', '🏛️', '🏦', '🏧', '⚖️', '🏷️', '✉️', '📦', '🎓', '📚', '✏️', '💻'] }
+];
+
+const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({ value, onChange, label }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const allEmojis = EMOJI_CATEGORIES.flatMap(c => c.emojis);
+    const filteredEmojis = search.trim() 
+        ? Array.from(new Set(allEmojis)) 
+        : null;
+
+    return (
+        <div className="relative inline-block" ref={containerRef}>
+            {label && <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">{label}</label>}
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-11 h-11 flex items-center justify-center text-xl bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all shadow-xs cursor-pointer group shrink-0"
+                title="Seleccionar emoji"
+            >
+                <span>{value || '🏷️'}</span>
+            </button>
+
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 6 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 6 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute left-0 top-full mt-2 z-50 w-72 bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-xl p-3 space-y-2 max-h-72 overflow-y-auto"
+                    >
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs">
+                            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Buscar emoji..."
+                                className="w-full bg-transparent outline-none text-xs text-gray-900 dark:text-white"
+                            />
+                        </div>
+
+                        {filteredEmojis ? (
+                            <div className="grid grid-cols-7 gap-1">
+                                {filteredEmojis.map(emoji => (
+                                    <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => { onChange(emoji); setIsOpen(false); setSearch(''); }}
+                                        className={`p-1.5 text-lg hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-all ${value === emoji ? 'bg-gray-100 dark:bg-zinc-800 scale-110' : ''}`}
+                                    >
+                                        {emoji}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {EMOJI_CATEGORIES.map(cat => (
+                                    <div key={cat.name} className="space-y-1">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block px-1">{cat.name}</span>
+                                        <div className="grid grid-cols-7 gap-1">
+                                            {cat.emojis.map(emoji => (
+                                                <button
+                                                    key={emoji}
+                                                    type="button"
+                                                    onClick={() => { onChange(emoji); setIsOpen(false); }}
+                                                    className={`p-1.5 text-lg hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-all ${value === emoji ? 'bg-gray-100 dark:bg-zinc-800 scale-110 font-bold' : ''}`}
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 interface FinanceModuleProps {
     onClose?: () => void;
@@ -225,9 +333,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     // --- Form States (Shopping) ---
     const [newListName, setNewListName] = useState('');
     const [newItemNames, setNewItemNames] = useState<{ [listId: number]: string }>({});
+    const [newItemQuantities, setNewItemQuantities] = useState<{ [listId: number]: string }>({});
+    const [newItemPrices, setNewItemPrices] = useState<{ [listId: number]: string }>({});
 
     useEffect(() => {
         fetchFinanceData();
+        return () => {
+            sessionStorage.removeItem('finance_unlocked_session');
+        };
     }, []);
 
     const autoProcessDueSubscriptions = async (recList: FinanceRecurringTransaction[], accountsList: any[]) => {
@@ -1731,8 +1844,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         const itemName = newItemNames[listId];
         if (!user || !itemName?.trim()) return;
 
-        await supabase.from('finance_shopping_items').insert([{ user_id: user.id, list_id: listId, name: itemName }]);
+        const qty = Math.max(1, parseInt(newItemQuantities[listId] || '1', 10) || 1);
+        const rawPrice = newItemPrices[listId] || '0';
+        const priceCents = Math.round(Math.max(0, parseFloat(rawPrice) || 0) * 100);
+
+        await supabase.from('finance_shopping_items').insert([{ 
+            user_id: user.id, 
+            list_id: listId, 
+            name: itemName.trim(),
+            quantity: qty,
+            price_cents: priceCents
+        }]);
+
         setNewItemNames(prev => ({ ...prev, [listId]: '' }));
+        setNewItemQuantities(prev => ({ ...prev, [listId]: '1' }));
+        setNewItemPrices(prev => ({ ...prev, [listId]: '' }));
+        fetchFinanceData();
+    };
+
+    const handleDeleteShoppingItem = async (itemId: number) => {
+        await supabase.from('finance_shopping_items').delete().eq('id', itemId);
         fetchFinanceData();
     };
 
@@ -3012,60 +3143,201 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             {activeTab === 'shopping' && (
                                 <div className="space-y-8">
                                     <div className="flex justify-between items-center">
-                                        <h2 className="text-xl font-bold">Listas de Compras</h2>
+                                        <div>
+                                            <h2 className="text-xl font-bold">Listas de Compras</h2>
+                                            <p className="text-xs text-gray-500">Planifica tus compras del super, calcula costos y controla tu gasto total</p>
+                                        </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="md:col-span-2 space-y-6">
                                             {shoppingLists.length === 0 ? (
-                                                <p className="text-gray-500">No hay listas de compras.</p>
+                                                <div className="p-8 text-center bg-gray-50 dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-2">
+                                                    <ShoppingCart className="w-8 h-8 mx-auto text-gray-400" />
+                                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No hay listas de compras.</p>
+                                                    <p className="text-xs text-gray-400">Crea tu primera lista de super a la derecha para organizar artículos, precios y cantidades.</p>
+                                                </div>
                                             ) : (
                                                 shoppingLists.map(list => {
                                                     const listItems = shoppingItems.filter(i => i.list_id === list.id);
                                                     const completed = listItems.filter(i => i.is_purchased).length;
-                                                    const total = listItems.length;
-                                                    const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+                                                    const totalItems = listItems.length;
+                                                    const progress = totalItems === 0 ? 0 : Math.round((completed / totalItems) * 100);
+
+                                                    const totalEstCents = listItems.reduce((acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0), 0);
+                                                    const totalBoughtCents = listItems.filter(i => i.is_purchased).reduce((acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0), 0);
+                                                    const totalPendingCents = Math.max(0, totalEstCents - totalBoughtCents);
                                                     
                                                     return (
-                                                        <div key={list.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm">
-                                                            <div className="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-zinc-800/50 pb-3">
-                                                                <h3 className="font-semibold text-lg">{list.name}</h3>
-                                                                <div className="flex items-center gap-4">
-                                                                    <span className="text-sm text-gray-500 font-medium">{completed} / {total}</span>
-                                                                    <button onClick={() => handleDeleteShoppingList(list.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                                        <div key={list.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-xs space-y-4">
+                                                            <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-zinc-800/80">
+                                                                <div>
+                                                                    <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                                                                        <span>🛒</span> {list.name}
+                                                                    </h3>
+                                                                    <p className="text-[11px] text-gray-400 mt-0.5">
+                                                                        {completed} de {totalItems} artículos listados
+                                                                    </p>
+                                                                </div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <button 
+                                                                        onClick={() => handleDeleteShoppingList(list.id)} 
+                                                                        className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
+                                                                        title="Eliminar lista completa"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
                                                                 </div>
                                                             </div>
-                                                            <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-4">
-                                                                <div className={`h-full rounded-full transition-all duration-300 ${progress === 100 ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${progress}%` }}></div>
-                                                            </div>
-                                                            
-                                                            <div className="space-y-2 mb-4">
-                                                                {listItems.map(item => (
-                                                                    <div key={item.id} className="flex items-center gap-3">
-                                                                        <button onClick={() => handleToggleShoppingItem(item)} className={`flex-shrink-0 w-5 h-5 rounded border ${item.is_purchased ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 dark:border-gray-600'} flex items-center justify-center`}>
-                                                                            {item.is_purchased && <CheckCircle2 className="w-3.5 h-3.5" />}
-                                                                        </button>
-                                                                        <span className={`text-sm ${item.is_purchased ? 'line-through text-gray-400' : ''}`}>{item.name}</span>
-                                                                    </div>
-                                                                ))}
+
+                                                            {/* Barra de progreso */}
+                                                            <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                                <div 
+                                                                    className={`h-full rounded-full transition-all duration-300 ${progress === 100 ? 'bg-emerald-500' : 'bg-gray-900 dark:bg-white'}`} 
+                                                                    style={{ width: `${progress}%` }}
+                                                                />
                                                             </div>
 
-                                                            <form onSubmit={(e) => handleAddShoppingItem(e, list.id)} className="flex gap-2">
-                                                                <input type="text" value={newItemNames[list.id] || ''} onChange={e => setNewItemNames(prev => ({ ...prev, [list.id]: e.target.value }))} placeholder="Añadir artículo..." className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-lg" />
-                                                                <button type="submit" className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-sm font-medium">Añadir</button>
+                                                            {/* Resumen financiero de la lista */}
+                                                            <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800/80 text-center">
+                                                                <div>
+                                                                    <span className="text-[10px] uppercase font-bold text-gray-400 block">Total Est.</span>
+                                                                    <span className="text-xs font-extrabold text-gray-900 dark:text-white">{formatCurrency(totalEstCents)}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-[10px] uppercase font-bold text-emerald-500 block">Comprado</span>
+                                                                    <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalBoughtCents)}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-[10px] uppercase font-bold text-amber-500 block">Por Comprar</span>
+                                                                    <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400">{formatCurrency(totalPendingCents)}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Lista de artículos */}
+                                                            <div className="space-y-1.5">
+                                                                {listItems.length === 0 ? (
+                                                                    <p className="text-xs text-gray-400 italic py-2 text-center">No hay artículos en esta lista aún.</p>
+                                                                ) : (
+                                                                    listItems.map(item => {
+                                                                        const itemTotalCents = (item.quantity || 1) * (item.price_cents || 0);
+                                                                        return (
+                                                                            <div key={item.id} className="flex items-center justify-between p-2.5 bg-gray-50/70 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800/80 group hover:border-gray-200 dark:hover:border-zinc-700 transition-all">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <button 
+                                                                                        type="button" 
+                                                                                        onClick={() => handleToggleShoppingItem(item)} 
+                                                                                        className={`w-5 h-5 rounded-lg border ${item.is_purchased ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 dark:border-zinc-700 hover:border-emerald-500'} flex items-center justify-center transition-all shrink-0`}
+                                                                                    >
+                                                                                        {item.is_purchased && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                                                                    </button>
+                                                                                    <div>
+                                                                                        <span className={`text-xs font-semibold ${item.is_purchased ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                                                                                            {item.name}
+                                                                                        </span>
+                                                                                        {((item.quantity && item.quantity > 1) || (item.price_cents && item.price_cents > 0)) && (
+                                                                                            <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                                                                                                {item.quantity && item.quantity > 1 && (
+                                                                                                    <span className="font-semibold text-gray-500 dark:text-gray-400">{item.quantity} ud.</span>
+                                                                                                )}
+                                                                                                {item.price_cents && item.price_cents > 0 && (
+                                                                                                    <span>c/u: {formatCurrency(item.price_cents)}</span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    {itemTotalCents > 0 && (
+                                                                                        <span className={`text-xs font-bold ${item.is_purchased ? 'text-emerald-600 dark:text-emerald-400 line-through opacity-75' : 'text-gray-900 dark:text-white'}`}>
+                                                                                            {formatCurrency(itemTotalCents)}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <button 
+                                                                                        type="button" 
+                                                                                        onClick={() => handleDeleteShoppingItem(item.id)} 
+                                                                                        className="text-gray-400 hover:text-red-500 p-1 opacity-60 group-hover:opacity-100 transition-opacity"
+                                                                                        title="Eliminar artículo"
+                                                                                    >
+                                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })
+                                                                )}
+                                                            </div>
+
+                                                            {/* Formulario rápido para añadir artículo con precio y cantidad */}
+                                                            <form onSubmit={(e) => handleAddShoppingItem(e, list.id)} className="pt-3 border-t border-gray-100 dark:border-zinc-800 space-y-2">
+                                                                <div className="flex flex-col sm:flex-row gap-2">
+                                                                    <input 
+                                                                        type="text" 
+                                                                        required
+                                                                        value={newItemNames[list.id] || ''} 
+                                                                        onChange={e => setNewItemNames(prev => ({ ...prev, [list.id]: e.target.value }))} 
+                                                                        placeholder="Ej. Leche 1L, Huevos 12pk" 
+                                                                        className="flex-1 px-3 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none text-gray-900 dark:text-white" 
+                                                                    />
+                                                                    <div className="flex gap-2">
+                                                                        <input 
+                                                                            type="number" 
+                                                                            min="1"
+                                                                            step="1"
+                                                                            value={newItemQuantities[list.id] || '1'} 
+                                                                            onChange={e => setNewItemQuantities(prev => ({ ...prev, [list.id]: e.target.value }))} 
+                                                                            placeholder="Cant." 
+                                                                            title="Cantidad de unidades"
+                                                                            className="w-16 px-2.5 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none text-center font-semibold text-gray-900 dark:text-white" 
+                                                                        />
+                                                                        <div className="relative w-24">
+                                                                            <span className="absolute left-2.5 top-2 text-xs text-gray-400 font-bold">$</span>
+                                                                            <input 
+                                                                                type="number" 
+                                                                                step="0.01"
+                                                                                min="0"
+                                                                                onKeyDown={blockNegativeKeys}
+                                                                                value={newItemPrices[list.id] || ''} 
+                                                                                onChange={e => setNewItemPrices(prev => ({ ...prev, [list.id]: e.target.value.replace(/-/g, '') }))} 
+                                                                                placeholder="Precio" 
+                                                                                title="Precio unitario estimado ($)"
+                                                                                className="w-full pl-6 pr-2 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none font-semibold text-gray-900 dark:text-white" 
+                                                                            />
+                                                                        </div>
+                                                                        <button 
+                                                                            type="submit" 
+                                                                            className="px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shrink-0 flex items-center gap-1"
+                                                                        >
+                                                                            <PlusIcon className="w-3.5 h-3.5" />
+                                                                            Añadir
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
                                                             </form>
                                                         </div>
-                                                    )
+                                                    );
                                                 })
                                             )}
                                         </div>
                                         <div>
                                             <form onSubmit={handleCreateShoppingList} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6">
-                                                <h3 className="font-semibold text-lg mb-4">Nueva Lista</h3>
-                                                <div>
-                                                    <label className="block text-sm font-medium mb-1">Nombre</label>
-                                                    <input required type="text" value={newListName} onChange={e => setNewListName(e.target.value)} placeholder="Ej. Supermercado" className="w-full px-4 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg" />
+                                                <h3 className="font-semibold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                                                    <ShoppingCart className="w-5 h-5 text-emerald-500" />
+                                                    Nueva Lista de Super
+                                                </h3>
+                                                <div className="space-y-1.5">
+                                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nombre de la lista</label>
+                                                    <input 
+                                                        required 
+                                                        type="text" 
+                                                        value={newListName} 
+                                                        onChange={e => setNewListName(e.target.value)} 
+                                                        placeholder="Ej. Supermercado Semanal, Farmacia..." 
+                                                        className="w-full px-3.5 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none" 
+                                                    />
                                                 </div>
-                                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-lg font-medium hover:opacity-90">Crear Lista</button>
+                                                <button type="submit" className="w-full bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white py-3 rounded-xl text-xs font-semibold transition-all">
+                                                    Crear Lista
+                                                </button>
                                             </form>
                                         </div>
                                     </div>
@@ -5077,10 +5349,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                 <div className="space-y-1.5">
                                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nombre de la Categoría</label>
-                                    <div className="flex gap-2">
-                                        <div className="w-12 h-11 flex items-center justify-center text-xl bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
-                                            {catEmoji || '🏷️'}
-                                        </div>
+                                    <div className="flex gap-2.5 items-center">
+                                        <EmojiPickerPopover value={catEmoji} onChange={setCatEmoji} />
                                         <input
                                             type="text"
                                             required
@@ -5088,7 +5358,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             value={catName}
                                             onChange={e => setCatName(e.target.value)}
                                             placeholder="Ej. Supermercado, Transporte, Salario..."
-                                            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                                            className="flex-1 px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium outline-none text-gray-900 dark:text-white"
                                         />
                                     </div>
                                 </div>
@@ -5115,22 +5385,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         </p>
                                     </div>
                                 )}
-
-                                <div className="space-y-1.5">
-                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Seleccionar Emoji</label>
-                                    <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5 p-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-2xl max-h-40 overflow-y-auto">
-                                        {['🛒', '🏠', '💡', '🚗', '⛽', '🍿', '💊', '🩺', '🎓', '✈️', '👕', '📱', '💰', '💼', '💵', '📈', '🎁', '☕', '🐾', '🏋️', '🛠️', '🍕', '🍣', '🌮', '🥗', '🍔', '🚌', '🔑', '🛋️', '📺', '🎨', '🔥', '⚡', '💧', '🔒', '📜'].map(emoji => (
-                                            <button
-                                                key={emoji}
-                                                type="button"
-                                                onClick={() => setCatEmoji(emoji)}
-                                                className={`p-2 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-xl transition-all text-base flex items-center justify-center ${catEmoji === emoji ? 'bg-white dark:bg-zinc-700 shadow-sm scale-110 font-bold' : ''}`}
-                                            >
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
 
                                 <div className="flex gap-2 pt-2">
                                     <button
@@ -5353,14 +5607,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             <form onSubmit={handleSaveBudgetItem} className="space-y-3.5">
                                 <div className="space-y-1">
                                     <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400">Nombre del Desglose</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            required
-                                            value={budgetItemIcon}
-                                            onChange={e => setBudgetItemIcon(e.target.value)}
-                                            className="w-11 text-center text-base py-1.5 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none"
-                                        />
+                                    <div className="flex gap-2 items-center">
+                                        <EmojiPickerPopover value={budgetItemIcon} onChange={setBudgetItemIcon} />
                                         <input
                                             type="text"
                                             required
@@ -5368,7 +5616,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             value={budgetItemName}
                                             onChange={e => setBudgetItemName(e.target.value)}
                                             placeholder="Ej. Supermercado, Alquiler, Salidas..."
-                                            className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs outline-none"
+                                            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white"
                                         />
                                     </div>
                                 </div>
@@ -5402,22 +5650,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             </option>
                                         ))}
                                     </select>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider">Icono Rápido</label>
-                                    <div className="flex flex-wrap gap-1 p-2 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl max-h-20 overflow-y-auto">
-                                        {['🛒', '🏠', '💡', '🚗', '⛽', '🍿', '💊', '🩺', '🎓', '✈️', '👕', '📱', '💰', '📈', '🎁', '☕', '🐾', '🏋️', '🛠️', '💼', '🧾'].map(emoji => (
-                                            <button
-                                                key={emoji}
-                                                type="button"
-                                                onClick={() => setBudgetItemIcon(emoji)}
-                                                className={`p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-lg text-sm transition-all ${budgetItemIcon === emoji ? 'bg-white dark:bg-zinc-700 shadow-xs' : ''}`}
-                                            >
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                    </div>
                                 </div>
 
                                 <div className="flex gap-2 pt-2">

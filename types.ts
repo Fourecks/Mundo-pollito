@@ -742,6 +742,8 @@ export interface FinanceShoppingItem {
     list_id: number;
     name: string;
     is_purchased: boolean;
+    quantity?: number;
+    price_cents?: number;
     estimated_amount_cents?: number;
     actual_amount_cents?: number;
     created_at: string;
