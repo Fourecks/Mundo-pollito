@@ -412,19 +412,17 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     </div>
   );
 
-  const isCustomPlaced = pos !== null && size !== null;
+  const activePos = pos ?? currentPosRef.current;
+  const activeSize = size ?? currentSizeRef.current;
+  const isCustomPlaced = activePos !== null && activeSize !== null;
 
   // Single persistent DOM root: NEVER unmounts or remounts children!
-  const computedStyle: React.CSSProperties = isInteracting ? {
+  const computedStyle: React.CSSProperties = (isCustomPlaced || isInteracting) && activePos && activeSize ? {
     position: 'fixed',
-    margin: 0,
-    zIndex: zIndex ?? 50,
-  } : (isCustomPlaced ? {
-    position: 'fixed',
-    left: `${pos.x}px`,
-    top: `${pos.y}px`,
-    width: `${size.width}px`,
-    height: `${size.height}px`,
+    left: `${activePos.x}px`,
+    top: `${activePos.y}px`,
+    width: `${activeSize.width}px`,
+    height: `${activeSize.height}px`,
     transform: 'none',
     margin: 0,
     zIndex: zIndex ?? 50,
@@ -435,7 +433,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     transform: 'translate(-50%, -50%)',
     margin: 0,
     zIndex: zIndex ?? 50,
-  });
+  };
 
   return (
     <ModalWindowContext.Provider value={{ startInteraction }}>
@@ -462,8 +460,8 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
         style={computedStyle}
         className={`
           ${!frameless ? `bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}` : 'relative flex flex-col'}
-          ${!isCustomPlaced ? (className || 'w-[92vw] max-w-3xl h-[80vh]') : ''}
-          ${!isCustomPlaced ? 'animate-deploy' : ''}
+          ${(!isCustomPlaced && !isInteracting) ? (className || 'w-[92vw] max-w-3xl h-[80vh]') : ''}
+          ${(!isCustomPlaced && !isInteracting) ? 'animate-deploy' : ''}
           pointer-events-auto select-auto
         `}
       >
