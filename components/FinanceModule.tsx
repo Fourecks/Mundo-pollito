@@ -141,6 +141,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     
     const [newCatName, setNewCatName] = useState('');
     const [newCatEmoji, setNewCatEmoji] = useState('💰');
+    const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
 
     // --- Form States (Budget) ---
     const [budgetAmount, setBudgetAmount] = useState('');
@@ -251,9 +252,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             // Update Account Balance
             const newBalance = (rec.type === 'INCOME') 
                 ? currAcc.balance_cents + txAmount 
-                : (currAcc.type === 'credit' ? currAcc.balance_cents + txAmount : currAcc.balance_cents - txAmount);
-            await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', targetAccId);
-            currAcc.balance_cents = newBalance;
+                : (currAcc.type === 'credit' ? currAcc.balance_cents + txAmount : Math.max(0, currAcc.balance_cents - txAmount));
+            await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBalance) }).eq('id', targetAccId);
+            currAcc.balance_cents = Math.max(0, newBalance);
 
             // Update Next Date
             const currentNext = new Date(rec.next_date || today);
@@ -519,7 +520,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     supabase.from('finance_debts').select('*').order('created_at', { ascending: false }),
                     supabase.from('finance_installments').select('*').order('created_at', { ascending: false }),
                     supabase.from('finance_budget_items').select('*').order('created_at'),
-                    supabase.from('finance_security').select('*').maybeSingle()
+                    supabase.from('finance_security').select('*').eq('user_id', user.id).maybeSingle()
                 ]);
                 if (listsRes.data) setShoppingLists(listsRes.data);
                 if (itemsRes.data) setShoppingItems(itemsRes.data);
@@ -537,16 +538,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                         }
                     }
                 } else if (cachedSec) {
-                    // Sync local cache back to database if missing
                     try {
                         const parsed = JSON.parse(cachedSec);
                         if (parsed && parsed.pin_hash) {
-                            await supabase.from('finance_security').insert([{
+                            setSecurityConfig(parsed);
+                            const { data: insertedSec } = await supabase.from('finance_security').upsert({
                                 user_id: user.id,
                                 pin_hash: parsed.pin_hash,
                                 require_on_enter: parsed.require_on_enter ?? false,
                                 require_on_delete: parsed.require_on_delete ?? true
-                            }]);
+                            }, { onConflict: 'user_id' }).select().maybeSingle();
+                            if (insertedSec) {
+                                setSecurityConfig(insertedSec);
+                                localStorage.setItem(localSecKey, JSON.stringify(insertedSec));
+                            }
                         }
                     } catch {
                         // silent
@@ -737,14 +742,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                     const newFromBal = fromAcc.type === 'credit'
                         ? fromAcc.balance_cents + totalDebitedCents
-                        : fromAcc.balance_cents - totalDebitedCents;
+                        : Math.max(0, fromAcc.balance_cents - totalDebitedCents);
 
                     const newToBal = toAcc.type === 'credit'
                         ? Math.max(0, toAcc.balance_cents - amountCents)
                         : toAcc.balance_cents + amountCents;
 
-                    await supabase.from('finance_accounts').update({ balance_cents: newFromBal }).eq('id', txAccountId);
-                    await supabase.from('finance_accounts').update({ balance_cents: newToBal }).eq('id', txToAccountId);
+                    await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newFromBal) }).eq('id', txAccountId);
+                    await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newToBal) }).eq('id', txToAccountId);
                 }
             } else {
                 const newTx = {
@@ -761,10 +766,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 
                 const currentBalance = selectedAcc.balance_cents;
                 const newBalance = (txType === 'EXPENSE') 
-                    ? (selectedAcc.type === 'credit' ? currentBalance + amountCents : currentBalance - amountCents)
+                    ? (selectedAcc.type === 'credit' ? currentBalance + amountCents : Math.max(0, currentBalance - amountCents))
                     : (selectedAcc.type === 'credit' ? Math.max(0, currentBalance - amountCents) : currentBalance + amountCents);
 
-                await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', txAccountId);
+                await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBalance) }).eq('id', txAccountId);
             }
 
             fetchFinanceData();
@@ -858,7 +863,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         }
 
         await supabase.from('finance_accounts').update({
-            balance_cents: fromAcc.balance_cents - totalDebitedCents
+            balance_cents: Math.max(0, fromAcc.balance_cents - totalDebitedCents)
         }).eq('id', fromAcc.id);
 
         const newCardBalance = Math.max(0, cardAcc.balance_cents - amountCents);
@@ -1010,9 +1015,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
         const newBal = targetAcc.type === 'credit'
             ? targetAcc.balance_cents + inst.installment_amount_cents
-            : targetAcc.balance_cents - inst.installment_amount_cents;
+            : Math.max(0, targetAcc.balance_cents - inst.installment_amount_cents);
 
-        await supabase.from('finance_accounts').update({ balance_cents: newBal }).eq('id', targetAcc.id);
+        await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBal) }).eq('id', targetAcc.id);
         fetchFinanceData();
     };
 
@@ -1029,6 +1034,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         let newBalance = currentBalance;
         if (type === 'EXPENSE' || type === 'TRANSFER_OUT') newBalance += amount_cents;
         if (type === 'INCOME' || type === 'TRANSFER_IN') newBalance -= amount_cents;
+        newBalance = Math.max(0, newBalance);
 
         await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', account_id);
         await supabase.from('finance_transactions').delete().eq('id', id);
@@ -1159,10 +1165,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const handleCreateCategory = async (e: React.FormEvent) => {
         e.preventDefault();
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user || !newCatName.trim()) return;
 
-        await supabase.from('finance_categories').insert([{ user_id: user.id, name: newCatName, emoji: newCatEmoji }]);
-        setNewCatName(''); setNewCatEmoji('💰');
+        await supabase.from('finance_categories').insert([{ user_id: user.id, name: newCatName.trim(), emoji: newCatEmoji || '💰' }]);
+        setNewCatName(''); 
+        setNewCatEmoji('💰');
+        setShowCreateCategoryModal(false);
         fetchFinanceData(true);
     };
 
@@ -1266,8 +1274,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         if (!txError) {
             const newBal = targetAccount.type === 'credit'
                 ? targetAccount.balance_cents + amountCents
-                : targetAccount.balance_cents - amountCents;
-            await supabase.from('finance_accounts').update({ balance_cents: newBal }).eq('id', targetAccount.id);
+                : Math.max(0, targetAccount.balance_cents - amountCents);
+            await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBal) }).eq('id', targetAccount.id);
 
             setQuickExpenseBudgetItem(null);
             setTxAmount('');
@@ -1300,51 +1308,42 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         const pinHash = await hashPin(cleanPin);
         const localKey = `finance_sec_${user.id}`;
         
-        try {
-            if (securityConfig?.id && securityConfig.id > 1000000000) {
-                 // Hacky fix if someone has Date.now() saved as id
-                 const { data: inserted } = await supabase.from('finance_security').insert([{
-                    user_id: user.id,
-                    pin_hash: pinHash,
-                    require_on_enter: securityConfig.require_on_enter,
-                    require_on_delete: securityConfig.require_on_delete
-                }]).select().maybeSingle();
-                if (inserted) {
-                    setSecurityConfig(inserted);
-                    localStorage.setItem(localKey, JSON.stringify(inserted));
-                }
-            } else if (securityConfig?.id) {
-                await supabase.from('finance_security').update({
-                    pin_hash: pinHash,
-                    updated_at: new Date().toISOString()
-                }).eq('id', securityConfig.id);
-                
-                const updatedConfig = { ...securityConfig, pin_hash: pinHash, updated_at: new Date().toISOString() };
-                setSecurityConfig(updatedConfig);
-                localStorage.setItem(localKey, JSON.stringify(updatedConfig));
-            } else {
-                const { data: inserted } = await supabase.from('finance_security').insert([{
-                    user_id: user.id,
-                    pin_hash: pinHash,
-                    require_on_enter: false,
-                    require_on_delete: true
-                }]).select().maybeSingle();
+        const newSecRecord = {
+            user_id: user.id,
+            pin_hash: pinHash,
+            require_on_enter: securityConfig?.require_on_enter ?? false,
+            require_on_delete: securityConfig?.require_on_delete ?? true,
+            updated_at: new Date().toISOString()
+        };
 
-                if (inserted) {
-                    setSecurityConfig(inserted);
-                    localStorage.setItem(localKey, JSON.stringify(inserted));
+        try {
+            const { data: upserted, error: upsertErr } = await supabase
+                .from('finance_security')
+                .upsert(newSecRecord, { onConflict: 'user_id' })
+                .select()
+                .maybeSingle();
+
+            if (upsertErr) {
+                console.error('Supabase upsert error:', upsertErr);
+                // Fallback direct update or insert
+                if (securityConfig?.id) {
+                    await supabase.from('finance_security').update({
+                        pin_hash: pinHash,
+                        updated_at: new Date().toISOString()
+                    }).eq('id', securityConfig.id);
+                } else {
+                    await supabase.from('finance_security').insert([newSecRecord]);
                 }
             }
+
+            const finalConfig = upserted || { ...(securityConfig || {}), ...newSecRecord };
+            setSecurityConfig(finalConfig);
+            localStorage.setItem(localKey, JSON.stringify(finalConfig));
         } catch (err) {
             console.error('Error saving PIN to Supabase:', err);
-            // Fallback for offline/errors
             const fallbackConfig = {
                 id: securityConfig?.id || 0,
-                user_id: user.id,
-                pin_hash: pinHash,
-                require_on_enter: securityConfig?.require_on_enter ?? false,
-                require_on_delete: securityConfig?.require_on_delete ?? true,
-                updated_at: new Date().toISOString()
+                ...newSecRecord
             };
             setSecurityConfig(fallbackConfig);
             localStorage.setItem(localKey, JSON.stringify(fallbackConfig));
@@ -1353,34 +1352,44 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         setShowSetPinModal(false);
         setNewPinValue('');
         setConfirmPinValue('');
-        fetchFinanceData(true);
+        await fetchFinanceData(true);
     };
 
     const handleToggleRequireOnEnter = async (val: boolean) => {
-        if (!securityConfig) return;
         const { data: { user } } = await supabase.auth.getUser();
-        const updated = { ...securityConfig, require_on_enter: val, require_pin_on_entry: val };
-        setSecurityConfig(updated);
-        if (user) {
-            localStorage.setItem(`finance_sec_${user.id}`, JSON.stringify(updated));
-        }
+        if (!user) return;
+        const updated = { ...(securityConfig || { pin_hash: '' }), user_id: user.id, require_on_enter: val, require_pin_on_entry: val, updated_at: new Date().toISOString() };
+        setSecurityConfig(updated as any);
+        localStorage.setItem(`finance_sec_${user.id}`, JSON.stringify(updated));
+        
         try {
-            await supabase.from('finance_security').update({ require_on_enter: val }).eq('id', securityConfig.id);
+            await supabase.from('finance_security').upsert({
+                user_id: user.id,
+                pin_hash: updated.pin_hash,
+                require_on_enter: val,
+                require_on_delete: updated.require_on_delete ?? true,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
         } catch {
             // silent
         }
     };
 
     const handleToggleRequireOnDelete = async (val: boolean) => {
-        if (!securityConfig) return;
         const { data: { user } } = await supabase.auth.getUser();
-        const updated = { ...securityConfig, require_on_delete: val, require_pin_on_delete: val };
-        setSecurityConfig(updated);
-        if (user) {
-            localStorage.setItem(`finance_sec_${user.id}`, JSON.stringify(updated));
-        }
+        if (!user) return;
+        const updated = { ...(securityConfig || { pin_hash: '' }), user_id: user.id, require_on_delete: val, require_pin_on_delete: val, updated_at: new Date().toISOString() };
+        setSecurityConfig(updated as any);
+        localStorage.setItem(`finance_sec_${user.id}`, JSON.stringify(updated));
+
         try {
-            await supabase.from('finance_security').update({ require_on_delete: val }).eq('id', securityConfig.id);
+            await supabase.from('finance_security').upsert({
+                user_id: user.id,
+                pin_hash: updated.pin_hash,
+                require_on_enter: updated.require_on_enter ?? false,
+                require_on_delete: val,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
         } catch {
             // silent
         }
@@ -1405,11 +1414,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             localStorage.removeItem(`finance_sec_${user.id}`);
-        }
-        try {
-            await supabase.from('finance_security').delete().eq('id', securityConfig.id);
-        } catch {
-            // silent
+            try {
+                await supabase.from('finance_security').delete().eq('user_id', user.id);
+            } catch {
+                if (securityConfig.id) {
+                    await supabase.from('finance_security').delete().eq('id', securityConfig.id);
+                }
+            }
         }
 
         setSecurityConfig(null);
@@ -1421,7 +1432,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const handleUnlockModule = async (e: React.FormEvent) => {
         e.preventDefault();
         setLockPinError('');
-        if (!securityConfig) {
+        if (!securityConfig || !securityConfig.pin_hash) {
             setIsUnlocked(true);
             return;
         }
@@ -1481,8 +1492,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         if (currAcc) {
             const newBalance = (rec.type === 'INCOME') 
                 ? currAcc.balance_cents + rec.amount_cents 
-                : currAcc.balance_cents - rec.amount_cents;
-            await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', targetAccId);
+                : Math.max(0, currAcc.balance_cents - rec.amount_cents);
+            await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBalance) }).eq('id', targetAccId);
         }
 
         const currentNext = new Date(rec.next_date || today);
@@ -1580,7 +1591,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         }]);
 
         await supabase.from('finance_accounts').update({
-            balance_cents: targetAcc.balance_cents - amountCents
+            balance_cents: Math.max(0, targetAcc.balance_cents - amountCents)
         }).eq('id', targetAcc.id);
 
         setContributeAmount('');
@@ -1658,7 +1669,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 const isOwe = debt.type === 'OWE';
                 const txType = isOwe ? 'EXPENSE' : 'INCOME';
                 const newBalance = isOwe 
-                    ? targetAcc.balance_cents - amountCents 
+                    ? Math.max(0, targetAcc.balance_cents - amountCents)
                     : targetAcc.balance_cents + amountCents;
 
                 await supabase.from('finance_transactions').insert([{
@@ -1670,7 +1681,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     description: `${isOwe ? 'Abono a deuda' : 'Cobro de préstamo'}: ${debt.name}`
                 }]);
 
-                await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', targetAcc.id);
+                await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBalance) }).eq('id', targetAcc.id);
             }
         }
 
@@ -1797,18 +1808,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     {isLoading ? (
                         <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div></div>
                     ) : !isUnlocked ? (
-                        <div className="min-h-[70vh] flex items-center justify-center p-4">
+                        <div className="min-h-[60vh] flex items-center justify-center p-4">
                             <motion.div 
-                                initial={{ opacity: 0, scale: 0.95, y: 12 }} 
+                                initial={{ opacity: 0, scale: 0.97, y: 8 }} 
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                                className="w-full max-w-sm bg-white dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6"
+                                className="w-full max-w-sm bg-white dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-sm text-center space-y-6"
                             >
-                                <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/60 rounded-2xl flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 shadow-inner">
-                                    <Lock className="w-8 h-8" />
+                                <div className="w-12 h-12 bg-gray-100 dark:bg-zinc-800 rounded-xl flex items-center justify-center mx-auto text-gray-800 dark:text-gray-200">
+                                    <Lock className="w-5 h-5" />
                                 </div>
-                                <div className="space-y-1.5">
-                                    <h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">Módulo Protegido</h2>
-                                    <p className="text-xs text-gray-500">Ingresa tu contraseña o PIN de seguridad para acceder a tus finanzas.</p>
+                                <div className="space-y-1">
+                                    <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">Módulo Protegido</h2>
+                                    <p className="text-xs text-gray-500">Ingresa tu PIN de 4 dígitos para acceder a tus finanzas.</p>
                                 </div>
 
                                 <form onSubmit={handleUnlockModule} className="space-y-4">
@@ -1823,7 +1834,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             value={lockPinInput}
                                             onChange={e => setLockPinInput(e.target.value.replace(/\D/g, ''))}
                                             placeholder="••••"
-                                            className="w-full text-center text-2xl tracking-widest font-mono py-3 px-4 bg-gray-50 dark:bg-[#181818] border border-gray-200 dark:border-zinc-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            className="w-full text-center text-2xl tracking-widest font-mono py-2.5 px-4 bg-gray-50 dark:bg-[#181818] border border-gray-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-gray-100"
                                         />
                                         {lockPinError && (
                                             <p className="text-xs font-semibold text-red-500 dark:text-red-400 flex items-center justify-center gap-1">
@@ -1835,7 +1846,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                     <button
                                         type="submit"
-                                        className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition-all active:scale-[0.98]"
+                                        className="w-full py-2.5 px-4 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 font-semibold text-sm rounded-xl transition-all"
                                     >
                                         Desbloquear Finanzas
                                     </button>
@@ -2168,14 +2179,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-gray-500 mt-0.5">Planifica y desglosa tus límites de gasto por partidas y categorías</p>
+                                                <p className="text-xs text-gray-500 mt-0.5">Control y desglose de límites de gasto mensuales</p>
                                             </div>
 
                                             {/* Month Selector Controls */}
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-[#121212] p-1 rounded-xl border border-gray-200 dark:border-zinc-800">
                                                 <button
                                                     onClick={handlePrevMonth}
-                                                    className="p-2.5 rounded-xl border border-gray-200 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/80 transition-colors text-gray-700 dark:text-gray-300"
+                                                    className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
                                                     title="Mes anterior"
                                                 >
                                                     <ChevronLeft className="w-4 h-4" />
@@ -2184,163 +2195,109 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     type="month"
                                                     value={selectedBudgetMonth}
                                                     onChange={e => e.target.value && setSelectedBudgetMonth(e.target.value)}
-                                                    className="px-3 py-2 text-xs font-semibold bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-gray-900 dark:text-white outline-none cursor-pointer"
+                                                    className="px-2 py-1 text-xs font-medium bg-transparent text-gray-900 dark:text-white outline-none cursor-pointer"
                                                 />
                                                 <button
                                                     onClick={handleNextMonth}
-                                                    className="p-2.5 rounded-xl border border-gray-200 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/80 transition-colors text-gray-700 dark:text-gray-300"
+                                                    className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
                                                     title="Mes siguiente"
                                                 >
                                                     <ChevronRight className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => setSelectedBudgetMonth(currentMonthPrefix)}
-                                                    className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary transition-colors border border-dashed border-gray-200 dark:border-zinc-800 rounded-xl"
+                                                    className="px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-white dark:hover:bg-zinc-800 transition-colors"
                                                 >
                                                     Hoy
                                                 </button>
                                             </div>
                                         </div>
 
-                                        {/* Top KPI Cards (Bento style) */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                            {/* Presupuesto Total Objetivo */}
-                                            <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Presupuesto Global</span>
-                                                        <p className="text-2xl font-black mt-1 text-gray-900 dark:text-white">
-                                                            {formatCurrency(totalEffectiveBudget)}
-                                                        </p>
-                                                    </div>
-                                                    <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-2xl">
-                                                        <PieChart className="w-4 h-4" />
-                                                    </div>
-                                                </div>
-                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-                                                    <span className="text-gray-500">Meta del mes</span>
-                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">
-                                                        {currentSelectedMonthBudget ? 'Fijado' : 'Suma de partidas'}
-                                                    </span>
-                                                </div>
+                                        {/* Summary Metrics */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-1">
+                                                <span className="text-[11px] font-medium text-gray-500">Presupuesto Global</span>
+                                                <p className="text-xl font-bold text-gray-900 dark:text-white">
+                                                    {formatCurrency(totalEffectiveBudget)}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400">
+                                                    {currentSelectedMonthBudget ? 'Meta fija' : 'Suma de partidas'}
+                                                </p>
                                             </div>
 
-                                            {/* Total Desglosado / Asignado */}
-                                            <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Desglosado</span>
-                                                        <p className="text-2xl font-black mt-1 text-indigo-600 dark:text-indigo-400">
-                                                            {formatCurrency(totalAllocatedInItems)}
-                                                        </p>
-                                                    </div>
-                                                    <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-2xl">
-                                                        <Layers className="w-4 h-4" />
-                                                    </div>
-                                                </div>
-                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-                                                    <span className="text-gray-500">{monthBudgetItems.length} partidas creadas</span>
-                                                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                                                        {totalEffectiveBudget > 0 ? `${Math.round((totalAllocatedInItems / totalEffectiveBudget) * 100)}%` : '0%'}
-                                                    </span>
-                                                </div>
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-1">
+                                                <span className="text-[11px] font-medium text-gray-500">Total Asignado</span>
+                                                <p className="text-xl font-bold text-gray-900 dark:text-white">
+                                                    {formatCurrency(totalAllocatedInItems)}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400">
+                                                    {monthBudgetItems.length} {monthBudgetItems.length === 1 ? 'partida' : 'partidas'}
+                                                </p>
                                             </div>
 
-                                            {/* Gastado Real */}
-                                            <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Gasto Real Mes</span>
-                                                        <p className={`text-2xl font-black mt-1 ${monthExpenses > totalEffectiveBudget && totalEffectiveBudget > 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
-                                                            {formatCurrency(monthExpenses)}
-                                                        </p>
-                                                    </div>
-                                                    <div className={`p-2.5 rounded-2xl ${monthExpenses > totalEffectiveBudget && totalEffectiveBudget > 0 ? 'bg-red-50 dark:bg-red-950/40 text-red-500' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'}`}>
-                                                        <TrendingDown className="w-4 h-4" />
-                                                    </div>
-                                                </div>
-                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-                                                    <span className="text-gray-500">Ejecución</span>
-                                                    <span className={`font-semibold ${overallPct > 90 ? 'text-red-500' : overallPct > 75 ? 'text-amber-500' : 'text-emerald-600'}`}>
-                                                        {overallPct}% gastado
-                                                    </span>
-                                                </div>
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-1">
+                                                <span className="text-[11px] font-medium text-gray-500">Gasto Real Mes</span>
+                                                <p className={`text-xl font-bold ${monthExpenses > totalEffectiveBudget && totalEffectiveBudget > 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
+                                                    {formatCurrency(monthExpenses)}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400">
+                                                    {overallPct}% ejecutado
+                                                </p>
                                             </div>
 
-                                            {/* Disponible / Restante */}
-                                            <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                                                            {currentSelectedMonthBudget ? (isOverAllocated ? 'Sobre-asignado' : 'Por Asignar') : 'Saldo Disponible'}
-                                                        </span>
-                                                        <p className={`text-2xl font-black mt-1 ${isOverAllocated ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                            {currentSelectedMonthBudget 
-                                                                ? (isOverAllocated ? `-${formatCurrency(overAllocatedAmount)}` : formatCurrency(unallocatedBudget))
-                                                                : formatCurrency(Math.max(0, totalEffectiveBudget - monthExpenses))
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                    <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-2xl">
-                                                        <ShieldCheck className="w-4 h-4" />
-                                                    </div>
-                                                </div>
-                                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800/80 flex items-center justify-between text-xs">
-                                                    <span className="text-gray-500">Estado</span>
-                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                                                        {isOverAllocated ? 'Excede límite global' : unallocatedBudget === 0 ? '100% asignado' : 'Margen libre'}
-                                                    </span>
-                                                </div>
+                                            <div className="bg-white dark:bg-[#0a0a0a] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-1">
+                                                <span className="text-[11px] font-medium text-gray-500">Disponible</span>
+                                                <p className={`text-xl font-bold ${isOverAllocated ? 'text-amber-500' : 'text-gray-900 dark:text-white'}`}>
+                                                    {currentSelectedMonthBudget 
+                                                        ? (isOverAllocated ? `-${formatCurrency(overAllocatedAmount)}` : formatCurrency(unallocatedBudget))
+                                                        : formatCurrency(Math.max(0, totalEffectiveBudget - monthExpenses))
+                                                    }
+                                                </p>
+                                                <p className="text-[10px] text-gray-400">
+                                                    {isOverAllocated ? 'Excede meta' : 'Margen restante'}
+                                                </p>
                                             </div>
                                         </div>
 
-                                        {/* Global Budget Progress Bar */}
-                                        <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
-                                            <div className="flex justify-between items-center text-sm font-semibold">
-                                                <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                                    <BarChart3 className="w-4 h-4 text-primary" />
-                                                    Consumo Global del Presupuesto
+                                        {/* Global Budget Progress */}
+                                        <div className="bg-white dark:bg-[#0a0a0a] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-2.5">
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="font-medium text-gray-700 dark:text-gray-300">
+                                                    Ejecución del Presupuesto
                                                 </span>
-                                                <span className={`${overallPct > 100 ? 'text-red-500' : overallPct > 80 ? 'text-amber-500' : 'text-primary'}`}>
+                                                <span className="font-medium text-gray-500">
                                                     {formatCurrency(monthExpenses)} de {formatCurrency(totalEffectiveBudget)} ({overallPct}%)
                                                 </span>
                                             </div>
-                                            <div className="h-3.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden flex">
+                                            <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                 <div
-                                                    className={`h-full rounded-full transition-all duration-500 ${
-                                                        overallPct > 100 ? 'bg-red-500' : overallPct > 85 ? 'bg-amber-500' : 'bg-primary'
+                                                    className={`h-full rounded-full transition-all duration-300 ${
+                                                        overallPct > 100 ? 'bg-red-500' : 'bg-gray-900 dark:bg-gray-100'
                                                     }`}
                                                     style={{ width: `${Math.min(100, overallPct)}%` }}
                                                 />
                                             </div>
-                                            <div className="flex justify-between text-xs text-gray-500">
-                                                <span>Disponible restante este mes: <strong>{formatCurrency(Math.max(0, totalEffectiveBudget - monthExpenses))}</strong></span>
-                                                <span>{totalEffectiveBudget > 0 && monthExpenses > totalEffectiveBudget ? `¡Presupuesto superado por ${formatCurrency(monthExpenses - totalEffectiveBudget)}!` : ''}</span>
-                                            </div>
                                         </div>
 
-                                        {/* Action Bar & Templates */}
-                                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingBudgetItem(null);
-                                                        setBudgetItemName('');
-                                                        setBudgetItemAmount('');
-                                                        setBudgetItemIcon('🏷️');
-                                                        setBudgetItemColor('#3b82f6');
-                                                        setBudgetItemCategoryId('');
-                                                        setShowBudgetItemModal(true);
-                                                    }}
-                                                    className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-2xl font-semibold text-xs shadow-sm hover:bg-primary-dark transition-all"
-                                                >
-                                                    <PlusIcon className="w-4 h-4" />
-                                                    Añadir Partida de Desglose
-                                                </button>
-                                            </div>
+                                        {/* Actions Bar */}
+                                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                                            <button
+                                                onClick={() => {
+                                                    setEditingBudgetItem(null);
+                                                    setBudgetItemName('');
+                                                    setBudgetItemAmount('');
+                                                    setBudgetItemIcon('🏷️');
+                                                    setBudgetItemColor('#3b82f6');
+                                                    setBudgetItemCategoryId('');
+                                                    setShowBudgetItemModal(true);
+                                                }}
+                                                className="flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2 rounded-xl font-medium text-xs shadow-sm transition-all"
+                                            >
+                                                <PlusIcon className="w-3.5 h-3.5" />
+                                                Añadir Partida
+                                            </button>
 
-                                            {/* Set/Edit Global Budget Total Form */}
-                                            <form onSubmit={handleSetBudget} className="flex items-center gap-2 w-full sm:w-auto">
+                                            <form onSubmit={handleSetBudget} className="flex items-center gap-2">
                                                 <input
                                                     type="number"
                                                     step="0.01"
@@ -2349,50 +2306,42 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     value={budgetAmount}
                                                     onChange={e => setBudgetAmount(e.target.value.replace(/-/g, ''))}
                                                     placeholder={currentSelectedMonthBudget ? (currentSelectedMonthBudget.total_amount_cents / 100).toFixed(2) : "Meta global..."}
-                                                    className="w-32 px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold outline-none focus:ring-1 focus:ring-primary"
+                                                    className="w-32 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-gray-100"
                                                 />
                                                 <button
                                                     type="submit"
-                                                    className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
                                                 >
-                                                    Fijar Meta Global
+                                                    Fijar Meta
                                                 </button>
                                             </form>
                                         </div>
 
-                                        {/* Breakdown List / Cards */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                                    <Layers className="w-4 h-4 text-primary" />
-                                                    Desglose de Partidas ({monthBudgetItems.length})
+                                        {/* Breakdown List */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2">
+                                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                                                    Partidas ({monthBudgetItems.length})
                                                 </h3>
-                                                <span className="text-xs text-gray-400">Total presupuestado: {formatCurrency(totalAllocatedInItems)}</span>
+                                                <span className="text-xs text-gray-400">Total: {formatCurrency(totalAllocatedInItems)}</span>
                                             </div>
 
                                             {monthBudgetItems.length === 0 ? (
-                                                <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-300 dark:border-zinc-800 rounded-3xl p-12 text-center space-y-4">
-                                                    <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto">
-                                                        <PieChart className="w-7 h-7" />
-                                                    </div>
-                                                    <div className="max-w-md mx-auto space-y-1">
-                                                        <h4 className="font-bold text-base text-gray-900 dark:text-white">Sin partidas en {monthDisplayTitle}</h4>
-                                                        <p className="text-xs text-gray-500">
-                                                            Crea tus partidas personalizadas (ej. Comida, Ahorro, Ocio, Servicios) usando el botón de "Añadir Partida".
-                                                        </p>
-                                                    </div>
+                                                <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-2">
+                                                    <p className="font-medium text-sm text-gray-900 dark:text-white">Sin partidas en {monthDisplayTitle}</p>
+                                                    <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                                                        Usa el botón "Añadir Partida" para crear categorías de gasto como Comida, Renta, Servicios o Transporte.
+                                                    </p>
                                                 </div>
                                             ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                     {monthBudgetItems.map(item => {
-                                                        // Calculate spent for this item
                                                         let spentCents = 0;
                                                         if (item.category_id) {
                                                             spentCents = monthTxs
                                                                 .filter(t => t.type === 'EXPENSE' && t.category_id === item.category_id)
                                                                 .reduce((acc, t) => acc + t.amount_cents, 0);
                                                         } else {
-                                                            // Match by description keyword or category name
                                                             const itemLower = item.name.toLowerCase();
                                                             spentCents = monthTxs
                                                                 .filter(t => {
@@ -2412,22 +2361,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         return (
                                                             <div
                                                                 key={item.id}
-                                                                className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm space-y-4 hover:border-gray-300 dark:hover:border-zinc-700 transition-all relative overflow-hidden group"
+                                                                className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm space-y-3 hover:border-gray-300 dark:hover:border-zinc-700 transition-all group"
                                                             >
-                                                                {/* Top Badge & Header */}
-                                                                <div className="flex items-start justify-between gap-3">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <span
-                                                                            className="w-8 h-8 rounded-full flex items-center justify-center text-lg"
-                                                                            style={{ backgroundColor: `${item.color || '#3b82f6'}15`, color: item.color || '#3b82f6' }}
-                                                                        >
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <span className="text-base leading-none">
                                                                             {item.icon || '🏷️'}
                                                                         </span>
                                                                         <div>
-                                                                            <h4 className="font-bold text-sm text-gray-900 dark:text-white leading-tight">{item.name}</h4>
+                                                                            <h4 className="font-semibold text-xs text-gray-900 dark:text-white leading-tight">{item.name}</h4>
                                                                             {linkedCat && (
-                                                                                <span className="text-[10px] text-gray-400 font-medium">
-                                                                                    Vinculado: {linkedCat.emoji} {linkedCat.name}
+                                                                                <span className="text-[10px] text-gray-400">
+                                                                                    {linkedCat.emoji} {linkedCat.name}
                                                                                 </span>
                                                                             )}
                                                                         </div>
@@ -2443,44 +2388,36 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                                 setBudgetItemCategoryId(item.category_id || '');
                                                                                 setShowBudgetItemModal(true);
                                                                             }}
-                                                                            className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl transition-colors"
+                                                                            className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
                                                                             title="Editar partida"
                                                                         >
-                                                                            <Pencil className="w-3.5 h-3.5" />
+                                                                            <Pencil className="w-3 h-3" />
                                                                         </button>
                                                                         <button
                                                                             onClick={() => handleDeleteBudgetItem(item.id)}
-                                                                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-xl transition-colors"
+                                                                            className="p-1 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
                                                                             title="Eliminar partida"
                                                                         >
-                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                            <Trash2 className="w-3 h-3" />
                                                                         </button>
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Progress Bar & Simple Stats */}
-                                                                <div className="space-y-2 pt-2">
-                                                                    <div className="flex justify-between items-end text-xs">
-                                                                        <div>
-                                                                            <span className="text-gray-500 block mb-0.5">Gastado / Asignado</span>
-                                                                            <span className="font-semibold text-gray-900 dark:text-white">
-                                                                                {formatCurrency(spentCents)} <span className="text-gray-400 font-normal">/ {formatCurrency(item.allocated_cents)}</span>
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="text-right">
-                                                                            <span className="text-gray-500 block mb-0.5">Restante</span>
-                                                                            <span className={`font-semibold ${isExceeded ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
-                                                                                {isExceeded ? `-${formatCurrency(Math.abs(remainingCents))}` : formatCurrency(remainingCents)}
-                                                                            </span>
-                                                                        </div>
+                                                                <div className="space-y-1.5">
+                                                                    <div className="flex justify-between text-[11px]">
+                                                                        <span className="text-gray-500">
+                                                                            {formatCurrency(spentCents)} <span className="text-gray-400">/ {formatCurrency(item.allocated_cents)}</span>
+                                                                        </span>
+                                                                        <span className={`font-medium ${isExceeded ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                                            {isExceeded ? `-${formatCurrency(Math.abs(remainingCents))}` : `${formatCurrency(remainingCents)} libre`}
+                                                                        </span>
                                                                     </div>
                                                                     <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                                         <div
-                                                                            className="h-full rounded-full transition-all duration-500"
-                                                                            style={{
-                                                                                width: `${Math.min(100, itemPct)}%`,
-                                                                                backgroundColor: isExceeded ? '#ef4444' : itemPct > 90 ? '#f59e0b' : (item.color || '#3b82f6')
-                                                                            }}
+                                                                            className={`h-full rounded-full transition-all duration-300 ${
+                                                                                isExceeded ? 'bg-red-500' : 'bg-gray-900 dark:bg-gray-100'
+                                                                            }`}
+                                                                            style={{ width: `${Math.min(100, itemPct)}%` }}
                                                                         />
                                                                     </div>
                                                                 </div>
@@ -3759,73 +3696,62 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         </div>
 
                                         {/* CATEGORIES */}
-                                        <div className="space-y-4">
-                                            <h3 className="text-lg font-semibold border-b border-gray-200 dark:border-zinc-800 pb-2">Categorías</h3>
-                                            <div className="flex flex-wrap gap-2 mb-4 max-h-48 overflow-y-auto">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2">
+                                                <div>
+                                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Categorías</h3>
+                                                    <p className="text-xs text-gray-500">Clasificación para gastos e ingresos</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setNewCatName('');
+                                                        setNewCatEmoji('🏷️');
+                                                        setShowCreateCategoryModal(true);
+                                                    }}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-medium transition-all"
+                                                >
+                                                    <PlusIcon className="w-3.5 h-3.5" />
+                                                    Nueva Categoría
+                                                </button>
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-2 pt-1 max-h-48 overflow-y-auto">
                                                 {categories.map(cat => (
-                                                    <span key={cat.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full text-sm font-medium">
-                                                        {cat.emoji} {cat.name}
+                                                    <span key={cat.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-800 dark:text-gray-200">
+                                                        <span>{cat.emoji}</span>
+                                                        <span>{cat.name}</span>
                                                     </span>
                                                 ))}
                                             </div>
-                                            <form onSubmit={handleCreateCategory} className="bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 space-y-3">
-                                                <h4 className="text-sm font-medium mb-1">Añadir categoría</h4>
-                                                <div className="flex gap-2">
-                                                    <input required type="text" placeholder="🍔" value={newCatEmoji} onChange={e=>setNewCatEmoji(e.target.value)} className="w-16 text-center px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
-                                                    <input required type="text" placeholder="Nombre (Alimentación...)" value={newCatName} onChange={e=>setNewCatName(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm" />
-                                                </div>
-                                                
-                                                <div className="space-y-1">
-                                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selector de Emojis</label>
-                                                    <div className="grid grid-cols-10 gap-1.5 p-2 bg-white dark:bg-[#0a0a0a] border border-gray-150 dark:border-zinc-800 rounded-lg max-h-36 overflow-y-auto">
-                                                        {['💰', '💵', '💳', '🏦', '💎', '💸', '💼', '📈', '📊', '🏧', '🏷️', '🪙', '🧾', '⚖️', '🍔', '🍕', '🍣', '🌮', '🥗', '☕', '🍺', '🍷', '🍩', '🥐', '🍏', '🍟', '🍜', '🍦', '🍫', '🛒', '🛍️', '👕', '👠', '👓', '👗', '💍', '💄', '🎒', '🚗', '⛽', '🚌', '✈️', '🚕', '🚲', '🛴', '🛵', '🚂', '⛵', '🏠', '🔑', '🔌', '🧹', '🛋️', '🛏️', '🚿', '🪴', '📺', '📻', '🩺', '💊', '🏋️', '🧘', '🚴', '⚽', '🏀', '🎾', '🥊', '🏊', '🎓', '📚', '🎒', '✏️', '💻', '📱', '🎧', '📸', '⌚', '🖥️', '🍿', '🎮', '🎉', '🎁', '🎬', '🎸', '🎨', '🎟️', '🎪', '🐾', '🐶', '🐱', '🐴', '🦜', '💈', '🛠️', '🔥', '💡', '❤️', '🏖️', '🏨', '🍼', '👶', '🌾', '🧼', '📦', '🧰', '📮', '✈️', '🗺️', '⛰️', '⛺', '🗿', '🔮', '🎲', '🎰', '🎯', '🧼', '🧻', '🪥', '🧺', '🛡️', '🔒', '📜', '🚑', '🚨', '🚒', '🏢', '🏗️', '🚜', '⚙️', '⚡', '💧', '☀️', '🌙', '🌐', '📡', '📢', '💬', '📮'].map(emoji => (
-                                                            <button
-                                                                key={emoji}
-                                                                type="button"
-                                                                onClick={() => setNewCatEmoji(emoji)}
-                                                                className={`p-1 hover:bg-gray-150 dark:hover:bg-zinc-800 rounded transition-all text-sm flex items-center justify-center ${newCatEmoji === emoji ? 'bg-gray-100 dark:bg-zinc-800 scale-110 border border-gray-200 dark:border-zinc-700 font-bold' : ''}`}
-                                                            >
-                                                                {emoji}
-                                                            </button>
-                                                         ))}
-                                                    </div>
-                                                </div>
-
-                                                <button type="submit" className="w-full bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">Guardar Categoría</button>
-                                            </form>
                                         </div>
 
                                         {/* SECURITY & PIN PROTECTION */}
-                                        <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-zinc-800">
-                                            <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-zinc-800">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl text-indigo-600 dark:text-indigo-400">
-                                                        <ShieldCheck className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="text-base font-bold text-gray-900 dark:text-white">Seguridad y Protección con PIN</h3>
-                                                        <p className="text-xs text-gray-500">Protege el ingreso a finanzas y la eliminación de cuentas/tarjetas.</p>
-                                                    </div>
+                                        <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-zinc-800">
+                                            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                                <div>
+                                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Seguridad y PIN</h3>
+                                                    <p className="text-xs text-gray-500">Control de acceso y protección de operaciones clave</p>
                                                 </div>
-                                                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                                                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
                                                     securityConfig?.pin_hash 
-                                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' 
-                                                        : 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400'
+                                                        ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' 
+                                                        : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400'
                                                 }`}>
-                                                    {securityConfig?.pin_hash ? 'PIN Activo' : 'Sin Protección'}
+                                                    {securityConfig?.pin_hash ? 'Protección activa' : 'Sin PIN'}
                                                 </span>
                                             </div>
 
                                             <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                                     <div>
-                                                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                                                            {securityConfig?.pin_hash ? 'Contraseña / PIN de Seguridad Configurado' : 'No has configurado un PIN de seguridad'}
+                                                        <div className="text-xs font-semibold text-gray-900 dark:text-white">
+                                                            {securityConfig?.pin_hash ? 'PIN de 4 dígitos configurado' : 'Sin PIN de seguridad'}
                                                         </div>
-                                                        <div className="text-xs text-gray-500">
+                                                        <div className="text-[11px] text-gray-500 mt-0.5">
                                                             {securityConfig?.pin_hash 
-                                                                ? 'Puedes cambiar el código actual o gestionar los bloqueos automáticos.' 
-                                                                : 'Crea un PIN numérico o alfanumérico para asegurar tus registros financieros.'}
+                                                                ? 'Puedes cambiar el código actual o gestionar las confirmaciones.' 
+                                                                : 'Crea un PIN numérico de 4 dígitos para proteger tu información.'}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2 shrink-0">
@@ -3837,10 +3763,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 setSetPinError('');
                                                                 setShowSetPinModal(true);
                                                             }}
-                                                            className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold shadow-sm transition-all"
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-medium transition-all"
                                                         >
                                                             <KeyRound className="w-3.5 h-3.5" />
-                                                            {securityConfig?.pin_hash ? 'Cambiar PIN' : 'Establecer PIN'}
+                                                            {securityConfig?.pin_hash ? 'Cambiar PIN' : 'Crear PIN'}
                                                         </button>
                                                         {securityConfig?.pin_hash && (
                                                             <button
@@ -3850,7 +3776,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     setDisablePinError('');
                                                                     setShowDisablePinModal(true);
                                                                 }}
-                                                                className="px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl border border-red-200 dark:border-red-900/50 transition-all"
+                                                                className="px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl border border-red-200 dark:border-red-900/40 transition-all"
                                                             >
                                                                 Eliminar PIN
                                                             </button>
@@ -3860,13 +3786,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                                 {securityConfig?.pin_hash && (
                                                     <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-800">
-                                                        <div className="flex items-center justify-between py-1.5">
+                                                        <div className="flex items-center justify-between py-1">
                                                             <div className="space-y-0.5 pr-4">
-                                                                <label htmlFor="toggle-lock-on-enter" className="text-xs font-bold text-gray-900 dark:text-white cursor-pointer">
-                                                                    Solicitar PIN al ingresar al módulo financiero
+                                                                <label htmlFor="toggle-lock-on-enter" className="text-xs font-medium text-gray-900 dark:text-white cursor-pointer">
+                                                                    Solicitar PIN al entrar al módulo
                                                                 </label>
                                                                 <p className="text-[11px] text-gray-500">
-                                                                    Bloquea la pantalla de finanzas hasta que se introduzca el PIN correcto.
+                                                                    Bloquea las vistas hasta ingresar el PIN de 4 dígitos.
                                                                 </p>
                                                             </div>
                                                             <button
@@ -3875,23 +3801,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 role="switch"
                                                                 aria-checked={securityConfig.require_on_enter}
                                                                 onClick={() => handleToggleRequireOnEnter(!securityConfig.require_on_enter)}
-                                                                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                                                                    securityConfig.require_on_enter ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-zinc-700'
+                                                                className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors ${
+                                                                    securityConfig.require_on_enter ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-zinc-700'
                                                                 }`}
                                                             >
-                                                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                                                                    securityConfig.require_on_enter ? 'translate-x-5' : 'translate-x-0'
+                                                                <div className={`w-4 h-4 rounded-full transition-transform ${
+                                                                    securityConfig.require_on_enter 
+                                                                        ? 'translate-x-5 bg-white dark:bg-gray-900' 
+                                                                        : 'translate-x-0 bg-white dark:bg-zinc-300'
                                                                 }`} />
                                                             </button>
                                                         </div>
 
-                                                        <div className="flex items-center justify-between py-1.5">
+                                                        <div className="flex items-center justify-between py-1">
                                                             <div className="space-y-0.5 pr-4">
-                                                                <label htmlFor="toggle-lock-on-delete" className="text-xs font-bold text-gray-900 dark:text-white cursor-pointer">
+                                                                <label htmlFor="toggle-lock-on-delete" className="text-xs font-medium text-gray-900 dark:text-white cursor-pointer">
                                                                     Proteger eliminación de cuentas y tarjetas
                                                                 </label>
                                                                 <p className="text-[11px] text-gray-500">
-                                                                    Exige ingresar el PIN antes de borrar permanentemente cualquier cuenta o tarjeta.
+                                                                    Pide confirmación con PIN antes de borrar una cuenta.
                                                                 </p>
                                                             </div>
                                                             <button
@@ -3900,12 +3828,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 role="switch"
                                                                 aria-checked={securityConfig.require_on_delete}
                                                                 onClick={() => handleToggleRequireOnDelete(!securityConfig.require_on_delete)}
-                                                                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                                                                    securityConfig.require_on_delete ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-zinc-700'
+                                                                className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors ${
+                                                                    securityConfig.require_on_delete ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-zinc-700'
                                                                 }`}
                                                             >
-                                                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                                                                    securityConfig.require_on_delete ? 'translate-x-5' : 'translate-x-0'
+                                                                <div className={`w-4 h-4 rounded-full transition-transform ${
+                                                                    securityConfig.require_on_delete 
+                                                                        ? 'translate-x-5 bg-white dark:bg-gray-900' 
+                                                                        : 'translate-x-0 bg-white dark:bg-zinc-300'
                                                                 }`} />
                                                             </button>
                                                         </div>
@@ -4913,19 +4843,88 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 )}
             </AnimatePresence>
 
+            {/* Category Creation Modal */}
+            <AnimatePresence>
+                {showCreateCategoryModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreateCategoryModal(false)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                <div>
+                                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Nueva Categoría</h3>
+                                    <p className="text-xs text-gray-500">Selecciona un icono y asigna un nombre</p>
+                                </div>
+                                <button type="button" onClick={() => setShowCreateCategoryModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
+                                    <XIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleCreateCategory} className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nombre de la categoría</label>
+                                    <div className="flex gap-2">
+                                        <div className="w-12 h-11 flex items-center justify-center text-xl bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
+                                            {newCatEmoji || '🏷️'}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            required
+                                            autoFocus
+                                            value={newCatName}
+                                            onChange={e => setNewCatName(e.target.value)}
+                                            placeholder="Ej. Supermercado, Gimnasio, Transporte..."
+                                            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Seleccionar Emoji</label>
+                                    <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5 p-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-2xl max-h-48 overflow-y-auto">
+                                        {['💰', '💵', '💳', '🏦', '💎', '💸', '💼', '📈', '📊', '🏧', '🏷️', '🪙', '🧾', '⚖️', '🍔', '🍕', '🍣', '🌮', '🥗', '☕', '🍺', '🍷', '🍩', '🥐', '🍏', '🍟', '🍜', '🍦', '🍫', '🛒', '🛍️', '👕', '👠', '👓', '👗', '💍', '💄', '🎒', '🚗', '⛽', '🚌', '✈️', '🚕', '🚲', '🛴', '🛵', '🚂', '⛵', '🏠', '🔑', '🔌', '🧹', '🛋️', '🛏️', '🚿', '🪴', '📺', '📻', '🩺', '💊', '🏋️', '🧘', '🚴', '⚽', '🏀', '🎾', '🥊', '🏊', '🎓', '📚', '🎒', '✏️', '💻', '📱', '🎧', '📸', '⌚', '🖥️', '🍿', '🎮', '🎉', '🎁', '🎬', '🎸', '🎨', '🎟️', '🎪', '🐾', '🐶', '🐱', '🐴', '🦜', '💈', '🛠️', '🔥', '💡', '❤️', '🏖️', '🏨', '🍼', '👶', '🌾', '🧼', '📦', '🧰', '📮', '🗺️', '⛰️', '⛺', '🗿', '🔮', '🎲', '🎰', '🎯', '🧻', '🪥', '🧺', '🛡️', '🔒', '📜', '🚑', '🚨', '🚒', '🏢', '🏗️', '🚜', '⚙️', '⚡', '💧', '☀️', '🌙', '🌐', '📡', '📢', '💬'].map(emoji => (
+                                            <button
+                                                key={emoji}
+                                                type="button"
+                                                onClick={() => setNewCatEmoji(emoji)}
+                                                className={`p-2 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-xl transition-all text-base flex items-center justify-center ${newCatEmoji === emoji ? 'bg-white dark:bg-zinc-700 shadow-sm scale-110 font-bold' : ''}`}
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCreateCategoryModal(false)}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
+                                    >
+                                        Crear Categoría
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Set / Change Security PIN Modal */}
             <AnimatePresence>
                 {showSetPinModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSetPinModal(false)}>
                         <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                             <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl text-indigo-600 dark:text-indigo-400">
-                                        <KeyRound className="w-4 h-4" />
-                                    </div>
-                                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                                        {securityConfig?.pin_hash ? 'Cambiar PIN / Contraseña' : 'Crear PIN de Seguridad'}
+                                <div>
+                                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                                        {securityConfig?.pin_hash ? 'Cambiar PIN' : 'Crear PIN de Seguridad'}
                                     </h3>
+                                    <p className="text-xs text-gray-500">Introduce 4 dígitos numéricos</p>
                                 </div>
                                 <button type="button" onClick={() => setShowSetPinModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
                                     <XIcon className="w-5 h-5" />
@@ -4944,8 +4943,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         autoFocus
                                         value={newPinValue}
                                         onChange={e => setNewPinValue(e.target.value.replace(/\D/g, ''))}
-                                        placeholder="Ej. 1234"
-                                        className="w-full text-center text-xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
+                                        placeholder="••••"
+                                        className="w-full text-center text-2xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
@@ -4958,8 +4957,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         required
                                         value={confirmPinValue}
                                         onChange={e => setConfirmPinValue(e.target.value.replace(/\D/g, ''))}
-                                        placeholder="Repite el PIN"
-                                        className="w-full text-center text-xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
+                                        placeholder="••••"
+                                        className="w-full text-center text-2xl tracking-widest font-mono py-2.5 px-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
                                     />
                                 </div>
 
@@ -4980,7 +4979,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm"
+                                        className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold shadow-sm"
                                     >
                                         Guardar PIN
                                     </button>
@@ -4996,12 +4995,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 {showDeletePinModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowDeletePinModal(false); setDeleteTargetAccountId(null); }}>
                         <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 text-center">
-                            <div className="w-12 h-12 bg-red-50 dark:bg-red-950/60 rounded-2xl flex items-center justify-center mx-auto text-red-600 dark:text-red-400">
-                                <ShieldAlert className="w-6 h-6" />
-                            </div>
                             <div className="space-y-1">
-                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Confirmación de Seguridad</h3>
-                                <p className="text-xs text-gray-500">Ingresa tu PIN para autorizar la eliminación definitiva de esta cuenta o tarjeta.</p>
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Confirmación de Seguridad</h3>
+                                <p className="text-xs text-gray-500">Ingresa tu PIN de 4 dígitos para autorizar la eliminación de esta cuenta o tarjeta.</p>
                             </div>
 
                             <form onSubmit={handleConfirmDeleteAccountWithPin} className="space-y-4">
@@ -5051,12 +5047,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 {showDisablePinModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDisablePinModal(false)}>
                         <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 text-center">
-                            <div className="w-12 h-12 bg-amber-50 dark:bg-amber-950/60 rounded-2xl flex items-center justify-center mx-auto text-amber-600 dark:text-amber-400">
-                                <KeyRound className="w-6 h-6" />
-                            </div>
                             <div className="space-y-1">
-                                <h3 className="text-base font-bold text-gray-900 dark:text-white">Desactivar PIN de Seguridad</h3>
-                                <p className="text-xs text-gray-500">Ingresa tu PIN actual para confirmar que deseas remover la protección de seguridad.</p>
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Desactivar PIN</h3>
+                                <p className="text-xs text-gray-500">Ingresa tu PIN actual para desactivar la protección.</p>
                             </div>
 
                             <form onSubmit={handleDisablePin} className="space-y-4">
