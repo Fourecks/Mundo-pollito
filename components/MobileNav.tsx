@@ -15,11 +15,11 @@ interface MobileNavProps {
 type TabName = 'home' | 'tasks' | 'projects' | 'calendar' | 'habits' | 'notes' | 'finance' | 'more';
 
 const ProjectsIcon: React.FC = () => (
-  <FolderKanban className="w-6 h-6" />
+  <FolderKanban className="w-5 h-5 landscape:w-4 landscape:h-4" />
 );
 
 const FinanceIcon: React.FC = () => (
-  <Wallet className="w-6 h-6" />
+  <Wallet className="w-5 h-5 landscape:w-4 landscape:h-4" />
 );
 
 const navItems: { id: TabName; label: string; icon: React.FC }[] = [
@@ -37,23 +37,23 @@ const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
   const isCrowded = navItems.length > 5;
   
   return (
-    <nav className="mobile-nav fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-t border-black/10 dark:border-white/10 z-50">
-      <div className="flex justify-around items-center h-[76px] px-1">
+    <nav className="mobile-nav fixed bottom-0 left-0 right-0 bg-white/85 dark:bg-gray-800/85 backdrop-blur-xl border-t border-black/10 dark:border-white/10 z-50 transition-all">
+      <div className="flex justify-around items-center h-[72px] landscape:h-[50px] px-1 max-w-4xl mx-auto">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center h-16 rounded-2xl transition-all duration-200 ${isCrowded ? 'w-[58px]' : 'w-16'} ${
-                isActive ? 'text-pink-600 dark:text-pink-400 scale-105 bg-pink-100/50 dark:bg-pink-900/40' : 'text-gray-500 dark:text-gray-400'
+              className={`flex flex-col landscape:flex-row items-center justify-center h-14 landscape:h-9 rounded-2xl transition-all duration-200 ${isCrowded ? 'w-[52px] landscape:w-auto landscape:px-2.5' : 'w-14 landscape:w-auto landscape:px-3'} ${
+                isActive ? 'text-pink-600 dark:text-pink-400 scale-105 bg-pink-100/50 dark:bg-pink-900/40' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
               aria-label={item.label}
             >
-              <div className={`p-2 transition-colors duration-200`}>
+              <div className="p-1.5 landscape:p-0.5 transition-colors duration-200 flex-shrink-0">
                 <item.icon />
               </div>
-              <span className="text-xs font-semibold leading-tight">{item.label}</span>
+              <span className="text-[11px] landscape:text-[11px] landscape:ml-1 font-semibold leading-tight">{item.label}</span>
             </button>
           );
         })}

@@ -1476,13 +1476,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         return (
             <>
                 <div className={activeTab === 'home' ? 'h-full flex flex-col' : 'hidden'}>
-                    <header className="sticky top-0 p-4 z-30 flex items-center justify-between">
+                    <header className="sticky top-0 p-4 landscape:p-2 z-30 flex items-center justify-between">
                         <Greeting name={capitalizedUserName} />
-                        <button onClick={() => setActiveTab('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800">
+                        <button onClick={() => setActiveTab('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 landscape:py-1 landscape:px-3 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800 transition-all">
                             Progreso
                         </button>
                     </header>
-                    <div className="w-[90%] max-w-sm mx-auto py-3 space-y-3">
+                    <div className="w-[92%] max-w-sm landscape:max-w-2xl mx-auto py-3 landscape:py-1 space-y-3">
                          <BibleVerse />
                          <MobilePomodoroWidget 
                             timeLeft={pomodoroState.timeLeft} 
@@ -1549,7 +1549,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             focusSessions={focusSessions}
                             isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
                         />
-                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 right-4 bg-primary text-white rounded-full p-4 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform">
+                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 landscape:bottom-16 right-4 bg-primary text-white rounded-full p-4 landscape:p-3 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform" aria-label="Añadir tarea">
                             <PlusIcon />
                         </button>
                     </div>
@@ -1632,13 +1632,13 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 )}
 
                 <div className={activeTab === 'notes' ? 'h-full flex flex-col' : 'hidden'}>
-                    <div className="h-full pt-8">
+                    <div className="h-full pt-8 landscape:pt-2">
                       <NotesSection isMobile={true} folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
                     </div>
                 </div>
 
                 <div className={activeTab === 'finance' ? 'h-full flex flex-col' : 'hidden'}>
-                    <div className="h-full pt-8">
+                    <div className="h-full pt-8 landscape:pt-2">
                         <FinanceModule />
                     </div>
                 </div>
@@ -1659,7 +1659,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 )}
 
                 <div className={activeTab === 'more' ? 'h-full flex flex-col' : 'hidden'}>
-                    <div className="p-4 pt-8">
+                    <div className="p-4 pt-8 landscape:pt-2 max-w-xl mx-auto">
                         <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden">
                             <div className="divide-y divide-black/5 dark:divide-white/10">
 
@@ -1725,12 +1725,12 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 )}
             </div>
 
-            <main className="flex-grow overflow-y-auto pb-28">
+            <main className="flex-grow overflow-y-auto pb-28 landscape:pb-16 custom-scrollbar">
                 {renderContent()}
             </main>
             
              {(activeTrack || activeSpotifyTrack) && (
-                <div className="fixed bottom-[76px] left-0 right-0 z-50">
+                <div className="fixed bottom-[76px] landscape:bottom-[52px] left-0 right-0 z-50">
                     <MobileMusicPlayer
                         track={activeTrack || activeSpotifyTrack}
                         queue={activeTrack?.queue || activeSpotifyTrack?.queue || []}
@@ -1925,7 +1925,7 @@ const App: React.FC = () => {
   const isPowerSavingActive = !!(uiSettings?.enableBatterySaver && batteryStatus.isLow);
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const isMobile = useMediaQuery('(max-width: 767px)');
+  const isMobile = useMediaQuery('(max-width: 767px), (orientation: landscape) and (max-height: 550px)');
   
   const settingsSaveTimeout = useRef<number | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);

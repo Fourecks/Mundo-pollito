@@ -3928,7 +3928,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {showTxModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowTxModal(false)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[90vh] overflow-y-auto custom-scrollbar">
                             
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold">Registrar {txType === 'EXPENSE' ? 'Gasto' : txType === 'INCOME' ? 'Ingreso' : 'Transferencia'}</h3>
@@ -4100,7 +4100,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {showAddFundsModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAddFundsModal(null)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-3">
                                 <h3 className="text-lg font-bold text-emerald-600 dark:text-emerald-400">Recargar / Recibir Fondos</h3>
                                 <button onClick={() => setShowAddFundsModal(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
@@ -4128,7 +4128,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {showPayCardModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPayCardModal(null)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-3">
                                 <h3 className="text-lg font-bold">Abonar a Tarjeta de Crédito</h3>
                                 <button onClick={() => setShowPayCardModal(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
@@ -4168,7 +4168,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {showInstallmentModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInstallmentModal(false)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-3">
                                 <h3 className="text-lg font-bold">Registrar Compra a Cuotas</h3>
                                 <button onClick={() => setShowInstallmentModal(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"><XIcon className="w-5 h-5" /></button>
