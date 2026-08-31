@@ -335,6 +335,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [newItemNames, setNewItemNames] = useState<{ [listId: number]: string }>({});
     const [newItemQuantities, setNewItemQuantities] = useState<{ [listId: number]: string }>({});
     const [newItemPrices, setNewItemPrices] = useState<{ [listId: number]: string }>({});
+    const [shoppingFilter, setShoppingFilter] = useState<'active' | 'archived'>('active');
+    const [showLoadExpenseModal, setShowLoadExpenseModal] = useState<FinanceShoppingList | null>(null);
+    const [loadExpenseAccountId, setLoadExpenseAccountId] = useState('');
+    const [loadExpenseCategoryId, setLoadExpenseCategoryId] = useState('');
+    const [loadExpenseDescription, setLoadExpenseDescription] = useState('');
+    const [loadExpenseDate, setLoadExpenseDate] = useState('');
 
     useEffect(() => {
         fetchFinanceData();
@@ -1878,6 +1884,79 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         fetchFinanceData();
     };
 
+    const handleToggleArchiveShoppingList = async (list: FinanceShoppingList) => {
+        await supabase.from('finance_shopping_lists').update({ is_archived: !list.is_archived }).eq('id', list.id);
+        fetchFinanceData();
+    };
+
+    const handleResetShoppingList = async (listId: number) => {
+        if (!confirm('¿Restablecer esta lista? Se eliminarán todos los artículos actuales para comenzar limpia.')) return;
+        await supabase.from('finance_shopping_items').delete().eq('list_id', listId);
+        fetchFinanceData();
+    };
+
+    const handleOpenLoadExpenseModal = (list: FinanceShoppingList) => {
+        const listItems = shoppingItems.filter(i => i.list_id === list.id && i.is_purchased);
+        if (listItems.length === 0) return;
+
+        const defaultCategory = categories.find(c => c.name.toLowerCase().includes('super') || c.name.toLowerCase().includes('compra')) || categories[0];
+
+        setShowLoadExpenseModal(list);
+        setLoadExpenseAccountId(accounts[0]?.id ? String(accounts[0].id) : '');
+        setLoadExpenseCategoryId(defaultCategory?.id ? String(defaultCategory.id) : '');
+        setLoadExpenseDescription(`Compra: ${list.name}`);
+        setLoadExpenseDate(new Date().toISOString().split('T')[0]);
+    };
+
+    const handleConfirmLoadExpense = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !showLoadExpenseModal || !loadExpenseAccountId) return;
+
+        const list = showLoadExpenseModal;
+        const purchasedItems = shoppingItems.filter(i => i.list_id === list.id && i.is_purchased);
+        const totalBoughtCents = purchasedItems.reduce((acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0), 0);
+
+        if (totalBoughtCents <= 0) {
+            alert('El monto total comprado debe ser mayor a $0 para registrar el gasto.');
+            return;
+        }
+
+        const accId = parseInt(loadExpenseAccountId, 10);
+        const targetAcc = accounts.find(a => a.id === accId);
+        if (!targetAcc) {
+            alert('Por favor selecciona una cuenta válida.');
+            return;
+        }
+
+        // 1. Insert transaction
+        await supabase.from('finance_transactions').insert([{
+            user_id: user.id,
+            account_id: accId,
+            category_id: loadExpenseCategoryId ? parseInt(loadExpenseCategoryId, 10) : null,
+            type: 'EXPENSE',
+            amount_cents: totalBoughtCents,
+            date: loadExpenseDate || new Date().toISOString().split('T')[0],
+            description: loadExpenseDescription.trim() || `Compra: ${list.name}`
+        }]);
+
+        // 2. Update account balance
+        await supabase.from('finance_accounts').update({
+            balance_cents: Math.max(0, targetAcc.balance_cents - totalBoughtCents)
+        }).eq('id', accId);
+
+        // 3. Reset checkmarks on items in this list
+        const purchasedIds = purchasedItems.map(i => i.id);
+        if (purchasedIds.length > 0) {
+            await supabase.from('finance_shopping_items')
+                .update({ is_purchased: false })
+                .in('id', purchasedIds);
+        }
+
+        setShowLoadExpenseModal(null);
+        fetchFinanceData();
+    };
+
     const handleAddDebt = async (e: React.FormEvent) => {
         e.preventDefault();
         const { data: { user } } = await supabase.auth.getUser();
@@ -3142,22 +3221,49 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             {/* SHOPPING TAB */}
                             {activeTab === 'shopping' && (
                                 <div className="space-y-8">
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                         <div>
-                                            <h2 className="text-xl font-bold">Listas de Compras</h2>
-                                            <p className="text-xs text-gray-500">Planifica tus compras del super, calcula costos y controla tu gasto total</p>
+                                            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                                <ShoppingCart className="w-6 h-6 text-emerald-500" /> Listas de Compras
+                                            </h2>
+                                            <p className="text-xs text-gray-500">Planifica tus compras del super, calcula costos, cárgalos a gastos y gestiona tus listas</p>
+                                        </div>
+                                        <div className="flex bg-gray-100 dark:bg-[#121212] p-1 rounded-xl border border-gray-200 dark:border-zinc-800 text-xs font-semibold shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShoppingFilter('active')}
+                                                className={`px-3 py-1.5 rounded-lg transition-all ${shoppingFilter === 'active' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                                            >
+                                                Activas ({shoppingLists.filter(l => !l.is_archived).length})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShoppingFilter('archived')}
+                                                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${shoppingFilter === 'archived' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                                            >
+                                                <Archive className="w-3.5 h-3.5" /> Archivadas ({shoppingLists.filter(l => l.is_archived).length})
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="md:col-span-2 space-y-6">
-                                            {shoppingLists.length === 0 ? (
-                                                <div className="p-8 text-center bg-gray-50 dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-2">
-                                                    <ShoppingCart className="w-8 h-8 mx-auto text-gray-400" />
-                                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No hay listas de compras.</p>
-                                                    <p className="text-xs text-gray-400">Crea tu primera lista de super a la derecha para organizar artículos, precios y cantidades.</p>
-                                                </div>
-                                            ) : (
-                                                shoppingLists.map(list => {
+                                            {(() => {
+                                                const displayedLists = shoppingLists.filter(l => shoppingFilter === 'archived' ? l.is_archived : !l.is_archived);
+                                                if (displayedLists.length === 0) {
+                                                    return (
+                                                        <div className="p-8 text-center bg-gray-50 dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-2">
+                                                            <ShoppingCart className="w-8 h-8 mx-auto text-gray-400" />
+                                                            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                                                {shoppingFilter === 'archived' ? 'No hay listas archivadas.' : 'No hay listas de compras activas.'}
+                                                            </p>
+                                                            <p className="text-xs text-gray-400">
+                                                                {shoppingFilter === 'archived' ? 'Puedes archivar listas completadas o guardadas para después.' : 'Crea tu primera lista de super a la derecha para organizar artículos, precios y cantidades.'}
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return displayedLists.map(list => {
                                                     const listItems = shoppingItems.filter(i => i.list_id === list.id);
                                                     const completed = listItems.filter(i => i.is_purchased).length;
                                                     const totalItems = listItems.length;
@@ -3166,20 +3272,47 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     const totalEstCents = listItems.reduce((acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0), 0);
                                                     const totalBoughtCents = listItems.filter(i => i.is_purchased).reduce((acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0), 0);
                                                     const totalPendingCents = Math.max(0, totalEstCents - totalBoughtCents);
-                                                    
+
                                                     return (
                                                         <div key={list.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-xs space-y-4">
-                                                            <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-zinc-800/80">
+                                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-gray-100 dark:border-zinc-800/80 gap-2">
                                                                 <div>
                                                                     <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
                                                                         <span>🛒</span> {list.name}
+                                                                        {list.is_archived && (
+                                                                            <span className="text-[10px] font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-500 px-2 py-0.5 rounded-full">Archivada</span>
+                                                                        )}
                                                                     </h3>
                                                                     <p className="text-[11px] text-gray-400 mt-0.5">
                                                                         {completed} de {totalItems} artículos listados
                                                                     </p>
                                                                 </div>
-                                                                <div className="flex items-center gap-3">
+                                                                <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                                                                    {/* Botón Restablecer lista */}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleResetShoppingList(list.id)}
+                                                                        className="p-1.5 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all flex items-center gap-1 text-xs font-semibold"
+                                                                        title="Restablecer lista (Eliminar todos los productos para volver a crear)"
+                                                                    >
+                                                                        <RefreshCw className="w-3.5 h-3.5" />
+                                                                        <span className="hidden sm:inline">Restablecer</span>
+                                                                    </button>
+
+                                                                    {/* Botón Archivar/Desarchivar */}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleToggleArchiveShoppingList(list)}
+                                                                        className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all flex items-center gap-1 text-xs font-semibold"
+                                                                        title={list.is_archived ? "Desarchivar lista" : "Archivar lista para después"}
+                                                                    >
+                                                                        <Archive className="w-3.5 h-3.5" />
+                                                                        <span className="hidden sm:inline">{list.is_archived ? "Desarchivar" : "Archivar"}</span>
+                                                                    </button>
+
+                                                                    {/* Botón Eliminar lista */}
                                                                     <button 
+                                                                        type="button"
                                                                         onClick={() => handleDeleteShoppingList(list.id)} 
                                                                         className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
                                                                         title="Eliminar lista completa"
@@ -3211,6 +3344,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     <span className="text-[10px] uppercase font-bold text-amber-500 block">Por Comprar</span>
                                                                     <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400">{formatCurrency(totalPendingCents)}</span>
                                                                 </div>
+                                                            </div>
+
+                                                            {/* BOTÓN CARGAR A GASTO */}
+                                                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-xl">
+                                                                <div className="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                                                    <Banknote className="w-4 h-4 text-emerald-500 shrink-0" />
+                                                                    <span>Monto listo para cargar: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(totalBoughtCents)}</strong></span>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={completed === 0 || totalBoughtCents <= 0}
+                                                                    onClick={() => handleOpenLoadExpenseModal(list)}
+                                                                    className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs ${
+                                                                        completed === 0 || totalBoughtCents <= 0
+                                                                            ? 'bg-gray-200 dark:bg-zinc-800 text-gray-400 border border-gray-300 dark:border-zinc-700 cursor-not-allowed opacity-60'
+                                                                            : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white cursor-pointer'
+                                                                    }`}
+                                                                    title={completed === 0 ? "Marca al menos un producto con el chequesito para habilitar este botón" : "Cargar el dinero de las compras marcadas como un gasto en tu cuenta"}
+                                                                >
+                                                                    <CreditCard className="w-3.5 h-3.5" />
+                                                                    Cargar a Gasto
+                                                                </button>
                                                             </div>
 
                                                             {/* Lista de artículos */}
@@ -3315,8 +3470,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             </form>
                                                         </div>
                                                     );
-                                                })
-                                            )}
+                                                });
+                                            })()}
                                         </div>
                                         <div>
                                             <form onSubmit={handleCreateShoppingList} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6">
@@ -5736,7 +5891,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     />
                                 </div>
 
-                                <div className="flex gap-2 pt-2">
+                                 <div className="flex gap-2 pt-2">
                                     <button
                                         type="button"
                                         onClick={() => setQuickExpenseBudgetItem(null)}
@@ -5749,6 +5904,122 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         className="flex-1 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors"
                                     >
                                         Registrar Gasto
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal Cargar Lista de Compras a Gasto */}
+            <AnimatePresence>
+                {showLoadExpenseModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowLoadExpenseModal(null)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                <div>
+                                    <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <Banknote className="w-5 h-5 text-emerald-500" />
+                                        Cargar Gasto de Compras
+                                    </h3>
+                                    <p className="text-xs text-gray-500">Registra los artículos marcados como un gasto real</p>
+                                </div>
+                                <button type="button" onClick={() => setShowLoadExpenseModal(null)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
+                                    <XIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl flex items-center justify-between">
+                                <div>
+                                    <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 block">Lista: {showLoadExpenseModal.name}</span>
+                                    <span className="text-[10px] text-gray-500">
+                                        {shoppingItems.filter(i => i.list_id === showLoadExpenseModal.id && i.is_purchased).length} artículos marcados
+                                    </span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Monto a descontar</span>
+                                    <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                                        {formatCurrency(shoppingItems.filter(i => i.list_id === showLoadExpenseModal.id && i.is_purchased).reduce((acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0), 0))}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleConfirmLoadExpense} className="space-y-3.5">
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Cuenta para aplicar el gasto *</label>
+                                    <select
+                                        required
+                                        value={loadExpenseAccountId}
+                                        onChange={e => setLoadExpenseAccountId(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none"
+                                    >
+                                        <option value="">-- Seleccionar Cuenta --</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.name} ({formatCurrency(acc.balance_cents)})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Categoría del Gasto</label>
+                                    <select
+                                        value={loadExpenseCategoryId}
+                                        onChange={e => setLoadExpenseCategoryId(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none"
+                                    >
+                                        <option value="">Sin Categoría</option>
+                                        {categories.filter(c => c.type === 'EXPENSE' || !c.type).map(cat => (
+                                            <option key={cat.id} value={cat.id}>
+                                                {cat.icon || '🏷️'} {cat.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Descripción de la transacción</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={loadExpenseDescription}
+                                        onChange={e => setLoadExpenseDescription(e.target.value)}
+                                        placeholder="Ej. Compra de supermercado semanal"
+                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Fecha</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={loadExpenseDate}
+                                        onChange={e => setLoadExpenseDate(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none"
+                                    />
+                                </div>
+
+                                <p className="text-[11px] text-gray-400 italic bg-gray-50 dark:bg-[#141414] p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800">
+                                    ✨ Nota: Al confirmar, se registrará el gasto, se descontará el dinero de la cuenta elegida y los chequesitos de esta lista se desmarcarán para permitirte volver a usarla.
+                                </p>
+
+                                <div className="flex gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowLoadExpenseModal(null)}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5"
+                                    >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Confirmar Gasto
                                     </button>
                                 </div>
                             </form>
