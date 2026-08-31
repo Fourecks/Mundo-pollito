@@ -1127,7 +1127,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               </ModalWindow>
           )}
            {openWindows.includes('finance') && (
-              <ModalWindow isOpen onClose={() => toggleWindow('finance')} title="Finanzas" isDraggable isResizable zIndex={getWindowZIndex('finance')} onFocus={() => bringToFront('finance')} className="w-full max-w-4xl h-[85vh]" windowState={windowStatesRef.current.finance} onStateChange={s => handleWindowStateChange('finance', s)} allowFullscreen>
+              <ModalWindow isOpen onClose={() => toggleWindow('finance')} title="Finanzas" isDraggable isResizable zIndex={getWindowZIndex('finance')} onFocus={() => bringToFront('finance')} className="w-full max-w-4xl h-[68vh]" windowState={windowStatesRef.current.finance} onStateChange={s => handleWindowStateChange('finance', s)} allowFullscreen>
                   <FinanceModule onClose={() => toggleWindow('finance')} />
               </ModalWindow>
           )}

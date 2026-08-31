@@ -98,6 +98,15 @@
         border-radius: 10px;
       }
 
+      /* Hide scrollbars completely while preserving scroll */
+      .hide-scrollbar, .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .hide-scrollbar::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+
       /* Dark scrollbar */
       html.dark .custom-scrollbar {
         scrollbar-color: #4b5563 #1f2937; /* For Firefox */

@@ -723,9 +723,11 @@ export interface FinanceSavingsGoal {
     target_amount_cents: number;
     current_amount_cents: number;
     target_date?: string;
+    frequency?: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
     account_id?: number;
     notes?: string;
     is_completed: boolean;
+    created_at?: string;
 }
 
 export interface FinanceShoppingList {

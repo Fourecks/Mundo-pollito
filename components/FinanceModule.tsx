@@ -7,7 +7,7 @@ import {
     LayoutDashboard, ListOrdered, PieChart, CalendarDays, Settings, Trash2, Wallet, 
     CreditCard, Landmark, CheckCircle2, ChevronDown, ChevronUp, Calendar, Banknote, ShoppingCart, BarChart3, Archive,
     ChevronLeft, ChevronRight, Download, AlertTriangle, Layers, ShieldCheck, Clock, Receipt, Pencil, HelpCircle,
-    Lock, Unlock, KeyRound, ShieldAlert, Sparkles, FolderPlus, DollarSign, RefreshCw, Copy, Check, Search
+    Lock, Unlock, KeyRound, ShieldAlert, Sparkles, FolderPlus, DollarSign, RefreshCw, Copy, Check, Search, Target
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -323,6 +323,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [goalName, setGoalName] = useState('');
     const [goalTargetAmount, setGoalTargetAmount] = useState('');
     const [goalTargetDate, setGoalTargetDate] = useState('');
+    const [goalFrequency, setGoalFrequency] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('MONTHLY');
 
     // --- Form States (Debts) ---
     const [debtName, setDebtName] = useState('');
@@ -1747,6 +1748,75 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         fetchFinanceData();
     };
 
+    // --- Savings Goal Calculation Helpers ---
+    const roundToNearest5Cents = (amount: number): number => {
+        return Math.round(amount * 20) / 20;
+    };
+
+    const calculateSavingsCuota = (targetCents: number, currentCents: number, targetDateStr?: string, frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' = 'MONTHLY') => {
+        const remainingCents = Math.max(0, targetCents - currentCents);
+        if (remainingCents <= 0) return { cuota: 0, periods: 0, daysRemaining: 0 };
+        if (!targetDateStr) return { cuota: null, periods: null, daysRemaining: null };
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const targetDate = new Date(targetDateStr);
+        const diffTime = targetDate.getTime() - now.getTime();
+        const daysRemaining = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+        let daysPerPeriod = 30;
+        if (frequency === 'WEEKLY') daysPerPeriod = 7;
+        else if (frequency === 'BIWEEKLY') daysPerPeriod = 14;
+
+        const periods = Math.max(1, Math.ceil(daysRemaining / daysPerPeriod));
+        const rawCuota = (remainingCents / 100) / periods;
+        const cuota = roundToNearest5Cents(rawCuota);
+
+        return { cuota, periods, daysRemaining };
+    };
+
+    const calculateEstimatedCompletionDate = (goal: FinanceSavingsGoal) => {
+        if (goal.is_completed || goal.current_amount_cents >= goal.target_amount_cents) {
+            return { isCompleted: true, text: '¡Meta alcanzada!' };
+        }
+
+        const remainingCents = goal.target_amount_cents - goal.current_amount_cents;
+
+        // Calculate based on contribution pace so far
+        if (goal.current_amount_cents > 0) {
+            const createdAt = goal.created_at ? new Date(goal.created_at) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const now = new Date();
+            const daysElapsed = Math.max(1, Math.ceil((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
+            const centsPerDay = goal.current_amount_cents / daysElapsed;
+            if (centsPerDay > 0) {
+                const daysNeeded = Math.ceil(remainingCents / centsPerDay);
+                const estimatedDate = new Date();
+                estimatedDate.setDate(now.getDate() + daysNeeded);
+                return {
+                    isCompleted: false,
+                    dateFormatted: estimatedDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }),
+                    daysNeeded,
+                    basedOnPace: true
+                };
+            }
+        }
+
+        // If target_date is set, show estimated completion date from schedule
+        if (goal.target_date) {
+            const now = new Date();
+            const targetDate = new Date(goal.target_date);
+            const daysNeeded = Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+            return {
+                isCompleted: false,
+                dateFormatted: targetDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }),
+                daysNeeded,
+                basedOnPace: false
+            };
+        }
+
+        return null;
+    };
+
     const handleCreateSavingsGoal = async (e: React.FormEvent) => {
         e.preventDefault();
         const { data: { user } } = await supabase.auth.getUser();
@@ -1757,12 +1827,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             user_id: user.id,
             name: goalName,
             target_amount_cents: amountCents,
-            target_date: goalTargetDate || null
+            target_date: goalTargetDate || null,
+            frequency: goalFrequency || 'MONTHLY'
         }]);
 
         setGoalName('');
         setGoalTargetAmount('');
         setGoalTargetDate('');
+        setGoalFrequency('MONTHLY');
         fetchFinanceData();
     };
 
@@ -2088,8 +2160,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         }
     };
 
+    const handleMouseDownDragScroll = (e: React.MouseEvent<HTMLDivElement>) => {
+        const slider = e.currentTarget;
+        let startX = e.pageX - slider.offsetLeft;
+        let scrollLeft = slider.scrollLeft;
+
+        const onMouseMove = (ev: MouseEvent) => {
+            const x = ev.pageX - slider.offsetLeft;
+            const walk = (x - startX) * 1.5;
+            slider.scrollLeft = scrollLeft - walk;
+        };
+
+        const onMouseUp = () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    };
+
     const renderTabs = () => (
-        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-zinc-800 mb-6 overflow-x-auto hide-scrollbar pb-px">
+        <div onMouseDown={handleMouseDownDragScroll} className="flex items-center gap-2 border-b border-gray-200 dark:border-zinc-800 mb-6 overflow-x-auto no-scrollbar pb-px select-none cursor-grab active:cursor-grabbing">
             {[
                 { id: 'overview', icon: LayoutDashboard, label: 'Resumen' },
                 { id: 'transactions', icon: ListOrdered, label: 'Movimientos' },
@@ -3145,11 +3237,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             ) : (
                                                 savingsGoals.map(goal => {
                                                     const progress = Math.min(100, Math.round((goal.current_amount_cents / goal.target_amount_cents) * 100));
+                                                    const freqLabel = goal.frequency === 'WEEKLY' ? 'semanal' : goal.frequency === 'BIWEEKLY' ? 'quincenal' : 'mensual';
+                                                    const cuotaInfo = calculateSavingsCuota(goal.target_amount_cents, goal.current_amount_cents, goal.target_date, goal.frequency || 'MONTHLY');
+                                                    const projection = calculateEstimatedCompletionDate(goal);
+
                                                     return (
                                                         <div key={goal.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 p-5 rounded-2xl shadow-sm hover:border-gray-200 dark:hover:border-zinc-700 transition-all space-y-4">
                                                             <div className="flex justify-between items-start">
                                                                 <div className="min-w-0">
-                                                                    <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{goal.name}</h3>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{goal.name}</h3>
+                                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 uppercase">
+                                                                            {freqLabel}
+                                                                        </span>
+                                                                    </div>
                                                                     {goal.target_date && (
                                                                         <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
                                                                             <Calendar className="w-3 h-3 text-gray-400" /> Meta para: {goal.target_date}
@@ -3170,18 +3271,50 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 </div>
                                                             </div>
 
+                                                            {/* Calculator & Projection Badges */}
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                                                {cuotaInfo.cuota !== null && cuotaInfo.cuota > 0 && (
+                                                                    <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800/80 flex items-center justify-between">
+                                                                        <div>
+                                                                            <span className="text-[10px] font-bold text-gray-400 block uppercase">Cuota Recomendada ({freqLabel})</span>
+                                                                            <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
+                                                                                ${cuotaInfo.cuota.toFixed(2)}
+                                                                            </span>
+                                                                        </div>
+                                                                        <span className="text-[10px] text-gray-400 bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-zinc-700">
+                                                                            {cuotaInfo.periods} cuotas (5¢)
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {projection && (
+                                                                    <div className="p-2.5 bg-indigo-50/60 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
+                                                                        <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 block uppercase flex items-center gap-1">
+                                                                            <Target className="w-3 h-3" /> Proyección de Fecha
+                                                                        </span>
+                                                                        <span className="font-semibold text-indigo-900 dark:text-indigo-200 text-xs">
+                                                                            {projection.isCompleted ? projection.text : `Llegada estimada: ${projection.dateFormatted}`}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
                                                             <div className="space-y-1">
-                                                                <div className="h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                                <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                                     <div 
-                                                                        className="h-full bg-zinc-800 dark:bg-white rounded-full transition-all duration-500" 
+                                                                        className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
                                                                         style={{ width: `${progress}%` }}
                                                                     />
                                                                 </div>
                                                                 <div className="flex justify-between items-center pt-1">
                                                                     <span className="text-[11px] text-gray-400 font-medium">{progress}% completado</span>
                                                                     <button 
-                                                                        onClick={() => setShowContributeModal(goal.id)} 
-                                                                        className="text-[11px] font-semibold bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white px-3 py-1.5 rounded-lg transition-colors"
+                                                                        onClick={() => {
+                                                                            setShowContributeModal(goal.id);
+                                                                            if (cuotaInfo.cuota && cuotaInfo.cuota > 0) {
+                                                                                setContributeAmount(cuotaInfo.cuota.toFixed(2));
+                                                                            }
+                                                                        }} 
+                                                                        className="text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
                                                                     >
                                                                         Aportar
                                                                     </button>
@@ -3195,23 +3328,62 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         {/* Create Goal Form */}
                                         <div className="lg:col-span-4">
                                             <form onSubmit={handleCreateSavingsGoal} className="bg-white dark:bg-[#0a0a0a] p-5 rounded-2xl border border-gray-100 dark:border-zinc-800 space-y-4 shadow-sm sticky top-6">
-                                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Nueva Meta</h3>
+                                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                                    <Target className="w-4 h-4 text-emerald-500" /> Nueva Meta de Ahorro
+                                                </h3>
                                                 <div>
-                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre</label>
-                                                    <input required type="text" value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="Ej. Viaje a Japón" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre de la Meta</label>
+                                                    <input required type="text" value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="Ej. Viaje a Japón, Fondo de Emergencia..." className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white outline-none" />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Monto Objetivo</label>
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Monto Objetivo ($)</label>
                                                     <div className="relative">
                                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
-                                                        <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
+                                                        <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white outline-none" />
                                                     </div>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha límite (Opcional)</label>
-                                                    <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white" />
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Frecuencia</label>
+                                                        <select
+                                                            value={goalFrequency}
+                                                            onChange={e => setGoalFrequency(e.target.value as any)}
+                                                            className="w-full px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-900 dark:text-white outline-none"
+                                                        >
+                                                            <option value="MONTHLY">Mensual (30d)</option>
+                                                            <option value="BIWEEKLY">Quincenal (14d)</option>
+                                                            <option value="WEEKLY">Semanal (7d)</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha límite</label>
+                                                        <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-900 dark:text-white outline-none" />
+                                                    </div>
                                                 </div>
-                                                <button type="submit" className="w-full bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">Crear Meta</button>
+
+                                                {/* Live Cuota Calculator Preview */}
+                                                {goalTargetAmount && parseFloat(goalTargetAmount) > 0 && goalTargetDate && (
+                                                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-xl space-y-1 text-xs">
+                                                        {(() => {
+                                                            const targetCents = Math.round(parseFloat(goalTargetAmount) * 100);
+                                                            const calc = calculateSavingsCuota(targetCents, 0, goalTargetDate, goalFrequency);
+                                                            const freqStr = goalFrequency === 'WEEKLY' ? 'semanal' : goalFrequency === 'BIWEEKLY' ? 'quincenal' : 'mensual';
+                                                            if (!calc.cuota) return null;
+                                                            return (
+                                                                <>
+                                                                    <span className="font-bold text-emerald-800 dark:text-emerald-300 block">
+                                                                        🧮 Cuota calculada: ${calc.cuota.toFixed(2)} / {freqStr}
+                                                                    </span>
+                                                                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                                                                        Abonando <strong>${calc.cuota.toFixed(2)}</strong> cada {freqStr} en <strong>{calc.periods} períodos</strong> ({calc.daysRemaining} días) alcanzarás tu meta a tiempo. Redondeado a 5¢.
+                                                                    </p>
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                )}
+
+                                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors shadow-sm">Crear Meta de Ahorro</button>
                                             </form>
                                         </div>
                                     </div>
@@ -3220,26 +3392,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                             {/* SHOPPING TAB */}
                             {activeTab === 'shopping' && (
-                                <div className="space-y-8">
+                                <div className="space-y-6">
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                         <div>
                                             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                                <ShoppingCart className="w-6 h-6 text-emerald-500" /> Listas de Compras
+                                                <ShoppingCart className="w-5 h-5 text-gray-700 dark:text-gray-300" /> Listas de Compras
                                             </h2>
-                                            <p className="text-xs text-gray-500">Planifica tus compras del super, calcula costos, cárgalos a gastos y gestiona tus listas</p>
+                                            <p className="text-xs text-gray-500">Organiza artículos, precios, cantidades y carga a gastos</p>
                                         </div>
-                                        <div className="flex bg-gray-100 dark:bg-[#121212] p-1 rounded-xl border border-gray-200 dark:border-zinc-800 text-xs font-semibold shrink-0">
+                                        <div className="flex bg-gray-100 dark:bg-[#141414] p-1 rounded-xl border border-gray-200 dark:border-zinc-800 text-xs font-medium shrink-0">
                                             <button
                                                 type="button"
                                                 onClick={() => setShoppingFilter('active')}
-                                                className={`px-3 py-1.5 rounded-lg transition-all ${shoppingFilter === 'active' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                                                className={`px-3 py-1.5 rounded-lg transition-all ${shoppingFilter === 'active' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
                                             >
                                                 Activas ({shoppingLists.filter(l => !l.is_archived).length})
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => setShoppingFilter('archived')}
-                                                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${shoppingFilter === 'archived' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                                                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${shoppingFilter === 'archived' ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
                                             >
                                                 <Archive className="w-3.5 h-3.5" /> Archivadas ({shoppingLists.filter(l => l.is_archived).length})
                                             </button>
@@ -3252,12 +3424,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 if (displayedLists.length === 0) {
                                                     return (
                                                         <div className="p-8 text-center bg-gray-50 dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-2">
-                                                            <ShoppingCart className="w-8 h-8 mx-auto text-gray-400" />
+                                                            <ShoppingCart className="w-7 h-7 mx-auto text-gray-400" />
                                                             <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                                                                 {shoppingFilter === 'archived' ? 'No hay listas archivadas.' : 'No hay listas de compras activas.'}
                                                             </p>
                                                             <p className="text-xs text-gray-400">
-                                                                {shoppingFilter === 'archived' ? 'Puedes archivar listas completadas o guardadas para después.' : 'Crea tu primera lista de super a la derecha para organizar artículos, precios y cantidades.'}
+                                                                {shoppingFilter === 'archived' ? 'Puedes archivar listas completadas o guardadas.' : 'Crea tu primera lista a la derecha para organizar artículos.'}
                                                             </p>
                                                         </div>
                                                     );
@@ -3274,48 +3446,45 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     const totalPendingCents = Math.max(0, totalEstCents - totalBoughtCents);
 
                                                     return (
-                                                        <div key={list.id} className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-xs space-y-4">
+                                                        <div key={list.id} className="bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-xs space-y-4">
                                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-gray-100 dark:border-zinc-800/80 gap-2">
                                                                 <div>
-                                                                    <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
-                                                                        <span>🛒</span> {list.name}
+                                                                    <h3 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                                                                        <span>{list.name}</span>
                                                                         {list.is_archived && (
-                                                                            <span className="text-[10px] font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-500 px-2 py-0.5 rounded-full">Archivada</span>
+                                                                            <span className="text-[10px] font-medium bg-gray-100 dark:bg-zinc-800 text-gray-500 px-2 py-0.5 rounded-full">Archivada</span>
                                                                         )}
                                                                     </h3>
                                                                     <p className="text-[11px] text-gray-400 mt-0.5">
-                                                                        {completed} de {totalItems} artículos listados
+                                                                        {completed} de {totalItems} artículos marcados
                                                                     </p>
                                                                 </div>
                                                                 <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                                                                    {/* Botón Restablecer lista */}
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleResetShoppingList(list.id)}
-                                                                        className="p-1.5 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all flex items-center gap-1 text-xs font-semibold"
-                                                                        title="Restablecer lista (Eliminar todos los productos para volver a crear)"
+                                                                        className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all flex items-center gap-1 text-xs font-medium"
+                                                                        title="Restablecer lista"
                                                                     >
                                                                         <RefreshCw className="w-3.5 h-3.5" />
                                                                         <span className="hidden sm:inline">Restablecer</span>
                                                                     </button>
 
-                                                                    {/* Botón Archivar/Desarchivar */}
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleToggleArchiveShoppingList(list)}
-                                                                        className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all flex items-center gap-1 text-xs font-semibold"
-                                                                        title={list.is_archived ? "Desarchivar lista" : "Archivar lista para después"}
+                                                                        className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all flex items-center gap-1 text-xs font-medium"
+                                                                        title={list.is_archived ? "Desarchivar lista" : "Archivar lista"}
                                                                     >
                                                                         <Archive className="w-3.5 h-3.5" />
                                                                         <span className="hidden sm:inline">{list.is_archived ? "Desarchivar" : "Archivar"}</span>
                                                                     </button>
 
-                                                                    {/* Botón Eliminar lista */}
                                                                     <button 
                                                                         type="button"
                                                                         onClick={() => handleDeleteShoppingList(list.id)} 
                                                                         className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
-                                                                        title="Eliminar lista completa"
+                                                                        title="Eliminar lista"
                                                                     >
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </button>
@@ -3323,76 +3492,76 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             </div>
 
                                                             {/* Barra de progreso */}
-                                                            <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                            <div className="h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                                 <div 
-                                                                    className={`h-full rounded-full transition-all duration-300 ${progress === 100 ? 'bg-emerald-500' : 'bg-gray-900 dark:bg-white'}`} 
+                                                                    className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300" 
                                                                     style={{ width: `${progress}%` }}
                                                                 />
                                                             </div>
 
-                                                            {/* Resumen financiero de la lista */}
-                                                            <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800/80 text-center">
+                                                            {/* Resumen financiero */}
+                                                            <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800 text-center">
                                                                 <div>
-                                                                    <span className="text-[10px] uppercase font-bold text-gray-400 block">Total Est.</span>
-                                                                    <span className="text-xs font-extrabold text-gray-900 dark:text-white">{formatCurrency(totalEstCents)}</span>
+                                                                    <span className="text-[10px] uppercase font-medium text-gray-400 block">Estimado</span>
+                                                                    <span className="text-xs font-semibold text-gray-900 dark:text-white">{formatCurrency(totalEstCents)}</span>
                                                                 </div>
                                                                 <div>
-                                                                    <span className="text-[10px] uppercase font-bold text-emerald-500 block">Comprado</span>
-                                                                    <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalBoughtCents)}</span>
+                                                                    <span className="text-[10px] uppercase font-medium text-gray-400 block">Comprado</span>
+                                                                    <span className="text-xs font-semibold text-gray-900 dark:text-white">{formatCurrency(totalBoughtCents)}</span>
                                                                 </div>
                                                                 <div>
-                                                                    <span className="text-[10px] uppercase font-bold text-amber-500 block">Por Comprar</span>
-                                                                    <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400">{formatCurrency(totalPendingCents)}</span>
+                                                                    <span className="text-[10px] uppercase font-medium text-gray-400 block">Pendiente</span>
+                                                                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{formatCurrency(totalPendingCents)}</span>
                                                                 </div>
                                                             </div>
 
-                                                            {/* BOTÓN CARGAR A GASTO */}
-                                                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-xl">
+                                                            {/* Cargar a Gasto Banner */}
+                                                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
                                                                 <div className="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                                                    <Banknote className="w-4 h-4 text-emerald-500 shrink-0" />
-                                                                    <span>Monto listo para cargar: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(totalBoughtCents)}</strong></span>
+                                                                    <Banknote className="w-4 h-4 text-gray-500 shrink-0" />
+                                                                    <span>Listo para cargar: <strong className="text-gray-900 dark:text-white font-semibold">{formatCurrency(totalBoughtCents)}</strong></span>
                                                                 </div>
                                                                 <button
                                                                     type="button"
                                                                     disabled={completed === 0 || totalBoughtCents <= 0}
                                                                     onClick={() => handleOpenLoadExpenseModal(list)}
-                                                                    className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs ${
+                                                                    className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
                                                                         completed === 0 || totalBoughtCents <= 0
-                                                                            ? 'bg-gray-200 dark:bg-zinc-800 text-gray-400 border border-gray-300 dark:border-zinc-700 cursor-not-allowed opacity-60'
-                                                                            : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white cursor-pointer'
+                                                                            ? 'bg-gray-100 dark:bg-zinc-800 text-gray-400 border border-gray-200 dark:border-zinc-700 cursor-not-allowed'
+                                                                            : 'bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white cursor-pointer shadow-xs'
                                                                     }`}
-                                                                    title={completed === 0 ? "Marca al menos un producto con el chequesito para habilitar este botón" : "Cargar el dinero de las compras marcadas como un gasto en tu cuenta"}
+                                                                    title={completed === 0 ? "Marca artículos con el check para habilitar" : "Cargar costo a tu cuenta"}
                                                                 >
                                                                     <CreditCard className="w-3.5 h-3.5" />
                                                                     Cargar a Gasto
                                                                 </button>
                                                             </div>
 
-                                                            {/* Lista de artículos */}
-                                                            <div className="space-y-1.5">
+                                                            {/* Lista de artículos (Deslizable, max 2-3 visibles) */}
+                                                            <div className="space-y-1.5 max-h-[155px] overflow-y-auto no-scrollbar pr-0.5">
                                                                 {listItems.length === 0 ? (
-                                                                    <p className="text-xs text-gray-400 italic py-2 text-center">No hay artículos en esta lista aún.</p>
+                                                                    <p className="text-xs text-gray-400 italic py-3 text-center">No hay artículos en esta lista.</p>
                                                                 ) : (
                                                                     listItems.map(item => {
                                                                         const itemTotalCents = (item.quantity || 1) * (item.price_cents || 0);
                                                                         return (
                                                                             <div key={item.id} className="flex items-center justify-between p-2.5 bg-gray-50/70 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800/80 group hover:border-gray-200 dark:hover:border-zinc-700 transition-all">
-                                                                                <div className="flex items-center gap-3">
+                                                                                <div className="flex items-center gap-3 min-w-0">
                                                                                     <button 
                                                                                         type="button" 
                                                                                         onClick={() => handleToggleShoppingItem(item)} 
-                                                                                        className={`w-5 h-5 rounded-lg border ${item.is_purchased ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 dark:border-zinc-700 hover:border-emerald-500'} flex items-center justify-center transition-all shrink-0`}
+                                                                                        className={`w-4 h-4 rounded border ${item.is_purchased ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900' : 'border-gray-300 dark:border-zinc-700 hover:border-gray-400'} flex items-center justify-center transition-all shrink-0`}
                                                                                     >
-                                                                                        {item.is_purchased && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                                                                        {item.is_purchased && <CheckCircle2 className="w-3 h-3" />}
                                                                                     </button>
-                                                                                    <div>
-                                                                                        <span className={`text-xs font-semibold ${item.is_purchased ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                                                                                    <div className="truncate">
+                                                                                        <span className={`text-xs font-medium ${item.is_purchased ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
                                                                                             {item.name}
                                                                                         </span>
                                                                                         {((item.quantity && item.quantity > 1) || (item.price_cents && item.price_cents > 0)) && (
                                                                                             <div className="flex items-center gap-2 text-[10px] text-gray-400">
                                                                                                 {item.quantity && item.quantity > 1 && (
-                                                                                                    <span className="font-semibold text-gray-500 dark:text-gray-400">{item.quantity} ud.</span>
+                                                                                                    <span className="font-medium text-gray-500 dark:text-gray-400">{item.quantity} ud.</span>
                                                                                                 )}
                                                                                                 {item.price_cents && item.price_cents > 0 && (
                                                                                                     <span>c/u: {formatCurrency(item.price_cents)}</span>
@@ -3401,9 +3570,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                                         )}
                                                                                     </div>
                                                                                 </div>
-                                                                                <div className="flex items-center gap-2">
+                                                                                <div className="flex items-center gap-2 shrink-0">
                                                                                     {itemTotalCents > 0 && (
-                                                                                        <span className={`text-xs font-bold ${item.is_purchased ? 'text-emerald-600 dark:text-emerald-400 line-through opacity-75' : 'text-gray-900 dark:text-white'}`}>
+                                                                                        <span className={`text-xs font-semibold ${item.is_purchased ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>
                                                                                             {formatCurrency(itemTotalCents)}
                                                                                         </span>
                                                                                     )}
@@ -3422,7 +3591,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 )}
                                                             </div>
 
-                                                            {/* Formulario rápido para añadir artículo con precio y cantidad */}
+                                                            {/* Formulario para añadir artículo */}
                                                             <form onSubmit={(e) => handleAddShoppingItem(e, list.id)} className="pt-3 border-t border-gray-100 dark:border-zinc-800 space-y-2">
                                                                 <div className="flex flex-col sm:flex-row gap-2">
                                                                     <input 
@@ -3430,8 +3599,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                         required
                                                                         value={newItemNames[list.id] || ''} 
                                                                         onChange={e => setNewItemNames(prev => ({ ...prev, [list.id]: e.target.value }))} 
-                                                                        placeholder="Ej. Leche 1L, Huevos 12pk" 
-                                                                        className="flex-1 px-3 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none text-gray-900 dark:text-white" 
+                                                                        placeholder="Nombre del artículo" 
+                                                                        className="flex-1 px-3 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none text-gray-900 dark:text-white focus:border-gray-400" 
                                                                     />
                                                                     <div className="flex gap-2">
                                                                         <input 
@@ -3441,8 +3610,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                             value={newItemQuantities[list.id] || '1'} 
                                                                             onChange={e => setNewItemQuantities(prev => ({ ...prev, [list.id]: e.target.value }))} 
                                                                             placeholder="Cant." 
-                                                                            title="Cantidad de unidades"
-                                                                            className="w-16 px-2.5 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none text-center font-semibold text-gray-900 dark:text-white" 
+                                                                            title="Cantidad"
+                                                                            className="w-16 px-2 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none text-center font-medium text-gray-900 dark:text-white" 
                                                                         />
                                                                         <div className="relative w-24">
                                                                             <span className="absolute left-2.5 top-2 text-xs text-gray-400 font-bold">$</span>
@@ -3454,8 +3623,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                                 value={newItemPrices[list.id] || ''} 
                                                                                 onChange={e => setNewItemPrices(prev => ({ ...prev, [list.id]: e.target.value.replace(/-/g, '') }))} 
                                                                                 placeholder="Precio" 
-                                                                                title="Precio unitario estimado ($)"
-                                                                                className="w-full pl-6 pr-2 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none font-semibold text-gray-900 dark:text-white" 
+                                                                                title="Precio unitario"
+                                                                                className="w-full pl-6 pr-2 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none font-medium text-gray-900 dark:text-white" 
                                                                             />
                                                                         </div>
                                                                         <button 
@@ -3474,23 +3643,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             })()}
                                         </div>
                                         <div>
-                                            <form onSubmit={handleCreateShoppingList} className="bg-gray-50 dark:bg-[#121212] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6">
-                                                <h3 className="font-semibold text-lg text-gray-900 dark:text-white flex items-center gap-2">
-                                                    <ShoppingCart className="w-5 h-5 text-emerald-500" />
-                                                    Nueva Lista de Super
-                                                </h3>
+                                            <form onSubmit={handleCreateShoppingList} className="bg-white dark:bg-[#0c0c0c] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6 shadow-xs">
+                                                <div className="space-y-1">
+                                                    <h3 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                                                        <ShoppingCart className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                                                        Nueva Lista
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500">Crea una lista minimalista para tus compras</p>
+                                                </div>
                                                 <div className="space-y-1.5">
-                                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nombre de la lista</label>
+                                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Nombre de la lista</label>
                                                     <input 
                                                         required 
                                                         type="text" 
                                                         value={newListName} 
                                                         onChange={e => setNewListName(e.target.value)} 
-                                                        placeholder="Ej. Supermercado Semanal, Farmacia..." 
-                                                        className="w-full px-3.5 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none" 
+                                                        placeholder="Ej. Supermercado Semanal" 
+                                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" 
                                                     />
                                                 </div>
-                                                <button type="submit" className="w-full bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white py-3 rounded-xl text-xs font-semibold transition-all">
+                                                <button type="submit" className="w-full bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs">
                                                     Crear Lista
                                                 </button>
                                             </form>
@@ -5916,11 +6088,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             <AnimatePresence>
                 {showLoadExpenseModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowLoadExpenseModal(null)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0c0c0c] rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-zinc-800 space-y-4">
                             <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                                 <div>
-                                    <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <Banknote className="w-5 h-5 text-emerald-500" />
+                                    <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <Banknote className="w-4 h-4 text-gray-700 dark:text-gray-300" />
                                         Cargar Gasto de Compras
                                     </h3>
                                     <p className="text-xs text-gray-500">Registra los artículos marcados como un gasto real</p>
@@ -5930,16 +6102,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 </button>
                             </div>
 
-                            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl flex items-center justify-between">
+                            <div className="p-3.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl flex items-center justify-between">
                                 <div>
-                                    <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 block">Lista: {showLoadExpenseModal.name}</span>
+                                    <span className="text-xs font-semibold text-gray-900 dark:text-white block">Lista: {showLoadExpenseModal.name}</span>
                                     <span className="text-[10px] text-gray-500">
                                         {shoppingItems.filter(i => i.list_id === showLoadExpenseModal.id && i.is_purchased).length} artículos marcados
                                     </span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Monto a descontar</span>
-                                    <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                                    <span className="text-[10px] text-gray-400 uppercase font-medium block">Monto a descontar</span>
+                                    <span className="text-base font-bold text-gray-900 dark:text-white">
                                         {formatCurrency(shoppingItems.filter(i => i.list_id === showLoadExpenseModal.id && i.is_purchased).reduce((acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0), 0))}
                                     </span>
                                 </div>
@@ -5947,12 +6119,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                             <form onSubmit={handleConfirmLoadExpense} className="space-y-3.5">
                                 <div className="space-y-1">
-                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Cuenta para aplicar el gasto *</label>
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Cuenta para aplicar el gasto *</label>
                                     <select
                                         required
                                         value={loadExpenseAccountId}
                                         onChange={e => setLoadExpenseAccountId(e.target.value)}
-                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none"
+                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
                                     >
                                         <option value="">-- Seleccionar Cuenta --</option>
                                         {accounts.map(acc => (
@@ -5964,11 +6136,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Categoría del Gasto</label>
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Categoría del Gasto</label>
                                     <select
                                         value={loadExpenseCategoryId}
                                         onChange={e => setLoadExpenseCategoryId(e.target.value)}
-                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none"
+                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
                                     >
                                         <option value="">Sin Categoría</option>
                                         {categories.filter(c => c.type === 'EXPENSE' || !c.type).map(cat => (
@@ -5980,46 +6152,46 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Descripción de la transacción</label>
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Descripción de la transacción</label>
                                     <input
                                         type="text"
                                         required
                                         value={loadExpenseDescription}
                                         onChange={e => setLoadExpenseDescription(e.target.value)}
                                         placeholder="Ej. Compra de supermercado semanal"
-                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none"
+                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
                                     />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Fecha</label>
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Fecha</label>
                                     <input
                                         type="date"
                                         required
                                         value={loadExpenseDate}
                                         onChange={e => setLoadExpenseDate(e.target.value)}
-                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none"
+                                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
                                     />
                                 </div>
 
-                                <p className="text-[11px] text-gray-400 italic bg-gray-50 dark:bg-[#141414] p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800">
-                                    ✨ Nota: Al confirmar, se registrará el gasto, se descontará el dinero de la cuenta elegida y los chequesitos de esta lista se desmarcarán para permitirte volver a usarla.
+                                <p className="text-[11px] text-gray-500 bg-gray-50 dark:bg-[#141414] p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800">
+                                    Al confirmar, se registrará el gasto en la cuenta seleccionada y los artículos comprados se restablecerán para su reutilización.
                                 </p>
 
                                 <div className="flex gap-2 pt-2">
                                     <button
                                         type="button"
                                         onClick={() => setShowLoadExpenseModal(null)}
-                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold transition-colors"
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-medium transition-colors"
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5"
+                                        className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-xs flex items-center justify-center gap-1.5"
                                     >
                                         <CheckCircle2 className="w-4 h-4" />
-                                        Confirmar Gasto
+                                        Registrar Gasto
                                     </button>
                                 </div>
                             </form>
