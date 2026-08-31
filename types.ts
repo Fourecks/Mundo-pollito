@@ -632,6 +632,8 @@ export interface FinanceCategory {
   color?: string;
   parent_id?: number;
   is_archived: boolean;
+  type?: 'EXPENSE' | 'INCOME' | 'expense' | 'income';
+  budget_limit_cents?: number;
 }
 
 export interface FinanceTransaction {

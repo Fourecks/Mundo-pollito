@@ -168,6 +168,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     
     const [newCatName, setNewCatName] = useState('');
     const [newCatEmoji, setNewCatEmoji] = useState('💰');
+    const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
+    const [catName, setCatName] = useState('');
+    const [catEmoji, setCatEmoji] = useState('🏷️');
+    const [catType, setCatType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
+    const [catBudgetAmount, setCatBudgetAmount] = useState('');
     const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
 
     // --- Form States (Budget) ---
@@ -527,7 +532,24 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             ]);
 
             if (accRes.data) setAccounts(accRes.data);
-            if (catRes.data) setCategories(catRes.data);
+            if (catRes.data && catRes.data.length > 0) {
+                setCategories(catRes.data);
+            } else if (user) {
+                const defaultCats = [
+                    { name: 'Supermercado & Alimentación', emoji: '🛒', type: 'EXPENSE', budget_limit_cents: 30000, user_id: user.id, is_archived: false },
+                    { name: 'Vivienda & Alquiler', emoji: '🏠', type: 'EXPENSE', budget_limit_cents: 50000, user_id: user.id, is_archived: false },
+                    { name: 'Transporte & Combustible', emoji: '🚗', type: 'EXPENSE', budget_limit_cents: 15000, user_id: user.id, is_archived: false },
+                    { name: 'Entretenimiento & Ocio', emoji: '🍿', type: 'EXPENSE', budget_limit_cents: 10000, user_id: user.id, is_archived: false },
+                    { name: 'Servicios & Luz', emoji: '💡', type: 'EXPENSE', budget_limit_cents: 12000, user_id: user.id, is_archived: false },
+                    { name: 'Salud & Bienestar', emoji: '🩺', type: 'EXPENSE', budget_limit_cents: 8000, user_id: user.id, is_archived: false },
+                    { name: 'Salario & Nómina', emoji: '💼', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false },
+                    { name: 'Freelance & Honorarios', emoji: '💵', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false },
+                    { name: 'Inversiones', emoji: '📈', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false }
+                ];
+                supabase.from('finance_categories').insert(defaultCats).select('*').then(({ data }) => {
+                    if (data) setCategories(data);
+                });
+            }
             if (txRes.data) setTransactions(txRes.data);
             if (budRes.data) setBudgets(budRes.data);
             if (recRes.data) setRecurring(recRes.data);
@@ -1186,20 +1208,89 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         fetchFinanceData(true);
     };
 
-    const handleCreateCategory = async (e: React.FormEvent) => {
+    const openNewCategoryModal = (defaultType: 'EXPENSE' | 'INCOME' = 'EXPENSE') => {
+        setEditingCategory(null);
+        setCatName('');
+        setCatEmoji(defaultType === 'INCOME' ? '💼' : '🛒');
+        setCatType(defaultType);
+        setCatBudgetAmount('');
+        setShowCreateCategoryModal(true);
+    };
+
+    const openEditCategoryModal = (cat: FinanceCategory) => {
+        setEditingCategory(cat);
+        setCatName(cat.name);
+        setCatEmoji(cat.emoji || '🏷️');
+        const isInc = cat.type && cat.type.toUpperCase() === 'INCOME';
+        setCatType(isInc ? 'INCOME' : 'EXPENSE');
+
+        const budgetItem = budgetItems.find(b => b.category_id === cat.id && b.month === selectedBudgetMonth);
+        const cents = budgetItem ? budgetItem.allocated_cents : (cat.budget_limit_cents || 0);
+        setCatBudgetAmount(cents > 0 ? (cents / 100).toString() : '');
+        setShowCreateCategoryModal(true);
+    };
+
+    const handleSaveCategory = async (e: React.FormEvent) => {
         e.preventDefault();
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user || !newCatName.trim()) return;
+        if (!user || !catName.trim()) return;
 
-        await supabase.from('finance_categories').insert([{ user_id: user.id, name: newCatName.trim(), emoji: newCatEmoji || '💰' }]);
-        setNewCatName(''); 
-        setNewCatEmoji('💰');
+        const budgetCents = catType === 'EXPENSE' && catBudgetAmount ? Math.round(parseFloat(catBudgetAmount) * 100) : 0;
+        let catId = editingCategory?.id;
+
+        if (editingCategory) {
+            await supabase.from('finance_categories').update({
+                name: catName.trim(),
+                emoji: catEmoji || '🏷️',
+                type: catType,
+                budget_limit_cents: budgetCents
+            }).eq('id', editingCategory.id);
+        } else {
+            const { data: insertedCat } = await supabase.from('finance_categories').insert([{
+                user_id: user.id,
+                name: catName.trim(),
+                emoji: catEmoji || '🏷️',
+                type: catType,
+                budget_limit_cents: budgetCents,
+                is_archived: false
+            }]).select().maybeSingle();
+            if (insertedCat) catId = insertedCat.id;
+        }
+
+        // Sync with budget_items if EXPENSE
+        if (catType === 'EXPENSE' && catId) {
+            const existingBudgetItem = budgetItems.find(b => b.category_id === catId && b.month === selectedBudgetMonth);
+            if (existingBudgetItem) {
+                await supabase.from('finance_budget_items').update({
+                    allocated_cents: budgetCents,
+                    name: catName.trim(),
+                    icon: catEmoji,
+                    updated_at: new Date().toISOString()
+                }).eq('id', existingBudgetItem.id);
+            } else if (budgetCents > 0) {
+                await supabase.from('finance_budget_items').insert([{
+                    user_id: user.id,
+                    month: selectedBudgetMonth,
+                    name: catName.trim(),
+                    allocated_cents: budgetCents,
+                    icon: catEmoji,
+                    color: '#27272a',
+                    category_id: catId
+                }]);
+            }
+        }
+
         setShowCreateCategoryModal(false);
+        setEditingCategory(null);
+        setCatName('');
+        setCatEmoji('🏷️');
+        setCatType('EXPENSE');
+        setCatBudgetAmount('');
         fetchFinanceData(true);
     };
 
     const handleDeleteCategory = async (id: number) => {
-        if (!confirm('¿Eliminar esta categoría?')) return;
+        if (!confirm('¿Eliminar esta categoría? Se eliminará también de tu presupuesto.')) return;
         await supabase.from('finance_categories').delete().eq('id', id);
         fetchFinanceData(true);
     };
@@ -3729,36 +3820,92 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             </button>
                                         </div>
 
-                                        {/* CATEGORIES */}
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2">
-                                                <div>
-                                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Categorías</h3>
-                                                    <p className="text-xs text-gray-500">Clasificación para gastos e ingresos</p>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setNewCatName('');
-                                                        setNewCatEmoji('🏷️');
-                                                        setShowCreateCategoryModal(true);
-                                                    }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-medium transition-all"
-                                                >
-                                                    <PlusIcon className="w-3.5 h-3.5" />
-                                                    Nueva Categoría
-                                                </button>
-                                            </div>
+                                         {/* CATEGORIES / PRESUPUESTOS UNIFICADOS */}
+                                         <div className="space-y-4">
+                                             <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2">
+                                                 <div>
+                                                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Categorías y Presupuestos</h3>
+                                                     <p className="text-xs text-gray-500">Administra tus categorías de gastos (presupuestos) e ingresos</p>
+                                                 </div>
+                                                 <div className="flex gap-2">
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => openNewCategoryModal('EXPENSE')}
+                                                         className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
+                                                     >
+                                                         <PlusIcon className="w-3.5 h-3.5" />
+                                                         Nueva Categoría
+                                                     </button>
+                                                 </div>
+                                             </div>
 
-                                            <div className="flex flex-wrap gap-2 pt-1 max-h-48 overflow-y-auto">
-                                                {categories.map(cat => (
-                                                    <span key={cat.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-800 dark:text-gray-200">
-                                                        <span>{cat.emoji}</span>
-                                                        <span>{cat.name}</span>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
+                                             {/* Expenses / Budgets Section */}
+                                             <div className="space-y-2">
+                                                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Categorías de Gasto / Presupuesto</span>
+                                                 <div className="flex flex-wrap gap-2">
+                                                     {categories.filter(c => !c.type || c.type.toUpperCase() === 'EXPENSE' || c.type.toUpperCase() === 'GASTO').map(cat => (
+                                                         <div key={cat.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-800 dark:text-gray-200 group">
+                                                             <span>{cat.emoji || '🛒'}</span>
+                                                             <span className="font-medium">{cat.name}</span>
+                                                             {cat.budget_limit_cents && cat.budget_limit_cents > 0 ? (
+                                                                 <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-200 dark:bg-zinc-800 rounded-md text-gray-700 dark:text-gray-300">
+                                                                     ${(cat.budget_limit_cents / 100).toFixed(2)}/mes
+                                                                 </span>
+                                                             ) : null}
+                                                             <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
+                                                                 <button
+                                                                     type="button"
+                                                                     onClick={() => openEditCategoryModal(cat)}
+                                                                     className="text-gray-400 hover:text-gray-700 dark:hover:text-white p-0.5 rounded transition-colors"
+                                                                     title="Editar"
+                                                                 >
+                                                                     <Pencil className="w-3 h-3" />
+                                                                 </button>
+                                                                 <button
+                                                                     type="button"
+                                                                     onClick={() => handleDeleteCategory(cat.id)}
+                                                                     className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
+                                                                     title="Eliminar"
+                                                                 >
+                                                                     <Trash2 className="w-3 h-3" />
+                                                                 </button>
+                                                             </div>
+                                                         </div>
+                                                     ))}
+                                                 </div>
+                                             </div>
+
+                                             {/* Income Section */}
+                                             <div className="space-y-2 pt-2">
+                                                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Categorías de Ingreso</span>
+                                                 <div className="flex flex-wrap gap-2">
+                                                     {categories.filter(c => c.type && (c.type.toUpperCase() === 'INCOME' || c.type.toUpperCase() === 'INGRESO')).map(cat => (
+                                                         <div key={cat.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-xl text-xs text-emerald-900 dark:text-emerald-300 group">
+                                                             <span>{cat.emoji || '💼'}</span>
+                                                             <span className="font-medium">{cat.name}</span>
+                                                             <div className="flex items-center gap-1 ml-1 pl-1 border-l border-emerald-200 dark:border-emerald-800">
+                                                                 <button
+                                                                     type="button"
+                                                                     onClick={() => openEditCategoryModal(cat)}
+                                                                     className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-white p-0.5 rounded transition-colors"
+                                                                     title="Editar"
+                                                                 >
+                                                                     <Pencil className="w-3 h-3" />
+                                                                 </button>
+                                                                 <button
+                                                                     type="button"
+                                                                     onClick={() => handleDeleteCategory(cat.id)}
+                                                                     className="text-emerald-600 dark:text-emerald-400 hover:text-red-500 p-0.5 rounded transition-colors"
+                                                                     title="Eliminar"
+                                                                 >
+                                                                     <Trash2 className="w-3 h-3" />
+                                                                 </button>
+                                                             </div>
+                                                         </div>
+                                                     ))}
+                                                 </div>
+                                             </div>
+                                         </div>
 
                                         {/* SECURITY & PIN PROTECTION */}
                                         <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-zinc-800">
@@ -3921,7 +4068,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <label className="block text-sm font-medium mb-1">Categoría</label>
                                             <select required value={txCategoryId} onChange={(e) => setTxCategoryId(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
                                                 <option value="" disabled>Selecciona una categoría</option>
-                                                {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>)}
+                                                {categories
+                                                    .filter(cat => !cat.type || (txType === 'EXPENSE' ? (cat.type.toUpperCase() === 'EXPENSE' || cat.type.toUpperCase() === 'GASTO') : (cat.type.toUpperCase() === 'INCOME' || cat.type.toUpperCase() === 'INGRESO')))
+                                                    .map(cat => <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name} {cat.budget_limit_cents && cat.budget_limit_cents > 0 ? `(Presupuesto: $${(cat.budget_limit_cents / 100).toFixed(2)})` : ''}</option>)}
                                             </select>
                                         </div>
                                     </>
@@ -4877,49 +5026,105 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 )}
             </AnimatePresence>
 
-            {/* Category Creation Modal */}
+            {/* Category Creation & Editing Modal */}
             <AnimatePresence>
                 {showCreateCategoryModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreateCategoryModal(false)}>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[88vh] overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                                 <div>
-                                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Nueva Categoría</h3>
-                                    <p className="text-xs text-gray-500">Selecciona un icono y asigna un nombre</p>
+                                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                                        {editingCategory ? 'Editar Categoría / Presupuesto' : 'Nueva Categoría / Presupuesto'}
+                                    </h3>
+                                    <p className="text-xs text-gray-500">Configura el tipo, icono y límite mensual</p>
                                 </div>
                                 <button type="button" onClick={() => setShowCreateCategoryModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full">
                                     <XIcon className="w-5 h-5" />
                                 </button>
                             </div>
 
-                            <form onSubmit={handleCreateCategory} className="space-y-4">
+                            <form onSubmit={handleSaveCategory} className="space-y-4">
+                                {/* Type Selector */}
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Tipo de Categoría</label>
+                                    <div className="grid grid-cols-2 gap-2 bg-gray-50 dark:bg-[#121212] p-1 rounded-2xl border border-gray-200 dark:border-zinc-800">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCatType('EXPENSE')}
+                                            className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                                                catType === 'EXPENSE'
+                                                    ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm'
+                                                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                                            }`}
+                                        >
+                                            <TrendingDown className="w-3.5 h-3.5 text-red-500" />
+                                            Gasto / Presupuesto
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCatType('INCOME')}
+                                            className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                                                catType === 'INCOME'
+                                                    ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm'
+                                                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                                            }`}
+                                        >
+                                            <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                                            Ingreso
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div className="space-y-1.5">
-                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nombre de la categoría</label>
+                                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Nombre de la Categoría</label>
                                     <div className="flex gap-2">
                                         <div className="w-12 h-11 flex items-center justify-center text-xl bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
-                                            {newCatEmoji || '🏷️'}
+                                            {catEmoji || '🏷️'}
                                         </div>
                                         <input
                                             type="text"
                                             required
                                             autoFocus
-                                            value={newCatName}
-                                            onChange={e => setNewCatName(e.target.value)}
-                                            placeholder="Ej. Supermercado, Gimnasio, Transporte..."
+                                            value={catName}
+                                            onChange={e => setCatName(e.target.value)}
+                                            placeholder="Ej. Supermercado, Transporte, Salario..."
                                             className="flex-1 px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
                                         />
                                     </div>
                                 </div>
 
+                                {/* Budget Limit (for Expense Categories) */}
+                                {catType === 'EXPENSE' && (
+                                    <div className="space-y-1.5">
+                                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Presupuesto Límite Mensual ($)</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs text-gray-400 font-bold">$</div>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                onKeyDown={blockNegativeKeys}
+                                                value={catBudgetAmount}
+                                                onChange={e => setCatBudgetAmount(e.target.value.replace(/-/g, ''))}
+                                                placeholder="Ej. 300.00 (Opcional)"
+                                                className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-semibold outline-none text-gray-900 dark:text-white"
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-gray-400">
+                                            Asigna un monto límite mensual para monitorear tu avance en el módulo de Presupuestos.
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div className="space-y-1.5">
                                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Seleccionar Emoji</label>
-                                    <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5 p-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-2xl max-h-48 overflow-y-auto">
-                                        {['💰', '💵', '💳', '🏦', '💎', '💸', '💼', '📈', '📊', '🏧', '🏷️', '🪙', '🧾', '⚖️', '🍔', '🍕', '🍣', '🌮', '🥗', '☕', '🍺', '🍷', '🍩', '🥐', '🍏', '🍟', '🍜', '🍦', '🍫', '🛒', '🛍️', '👕', '👠', '👓', '👗', '💍', '💄', '🎒', '🚗', '⛽', '🚌', '✈️', '🚕', '🚲', '🛴', '🛵', '🚂', '⛵', '🏠', '🔑', '🔌', '🧹', '🛋️', '🛏️', '🚿', '🪴', '📺', '📻', '🩺', '💊', '🏋️', '🧘', '🚴', '⚽', '🏀', '🎾', '🥊', '🏊', '🎓', '📚', '🎒', '✏️', '💻', '📱', '🎧', '📸', '⌚', '🖥️', '🍿', '🎮', '🎉', '🎁', '🎬', '🎸', '🎨', '🎟️', '🎪', '🐾', '🐶', '🐱', '🐴', '🦜', '💈', '🛠️', '🔥', '💡', '❤️', '🏖️', '🏨', '🍼', '👶', '🌾', '🧼', '📦', '🧰', '📮', '🗺️', '⛰️', '⛺', '🗿', '🔮', '🎲', '🎰', '🎯', '🧻', '🪥', '🧺', '🛡️', '🔒', '📜', '🚑', '🚨', '🚒', '🏢', '🏗️', '🚜', '⚙️', '⚡', '💧', '☀️', '🌙', '🌐', '📡', '📢', '💬'].map(emoji => (
+                                    <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5 p-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-2xl max-h-40 overflow-y-auto">
+                                        {['🛒', '🏠', '💡', '🚗', '⛽', '🍿', '💊', '🩺', '🎓', '✈️', '👕', '📱', '💰', '💼', '💵', '📈', '🎁', '☕', '🐾', '🏋️', '🛠️', '🍕', '🍣', '🌮', '🥗', '🍔', '🚌', '🔑', '🛋️', '📺', '🎨', '🔥', '⚡', '💧', '🔒', '📜'].map(emoji => (
                                             <button
                                                 key={emoji}
                                                 type="button"
-                                                onClick={() => setNewCatEmoji(emoji)}
-                                                className={`p-2 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-xl transition-all text-base flex items-center justify-center ${newCatEmoji === emoji ? 'bg-white dark:bg-zinc-700 shadow-sm scale-110 font-bold' : ''}`}
+                                                onClick={() => setCatEmoji(emoji)}
+                                                className={`p-2 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-xl transition-all text-base flex items-center justify-center ${catEmoji === emoji ? 'bg-white dark:bg-zinc-700 shadow-sm scale-110 font-bold' : ''}`}
                                             >
                                                 {emoji}
                                             </button>
@@ -4939,7 +5144,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         type="submit"
                                         className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
                                     >
-                                        Crear Categoría
+                                        {editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}
                                     </button>
                                 </div>
                             </form>
