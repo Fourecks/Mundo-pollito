@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS public.finance_savings_goals (
     target_amount_cents BIGINT NOT NULL,
     current_amount_cents BIGINT NOT NULL DEFAULT 0,
     target_date DATE,
+    frequency TEXT DEFAULT 'MONTHLY',
+    custom_contribution_cents BIGINT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 ALTER TABLE public.finance_savings_goals ENABLE ROW LEVEL SECURITY;
