@@ -329,6 +329,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [goalName, setGoalName] = useState('');
     const [goalTargetAmount, setGoalTargetAmount] = useState('');
     const [goalTargetDate, setGoalTargetDate] = useState('');
+    const [goalCustomContribution, setGoalCustomContribution] = useState('');
     const [goalFrequency, setGoalFrequency] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('MONTHLY');
 
     // --- Form States (Debts) ---
@@ -1824,10 +1825,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         return Math.round(amount * 20) / 20;
     };
 
-    const calculateSavingsCuota = (targetCents: number, currentCents: number, targetDateStr?: string, frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' = 'MONTHLY') => {
+    const calculateSavingsCuota = (targetCents: number, currentCents: number, targetDateStr?: string, frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' = 'MONTHLY', customContribCents?: number) => {
         const remainingCents = Math.max(0, targetCents - currentCents);
         if (remainingCents <= 0) return { cuota: 0, periods: 0, daysRemaining: 0 };
-        if (!targetDateStr) return { cuota: null, periods: null, daysRemaining: null };
+        
+        if (!targetDateStr) {
+            if (customContribCents && customContribCents > 0) {
+                const periods = Math.max(1, Math.ceil(remainingCents / customContribCents));
+                const cuota = customContribCents / 100;
+                let daysPerPeriod = 30;
+                if (frequency === 'WEEKLY') daysPerPeriod = 7;
+                else if (frequency === 'BIWEEKLY') daysPerPeriod = 14;
+                const daysRemaining = periods * daysPerPeriod;
+                return { cuota, periods, daysRemaining, isIndefinite: true };
+            }
+            return { cuota: null, periods: null, daysRemaining: null, isIndefinite: true };
+        }
 
         const now = new Date();
         now.setHours(0, 0, 0, 0);
@@ -1843,7 +1856,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         const rawCuota = (remainingCents / 100) / periods;
         const cuota = roundToNearest5Cents(rawCuota);
 
-        return { cuota, periods, daysRemaining };
+        return { cuota, periods, daysRemaining, isIndefinite: false };
     };
 
     const calculateEstimatedCompletionDate = (goal: FinanceSavingsGoal) => {
@@ -1870,6 +1883,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     basedOnPace: true
                 };
             }
+        }
+
+        // If custom contribution is defined for indefinite goals
+        if (goal.custom_contribution_cents && goal.custom_contribution_cents > 0) {
+            const daysPerPeriod = goal.frequency === 'WEEKLY' ? 7 : goal.frequency === 'BIWEEKLY' ? 14 : 30;
+            const periodsNeeded = Math.ceil(remainingCents / goal.custom_contribution_cents);
+            const daysNeeded = periodsNeeded * daysPerPeriod;
+            const estimatedDate = new Date();
+            estimatedDate.setDate(estimatedDate.getDate() + daysNeeded);
+            return {
+                isCompleted: false,
+                dateFormatted: estimatedDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }),
+                daysNeeded,
+                periodsNeeded,
+                basedOnCustomContribution: true
+            };
         }
 
         // If target_date is set, show estimated completion date from schedule
@@ -1902,14 +1931,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         }
 
         const amountCents = Math.round(rawAmount * 100);
+        const customContribRaw = parseFloat(goalCustomContribution);
+        const customContribCents = (!isNaN(customContribRaw) && customContribRaw > 0) ? Math.round(customContribRaw * 100) : undefined;
         const tempId = Date.now();
+
         const newGoalObj: FinanceSavingsGoal = {
             id: tempId,
             user_id: 'local',
             name: goalName.trim(),
             target_amount_cents: amountCents,
             current_amount_cents: 0,
-            target_date: goalTargetDate || null,
+            target_date: goalTargetDate ? goalTargetDate : undefined,
+            custom_contribution_cents: customContribCents,
             frequency: (goalFrequency || 'MONTHLY') as any,
             is_completed: false,
             created_at: new Date().toISOString()
@@ -1921,6 +1954,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         setGoalName('');
         setGoalTargetAmount('');
         setGoalTargetDate('');
+        setGoalCustomContribution('');
         setGoalFrequency('MONTHLY');
 
         try {
@@ -1931,7 +1965,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     name: newGoalObj.name,
                     target_amount_cents: amountCents,
                     current_amount_cents: 0,
-                    target_date: goalTargetDate || null,
+                    target_date: goalTargetDate ? goalTargetDate : null,
+                    custom_contribution_cents: customContribCents || null,
                     frequency: goalFrequency || 'MONTHLY'
                 }]).select();
 
@@ -3349,22 +3384,31 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                 savingsGoals.map(goal => {
                                                     const progress = Math.min(100, Math.round((goal.current_amount_cents / goal.target_amount_cents) * 100));
                                                     const freqLabel = goal.frequency === 'WEEKLY' ? 'semanal' : goal.frequency === 'BIWEEKLY' ? 'quincenal' : 'mensual';
-                                                    const cuotaInfo = calculateSavingsCuota(goal.target_amount_cents, goal.current_amount_cents, goal.target_date, goal.frequency || 'MONTHLY');
+                                                    const cuotaInfo = calculateSavingsCuota(goal.target_amount_cents, goal.current_amount_cents, goal.target_date, goal.frequency || 'MONTHLY', goal.custom_contribution_cents);
                                                     const projection = calculateEstimatedCompletionDate(goal);
 
                                                     return (
                                                         <div key={goal.id} className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 p-4 rounded-xl space-y-3 shadow-2xs">
                                                             <div className="flex justify-between items-start">
                                                                 <div className="min-w-0">
-                                                                    <div className="flex items-center gap-2">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
                                                                         <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{goal.name}</h3>
                                                                         <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-zinc-700 uppercase tracking-wider">
                                                                             {freqLabel}
                                                                         </span>
+                                                                        {!goal.target_date && (
+                                                                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 uppercase tracking-wider">
+                                                                                Indefinida
+                                                                            </span>
+                                                                        )}
                                                                     </div>
-                                                                    {goal.target_date && (
+                                                                    {goal.target_date ? (
                                                                         <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
                                                                             <Calendar className="w-3 h-3 text-gray-400" /> Meta para: {goal.target_date}
+                                                                        </p>
+                                                                    ) : (
+                                                                        <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
+                                                                            <Calendar className="w-3 h-3 text-gray-400" /> Sin fecha límite (Indefinida)
                                                                         </p>
                                                                     )}
                                                                 </div>
@@ -3388,13 +3432,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 {cuotaInfo.cuota !== null && cuotaInfo.cuota > 0 && (
                                                                     <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-lg border border-gray-200 dark:border-zinc-800 flex items-center justify-between">
                                                                         <div>
-                                                                            <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">Cuota ({freqLabel})</span>
+                                                                            <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">Abono ({freqLabel})</span>
                                                                             <span className="font-bold text-gray-900 dark:text-white text-xs">
                                                                                 ${cuotaInfo.cuota.toFixed(2)}
                                                                             </span>
                                                                         </div>
                                                                         <span className="text-[10px] text-gray-400 bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-zinc-700">
-                                                                            {cuotaInfo.periods} cuotas
+                                                                            ~{cuotaInfo.periods} abonos
                                                                         </span>
                                                                     </div>
                                                                 )}
@@ -3422,7 +3466,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     <button 
                                                                         onClick={() => {
                                                                             setShowContributeModal(goal.id);
-                                                                            if (cuotaInfo.cuota && cuotaInfo.cuota > 0) {
+                                                                            if (goal.custom_contribution_cents && goal.custom_contribution_cents > 0) {
+                                                                                setContributeAmount((goal.custom_contribution_cents / 100).toFixed(2));
+                                                                            } else if (cuotaInfo.cuota && cuotaInfo.cuota > 0) {
                                                                                 setContributeAmount(cuotaInfo.cuota.toFixed(2));
                                                                             }
                                                                         }} 
@@ -3444,7 +3490,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     <h3 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
                                                         <Target className="w-4 h-4 text-gray-700 dark:text-gray-300" /> Nueva Meta
                                                     </h3>
-                                                    <p className="text-xs text-gray-500">Planifica tu próxima meta de ahorro</p>
+                                                    <p className="text-xs text-gray-500">Planifica tu próxima meta de ahorro (con o sin fecha)</p>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nombre de la Meta</label>
@@ -3471,29 +3517,75 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         </select>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Fecha límite</label>
+                                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Fecha límite (Opcional)</label>
                                                         <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" />
                                                     </div>
                                                 </div>
 
+                                                {!goalTargetDate && (
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Abono deseado por período ($)</label>
+                                                        <div className="relative">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
+                                                            <input 
+                                                                type="number" 
+                                                                step="0.01" 
+                                                                min="0" 
+                                                                onKeyDown={blockNegativeKeys} 
+                                                                value={goalCustomContribution} 
+                                                                onChange={e => setGoalCustomContribution(e.target.value.replace(/-/g, ''))} 
+                                                                placeholder="Ej. 100.00" 
+                                                                className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" 
+                                                            />
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-400 mt-1">
+                                                            Sin fecha límite, la meta es indefinida. Escribe el abono a realizar en cada período ({goalFrequency === 'WEEKLY' ? 'semanal' : goalFrequency === 'BIWEEKLY' ? 'quincenal' : 'mensual'}).
+                                                        </p>
+                                                    </div>
+                                                )}
+
                                                 {/* Live Cuota Calculator Preview */}
-                                                {goalTargetAmount && parseFloat(goalTargetAmount) > 0 && goalTargetDate && (
+                                                {goalTargetAmount && parseFloat(goalTargetAmount) > 0 && (
                                                     <div className="p-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl space-y-1 text-sm text-gray-700 dark:text-gray-300 mt-2">
                                                         {(() => {
                                                             const targetCents = Math.round(parseFloat(goalTargetAmount) * 100);
-                                                            const calc = calculateSavingsCuota(targetCents, 0, goalTargetDate, goalFrequency);
                                                             const freqStr = goalFrequency === 'WEEKLY' ? 'semanal' : goalFrequency === 'BIWEEKLY' ? 'quincenal' : 'mensual';
-                                                            if (!calc.cuota) return null;
-                                                            return (
-                                                                <>
-                                                                    <span className="font-semibold text-gray-900 dark:text-white block">
-                                                                        Cuota: ${calc.cuota.toFixed(2)} / {freqStr}
+
+                                                            if (goalTargetDate) {
+                                                                const calc = calculateSavingsCuota(targetCents, 0, goalTargetDate, goalFrequency);
+                                                                if (!calc.cuota) return null;
+                                                                return (
+                                                                    <>
+                                                                        <span className="font-semibold text-gray-900 dark:text-white block">
+                                                                            Cuota: ${calc.cuota.toFixed(2)} / {freqStr}
+                                                                        </span>
+                                                                        <p className="text-xs text-gray-500 mt-1">
+                                                                            Abonando ${calc.cuota.toFixed(2)} en {calc.periods} períodos ({calc.daysRemaining} días).
+                                                                        </p>
+                                                                    </>
+                                                                );
+                                                            } else if (goalCustomContribution && parseFloat(goalCustomContribution) > 0) {
+                                                                const contribCents = Math.round(parseFloat(goalCustomContribution) * 100);
+                                                                const periods = Math.ceil(targetCents / contribCents);
+                                                                const daysPerPeriod = goalFrequency === 'WEEKLY' ? 7 : goalFrequency === 'BIWEEKLY' ? 14 : 30;
+                                                                const totalDays = periods * daysPerPeriod;
+                                                                return (
+                                                                    <>
+                                                                        <span className="font-semibold text-gray-900 dark:text-white block">
+                                                                            Meta Indefinida • Abono: ${parseFloat(goalCustomContribution).toFixed(2)} / {freqStr}
+                                                                        </span>
+                                                                        <p className="text-xs text-gray-500 mt-1">
+                                                                            Alcanzarás tu meta en aprox. {periods} períodos (~{totalDays} días).
+                                                                        </p>
+                                                                    </>
+                                                                );
+                                                            } else {
+                                                                return (
+                                                                    <span className="text-xs text-gray-500 block">
+                                                                        Meta Indefinida (sin fecha límite). Ingresa cuánto deseas abonar por período arriba.
                                                                     </span>
-                                                                    <p className="text-xs text-gray-500 mt-1">
-                                                                        Abonando ${calc.cuota.toFixed(2)} en {calc.periods} períodos ({calc.daysRemaining} días).
-                                                                    </p>
-                                                                </>
-                                                            );
+                                                                );
+                                                            }
                                                         })()}
                                                     </div>
                                                 )}
@@ -4091,7 +4183,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     .sort((a, b) => b.amount - a.amount);
                                 const totalCatExpense = sortedCategoryBreakdown.reduce((a, b) => a + b.amount, 0);
 
-                                const monochromePalette = ['#18181b', '#3f3f46', '#52525b', '#71717a', '#8a8a8e', '#a1a1aa', '#d4d4d8', '#e4e4e7'];
+                                const categoryPalette = ['#10b981', '#f43f5e', '#6366f1', '#f59e0b', '#06b6d4', '#8b5cf6', '#ec4899', '#3b82f6'];
 
                                 return (
                                     <div className="space-y-8 max-w-5xl mx-auto">
@@ -4106,16 +4198,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <div className="p-5 rounded-2xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-xs font-semibold text-gray-500">Tasa de Ahorro</span>
-                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200">
-                                                        {savingsRate >= 20 ? 'Saludable' : savingsRate > 0 ? 'Estable' : 'Neutro'}
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                                        savingsRate >= 20 
+                                                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' 
+                                                            : savingsRate > 0 
+                                                            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50' 
+                                                            : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50'
+                                                    }`}>
+                                                        {savingsRate >= 20 ? 'Saludable' : savingsRate > 0 ? 'Estable' : 'Deficitario'}
                                                     </span>
                                                 </div>
                                                 <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{savingsRate}%</div>
                                                 <div className="space-y-1">
                                                     <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div className="h-full rounded-full bg-gray-900 dark:bg-white" style={{ width: `${Math.min(100, savingsRate)}%` }} />
+                                                        <div className={`h-full rounded-full transition-all duration-300 ${netSavings >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }} />
                                                     </div>
-                                                    <p className="text-[10px] text-gray-400">Superávit: {formatCurrency(netSavings)}</p>
+                                                    <p className="text-[10px] text-gray-400 flex items-center justify-between">
+                                                        <span>Superávit:</span>
+                                                        <strong className={`font-semibold ${netSavings >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                            {formatCurrency(netSavings)}
+                                                        </strong>
+                                                    </p>
                                                 </div>
                                             </div>
 
@@ -4123,7 +4226,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <div className="p-5 rounded-2xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-xs font-semibold text-gray-500">Promedio Diario</span>
-                                                    <TrendingDown className="w-4 h-4 text-gray-400" />
+                                                    <TrendingDown className="w-4 h-4 text-rose-500" />
                                                 </div>
                                                 <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{formatCurrency(dailyAverageExpense)}</div>
                                                 <p className="text-[10px] text-gray-400">Basado en {currentDay} días transcurridos</p>
@@ -4133,7 +4236,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <div className="p-5 rounded-2xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-xs font-semibold text-gray-500">Proyección Fin de Mes</span>
-                                                    <BarChart3 className="w-4 h-4 text-gray-400" />
+                                                    <BarChart3 className="w-4 h-4 text-amber-500" />
                                                 </div>
                                                 <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{formatCurrency(projectedMonthlyExpense)}</div>
                                                 <p className="text-[10px] text-gray-400">Estimación para {daysInMonth} días del mes</p>
@@ -4143,14 +4246,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <div className="p-5 rounded-2xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-xs font-semibold text-gray-500">Uso de Crédito</span>
-                                                    <CreditCard className="w-4 h-4 text-gray-400" />
+                                                    <CreditCard className="w-4 h-4 text-indigo-500" />
                                                 </div>
-                                                <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{creditUtilization}%</div>
+                                                <div className={`text-2xl font-bold tracking-tight ${creditUtilization > 70 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>{creditUtilization}%</div>
                                                 <div className="space-y-1">
                                                     <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div className="h-full rounded-full bg-gray-900 dark:bg-white" style={{ width: `${creditUtilization}%` }} />
+                                                        <div className={`h-full rounded-full transition-all duration-300 ${creditUtilization > 70 ? 'bg-rose-500' : creditUtilization > 40 ? 'bg-amber-500' : 'bg-indigo-500'}`} style={{ width: `${creditUtilization}%` }} />
                                                     </div>
-                                                    <p className="text-[10px] text-gray-400">{formatCurrency(totalCreditUsed)} de {formatCurrency(totalCreditLimit)}</p>
+                                                    <p className="text-[10px] text-gray-400 flex justify-between">
+                                                        <span>{formatCurrency(totalCreditUsed)}</span>
+                                                        <span>de {formatCurrency(totalCreditLimit)}</span>
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
@@ -4161,22 +4267,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             <div className="bg-white dark:bg-[#09090b] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                                                 <div className="flex justify-between items-center">
                                                     <div>
-                                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Gasto Diario (Mes Actual)</h3>
+                                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Gasto Diario vs Ingresos (Mes Actual)</h3>
                                                         <p className="text-xs text-gray-500">Comportamiento día por día</p>
                                                     </div>
-                                                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-zinc-800 rounded-lg text-gray-700 dark:text-gray-300">Monocromo</span>
+                                                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-zinc-800 rounded-lg text-gray-700 dark:text-gray-300">Mensual</span>
                                                 </div>
                                                 <div className="h-64">
                                                     <ResponsiveContainer width="100%" height="100%">
                                                         <AreaChart data={dailyData}>
                                                             <defs>
                                                                 <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                                                                    <stop offset="5%" stopColor="#18181b" stopOpacity={0.25}/>
-                                                                    <stop offset="95%" stopColor="#18181b" stopOpacity={0}/>
+                                                                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.25}/>
+                                                                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
                                                                 </linearGradient>
                                                                 <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                                                                    <stop offset="5%" stopColor="#71717a" stopOpacity={0.2}/>
-                                                                    <stop offset="95%" stopColor="#71717a" stopOpacity={0}/>
+                                                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25}/>
+                                                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                                                                 </linearGradient>
                                                             </defs>
                                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
@@ -4184,8 +4290,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} tick={{ fontSize: 11, fill: '#71717a' }} />
                                                             <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
                                                             <Legend />
-                                                            <Area type="monotone" dataKey="Gasto" stroke="#18181b" strokeWidth={2} fillOpacity={1} fill="url(#expenseGradient)" />
-                                                            <Area type="monotone" dataKey="Ingreso" stroke="#71717a" strokeWidth={1.5} strokeDasharray="4 4" fillOpacity={1} fill="url(#incomeGradient)" />
+                                                            <Area type="monotone" dataKey="Gasto" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#expenseGradient)" />
+                                                            <Area type="monotone" dataKey="Ingreso" stroke="#10b981" strokeWidth={2} strokeDasharray="3 3" fillOpacity={1} fill="url(#incomeGradient)" />
                                                         </AreaChart>
                                                     </ResponsiveContainer>
                                                 </div>
@@ -4208,9 +4314,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} tick={{ fontSize: 11, fill: '#71717a' }} />
                                                             <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
                                                             <Legend />
-                                                            <Line type="monotone" dataKey="Ingresos" stroke="#71717a" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                                                            <Line type="monotone" dataKey="Gastos" stroke="#18181b" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                                                            <Line type="monotone" dataKey="Ahorro" stroke="#a1a1aa" strokeWidth={1.5} strokeDasharray="3 3" dot={{ r: 2 }} />
+                                                            <Line type="monotone" dataKey="Ingresos" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                                                            <Line type="monotone" dataKey="Gastos" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                                                            <Line type="monotone" dataKey="Ahorro" stroke="#6366f1" strokeWidth={1.5} strokeDasharray="3 3" dot={{ r: 2 }} />
                                                         </LineChart>
                                                     </ResponsiveContainer>
                                                 </div>
@@ -4242,7 +4348,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                             className="h-full rounded-full transition-all duration-500" 
                                                                             style={{ 
                                                                                 width: `${pct}%`,
-                                                                                backgroundColor: monochromePalette[idx % monochromePalette.length]
+                                                                                backgroundColor: categoryPalette[idx % categoryPalette.length]
                                                                             }} 
                                                                         />
                                                                     </div>
@@ -4938,7 +5044,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <label className="block text-xs font-semibold mb-1">Monto a depositar ($)</label>
                                     <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} autoFocus value={addFundsAmount} onChange={e => setAddFundsAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-lg font-bold" />
                                 </div>
-                                <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
+                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
                                     Añadir Fondos a la Cuenta
                                 </button>
                             </form>
@@ -4978,7 +5084,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </select>
                                 </div>
 
-                                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors">
+                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
                                     Confirmar Pago de Tarjeta
                                 </button>
                             </form>
@@ -5134,7 +5240,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         ))}
                                     </select>
                                 </div>
-                                <button type="submit" className="w-full bg-emerald-500 text-white px-4 py-3.5 rounded-xl font-medium shadow-sm hover:bg-emerald-600 transition-colors">
+                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
                                     Confirmar Aporte
                                 </button>
                             </form>
@@ -5690,7 +5796,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     </div>
                                 )}
 
-                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+                                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
                                     Crear Cuenta / Tarjeta
                                 </button>
                             </form>

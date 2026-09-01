@@ -723,6 +723,7 @@ export interface FinanceSavingsGoal {
     target_amount_cents: number;
     current_amount_cents: number;
     target_date?: string;
+    custom_contribution_cents?: number;
     frequency?: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
     account_id?: number;
     notes?: string;
