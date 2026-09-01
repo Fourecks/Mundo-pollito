@@ -139,7 +139,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [budgets, setBudgets] = useState<FinanceBudget[]>([]);
     const [budgetItems, setBudgetItems] = useState<FinanceBudgetItem[]>([]);
     const [recurring, setRecurring] = useState<FinanceRecurringTransaction[]>([]);
-    const [savingsGoals, setSavingsGoals] = useState<FinanceSavingsGoal[]>([]);
+    const [savingsGoals, setSavingsGoals] = useState<FinanceSavingsGoal[]>(() => {
+        try {
+            const cached = localStorage.getItem('finance_savings_goals_cache');
+            if (cached) return JSON.parse(cached);
+        } catch {}
+        return [];
+    });
     const [shoppingLists, setShoppingLists] = useState<FinanceShoppingList[]>([]);
     const [shoppingItems, setShoppingItems] = useState<FinanceShoppingItem[]>([]);
     const [debts, setDebts] = useState<any[]>([]);
@@ -350,6 +356,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         };
     }, []);
 
+    useEffect(() => {
+        if (savingsGoals && savingsGoals.length > 0) {
+            try {
+                localStorage.setItem('finance_savings_goals_cache', JSON.stringify(savingsGoals));
+            } catch {}
+        }
+    }, [savingsGoals]);
+
     const autoProcessDueSubscriptions = async (recList: FinanceRecurringTransaction[], accountsList: any[]) => {
         const today = new Date().toISOString().split('T')[0];
         const due = recList.filter(r => r.next_date && r.next_date <= today);
@@ -408,14 +422,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBalance) }).eq('id', targetAccId);
             currAcc.balance_cents = Math.max(0, newBalance);
 
-            // Update Next Date
-            const currentNext = new Date(rec.next_date || today);
-            if (rec.frequency === 'weekly') currentNext.setDate(currentNext.getDate() + 7);
-            else if (rec.frequency === 'yearly') currentNext.setFullYear(currentNext.getFullYear() + 1);
-            else currentNext.setMonth(currentNext.getMonth() + 1);
+            // Update Next Date or delete if single payment
+            if (rec.frequency === 'once' || rec.frequency === 'ONCE') {
+                await supabase.from('finance_recurring_transactions').delete().eq('id', rec.id);
+            } else {
+                const currentNext = new Date(rec.next_date || today);
+                if (rec.frequency === 'weekly') currentNext.setDate(currentNext.getDate() + 7);
+                else if (rec.frequency === 'yearly') currentNext.setFullYear(currentNext.getFullYear() + 1);
+                else currentNext.setMonth(currentNext.getMonth() + 1);
 
-            const newNextDateStr = currentNext.toISOString().split('T')[0];
-            await supabase.from('finance_recurring_transactions').update({ next_date: newNextDateStr }).eq('id', rec.id);
+                const newNextDateStr = currentNext.toISOString().split('T')[0];
+                await supabase.from('finance_recurring_transactions').update({ next_date: newNextDateStr }).eq('id', rec.id);
+            }
             dataChanged = true;
         }
 
@@ -674,7 +692,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             if (txRes.data) setTransactions(txRes.data);
             if (budRes.data) setBudgets(budRes.data);
             if (recRes.data) setRecurring(recRes.data);
-            if (goalsRes.data) setSavingsGoals(goalsRes.data);
+            if (goalsRes.data && goalsRes.data.length > 0) {
+                setSavingsGoals(goalsRes.data);
+                try {
+                    localStorage.setItem('finance_savings_goals_cache', JSON.stringify(goalsRes.data));
+                } catch {}
+            } else {
+                try {
+                    const cached = localStorage.getItem('finance_savings_goals_cache');
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        if (parsed && parsed.length > 0) setSavingsGoals(parsed);
+                    }
+                } catch {}
+            }
 
             if (recRes.data && accRes.data) {
                 autoProcessDueSubscriptions(recRes.data, accRes.data);
@@ -946,6 +977,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 };
 
                 await supabase.from('finance_transactions').insert([newTx]);
+                
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (txDate > todayStr) {
+                    await supabase.from('finance_recurring_transactions').insert([{
+                        user_id: user.id,
+                        description: txDescription || (txType === 'EXPENSE' ? 'Pago programado' : 'Ingreso programado'),
+                        amount_cents: amountCents,
+                        frequency: 'once',
+                        next_date: txDate,
+                        account_id: Number(txAccountId),
+                        category_id: txCategoryId ? Number(txCategoryId) : null,
+                        type: txType === 'TRANSFER_OUT' ? 'EXPENSE' : txType
+                    }]);
+                }
                 
                 const currentBalance = selectedAcc.balance_cents;
                 const newBalance = (txType === 'EXPENSE') 
@@ -3735,8 +3780,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center">
                                             <div>
-                                                <h2 className="text-xl font-bold flex items-center gap-2">
-                                                    <CreditCard className="w-5 h-5 text-indigo-500" />
+                                                <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+                                                    <CreditCard className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                                                     Mis Tarjetas (Crédito y Débito)
                                                 </h2>
                                                 <p className="text-xs text-gray-500">Gestión visual de plásticos, límites, fechas de corte y vencimientos</p>
@@ -3754,7 +3799,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         </div>
 
                                         {accounts.filter(a => a.type === 'credit' || a.type === 'debit').length === 0 ? (
-                                            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-3xl p-8 text-center space-y-2">
+                                            <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-2">
                                                 <CreditCard className="w-10 h-10 text-gray-400 mx-auto" />
                                                 <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">No tienes tarjetas registradas</p>
                                                 <p className="text-xs text-gray-500">Agrega tus tarjetas de crédito o débito desde Ajustes para llevar control de deudas y fechas de pago.</p>
@@ -3771,73 +3816,61 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     return (
                                                         <div 
                                                             key={card.id} 
-                                                            className={`relative overflow-hidden rounded-3xl p-6 text-white shadow-lg transition-transform hover:-translate-y-1 ${
-                                                                card.card_color === 'slate' ? 'bg-gradient-to-br from-zinc-900 via-neutral-950 to-zinc-900' :
-                                                                card.card_color === 'indigo' ? 'bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900' :
-                                                                card.card_color === 'blue' ? 'bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900' :
-                                                                card.card_color === 'emerald' ? 'bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900' :
-                                                                card.card_color === 'rose' ? 'bg-gradient-to-br from-rose-950 via-rose-900 to-slate-900' :
-                                                                card.card_color === 'amber' ? 'bg-gradient-to-br from-amber-950 via-amber-900 to-slate-900' :
-                                                                card.card_color === 'violet' ? 'bg-gradient-to-br from-violet-950 via-violet-900 to-slate-900' :
-                                                                (isCredit ? 'bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900' : 'bg-gradient-to-br from-emerald-800 via-teal-900 to-slate-900')
-                                                            }`}
+                                                            className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-4 text-gray-900 dark:text-white"
                                                         >
-                                                            {/* Physical Card Chip Graphic */}
-                                                            <div className="flex justify-between items-start mb-6">
+                                                            <div className="flex justify-between items-start">
                                                                 <div>
-                                                                    <span className="text-[10px] tracking-widest font-bold uppercase opacity-75">
+                                                                    <span className="text-[10px] tracking-wider font-semibold uppercase text-gray-400 block">
                                                                         {isCredit ? 'Tarjeta de Crédito' : 'Tarjeta de Débito'}
                                                                     </span>
-                                                                    <h3 className="text-lg font-bold tracking-tight">{card.name}</h3>
+                                                                    <h3 className="text-base font-bold text-gray-900 dark:text-white mt-0.5">{card.name}</h3>
                                                                 </div>
-                                                                <div className="w-10 h-8 rounded-lg bg-yellow-400/80 border border-yellow-200/50 flex items-center justify-center shadow-inner">
-                                                                    <div className="w-6 h-5 border border-yellow-600/60 rounded flex flex-col justify-between p-0.5">
-                                                                        <div className="h-0.5 bg-yellow-700/50 w-full" />
-                                                                        <div className="h-0.5 bg-yellow-700/50 w-full" />
-                                                                    </div>
-                                                                </div>
+                                                                <span className="font-mono text-xs text-gray-500 bg-gray-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-gray-200 dark:border-zinc-700">
+                                                                    •••• {card.card_number_last4 || '4242'}
+                                                                </span>
                                                             </div>
 
-                                                            {/* Card Number Representation */}
-                                                            <div className="my-4 font-mono text-base tracking-widest opacity-90">
-                                                                •••• •••• •••• {card.card_number_last4 || '4242'}
-                                                            </div>
-
-                                                            {/* Balance / Limit Details */}
                                                             {isCredit ? (
-                                                                <div className="space-y-2 mt-4 pt-3 border-t border-white/10">
-                                                                    <div className="flex justify-between text-xs">
-                                                                        <span className="opacity-75">Deuda Actual:</span>
-                                                                        <span className="font-bold text-red-300">{formatCurrency(debtBalance)}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between text-xs">
-                                                                        <span className="opacity-75">Disponible:</span>
-                                                                        <span className="font-semibold">{formatCurrency(availableCents)}</span>
-                                                                    </div>
-                                                                    <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                                                                        <div className="h-full bg-red-400 rounded-full transition-all duration-500" style={{ width: `${usedPct}%` }} />
+                                                                <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-zinc-800">
+                                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                                        <div className="bg-gray-50 dark:bg-[#121212] p-2.5 rounded-xl border border-gray-200/60 dark:border-zinc-800/80">
+                                                                            <span className="text-[10px] text-gray-400 block uppercase font-medium">Deuda Actual</span>
+                                                                            <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(debtBalance)}</span>
+                                                                        </div>
+                                                                        <div className="bg-gray-50 dark:bg-[#121212] p-2.5 rounded-xl border border-gray-200/60 dark:border-zinc-800/80">
+                                                                            <span className="text-[10px] text-gray-400 block uppercase font-medium">Disponible</span>
+                                                                            <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(availableCents)}</span>
+                                                                        </div>
                                                                     </div>
 
-                                                                    <div className="flex justify-between text-[11px] opacity-80 pt-1">
+                                                                    <div className="space-y-1">
+                                                                        <div className="flex justify-between text-[11px] text-gray-400 font-medium">
+                                                                            <span>Uso de límite</span>
+                                                                            <span>{usedPct}%</span>
+                                                                        </div>
+                                                                        <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                                            <div className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300" style={{ width: `${usedPct}%` }} />
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex justify-between text-[11px] text-gray-500 pt-1">
                                                                         <span>Corte: Día {card.cutoff_day || 'N/A'}</span>
                                                                         <span>Pago: Día {card.due_day || 'N/A'}</span>
                                                                     </div>
 
                                                                     {debtBalance > 0 && (
                                                                         <button
-                                                                            onClick={() => {
-                                                                                setShowPayCardModal(card);
-                                                                            }}
-                                                                            className="w-full mt-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                                                                            onClick={() => setShowPayCardModal(card)}
+                                                                            className="w-full bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 py-2 rounded-xl text-xs font-semibold transition-colors shadow-2xs mt-1"
                                                                         >
                                                                             Abonar a Tarjeta
                                                                         </button>
                                                                     )}
                                                                 </div>
                                                             ) : (
-                                                                <div className="space-y-1 mt-4 pt-3 border-t border-white/10">
-                                                                    <span className="text-xs opacity-75">Saldo Disponible:</span>
-                                                                    <p className="text-2xl font-extrabold">{formatCurrency(card.balance_cents)}</p>
+                                                                <div className="space-y-1 pt-2 border-t border-gray-100 dark:border-zinc-800">
+                                                                    <span className="text-[11px] text-gray-400 block uppercase font-medium">Saldo Disponible</span>
+                                                                    <p className="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(card.balance_cents)}</p>
                                                                 </div>
                                                             )}
                                                         </div>
