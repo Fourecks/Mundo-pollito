@@ -904,8 +904,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             }
         }
 
+        const todayStr = new Date().toISOString().split('T')[0];
+        const isFutureDate = txDate > todayStr;
+
         try {
-            if (txType === 'TRANSFER_OUT') {
+            if (isFutureDate) {
+                // Future scheduled payment or income: Save to finance_recurring_transactions (Pago Único / Recurrente)
+                // DO NOT deduct balance or create finished transaction immediately
+                await supabase.from('finance_recurring_transactions').insert([{
+                    user_id: user.id,
+                    description: txDescription || (txType === 'EXPENSE' ? 'Pago programado' : txType === 'INCOME' ? 'Ingreso programado' : 'Transferencia programada'),
+                    amount_cents: amountCents,
+                    frequency: 'once',
+                    start_date: todayStr,
+                    next_date: txDate,
+                    account_id: Number(txAccountId),
+                    category_id: txCategoryId ? Number(txCategoryId) : null,
+                    type: txType === 'TRANSFER_OUT' ? 'EXPENSE' : txType,
+                    auto_create: true,
+                    is_active: true
+                }]);
+            } else if (txType === 'TRANSFER_OUT') {
                 if (!txAccountId || !txToAccountId) return alert("Selecciona cuenta de origen y destino");
                 if (txAccountId === txToAccountId) return alert("La cuenta de origen y la de destino no pueden ser la misma");
                 
@@ -977,21 +996,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 };
 
                 await supabase.from('finance_transactions').insert([newTx]);
-                
-                const todayStr = new Date().toISOString().split('T')[0];
-                if (txDate > todayStr) {
-                    await supabase.from('finance_recurring_transactions').insert([{
-                        user_id: user.id,
-                        description: txDescription || (txType === 'EXPENSE' ? 'Pago programado' : 'Ingreso programado'),
-                        amount_cents: amountCents,
-                        frequency: 'once',
-                        next_date: txDate,
-                        account_id: Number(txAccountId),
-                        category_id: txCategoryId ? Number(txCategoryId) : null,
-                        type: txType === 'TRANSFER_OUT' ? 'EXPENSE' : txType
-                    }]);
-                }
-                
+
                 const currentBalance = selectedAcc.balance_cents;
                 const newBalance = (txType === 'EXPENSE') 
                     ? (selectedAcc.type === 'credit' ? currentBalance + amountCents : Math.max(0, currentBalance - amountCents))
@@ -1793,13 +1798,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBalance) }).eq('id', targetAccId);
         }
 
-        const currentNext = new Date(rec.next_date || today);
-        if (rec.frequency === 'weekly') currentNext.setDate(currentNext.getDate() + 7);
-        else if (rec.frequency === 'yearly') currentNext.setFullYear(currentNext.getFullYear() + 1);
-        else currentNext.setMonth(currentNext.getMonth() + 1);
+        if (rec.frequency === 'once' || rec.frequency === 'ONCE') {
+            await supabase.from('finance_recurring_transactions').delete().eq('id', rec.id);
+        } else {
+            const currentNext = new Date(rec.next_date || today);
+            if (rec.frequency === 'weekly') currentNext.setDate(currentNext.getDate() + 7);
+            else if (rec.frequency === 'yearly') currentNext.setFullYear(currentNext.getFullYear() + 1);
+            else currentNext.setMonth(currentNext.getMonth() + 1);
 
-        const newNextDateStr = currentNext.toISOString().split('T')[0];
-        await supabase.from('finance_recurring_transactions').update({ next_date: newNextDateStr }).eq('id', rec.id);
+            const newNextDateStr = currentNext.toISOString().split('T')[0];
+            await supabase.from('finance_recurring_transactions').update({ next_date: newNextDateStr }).eq('id', rec.id);
+        }
 
         fetchFinanceData();
     };
@@ -4082,66 +4091,66 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     .sort((a, b) => b.amount - a.amount);
                                 const totalCatExpense = sortedCategoryBreakdown.reduce((a, b) => a + b.amount, 0);
 
+                                const monochromePalette = ['#18181b', '#3f3f46', '#52525b', '#71717a', '#8a8a8e', '#a1a1aa', '#d4d4d8', '#e4e4e7'];
+
                                 return (
-                                    <div className="space-y-8">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                            <div>
-                                                <h2 className="text-xl font-bold">Estadísticas y Análisis Financiero</h2>
-                                                <p className="text-xs text-gray-500 mt-1">Métricas en tiempo real, tendencias de gastos y evolución de saldo</p>
-                                            </div>
+                                    <div className="space-y-8 max-w-5xl mx-auto">
+                                        <div className="border-b border-gray-200 dark:border-zinc-800 pb-4">
+                                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Análisis Financiero</h2>
+                                            <p className="text-xs text-gray-500 mt-1">Métricas clave, proyecciones y patrones de gasto consolidados</p>
                                         </div>
 
                                         {/* KPI Metrics Grid */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                             {/* Savings Rate Card */}
-                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-xs font-semibold text-gray-500">Tasa de Ahorro</span>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${savingsRate >= 20 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : savingsRate > 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400'}`}>
-                                                        {savingsRate >= 20 ? 'Saludable' : savingsRate > 0 ? 'Regular' : 'Atención'}
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200">
+                                                        {savingsRate >= 20 ? 'Saludable' : savingsRate > 0 ? 'Estable' : 'Neutro'}
                                                     </span>
                                                 </div>
-                                                <div className="text-2xl font-bold tracking-tight">{savingsRate}%</div>
+                                                <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{savingsRate}%</div>
                                                 <div className="space-y-1">
                                                     <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div className={`h-full rounded-full ${savingsRate >= 20 ? 'bg-emerald-500' : savingsRate > 0 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, savingsRate)}%` }} />
+                                                        <div className="h-full rounded-full bg-gray-900 dark:bg-white" style={{ width: `${Math.min(100, savingsRate)}%` }} />
                                                     </div>
                                                     <p className="text-[10px] text-gray-400">Superávit: {formatCurrency(netSavings)}</p>
                                                 </div>
                                             </div>
 
                                             {/* Daily Average Expense Card */}
-                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-xs font-semibold text-gray-500">Promedio Diario (Mes)</span>
-                                                    <TrendingDown className="w-4 h-4 text-red-500" />
+                                                    <span className="text-xs font-semibold text-gray-500">Promedio Diario</span>
+                                                    <TrendingDown className="w-4 h-4 text-gray-400" />
                                                 </div>
-                                                <div className="text-2xl font-bold tracking-tight">{formatCurrency(dailyAverageExpense)}</div>
-                                                <p className="text-[10px] text-gray-400">Basado en {currentDay} días transcurridos este mes</p>
+                                                <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{formatCurrency(dailyAverageExpense)}</div>
+                                                <p className="text-[10px] text-gray-400">Basado en {currentDay} días transcurridos</p>
                                             </div>
 
                                             {/* Projected Monthly Expense Card */}
-                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-xs font-semibold text-gray-500">Proyección Fin de Mes</span>
-                                                    <BarChart3 className="w-4 h-4 text-blue-500" />
+                                                    <BarChart3 className="w-4 h-4 text-gray-400" />
                                                 </div>
-                                                <div className="text-2xl font-bold tracking-tight">{formatCurrency(projectedMonthlyExpense)}</div>
-                                                <p className="text-[10px] text-gray-400">Ritmo proyectado para {daysInMonth} días del mes</p>
+                                                <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{formatCurrency(projectedMonthlyExpense)}</div>
+                                                <p className="text-[10px] text-gray-400">Estimación para {daysInMonth} días del mes</p>
                                             </div>
 
                                             {/* Credit Utilization Card */}
-                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm space-y-3">
+                                            <div className="p-5 rounded-2xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-xs font-semibold text-gray-500">Uso Crédito Total</span>
-                                                    <CreditCard className="w-4 h-4 text-purple-500" />
+                                                    <span className="text-xs font-semibold text-gray-500">Uso de Crédito</span>
+                                                    <CreditCard className="w-4 h-4 text-gray-400" />
                                                 </div>
-                                                <div className="text-2xl font-bold tracking-tight">{creditUtilization}%</div>
+                                                <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{creditUtilization}%</div>
                                                 <div className="space-y-1">
                                                     <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div className={`h-full rounded-full ${creditUtilization > 80 ? 'bg-red-500' : creditUtilization > 50 ? 'bg-amber-500' : 'bg-purple-500'}`} style={{ width: `${creditUtilization}%` }} />
+                                                        <div className="h-full rounded-full bg-gray-900 dark:bg-white" style={{ width: `${creditUtilization}%` }} />
                                                     </div>
-                                                    <p className="text-[10px] text-gray-400">{formatCurrency(totalCreditUsed)} de {formatCurrency(totalCreditLimit)} límite</p>
+                                                    <p className="text-[10px] text-gray-400">{formatCurrency(totalCreditUsed)} de {formatCurrency(totalCreditLimit)}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -4149,59 +4158,59 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         {/* Line Charts Grid */}
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                             {/* Real Daily Expense Line/Area Chart */}
-                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
+                                            <div className="bg-white dark:bg-[#09090b] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                                                 <div className="flex justify-between items-center">
                                                     <div>
-                                                        <h3 className="text-base font-bold">Gasto Diario (Este Mes)</h3>
-                                                        <p className="text-xs text-gray-500">Gráfica de tendencia día por día</p>
+                                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Gasto Diario (Mes Actual)</h3>
+                                                        <p className="text-xs text-gray-500">Comportamiento día por día</p>
                                                     </div>
-                                                    <span className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-zinc-800 rounded-lg">Línea Real</span>
+                                                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-zinc-800 rounded-lg text-gray-700 dark:text-gray-300">Monocromo</span>
                                                 </div>
                                                 <div className="h-64">
                                                     <ResponsiveContainer width="100%" height="100%">
                                                         <AreaChart data={dailyData}>
                                                             <defs>
                                                                 <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                                                                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
-                                                                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                                                                    <stop offset="5%" stopColor="#18181b" stopOpacity={0.25}/>
+                                                                    <stop offset="95%" stopColor="#18181b" stopOpacity={0}/>
                                                                 </linearGradient>
                                                                 <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                                                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                                                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                                                    <stop offset="5%" stopColor="#71717a" stopOpacity={0.2}/>
+                                                                    <stop offset="95%" stopColor="#71717a" stopOpacity={0}/>
                                                                 </linearGradient>
                                                             </defs>
                                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
-                                                            <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} tick={{ fontSize: 11 }} />
+                                                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#71717a' }} />
+                                                            <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} tick={{ fontSize: 11, fill: '#71717a' }} />
                                                             <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
                                                             <Legend />
-                                                            <Area type="monotone" dataKey="Gasto" stroke="#ef4444" strokeWidth={2.5} fillOpacity={1} fill="url(#expenseGradient)" />
-                                                            <Area type="monotone" dataKey="Ingreso" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#incomeGradient)" />
+                                                            <Area type="monotone" dataKey="Gasto" stroke="#18181b" strokeWidth={2} fillOpacity={1} fill="url(#expenseGradient)" />
+                                                            <Area type="monotone" dataKey="Ingreso" stroke="#71717a" strokeWidth={1.5} strokeDasharray="4 4" fillOpacity={1} fill="url(#incomeGradient)" />
                                                         </AreaChart>
                                                     </ResponsiveContainer>
                                                 </div>
                                             </div>
 
                                             {/* 6 Months Trend Line Chart */}
-                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
+                                            <div className="bg-white dark:bg-[#09090b] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
                                                 <div className="flex justify-between items-center">
                                                     <div>
-                                                        <h3 className="text-base font-bold">Evolución de Ingresos y Gastos (6 Meses)</h3>
-                                                        <p className="text-xs text-gray-500">Comparativa histórica de tendencias</p>
+                                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Tendencia Histórica (6 Meses)</h3>
+                                                        <p className="text-xs text-gray-500">Comparación de flujos mensual</p>
                                                     </div>
-                                                    <span className="text-xs font-bold px-2 py-1 bg-gray-100 dark:bg-zinc-800 rounded-lg">Tendencia</span>
+                                                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-zinc-800 rounded-lg text-gray-700 dark:text-gray-300">Histórico</span>
                                                 </div>
                                                 <div className="h-64">
                                                     <ResponsiveContainer width="100%" height="100%">
                                                         <LineChart data={sixMonthsData}>
                                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
-                                                            <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} tick={{ fontSize: 11 }} />
+                                                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#71717a' }} />
+                                                            <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} tick={{ fontSize: 11, fill: '#71717a' }} />
                                                             <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
                                                             <Legend />
-                                                            <Line type="monotone" dataKey="Ingresos" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                                            <Line type="monotone" dataKey="Gastos" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                                            <Line type="monotone" dataKey="Ahorro" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+                                                            <Line type="monotone" dataKey="Ingresos" stroke="#71717a" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                                                            <Line type="monotone" dataKey="Gastos" stroke="#18181b" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                                                            <Line type="monotone" dataKey="Ahorro" stroke="#a1a1aa" strokeWidth={1.5} strokeDasharray="3 3" dot={{ r: 2 }} />
                                                         </LineChart>
                                                     </ResponsiveContainer>
                                                 </div>
@@ -4211,10 +4220,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         {/* Category Breakdown & Progress Gauges */}
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                             {/* Category Progress Bars */}
-                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
-                                                <h3 className="text-base font-bold">Desglose de Gastos por Categoría</h3>
+                                            <div className="bg-white dark:bg-[#09090b] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                                                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Gastos por Categoría</h3>
                                                 {sortedCategoryBreakdown.length === 0 ? (
-                                                    <p className="text-sm text-gray-500 text-center py-8">No hay gastos registrados para analizar.</p>
+                                                    <p className="text-xs text-gray-500 text-center py-8">No hay gastos registrados para analizar.</p>
                                                 ) : (
                                                     <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                                                         {sortedCategoryBreakdown.map((cat, idx) => {
@@ -4222,18 +4231,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                             return (
                                                                 <div key={idx} className="space-y-1">
                                                                     <div className="flex justify-between items-center text-xs">
-                                                                        <span className="font-semibold flex items-center gap-1.5">
+                                                                        <span className="font-semibold flex items-center gap-1.5 text-gray-900 dark:text-white">
                                                                             <span>{cat.emoji}</span>
                                                                             <span>{cat.name}</span>
                                                                         </span>
-                                                                        <span className="font-bold">{formatCurrency(Math.round(cat.amount * 100))} <span className="text-gray-400 font-normal">({pct}%)</span></span>
+                                                                        <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(Math.round(cat.amount * 100))} <span className="text-gray-400 font-normal">({pct}%)</span></span>
                                                                     </div>
                                                                     <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                                         <div 
                                                                             className="h-full rounded-full transition-all duration-500" 
                                                                             style={{ 
                                                                                 width: `${pct}%`,
-                                                                                backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#3b82f6'][idx % 8]
+                                                                                backgroundColor: monochromePalette[idx % monochromePalette.length]
                                                                             }} 
                                                                         />
                                                                     </div>
@@ -4245,25 +4254,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                             </div>
 
                                             {/* Category Pie Chart */}
-                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
-                                                <h3 className="text-base font-bold text-center">Distribución Porcentual</h3>
+                                            <div className="bg-white dark:bg-[#09090b] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                                                <h3 className="text-sm font-bold text-center text-gray-900 dark:text-white">Distribución de Gastos</h3>
                                                 <div className="h-64">
                                                     {sortedCategoryBreakdown.length > 0 ? (
                                                         <ResponsiveContainer width="100%" height="100%">
                                                             <RechartsPieChart>
                                                                 <Pie
                                                                     data={sortedCategoryBreakdown.map(c => ({ name: `${c.emoji} ${c.name}`, value: c.amount }))}
-                                                                    cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value"
+                                                                    cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value"
                                                                 >
                                                                     {sortedCategoryBreakdown.map((_, index) => (
-                                                                        <Cell key={`cell-${index}`} fill={['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#3b82f6'][index % 8]} />
+                                                                        <Cell key={`cell-${index}`} fill={monochromePalette[index % monochromePalette.length]} />
                                                                     ))}
                                                                 </Pie>
                                                                 <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
                                                                 <Legend />
                                                             </RechartsPieChart>
                                                         </ResponsiveContainer>
-                                                    ) : <p className="text-center text-gray-500 mt-20">No hay suficientes datos</p>}
+                                                    ) : <p className="text-center text-xs text-gray-500 mt-20">No hay suficientes datos</p>}
                                                 </div>
                                             </div>
                                         </div>
@@ -4425,41 +4434,61 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             {/* SETTINGS TAB */}
                             {activeTab === 'settings' && (
                                 <div className="space-y-8 max-w-4xl mx-auto">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="border-b border-gray-200 dark:border-zinc-800 pb-4">
+                                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Configuración del Sistema</h2>
+                                        <p className="text-xs text-gray-500 mt-1">Gestiona tus cuentas financieras, categorías de presupuesto y opciones de seguridad</p>
+                                    </div>
+
+                                    <div className="space-y-8">
                                         
-                                        {/* ACCOUNTS */}
-                                        <div className="space-y-4">
-                                            <h3 className="text-lg font-semibold border-b border-gray-200 dark:border-zinc-800 pb-2">Tus Cuentas y Tarjetas</h3>
-                                            <div className="space-y-2 mb-4">
+                                        {/* SECTION 1: ACCOUNTS */}
+                                        <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-zinc-800 pb-3">
+                                                <div>
+                                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">Cuentas y Tarjetas de Crédito</h3>
+                                                    <p className="text-xs text-gray-500">Cuentas registradas para tus movimientos y saldos</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowCreateAccountModal(true)}
+                                                    className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shrink-0 self-start sm:self-auto"
+                                                >
+                                                    <PlusIcon className="w-3.5 h-3.5" />
+                                                    Nueva Cuenta
+                                                </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 gap-2.5">
                                                 {accounts.map(acc => (
-                                                    <div key={acc.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-gray-800">
+                                                    <div key={acc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200/80 dark:border-zinc-800/80 gap-3">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="p-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm text-gray-600 dark:text-gray-300">
+                                                            <div className="p-2 bg-white dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-700 dark:text-gray-300">
                                                                 {getAccountIcon(acc.type)}
                                                             </div>
                                                             <div>
-                                                                <p className="font-semibold text-sm">{acc.name}</p>
-                                                                <p className="text-[10px] text-gray-500 uppercase font-bold">
+                                                                <p className="font-semibold text-xs text-gray-900 dark:text-white">{acc.name}</p>
+                                                                <p className="text-[10px] text-gray-400 uppercase font-semibold">
                                                                     {acc.type === 'credit' ? `Tarjeta de Crédito ${acc.card_number_last4 ? `•••• ${acc.card_number_last4}` : ''}` : acc.type === 'wallet' ? 'Wallet digital' : acc.type}
                                                                 </p>
                                                                 {['bank', 'credit', 'debit'].includes(acc.type) && (acc.maintenance_fee_type !== 'none' || acc.transfer_fee_type !== 'none') && (
                                                                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                                         {acc.maintenance_fee_type !== 'none' && (
-                                                                            <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 rounded">
+                                                                            <span className="text-[9px] font-medium px-2 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
                                                                                 Mantenimiento: {acc.maintenance_fee_type === 'fixed' ? `$${acc.maintenance_fee_value}` : `${acc.maintenance_fee_value}%`} ({acc.maintenance_fee_freq === 'yearly' ? 'Anual' : 'Mensual'})
                                                                             </span>
                                                                         )}
                                                                         {acc.transfer_fee_type !== 'none' && (
-                                                                            <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-indigo-100 text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 rounded">
-                                                                                Comisión Transf: {acc.transfer_fee_type === 'fixed' ? `$${acc.transfer_fee_value}` : `${acc.transfer_fee_value}%`}
+                                                                            <span className="text-[9px] font-medium px-2 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
+                                                                                Comisión: {acc.transfer_fee_type === 'fixed' ? `$${acc.transfer_fee_value}` : `${acc.transfer_fee_value}%`}
                                                                             </span>
                                                                         )}
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="font-bold text-sm text-gray-700 dark:text-gray-300">{formatCurrency(acc.balance_cents)}</span>
+
+                                                        <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-200 dark:border-zinc-800">
+                                                            <span className="font-bold text-xs text-gray-900 dark:text-white">{formatCurrency(acc.balance_cents)}</span>
                                                             <div className="flex items-center gap-1">
                                                                 <button 
                                                                     type="button"
@@ -4483,14 +4512,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                             (acc.transfer_fee_type && acc.transfer_fee_type !== 'none')
                                                                         );
                                                                     }}
-                                                                    className="text-gray-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-all shrink-0"
+                                                                    className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
+                                                                    title="Editar cuenta"
                                                                 >
                                                                     <Pencil className="w-3.5 h-3.5" />
                                                                 </button>
                                                                 <button 
                                                                     type="button"
                                                                     onClick={() => handleDeleteAccount(acc.id)} 
-                                                                    className="text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-all shrink-0"
+                                                                    className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
+                                                                    title="Eliminar cuenta"
                                                                 >
                                                                     <Trash2 className="w-3.5 h-3.5" />
                                                                 </button>
@@ -4499,130 +4530,119 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     </div>
                                                 ))}
                                             </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowCreateAccountModal(true)}
-                                                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-gray-50 hover:bg-gray-100 dark:bg-[#121212] dark:hover:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-800 hover:border-gray-400 dark:hover:border-zinc-700 rounded-2xl text-xs font-bold text-gray-800 dark:text-zinc-200 transition-all shadow-sm cursor-pointer"
-                                            >
-                                                <PlusIcon className="w-4 h-4 text-emerald-500 shrink-0" />
-                                                Añadir Nueva Cuenta o Tarjeta
-                                            </button>
                                         </div>
 
-                                         {/* CATEGORIES / PRESUPUESTOS UNIFICADOS */}
-                                         <div className="space-y-4">
-                                             <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-2">
-                                                 <div>
-                                                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Categorías y Presupuestos</h3>
-                                                     <p className="text-xs text-gray-500">Administra tus categorías de gastos (presupuestos) e ingresos</p>
-                                                 </div>
-                                                 <div className="flex gap-2">
-                                                     <button
-                                                         type="button"
-                                                         onClick={() => openNewCategoryModal('EXPENSE')}
-                                                         className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
-                                                     >
-                                                         <PlusIcon className="w-3.5 h-3.5" />
-                                                         Nueva Categoría
-                                                     </button>
-                                                 </div>
-                                             </div>
-
-                                             {/* Expenses / Budgets Section */}
-                                             <div className="space-y-2">
-                                                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Categorías de Gasto / Presupuesto</span>
-                                                 <div className="flex flex-wrap gap-2">
-                                                     {categories.filter(c => !c.type || c.type.toUpperCase() === 'EXPENSE' || c.type.toUpperCase() === 'GASTO').map(cat => (
-                                                         <div key={cat.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-800 dark:text-gray-200 group">
-                                                             <span>{cat.emoji || '🛒'}</span>
-                                                             <span className="font-medium">{cat.name}</span>
-                                                             {cat.budget_limit_cents && cat.budget_limit_cents > 0 ? (
-                                                                 <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-200 dark:bg-zinc-800 rounded-md text-gray-700 dark:text-gray-300">
-                                                                     ${(cat.budget_limit_cents / 100).toFixed(2)}/mes
-                                                                 </span>
-                                                             ) : null}
-                                                             <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
-                                                                 <button
-                                                                     type="button"
-                                                                     onClick={() => openEditCategoryModal(cat)}
-                                                                     className="text-gray-400 hover:text-gray-700 dark:hover:text-white p-0.5 rounded transition-colors"
-                                                                     title="Editar"
-                                                                 >
-                                                                     <Pencil className="w-3 h-3" />
-                                                                 </button>
-                                                                 <button
-                                                                     type="button"
-                                                                     onClick={() => handleDeleteCategory(cat.id)}
-                                                                     className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
-                                                                     title="Eliminar"
-                                                                 >
-                                                                     <Trash2 className="w-3 h-3" />
-                                                                 </button>
-                                                             </div>
-                                                         </div>
-                                                     ))}
-                                                 </div>
-                                             </div>
-
-                                             {/* Income Section */}
-                                             <div className="space-y-2 pt-2">
-                                                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Categorías de Ingreso</span>
-                                                 <div className="flex flex-wrap gap-2">
-                                                     {categories.filter(c => c.type && (c.type.toUpperCase() === 'INCOME' || c.type.toUpperCase() === 'INGRESO')).map(cat => (
-                                                         <div key={cat.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-xl text-xs text-emerald-900 dark:text-emerald-300 group">
-                                                             <span>{cat.emoji || '💼'}</span>
-                                                             <span className="font-medium">{cat.name}</span>
-                                                             <div className="flex items-center gap-1 ml-1 pl-1 border-l border-emerald-200 dark:border-emerald-800">
-                                                                 <button
-                                                                     type="button"
-                                                                     onClick={() => openEditCategoryModal(cat)}
-                                                                     className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-white p-0.5 rounded transition-colors"
-                                                                     title="Editar"
-                                                                 >
-                                                                     <Pencil className="w-3 h-3" />
-                                                                 </button>
-                                                                 <button
-                                                                     type="button"
-                                                                     onClick={() => handleDeleteCategory(cat.id)}
-                                                                     className="text-emerald-600 dark:text-emerald-400 hover:text-red-500 p-0.5 rounded transition-colors"
-                                                                     title="Eliminar"
-                                                                 >
-                                                                     <Trash2 className="w-3 h-3" />
-                                                                 </button>
-                                                             </div>
-                                                         </div>
-                                                     ))}
-                                                 </div>
-                                             </div>
-                                         </div>
-
-                                        {/* SECURITY & PIN PROTECTION */}
-                                        <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-zinc-800">
-                                            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                        {/* SECTION 2: CATEGORIES & BUDGETS */}
+                                        <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-6">
+                                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
                                                 <div>
-                                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Seguridad y PIN</h3>
-                                                    <p className="text-xs text-gray-500">Control de acceso y protección de operaciones clave</p>
+                                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">Categorías y Presupuestos</h3>
+                                                    <p className="text-xs text-gray-500">Clasificación de movimientos y topes mensuales</p>
                                                 </div>
-                                                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openNewCategoryModal('EXPENSE')}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
+                                                >
+                                                    <PlusIcon className="w-3.5 h-3.5" />
+                                                    Nueva Categoría
+                                                </button>
+                                            </div>
+
+                                            {/* Expenses Section */}
+                                            <div className="space-y-2.5">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Categorías de Gasto / Presupuesto</span>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {categories.filter(c => !c.type || c.type.toUpperCase() === 'EXPENSE' || c.type.toUpperCase() === 'GASTO').map(cat => (
+                                                        <div key={cat.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-900 dark:text-gray-100">
+                                                            <span>{cat.emoji || '🛒'}</span>
+                                                            <span className="font-medium">{cat.name}</span>
+                                                            {cat.budget_limit_cents && cat.budget_limit_cents > 0 ? (
+                                                                <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
+                                                                    ${(cat.budget_limit_cents / 100).toFixed(2)}/mes
+                                                                </span>
+                                                            ) : null}
+                                                            <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openEditCategoryModal(cat)}
+                                                                    className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-0.5 rounded transition-colors"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Pencil className="w-3 h-3" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteCategory(cat.id)}
+                                                                    className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
+                                                                    title="Eliminar"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Income Section */}
+                                            <div className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800/80">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Categorías de Ingreso</span>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {categories.filter(c => c.type && (c.type.toUpperCase() === 'INCOME' || c.type.toUpperCase() === 'INGRESO')).map(cat => (
+                                                        <div key={cat.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100/70 dark:bg-zinc-800/60 border border-gray-200 dark:border-zinc-700/80 rounded-xl text-xs text-gray-900 dark:text-gray-100">
+                                                            <span>{cat.emoji || '💼'}</span>
+                                                            <span className="font-medium">{cat.name}</span>
+                                                            <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openEditCategoryModal(cat)}
+                                                                    className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-0.5 rounded transition-colors"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Pencil className="w-3 h-3" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteCategory(cat.id)}
+                                                                    className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
+                                                                    title="Eliminar"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* SECTION 3: SECURITY & PIN */}
+                                        <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
+                                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
+                                                <div>
+                                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">Seguridad y Código PIN</h3>
+                                                    <p className="text-xs text-gray-500">Protección del módulo financiero y confirmaciones requeridas</p>
+                                                </div>
+                                                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-md ${
                                                     securityConfig?.pin_hash 
                                                         ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' 
                                                         : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400'
                                                 }`}>
-                                                    {securityConfig?.pin_hash ? 'Protección activa' : 'Sin PIN'}
+                                                    {securityConfig?.pin_hash ? 'Protección Activa' : 'Sin PIN'}
                                                 </span>
                                             </div>
 
-                                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-gray-200/80 dark:border-zinc-800/80 space-y-4">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                                     <div>
                                                         <div className="text-xs font-semibold text-gray-900 dark:text-white">
-                                                            {securityConfig?.pin_hash ? 'PIN de 4 dígitos configurado' : 'Sin PIN de seguridad'}
+                                                            {securityConfig?.pin_hash ? 'PIN de 4 dígitos configurado' : 'Sin PIN de seguridad activo'}
                                                         </div>
                                                         <div className="text-[11px] text-gray-500 mt-0.5">
                                                             {securityConfig?.pin_hash 
-                                                                ? 'Puedes cambiar el código actual o gestionar las confirmaciones.' 
-                                                                : 'Crea un PIN numérico de 4 dígitos para proteger tu información.'}
+                                                                ? 'Puedes actualizar tu código actual o modificar las reglas de bloqueo.' 
+                                                                : 'Configura un PIN numérico de 4 dígitos para proteger tu información.'}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2 shrink-0">
@@ -4634,7 +4654,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 setSetPinError('');
                                                                 setShowSetPinModal(true);
                                                             }}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-medium transition-all"
+                                                            className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
                                                         >
                                                             <KeyRound className="w-3.5 h-3.5" />
                                                             {securityConfig?.pin_hash ? 'Cambiar PIN' : 'Crear PIN'}
@@ -4647,7 +4667,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     setDisablePinError('');
                                                                     setShowDisablePinModal(true);
                                                                 }}
-                                                                className="px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl border border-red-200 dark:border-red-900/40 transition-all"
+                                                                className="px-3.5 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-xl border border-gray-300 dark:border-zinc-700 transition-all"
                                                             >
                                                                 Eliminar PIN
                                                             </button>
@@ -4659,11 +4679,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-800">
                                                         <div className="flex items-center justify-between py-1">
                                                             <div className="space-y-0.5 pr-4">
-                                                                <label htmlFor="toggle-lock-on-enter" className="text-xs font-medium text-gray-900 dark:text-white cursor-pointer">
-                                                                    Solicitar PIN al entrar al módulo
+                                                                <label htmlFor="toggle-lock-on-enter" className="text-xs font-semibold text-gray-900 dark:text-white cursor-pointer">
+                                                                    Solicitar PIN al ingresar
                                                                 </label>
                                                                 <p className="text-[11px] text-gray-500">
-                                                                    Bloquea las vistas hasta ingresar el PIN de 4 dígitos.
+                                                                    Bloquea las vistas financieras hasta introducir el PIN de 4 dígitos.
                                                                 </p>
                                                             </div>
                                                             <button
@@ -4673,7 +4693,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 aria-checked={securityConfig.require_on_enter}
                                                                 onClick={() => handleToggleRequireOnEnter(!securityConfig.require_on_enter)}
                                                                 className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors ${
-                                                                    securityConfig.require_on_enter ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-zinc-700'
+                                                                    securityConfig.require_on_enter ? 'bg-gray-900 dark:bg-white' : 'bg-gray-300 dark:bg-zinc-700'
                                                                 }`}
                                                             >
                                                                 <div className={`w-4 h-4 rounded-full transition-transform ${
@@ -4686,11 +4706,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                                         <div className="flex items-center justify-between py-1">
                                                             <div className="space-y-0.5 pr-4">
-                                                                <label htmlFor="toggle-lock-on-delete" className="text-xs font-medium text-gray-900 dark:text-white cursor-pointer">
-                                                                    Proteger eliminación de cuentas y tarjetas
+                                                                <label htmlFor="toggle-lock-on-delete" className="text-xs font-semibold text-gray-900 dark:text-white cursor-pointer">
+                                                                    Proteger eliminación de cuentas
                                                                 </label>
                                                                 <p className="text-[11px] text-gray-500">
-                                                                    Pide confirmación con PIN antes de borrar una cuenta.
+                                                                    Exige la validación del PIN antes de borrar cuentas o tarjetas.
                                                                 </p>
                                                             </div>
                                                             <button
@@ -4700,7 +4720,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                 aria-checked={securityConfig.require_on_delete}
                                                                 onClick={() => handleToggleRequireOnDelete(!securityConfig.require_on_delete)}
                                                                 className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors ${
-                                                                    securityConfig.require_on_delete ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-zinc-700'
+                                                                    securityConfig.require_on_delete ? 'bg-gray-900 dark:bg-white' : 'bg-gray-300 dark:bg-zinc-700'
                                                                 }`}
                                                             >
                                                                 <div className={`w-4 h-4 rounded-full transition-transform ${
