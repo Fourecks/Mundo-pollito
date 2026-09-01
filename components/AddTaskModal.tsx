@@ -68,21 +68,30 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.lang = 'es-ES';
-    recognition.interimResults = false;
+    recognition.interimResults = true;
+
+    // Guarda el texto actual y añade un espacio si no está vacío
+    const baseText = text ? text + (text.endsWith(' ') ? '' : ' ') : '';
+    let finalTranscript = '';
 
     recognition.onstart = () => {
-      setText('');
       setIsListening(true);
     };
 
     recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results)
-        .map((result: any) => result[0])
-        .map((result: any) => result.transcript)
-        .join('');
-      if (transcript) { setText(transcript); }
+      let interimTranscript = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      
+      setText(baseText + finalTranscript + interimTranscript);
     };
 
     recognition.onerror = (event: any) => {

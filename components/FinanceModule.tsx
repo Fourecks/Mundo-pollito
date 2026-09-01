@@ -4371,7 +4371,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value"
                                                                 >
                                                                     {sortedCategoryBreakdown.map((_, index) => (
-                                                                        <Cell key={`cell-${index}`} fill={monochromePalette[index % monochromePalette.length]} />
+                                                                        <Cell key={`cell-${index}`} fill={categoryPalette[index % categoryPalette.length]} />
                                                                     ))}
                                                                 </Pie>
                                                                 <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />

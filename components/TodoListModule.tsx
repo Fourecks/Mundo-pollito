@@ -116,7 +116,7 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     const [calendarVisible, setCalendarVisible] = useState(false);
     const [isCalendarPanelVisible, setIsCalendarPanelVisible] = useState(!isMobile);
     const [isNarrow, setIsNarrow] = useState(false);
-    const [selectedProjectId, setSelectedProjectId] = useState<number | 'all' | null>('all');
+    const [selectedProjectId, setSelectedProjectId] = useState<number | 'all' | null | 'projects_only'>('all');
     
     // State for 'Projects' tab
     const [viewingProject, setViewingProject] = useState<Project | null>(null);
@@ -179,6 +179,8 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
             setSelectedProjectId('all');
         } else if (value === 'none') {
             setSelectedProjectId(null);
+        } else if (value === 'projects_only') {
+            setSelectedProjectId('projects_only');
         } else {
             setSelectedProjectId(Number(value));
         }
@@ -190,6 +192,9 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
         }
         if (selectedProjectId === null) {
             return todosForSelectedDate.filter(t => !t.project_id);
+        }
+        if (selectedProjectId === 'projects_only') {
+            return todosForSelectedDate.filter(t => t.project_id !== null && t.project_id !== undefined);
         }
         return todosForSelectedDate.filter(t => t.project_id === selectedProjectId);
     }, [todosForSelectedDate, selectedProjectId]);
@@ -392,8 +397,9 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
                                                     className="text-xs font-semibold text-gray-500 dark:text-gray-300 bg-transparent focus:outline-none appearance-none pr-4 pl-1 cursor-pointer max-w-28"
                                                     aria-label="Filtrar por proyecto"
                                                 >
-                                                    <option value="all">Proyectos</option>
-                                                    <option value="none">Sin Proyecto</option>
+                                                    <option value="all">Todas las tareas</option>
+                                                    <option value="none">Solo sin proyectos</option>
+                                                    <option value="projects_only">Solo proyectos</option>
                                                     {projects.filter(p => !p.is_archived).map(p => (
                                                         <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
                                                     ))}
