@@ -2,7 +2,6 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem, Priority, ProjectExpense } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
-import { useHuddle } from '../src/context/HuddleContext';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, LayoutGrid
 } from 'lucide-react';
@@ -44,19 +43,6 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
             </div>
         </div>
     );
-};
-
-const VideoStream = ({ stream }: { stream: MediaStream | null }) => {
-    const videoRef = useRef<HTMLVideoElement | null>(null);
-    React.useEffect(() => {
-        if (videoRef.current && stream) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(err => console.warn("Error playing video stream:", err));
-        }
-    }, [stream]);
-    
-    if (!stream) return null;
-    return <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-lg" />;
 };
 
 export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
@@ -195,29 +181,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     // Pinned Filter State
     const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-
-    // Global Huddle Integration from Context
-    const {
-        activeHuddle,
-        isHuddleActive: isGlobalHuddleActive,
-        startHuddle,
-        leaveHuddle,
-        isMicOn,
-        isVideoOn,
-        isScreenSharing,
-        toggleMic,
-        toggleVideo,
-        toggleScreenShare,
-        localStream,
-        screenStream,
-        localVolume,
-        speakingParticipants,
-        huddleParticipants,
-        isHuddleFullScreen,
-        setIsHuddleFullScreen,
-    } = useHuddle();
-
-    const [showHuddleParticipants, setShowHuddleParticipants] = useState(false);
 
     // Thread (Hilo) States
     const [activeThreadMessage, setActiveThreadMessage] = useState<ProjectChatMessage | null>(null);
@@ -606,31 +569,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         return activeProject.polls || [];
     }, [activeProject]);
 
-    const activeHuddles = useMemo(() => {
-        if (!activeProject) return [];
-        return activeProject.huddles || [];
-    }, [activeProject]);
 
-    // Listen for global huddle-ended events to synchronize project huddle state immediately
-    React.useEffect(() => {
-        const handleHuddleEnded = (e: any) => {
-            const detail = e.detail;
-            if (activeProject && detail && (detail.projectId === activeProject.id || !detail.projectId)) {
-                const currentHuddles = activeProject.huddles || [];
-                const updatedHuddles = currentHuddles.map(h => 
-                    (!detail.channelId || h.channel_id === detail.channelId)
-                        ? { ...h, active: false, participants: [] }
-                        : h
-                );
-                onUpdateProject(activeProject.id, { huddles: updatedHuddles });
-            }
-        };
-
-        window.addEventListener('huddle-ended', handleHuddleEnded);
-        return () => {
-            window.removeEventListener('huddle-ended', handleHuddleEnded);
-        };
-    }, [activeProject, onUpdateProject]);
 
     // Handle channel redirection from notifications
     const pendingRedirectChannelRef = useRef<string | null>(null);
@@ -674,44 +613,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         };
     }, []);
 
-    // Listen for huddle call summaries and post system record to channel chat
-    React.useEffect(() => {
-        const handleHuddleSummary = (e: any) => {
-            const detail = e.detail;
-            if (activeProject && detail) {
-                const { projectId, channelId, durationText, participantsStr } = detail;
-                if (!projectId || projectId === activeProject.id) {
-                    const targetChanId = channelId || selectedChannelId || 'general';
-                    const summaryMsg: ProjectChatMessage = {
-                        id: crypto.randomUUID(),
-                        project_id: activeProject.id,
-                        channel_id: targetChanId,
-                        sender_name: 'Sistema 📞',
-                        sender_email: 'sistema@pollito.com',
-                        text: `📞 **Llamada Huddle Finalizada**\n• Duración: ${durationText}\n• Participantes: ${participantsStr}`,
-                        created_at: new Date().toISOString()
-                    };
-                    const currentMsgs = activeProject.chat_messages || [];
-                    const isDuplicate = currentMsgs.some(m => 
-                        m.sender_name === 'Sistema 📞' && 
-                        m.channel_id === targetChanId &&
-                        m.text.includes(durationText) &&
-                        (new Date().getTime() - new Date(m.created_at).getTime() < 10000)
-                    );
-                    if (!isDuplicate) {
-                        onUpdateProject(activeProject.id, { 
-                            chat_messages: [...currentMsgs, summaryMsg] 
-                        });
-                    }
-                }
-            }
-        };
 
-        window.addEventListener('huddle-call-summary', handleHuddleSummary);
-        return () => {
-            window.removeEventListener('huddle-call-summary', handleHuddleSummary);
-        };
-    }, [activeProject, selectedChannelId, onUpdateProject]);
 
     // Handle channel selection synchronization
     React.useEffect(() => {
@@ -1107,7 +1009,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             { id: 'sprints', label: 'Sprints', icon: Target },
                             { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
                             { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs },
-                            { id: 'chat', label: 'Canales', icon: MessageSquare, badge: unreadChatMessagesCount, isHuddle: isGlobalHuddleActive || (activeProject.huddles || []).some(h => h.active) },
+                            { id: 'chat', label: 'Canales', icon: MessageSquare, badge: unreadChatMessagesCount },
                             { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
                             { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time },
                             { id: 'team', label: 'Equipo', icon: Users },
@@ -1123,12 +1025,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             >
                                 <tab.icon className="w-3.5 h-3.5" />
                                 {tab.label}
-                                {tab.isHuddle && (
-                                    <span className="absolute -top-0.5 right-0 flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                    </span>
-                                )}
+
                                 {tab.badge ? (
                                     <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                                         activeTab === tab.id ? 'bg-white/20 dark:bg-black/20' : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
@@ -2463,38 +2360,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             onUpdateProject(activeProject.id, { chat_messages: updatedMessages });
         };
 
-        const isCurrentChannelHuddleActive = isGlobalHuddleActive && activeHuddle?.projectId === activeProject.id && activeHuddle?.channelId === currentChannel.id;
 
-        const handleToggleHuddle = () => {
-            if (isCurrentChannelHuddleActive) {
-                const isMultiUser = huddleParticipants.length > 1;
-                leaveHuddle();
-                if (!isMultiUser) {
-                    const updatedHuddles = activeHuddles.map(h => h.channel_id === currentChannel.id ? { ...h, active: false, participants: [] } : h);
-                    onUpdateProject(activeProject.id, { huddles: updatedHuddles });
-                }
-            } else {
-                startHuddle(activeProject.id, activeProject.name, currentChannel.id, currentChannel.name, activeProject.emoji);
-                const updatedHuddles = activeHuddles.some(h => h.channel_id === currentChannel.id)
-                    ? activeHuddles.map(h => h.channel_id === currentChannel.id ? { 
-                        ...h, 
-                        active: true, 
-                        started_at: h.started_at || new Date().toISOString(),
-                        participants: (h.participants || []).some(p => p.email === currentUserEmail) 
-                            ? h.participants 
-                            : [...(h.participants || []), { name: currentUserName, email: currentUserEmail, avatar: currentUser?.avatar_url || null, has_mic: true, has_video: false, has_screen: false }] 
-                      } : h)
-                    : [...activeHuddles, { 
-                        id: crypto.randomUUID(), 
-                        project_id: activeProject.id, 
-                        channel_id: currentChannel.id, 
-                        active: true, 
-                        started_at: new Date().toISOString(), 
-                        participants: [{ name: currentUserName, email: currentUserEmail, avatar: currentUser?.avatar_url || null, has_mic: true, has_video: false, has_screen: false }] 
-                      }];
-                onUpdateProject(activeProject.id, { huddles: updatedHuddles });
-            }
-        };
 
         return (
             <div className="flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden">
@@ -2518,38 +2384,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             )}
                         </div>
 
-                        {/* Active Global Huddle Banner */}
-                        {(isGlobalHuddleActive || activeHuddles.some(h => h.active)) && (
-                            <div className="mx-3 my-2 p-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
-                                <div className="flex items-center gap-1.5 mb-1.5">
-                                    <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                    </span>
-                                    <span className="text-[10px] uppercase font-bold text-emerald-800 dark:text-emerald-400">Reunión en Curso</span>
-                                </div>
-                                <button 
-                                    onClick={() => {
-                                        if (isGlobalHuddleActive && activeHuddle) {
-                                            setSelectedChannelId(activeHuddle.channelId);
-                                        } else {
-                                            const runningHuddle = activeHuddles.find(h => h.active) || { channel_id: 'general' };
-                                            setSelectedChannelId(runningHuddle.channel_id);
-                                            startHuddle(activeProject.id, activeProject.name, runningHuddle.channel_id, runningHuddle.channel_id, activeProject.emoji);
-                                        }
-                                    }}
-                                    className="w-full text-center py-1 text-[11px] bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700 transition-colors"
-                                >
-                                    {isCurrentChannelHuddleActive ? 'Huddle Activo 🎙️' : 'Unirse al Huddle 🎙️'}
-                                </button>
-                            </div>
-                        )}
-
                         {/* Channels List */}
                         <div className="p-2 space-y-0.5">
                             {activeChannels.map(chan => {
                                 const isSelected = chan.id === currentChannel.id;
-                                const isChanHuddleActive = (activeHuddles.find(h => h.channel_id === chan.id)?.active) || (isGlobalHuddleActive && activeHuddle?.projectId === activeProject.id && activeHuddle?.channelId === chan.id);
                                 
                                 // Check dynamic unread status for the channel
                                 const hasUnread = !isSelected && (activeProject.chat_messages || []).some(m => {
@@ -2581,12 +2419,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             </span>
                                             <div className="truncate flex items-center gap-1">
                                                 <span className="text-xs truncate">{chan.name}</span>
-                                                {isChanHuddleActive && (
-                                                    <span className="flex h-2 w-2 shrink-0 relative">
-                                                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-emerald-400 opacity-75"></span>
-                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                                    </span>
-                                                )}
                                             </div>
                                         </div>
 
@@ -2691,26 +2523,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     </button>
                                 )}
 
-                                {/* Huddle Live Meet Button - hidden if locked */}
-                                {!(currentChannel.is_private && currentChannel.password && !unlockedChannels[currentChannel.id]) && (
-                                    <button 
-                                        onClick={handleToggleHuddle}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
-                                            isCurrentChannelHuddleActive 
-                                                ? 'bg-red-600 hover:bg-red-700 text-white' 
-                                                : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active || (isGlobalHuddleActive && activeHuddle?.projectId === activeProject.id && activeHuddle?.channelId === currentChannel.id))
-                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
-                                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                        }`}
-                                    >
-                                        <Video className="w-3.5 h-3.5" />
-                                        {isCurrentChannelHuddleActive 
-                                            ? (huddleParticipants.length > 1 ? 'Salirse' : 'Colgar') 
-                                            : (activeHuddles.find(h => h.channel_id === currentChannel.id)?.active || isGlobalHuddleActive) 
-                                                ? 'Unirse al Huddle 🎙️' 
-                                                : 'Iniciar Huddle'}
-                                    </button>
-                                )}
+
 
                                 {/* Clear Channel Messages - Only visible to Project Owner/Creator */}
                                 {isProjectCreator && (
@@ -2728,35 +2541,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         </div>
 
-                        {/* In-channel live active call banner */}
-                        {isCurrentChannelHuddleActive && (
-                            <div className="mx-6 my-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-900/30 via-slate-900/50 to-emerald-950/30 border border-emerald-500/40 flex items-center justify-between text-xs text-white shadow-sm shrink-0">
-                                <div className="flex items-center gap-2.5">
-                                    <span className="relative flex h-2.5 w-2.5">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                    </span>
-                                    <div>
-                                        <p className="font-bold text-emerald-300">Llamada Huddle en curso en este canal</p>
-                                        <p className="text-[11px] text-gray-300">Puedes moverte a cualquier sección y la llamada permanecerá en el recuadro flotante interactivo.</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setIsHuddleFullScreen(true)}
-                                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold border border-white/10 flex items-center gap-1 transition-colors"
-                                    >
-                                        <Maximize2 className="w-3.5 h-3.5" /> Pantalla Completa
-                                    </button>
-                                    <button
-                                        onClick={handleToggleHuddle}
-                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors"
-                                    >
-                                        {huddleParticipants.length > 1 ? 'Salirse' : 'Colgar'} 📞
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+
 
                         {/* CONDITIONAL LOCK VIEW OR ACTIVE CONVERSATION VIEW */}
                         {currentChannel.is_private && !unlockedChannels[currentChannel.id] ? (
