@@ -7,7 +7,7 @@ export interface WindowState {
 
 export type Priority = 'low' | 'medium' | 'high';
 
-export type WindowType = 'todo' | 'calendar' | 'notes' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso' | 'projects' | 'spotify' | 'finance';
+export type WindowType = 'todo' | 'calendar' | 'notes' | 'music' | 'pomodoro' | 'browser' | 'habits' | 'progreso' | 'projects' | 'spotify' | 'finance' | 'student';
 
 export interface TaskComment {
   id: string;
@@ -74,6 +74,10 @@ export interface Todo {
   assignee?: string | null;
   assigned_to?: string | null;
   list_id?: string | null;
+  // Student Module
+  subject_id?: string | null;
+  unit_id?: string | null;
+  academic_type?: string | null;
 }
 
 export interface ProjectMember {

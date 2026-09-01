@@ -6,8 +6,8 @@ import { Folder, Note, Playlist, QuickNote, Todo } from './types';
 
 let db: IDBDatabase;
 const DB_NAME_PREFIX = 'PollitoProductivoDB';
-const DB_VERSION = 4; // Incremented version for new schema
-const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'projects', 'habits', 'habit_records'];
+const DB_VERSION = 9; // Incremented version for new schema
+const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'projects', 'habits', 'habit_records', 'student_academic_periods', 'student_subjects', 'student_subject_schedules', 'student_units', 'student_topics', 'student_exams', 'student_resources', 'student_study_sessions', 'student_readings', 'student_grades', 'student_attendance', 'student_decks', 'student_flashcards', 'student_goals', 'student_study_targets'];
 
 // --- Types for Sync Queue ---
 interface SyncOperation {

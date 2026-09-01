@@ -424,7 +424,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             currAcc.balance_cents = Math.max(0, newBalance);
 
             // Update Next Date or delete if single payment
-            if (rec.frequency === 'once' || rec.frequency === 'ONCE') {
+            if ((rec.frequency as string) === 'once' || (rec.frequency as string) === 'ONCE') {
                 await supabase.from('finance_recurring_transactions').delete().eq('id', rec.id);
             } else {
                 const currentNext = new Date(rec.next_date || today);
@@ -1799,7 +1799,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             await supabase.from('finance_accounts').update({ balance_cents: Math.max(0, newBalance) }).eq('id', targetAccId);
         }
 
-        if (rec.frequency === 'once' || rec.frequency === 'ONCE') {
+        if ((rec.frequency as string) === 'once' || (rec.frequency as string) === 'ONCE') {
             await supabase.from('finance_recurring_transactions').delete().eq('id', rec.id);
         } else {
             const currentNext = new Date(rec.next_date || today);

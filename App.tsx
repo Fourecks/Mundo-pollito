@@ -12,6 +12,7 @@ import Dock from './components/Dock';
 import ModalWindow from './components/ModalWindow';
 import TodoListModule from './components/TodoListModule';
 import { FinanceModule } from './components/FinanceModule';
+import { StudentModule } from './components/student/StudentModule';
 import NotesSection from './components/NotesSection';
 import MusicPlayer from './components/MusicPlayer';
 import SpotifyFloatingPlayer from './components/SpotifyFloatingPlayer';
@@ -1131,6 +1132,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                   <FinanceModule onClose={() => toggleWindow('finance')} />
               </ModalWindow>
           )}
+          {openWindows.includes('student') && (
+              <ModalWindow isOpen onClose={() => toggleWindow('student')} title="Estudio" isDraggable isResizable zIndex={getWindowZIndex('student')} onFocus={() => bringToFront('student')} className="w-full max-w-5xl h-[80vh]" windowState={windowStatesRef.current.student} onStateChange={s => handleWindowStateChange('student', s)} allowFullscreen>
+                  <StudentModule />
+              </ModalWindow>
+          )}
           {openWindows.includes('music') && (
               <ModalWindow isOpen onClose={() => toggleWindow('music')} frameless isDraggable isResizable zIndex={getWindowZIndex('music')} onFocus={() => bringToFront('music')} className="w-[600px] h-[450px]" windowState={windowStatesRef.current.music} onStateChange={s => handleWindowStateChange('music', s)}>
                   <MusicPlayer playlists={playlists} onAddPlaylist={handleAddPlaylist} onUpdatePlaylist={handleUpdatePlaylist} onDeletePlaylist={handleDeletePlaylist} onSelectTrack={handleSelectTrack} onClose={() => toggleWindow('music')} />
@@ -1640,6 +1646,12 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 <div className={activeTab === 'finance' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full pt-8 landscape:pt-2">
                         <FinanceModule />
+                    </div>
+                </div>
+
+                <div className={activeTab === 'student' ? 'h-full flex flex-col' : 'hidden'}>
+                    <div className="h-full pt-8 landscape:pt-2">
+                        <StudentModule />
                     </div>
                 </div>
 

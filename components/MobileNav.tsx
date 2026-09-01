@@ -6,13 +6,14 @@ import NotesIcon from './icons/NotesIcon';
 import MoreIcon from './icons/MoreIcon';
 import CheckBadgeIcon from './icons/CheckBadgeIcon';
 import { FolderKanban, Wallet } from 'lucide-react';
+import AcademicIcon from './icons/AcademicIcon';
 
 interface MobileNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
-type TabName = 'home' | 'tasks' | 'projects' | 'calendar' | 'habits' | 'notes' | 'finance' | 'more';
+type TabName = 'home' | 'tasks' | 'projects' | 'calendar' | 'habits' | 'notes' | 'finance' | 'student' | 'more';
 
 const ProjectsIcon: React.FC = () => (
   <FolderKanban className="w-5 h-5 landscape:w-4 landscape:h-4" />
@@ -28,6 +29,7 @@ const navItems: { id: TabName; label: string; icon: React.FC }[] = [
   { id: 'projects', label: 'Proyectos', icon: ProjectsIcon },
   { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
   { id: 'habits', label: 'Hábitos', icon: CheckBadgeIcon },
+  { id: 'student', label: 'Estudio', icon: AcademicIcon },
   { id: 'notes', label: 'Notas', icon: NotesIcon },
   { id: 'finance', label: 'Finanzas', icon: FinanceIcon },
   { id: 'more', label: 'Más', icon: MoreIcon },

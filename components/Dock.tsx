@@ -8,6 +8,7 @@ import { WindowType } from '../types';
 import CheckBadgeIcon from './icons/CheckBadgeIcon';
 import BriefcaseIcon from './icons/BriefcaseIcon';
 import { FolderKanban, Wallet } from 'lucide-react';
+import AcademicIcon from './icons/AcademicIcon';
 
 interface DockProps {
   onButtonClick: (window: WindowType) => void;
@@ -25,6 +26,7 @@ const FinanceIcon: React.FC = () => (
 const dockItems: { id: WindowType; label: string; icon: React.FC }[] = [
   { id: 'todo', label: 'Tareas', icon: ListIcon },
   { id: 'projects', label: 'Proyectos', icon: ProjectsIcon },
+  { id: 'student', label: 'Estudio', icon: AcademicIcon },
   { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
   { id: 'habits', label: 'Hábitos', icon: CheckBadgeIcon },
   { id: 'pomodoro', label: 'Pomodoro', icon: ClockIcon },
