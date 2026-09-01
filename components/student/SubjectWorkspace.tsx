@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Subject, Unit, Exam, Topic, Resource, StudySession, Grade, Attendance, Deck, Flashcard } from './types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { syncableCreate, syncableUpdate, getAll } from '../../db';
+import { syncableCreate, syncableUpdate, syncableDelete, getAll, ensureDB } from '../../db';
+import { supabase } from '../../supabaseClient';
 
 interface Props {
   subject: Subject;
@@ -61,31 +62,81 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
     loadData();
   }, [subject.id]);
 
+  const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
+  const getUserId = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user?.id || 'local';
+    } catch {
+      return 'local';
+    }
+  };
+
   const loadData = async () => {
     try {
-      const allUnits = await getAll<Unit>('student_units');
+      await ensureDB();
+
+      const [
+        allUnits,
+        allExams,
+        allResources,
+        allSessions,
+        allGrades,
+        allAttendances,
+        allDecks,
+        allCards
+      ] = await Promise.all([
+        getAll<Unit>('student_units'),
+        getAll<Exam>('student_exams'),
+        getAll<Resource>('student_resources'),
+        getAll<StudySession>('student_study_sessions'),
+        getAll<Grade>('student_grades'),
+        getAll<Attendance>('student_attendance'),
+        getAll<Deck>('student_decks'),
+        getAll<Flashcard>('student_flashcards'),
+      ]);
+
       setUnits(allUnits.filter(u => u.subject_id === subject.id));
-
-      const allExams = await getAll<Exam>('student_exams');
       setExams(allExams.filter(e => e.subject_id === subject.id));
-      
-      const allResources = await getAll<Resource>('student_resources');
       setResources(allResources.filter(r => r.subject_id === subject.id));
-      
-      const allSessions = await getAll<StudySession>('student_study_sessions');
       setStudySessions(allSessions.filter(s => s.subject_id === subject.id));
-
-      const allGrades = await getAll<Grade>('student_grades');
       setGrades(allGrades.filter(g => g.subject_id === subject.id));
-
-      const allAttendances = await getAll<Attendance>('student_attendance');
       setAttendances(allAttendances.filter(a => a.subject_id === subject.id));
-
-      const allDecks = await getAll<Deck>('student_decks');
       setDecks(allDecks.filter(d => d.subject_id === subject.id));
-
-      const allCards = await getAll<Flashcard>('student_flashcards');
       setFlashcards(allCards);
+
+      // Background Supabase Sync if online
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id && navigator.onLine) {
+          const { data: remoteDecks } = await supabase.from('student_decks').select('*').eq('subject_id', subject.id);
+          if (remoteDecks) setDecks(remoteDecks);
+          
+          const { data: remoteExams } = await supabase.from('student_exams').select('*').eq('subject_id', subject.id);
+          if (remoteExams) setExams(remoteExams);
+
+          const { data: remoteGrades } = await supabase.from('student_grades').select('*').eq('subject_id', subject.id);
+          if (remoteGrades) setGrades(remoteGrades);
+
+          const { data: remoteResources } = await supabase.from('student_resources').select('*').eq('subject_id', subject.id);
+          if (remoteResources) setResources(remoteResources);
+
+          const { data: remoteUnits } = await supabase.from('student_units').select('*').eq('subject_id', subject.id);
+          if (remoteUnits) setUnits(remoteUnits);
+        }
+      } catch (err) {
+        console.warn("Supabase fetch in workspace:", err);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -93,31 +144,69 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
 
   const handleSaveDeck = async () => {
     if (!newDeckTitle.trim()) return;
-    const newDeck: Omit<Deck, 'id'> = {
-      user_id: 'local',
+    const userId = await getUserId();
+    const newDeck: Deck = {
+      id: generateUUID(),
+      user_id: userId,
       subject_id: subject.id,
       title: newDeckTitle.trim(),
       created_at: new Date().toISOString()
     };
-    await syncableCreate('student_decks', newDeck);
+
+    setDecks(prev => [newDeck, ...prev]);
     setIsAddingDeck(false);
     setNewDeckTitle('');
+
+    try {
+      await syncableCreate('student_decks', newDeck);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteDeck = async (deckId: string) => {
+    setDecks(prev => prev.filter(d => d.id !== deckId));
+    if (selectedDeck?.id === deckId) setSelectedDeck(null);
+    try {
+      await syncableDelete('student_decks', deckId);
+    } catch (err) {
+      console.error(err);
+    }
     loadData();
   };
 
   const handleSaveFlashcard = async () => {
     if (!selectedDeck || !newCardFront.trim() || !newCardBack.trim()) return;
-    const newCard: Omit<Flashcard, 'id'> = {
+    const newCard: Flashcard = {
+      id: generateUUID(),
       deck_id: selectedDeck.id,
       front: newCardFront.trim(),
       back: newCardBack.trim(),
       status: 'new',
       created_at: new Date().toISOString()
     };
-    await syncableCreate('student_flashcards', newCard);
+
+    setFlashcards(prev => [newCard, ...prev]);
     setIsAddingCard(false);
     setNewCardFront('');
     setNewCardBack('');
+
+    try {
+      await syncableCreate('student_flashcards', newCard);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteFlashcard = async (cardId: string) => {
+    setFlashcards(prev => prev.filter(c => c.id !== cardId));
+    try {
+      await syncableDelete('student_flashcards', cardId);
+    } catch (err) {
+      console.error(err);
+    }
     loadData();
   };
 
@@ -125,7 +214,7 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
     const card = flashcards.find(c => c.id === cardId);
     if (!card) return;
     const updated = { ...card, status: newStatus };
-    await syncableUpdate('student_flashcards', updated);
+    setFlashcards(prev => prev.map(c => c.id === cardId ? updated : c));
     
     const activeCards = flashcards.filter(c => c.deck_id === selectedDeck?.id);
     if (reviewIndex + 1 < activeCards.length) {
@@ -136,26 +225,51 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
       setReviewIndex(0);
       setIsCardFlipped(false);
     }
-    loadData();
+
+    try {
+      await syncableUpdate('student_flashcards', updated);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleSaveUnit = async () => {
     if (!newUnitName.trim()) return;
-    const newUnit: Omit<Unit, 'id'> = {
+    const newUnit: Unit = {
+      id: generateUUID(),
       subject_id: subject.id,
       name: newUnitName.trim(),
       order_index: units.length,
     };
-    await syncableCreate('student_units', newUnit);
+
+    setUnits(prev => [...prev, newUnit]);
     setIsAddingUnit(false);
     setNewUnitName('');
+
+    try {
+      await syncableCreate('student_units', newUnit);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteUnit = async (unitId: string) => {
+    setUnits(prev => prev.filter(u => u.id !== unitId));
+    try {
+      await syncableDelete('student_units', unitId);
+    } catch (err) {
+      console.error(err);
+    }
     loadData();
   };
 
   const handleSaveExam = async () => {
     if (!newExamTitle.trim() || !newExamDate) return;
-    const newExam: Omit<Exam, 'id'> = {
-      user_id: 'local',
+    const userId = await getUserId();
+    const newExam: Exam = {
+      id: generateUUID(),
+      user_id: userId,
       subject_id: subject.id,
       title: newExamTitle.trim(),
       type: 'quiz',
@@ -163,28 +277,64 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
       status: 'pending',
       created_at: new Date().toISOString()
     };
-    await syncableCreate('student_exams', newExam);
+
+    setExams(prev => [newExam, ...prev]);
     setIsAddingExam(false);
     setNewExamTitle('');
     setNewExamDate('');
+
+    try {
+      await syncableCreate('student_exams', newExam);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteExam = async (examId: string) => {
+    setExams(prev => prev.filter(e => e.id !== examId));
+    try {
+      await syncableDelete('student_exams', examId);
+    } catch (err) {
+      console.error(err);
+    }
     loadData();
   };
 
   const handleSaveResource = async () => {
     if (!newResourceTitle.trim()) return;
-    const newResource: Omit<Resource, 'id'> = {
-      user_id: 'local',
+    const userId = await getUserId();
+    const newResource: Resource = {
+      id: generateUUID(),
+      user_id: userId,
       subject_id: subject.id,
       title: newResourceTitle.trim(),
       url: newResourceUrl.trim() || undefined,
       type: newResourceType,
       created_at: new Date().toISOString()
     };
-    await syncableCreate('student_resources', newResource);
+
+    setResources(prev => [newResource, ...prev]);
     setIsAddingResource(false);
     setNewResourceTitle('');
     setNewResourceUrl('');
     setNewResourceType('link');
+
+    try {
+      await syncableCreate('student_resources', newResource);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteResource = async (resourceId: string) => {
+    setResources(prev => prev.filter(r => r.id !== resourceId));
+    try {
+      await syncableDelete('student_resources', resourceId);
+    } catch (err) {
+      console.error(err);
+    }
     loadData();
   };
 
@@ -206,8 +356,10 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
       return; // Ignore very short sessions
     }
     
-    const newSession: Omit<StudySession, 'id'> = {
-      user_id: 'local',
+    const userId = await getUserId();
+    const newSession: StudySession = {
+      id: generateUUID(),
+      user_id: userId,
       subject_id: subject.id,
       duration_minutes: Math.round(studySeconds / 60),
       objective: studyObjective.trim() || undefined,
@@ -215,9 +367,15 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
       created_at: new Date().toISOString()
     };
     
-    await syncableCreate('student_study_sessions', newSession);
+    setStudySessions(prev => [newSession, ...prev]);
     setStudySeconds(0);
     setStudyObjective('');
+
+    try {
+      await syncableCreate('student_study_sessions', newSession);
+    } catch (err) {
+      console.error(err);
+    }
     loadData();
   };
 
@@ -230,8 +388,10 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
   const handleSaveGrade = async () => {
     if (!newGradeName.trim() || !newGradeScore || !newGradeMaxScore || !newGradeWeight) return;
 
-    const newGrade: Omit<Grade, 'id'> = {
-      user_id: 'local',
+    const userId = await getUserId();
+    const newGrade: Grade = {
+      id: generateUUID(),
+      user_id: userId,
       subject_id: subject.id,
       name: newGradeName.trim(),
       score: parseFloat(newGradeScore),
@@ -240,12 +400,28 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
       created_at: new Date().toISOString()
     };
     
-    await syncableCreate('student_grades', newGrade);
+    setGrades(prev => [newGrade, ...prev]);
     setIsAddingGrade(false);
     setNewGradeName('');
     setNewGradeScore('');
     setNewGradeMaxScore('10');
     setNewGradeWeight('');
+
+    try {
+      await syncableCreate('student_grades', newGrade);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteGrade = async (gradeId: string) => {
+    setGrades(prev => prev.filter(g => g.id !== gradeId));
+    try {
+      await syncableDelete('student_grades', gradeId);
+    } catch (err) {
+      console.error(err);
+    }
     loadData();
   };
 
@@ -255,19 +431,32 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
     // Check if attendance already recorded today
     const existing = attendances.find(a => a.date === today);
     if (existing) {
-      // Could add update logic here if desired, but skip for simplicity
+      const updated = { ...existing, status };
+      setAttendances(prev => prev.map(a => a.id === existing.id ? updated : a));
+      try {
+        await syncableUpdate('student_attendance', updated);
+      } catch (err) {
+        console.error(err);
+      }
       return; 
     }
 
-    const newAttendance: Omit<Attendance, 'id'> = {
-      user_id: 'local',
+    const userId = await getUserId();
+    const newAttendance: Attendance = {
+      id: generateUUID(),
+      user_id: userId,
       subject_id: subject.id,
       date: today,
       status,
       created_at: new Date().toISOString()
     };
     
-    await syncableCreate('student_attendance', newAttendance);
+    setAttendances(prev => [newAttendance, ...prev]);
+    try {
+      await syncableCreate('student_attendance', newAttendance);
+    } catch (err) {
+      console.error(err);
+    }
     loadData();
   };
 
@@ -364,8 +553,12 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
                         </div>
                         <span className="font-medium text-gray-900 dark:text-gray-100">{unit.name}</span>
                       </div>
-                      <button className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                      <button 
+                        onClick={() => handleDeleteUnit(unit.id)}
+                        className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                        title="Eliminar unidad"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                       </button>
                     </div>
                   ))}
@@ -396,7 +589,7 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
               ) : (
                 <div className="space-y-3">
                   {exams.map(exam => (
-                    <div key={exam.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div key={exam.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
                       <div>
                         <h4 className="font-semibold text-lg text-gray-900 dark:text-gray-100">{exam.title}</h4>
                         <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
@@ -409,9 +602,28 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${exam.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}>
-                          {exam.status === 'completed' ? 'Completado' : 'Pendiente'}
-                        </span>
+                        <button
+                          onClick={async () => {
+                            const newStatus = exam.status === 'completed' ? 'pending' : 'completed';
+                            const updated = { ...exam, status: newStatus as any };
+                            setExams(prev => prev.map(e => e.id === exam.id ? updated : e));
+                            try {
+                              await syncableUpdate('student_exams', updated);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${exam.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}
+                        >
+                          {exam.status === 'completed' ? '✓ Completado' : '⏳ Pendiente'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteExam(exam.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                          title="Eliminar examen"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -435,17 +647,28 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {resources.map(resource => (
-                    <a key={resource.id} href={resource.url || '#'} target="_blank" rel="noopener noreferrer" className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all flex flex-col gap-3 group block">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-xl">
-                          {resource.type === 'link' ? '🔗' : resource.type === 'pdf' ? '📄' : resource.type === 'video' ? '▶️' : '📁'}
+                    <div key={resource.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-xl">
+                            {resource.type === 'link' ? '🔗' : resource.type === 'pdf' ? '📄' : resource.type === 'video' ? '▶️' : '📁'}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteResource(resource.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                            title="Eliminar recurso"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                          </button>
                         </div>
-                        <h4 className="font-medium group-hover:text-blue-600 transition-colors truncate">{resource.title}</h4>
+                        <h4 className="font-medium text-gray-900 dark:text-white truncate">{resource.title}</h4>
+                        {resource.url && (
+                          <a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate block mt-1">
+                            {resource.url} ↗
+                          </a>
+                        )}
                       </div>
-                      {resource.url && (
-                        <p className="text-xs text-gray-400 truncate">{resource.url}</p>
-                      )}
-                    </a>
+                    </div>
                   ))}
                 </div>
               )}

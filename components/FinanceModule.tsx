@@ -195,6 +195,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [disablePinInput, setDisablePinInput] = useState('');
     const [disablePinError, setDisablePinError] = useState('');
 
+    // --- Month Deletion in Cierre States ---
+    const [deleteTargetMonth, setDeleteTargetMonth] = useState<{ monthKey: string; monthName: string; count: number } | null>(null);
+    const [showDeleteMonthModal, setShowDeleteMonthModal] = useState(false);
+    const [deleteMonthPinInput, setDeleteMonthPinInput] = useState('');
+    const [deleteMonthPinError, setDeleteMonthPinError] = useState('');
+
     // --- Budget Breakdown States ---
     const [selectedBudgetMonth, setSelectedBudgetMonth] = useState<string>(new Date().toISOString().substring(0, 7));
     const [showBudgetItemModal, setShowBudgetItemModal] = useState(false);
@@ -570,72 +576,44 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         return Math.abs(hash).toString(16).padStart(16, '0');
     };
 
-    // Auto-carryover of budget items to future / new months
-    useEffect(() => {
-        if (!selectedBudgetMonth || budgetItems.length === 0) return;
-
-        const currentMonthItems = budgetItems.filter(b => b.month === selectedBudgetMonth);
-        if (currentMonthItems.length === 0) {
-            // Find most recent month with configured items
-            const allMonths = Array.from(new Set(budgetItems.map(b => b.month))).sort().reverse();
-            const sourceMonth = allMonths.find(m => m < selectedBudgetMonth) || allMonths[0];
-            
-            if (sourceMonth && sourceMonth !== selectedBudgetMonth) {
-                const sourceItems = budgetItems.filter(b => b.month === sourceMonth);
-                if (sourceItems.length > 0) {
-                    const doAutoCarryover = async () => {
-                        const { data: { user } } = await supabase.auth.getUser();
-                        if (!user) return;
-
-                        const newItems = sourceItems.map(item => ({
-                            user_id: user.id,
-                            month: selectedBudgetMonth,
-                            name: item.name,
-                            icon: item.icon || '🏷️',
-                            color: item.color || '#3b82f6',
-                            allocated_cents: item.allocated_cents,
-                            category_id: item.category_id || null
-                        }));
-
-                        try {
-                            const { data: inserted, error } = await supabase.from('finance_budget_items').insert(newItems).select();
-                            if (inserted && !error) {
-                                setBudgetItems(prev => [...prev, ...inserted]);
-                            } else {
-                                const localItems = newItems.map((item, idx) => ({ ...item, id: Date.now() + idx } as FinanceBudgetItem));
-                                setBudgetItems(prev => [...prev, ...localItems]);
-                            }
-                        } catch {
-                            const localItems = newItems.map((item, idx) => ({ ...item, id: Date.now() + idx } as FinanceBudgetItem));
-                            setBudgetItems(prev => [...prev, ...localItems]);
-                        }
-
-                        // Also carry over overall monthly budget target if exists
-                        const sourceBudget = budgets.find(b => b.month === sourceMonth);
-                        const curBudget = budgets.find(b => b.month === selectedBudgetMonth);
-                        if (sourceBudget && !curBudget) {
-                            try {
-                                await supabase.from('finance_budgets').insert([{
-                                    user_id: user.id,
-                                    month: selectedBudgetMonth,
-                                    total_amount_cents: sourceBudget.total_amount_cents
-                                }]);
-                                setBudgets(prev => [...prev, {
-                                    id: Date.now(),
-                                    user_id: user.id,
-                                    month: selectedBudgetMonth,
-                                    total_amount_cents: sourceBudget.total_amount_cents
-                                }]);
-                            } catch {
-                                // silent
-                            }
-                        }
-                    };
-                    doAutoCarryover();
-                }
-            }
+    // Helper to explicitly copy previous month's budget items on user demand
+    const handleCopyFromPreviousMonth = async () => {
+        const allMonths = Array.from(new Set(budgetItems.map(b => b.month))).sort().reverse();
+        const sourceMonth = allMonths.find(m => m < selectedBudgetMonth) || allMonths[0];
+        if (!sourceMonth || sourceMonth === selectedBudgetMonth) {
+            alert('No se encontraron desgloses en otros meses para copiar.');
+            return;
         }
-    }, [selectedBudgetMonth, budgetItems.length]);
+        const sourceItems = budgetItems.filter(b => b.month === sourceMonth);
+        if (sourceItems.length === 0) {
+            alert('El mes anterior no tiene desgloses.');
+            return;
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const newItems = sourceItems.map(item => ({
+            user_id: user.id,
+            month: selectedBudgetMonth,
+            name: item.name,
+            icon: item.icon || '🏷️',
+            color: item.color || '#3b82f6',
+            allocated_cents: item.allocated_cents,
+            category_id: item.category_id || null
+        }));
+
+        try {
+            const { data: inserted, error } = await supabase.from('finance_budget_items').insert(newItems).select();
+            if (inserted && !error) {
+                setBudgetItems(prev => [...prev, ...inserted]);
+            } else {
+                const localItems = newItems.map((item, idx) => ({ ...item, id: Date.now() + idx } as FinanceBudgetItem));
+                setBudgetItems(prev => [...prev, ...localItems]);
+            }
+        } catch (err) {
+            console.error('Error copying budget items:', err);
+        }
+    };
 
     const fetchFinanceData = async (silent: boolean = false) => {
         try {
@@ -672,38 +650,47 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             ]);
 
             if (accRes.data) setAccounts(accRes.data);
-            if (catRes.data && catRes.data.length > 0) {
+            if (catRes.data) {
                 setCategories(catRes.data);
-            } else if (user) {
-                const defaultCats = [
-                    { name: 'Supermercado & Alimentación', emoji: '🛒', type: 'EXPENSE', budget_limit_cents: 30000, user_id: user.id, is_archived: false },
-                    { name: 'Vivienda & Alquiler', emoji: '🏠', type: 'EXPENSE', budget_limit_cents: 50000, user_id: user.id, is_archived: false },
-                    { name: 'Transporte & Combustible', emoji: '🚗', type: 'EXPENSE', budget_limit_cents: 15000, user_id: user.id, is_archived: false },
-                    { name: 'Entretenimiento & Ocio', emoji: '🍿', type: 'EXPENSE', budget_limit_cents: 10000, user_id: user.id, is_archived: false },
-                    { name: 'Servicios & Luz', emoji: '💡', type: 'EXPENSE', budget_limit_cents: 12000, user_id: user.id, is_archived: false },
-                    { name: 'Salud & Bienestar', emoji: '🩺', type: 'EXPENSE', budget_limit_cents: 8000, user_id: user.id, is_archived: false },
-                    { name: 'Salario & Nómina', emoji: '💼', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false },
-                    { name: 'Freelance & Honorarios', emoji: '💵', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false },
-                    { name: 'Inversiones', emoji: '📈', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false }
-                ];
-                supabase.from('finance_categories').insert(defaultCats).select('*').then(({ data }) => {
-                    if (data) setCategories(data);
-                });
+                // Only seed default categories if it's the very first time for a fresh account (and not user-deleted)
+                if (user) {
+                    const seededKey = `finance_categories_initialized_${user.id}`;
+                    const hasEverBeenInitialized = localStorage.getItem(seededKey);
+                    if (catRes.data.length === 0 && !hasEverBeenInitialized) {
+                        localStorage.setItem(seededKey, 'true');
+                        const defaultCats = [
+                            { name: 'Supermercado & Alimentación', emoji: '🛒', type: 'EXPENSE', budget_limit_cents: 30000, user_id: user.id, is_archived: false },
+                            { name: 'Vivienda & Alquiler', emoji: '🏠', type: 'EXPENSE', budget_limit_cents: 50000, user_id: user.id, is_archived: false },
+                            { name: 'Transporte & Combustible', emoji: '🚗', type: 'EXPENSE', budget_limit_cents: 15000, user_id: user.id, is_archived: false },
+                            { name: 'Entretenimiento & Ocio', emoji: '🍿', type: 'EXPENSE', budget_limit_cents: 10000, user_id: user.id, is_archived: false },
+                            { name: 'Servicios & Luz', emoji: '💡', type: 'EXPENSE', budget_limit_cents: 12000, user_id: user.id, is_archived: false },
+                            { name: 'Salud & Bienestar', emoji: '🩺', type: 'EXPENSE', budget_limit_cents: 8000, user_id: user.id, is_archived: false },
+                            { name: 'Salario & Nómina', emoji: '💼', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false },
+                            { name: 'Freelance & Honorarios', emoji: '💵', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false },
+                            { name: 'Inversiones', emoji: '📈', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false }
+                        ];
+                        supabase.from('finance_categories').insert(defaultCats).select('*').then(({ data }) => {
+                            if (data) setCategories(data);
+                        });
+                    } else {
+                        localStorage.setItem(seededKey, 'true');
+                    }
+                }
             }
             if (txRes.data) setTransactions(txRes.data);
             if (budRes.data) setBudgets(budRes.data);
             if (recRes.data) setRecurring(recRes.data);
-            if (goalsRes.data && goalsRes.data.length > 0) {
+            if (goalsRes.data) {
                 setSavingsGoals(goalsRes.data);
                 try {
                     localStorage.setItem('finance_savings_goals_cache', JSON.stringify(goalsRes.data));
                 } catch {}
-            } else {
+            } else if (goalsRes.error) {
                 try {
                     const cached = localStorage.getItem('finance_savings_goals_cache');
                     if (cached) {
                         const parsed = JSON.parse(cached);
-                        if (parsed && parsed.length > 0) setSavingsGoals(parsed);
+                        if (parsed) setSavingsGoals(parsed);
                     }
                 } catch {}
             }
@@ -1257,22 +1244,41 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
     const handleDeleteInstallment = async (id: number) => {
         if (!confirm('¿Eliminar esta compra a cuotas?')) return;
-        await supabase.from('finance_installments').delete().eq('id', id);
-        fetchFinanceData();
+        setInstallments(prev => prev.filter(i => i.id !== id));
+        try {
+            await supabase.from('finance_installments').delete().eq('id', id);
+        } catch (err) {
+            console.error('Error deleting installment:', err);
+        }
     };
 
     const handleDeleteTransaction = async (id: number, type: string, amount_cents: number, account_id: number) => {
         if (!confirm('¿Eliminar este movimiento? Se ajustará el saldo de la cuenta.')) return;
         
-        const currentBalance = accounts.find(a => a.id === account_id)?.balance_cents || 0;
-        let newBalance = currentBalance;
-        if (type === 'EXPENSE' || type === 'TRANSFER_OUT') newBalance += amount_cents;
-        if (type === 'INCOME' || type === 'TRANSFER_IN') newBalance -= amount_cents;
-        newBalance = Math.max(0, newBalance);
+        // Optimistic UI updates
+        setTransactions(prev => prev.filter(t => t.id !== id));
+        setAccounts(prev => prev.map(a => {
+            if (a.id !== account_id) return a;
+            let newBalance = a.balance_cents;
+            if (type === 'EXPENSE' || type === 'TRANSFER_OUT') newBalance += amount_cents;
+            if (type === 'INCOME' || type === 'TRANSFER_IN') newBalance -= amount_cents;
+            return { ...a, balance_cents: Math.max(0, newBalance) };
+        }));
 
-        await supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', account_id);
-        await supabase.from('finance_transactions').delete().eq('id', id);
-        fetchFinanceData();
+        try {
+            const currentBalance = accounts.find(a => a.id === account_id)?.balance_cents || 0;
+            let newBalance = currentBalance;
+            if (type === 'EXPENSE' || type === 'TRANSFER_OUT') newBalance += amount_cents;
+            if (type === 'INCOME' || type === 'TRANSFER_IN') newBalance -= amount_cents;
+            newBalance = Math.max(0, newBalance);
+
+            await Promise.allSettled([
+                supabase.from('finance_accounts').update({ balance_cents: newBalance }).eq('id', account_id),
+                supabase.from('finance_transactions').delete().eq('id', id)
+            ]);
+        } catch (err) {
+            console.error('Error deleting transaction:', err);
+        }
     };
 
     const handleCreateAccount = async (e: React.FormEvent) => {
@@ -1360,6 +1366,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         }
     };
 
+    const executeDeleteAccount = async (id: number) => {
+        setAccounts(prev => prev.filter(a => a.id !== id));
+        setTransactions(prev => prev.filter(t => t.account_id !== id));
+        try {
+            await supabase.from('finance_transactions').delete().eq('account_id', id);
+            await supabase.from('finance_accounts').delete().eq('id', id);
+        } catch (err) {
+            console.error('Error deleting account:', err);
+        }
+    };
+
     const handleDeleteAccount = async (id: number) => {
         if (securityConfig?.require_on_delete && securityConfig?.pin_hash) {
             setDeleteTargetAccountId(id);
@@ -1368,8 +1385,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             setShowDeletePinModal(true);
         } else {
             if (!confirm('¿Eliminar esta cuenta? Se eliminarán también sus movimientos.')) return;
-            await supabase.from('finance_accounts').delete().eq('id', id);
-            fetchFinanceData(true);
+            await executeDeleteAccount(id);
         }
     };
 
@@ -1389,11 +1405,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             return;
         }
 
-        await supabase.from('finance_accounts').delete().eq('id', deleteTargetAccountId);
+        const targetId = deleteTargetAccountId;
         setShowDeletePinModal(false);
         setDeleteTargetAccountId(null);
         setDeletePinInput('');
-        fetchFinanceData(true);
+        await executeDeleteAccount(targetId);
     };
 
     const openNewCategoryModal = (defaultType: 'EXPENSE' | 'INCOME' = 'EXPENSE') => {
@@ -1478,9 +1494,30 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     };
 
     const handleDeleteCategory = async (id: number) => {
-        if (!confirm('¿Eliminar esta categoría? Se eliminará también de tu presupuesto.')) return;
-        await supabase.from('finance_categories').delete().eq('id', id);
-        fetchFinanceData(true);
+        if (!confirm('¿Eliminar esta categoría? Se desvinculará de tus movimientos y desgloses.')) return;
+        
+        // Optimistic UI update
+        setCategories(prev => prev.filter(c => c.id !== id));
+        setBudgetItems(prev => prev.map(bi => bi.category_id === id ? { ...bi, category_id: null } : bi));
+        setTransactions(prev => prev.map(t => t.category_id === id ? { ...t, category_id: null } : t));
+
+        // Mark user categories as initialized so default seed categories are never revived
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            localStorage.setItem(`finance_categories_initialized_${user.id}`, 'true');
+        }
+
+        try {
+            await Promise.allSettled([
+                supabase.from('finance_budget_items').update({ category_id: null }).eq('category_id', id),
+                supabase.from('finance_transactions').update({ category_id: null }).eq('category_id', id),
+                supabase.from('finance_recurring_transactions').update({ category_id: null }).eq('category_id', id),
+                supabase.from('finance_shopping_items').update({ category_id: null }).eq('category_id', id)
+            ]);
+            await supabase.from('finance_categories').delete().eq('id', id);
+        } catch (err) {
+            console.error('Error deleting category:', err);
+        }
     };
 
     const handleSetBudget = async (e: React.FormEvent) => {
@@ -1544,8 +1581,70 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
     const handleDeleteBudgetItem = async (id: number) => {
         if (!confirm('¿Eliminar este desglose del presupuesto?')) return;
-        await supabase.from('finance_budget_items').delete().eq('id', id);
-        fetchFinanceData(true);
+        setBudgetItems(prev => prev.filter(b => b.id !== id));
+        try {
+            await supabase.from('finance_budget_items').delete().eq('id', id);
+        } catch (err) {
+            console.error('Error deleting budget item:', err);
+        }
+    };
+
+    // --- Month Deletion in Cierre (with optional PIN protection) ---
+    const executeDeleteMonth = async (monthKey: string) => {
+        // Optimistic UI updates
+        setTransactions(prev => prev.filter(t => !t.date.startsWith(monthKey)));
+        setBudgetItems(prev => prev.filter(b => b.month !== monthKey));
+        setBudgets(prev => prev.filter(b => b.month !== monthKey));
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            await Promise.allSettled([
+                supabase.from('finance_transactions').delete().eq('user_id', user.id).gte('date', `${monthKey}-01`).lte('date', `${monthKey}-31`),
+                supabase.from('finance_budget_items').delete().eq('user_id', user.id).eq('month', monthKey),
+                supabase.from('finance_budgets').delete().eq('user_id', user.id).eq('month', monthKey)
+            ]);
+        } catch (err) {
+            console.error('Error deleting month data from Supabase:', err);
+        }
+    };
+
+    const handlePromptDeleteMonth = (monthKey: string, monthName: string, count: number) => {
+        if (securityConfig?.pin_hash) {
+            setDeleteTargetMonth({ monthKey, monthName, count });
+            setDeleteMonthPinInput('');
+            setDeleteMonthPinError('');
+            setShowDeleteMonthModal(true);
+        } else {
+            if (confirm(`¿Estás seguro de que deseas eliminar permanentemente todos los movimientos y datos del mes ${monthName}? Esta acción no se puede deshacer.`)) {
+                executeDeleteMonth(monthKey);
+            }
+        }
+    };
+
+    const handleConfirmDeleteMonthWithPin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setDeleteMonthPinError('');
+        if (!deleteTargetMonth) return;
+
+        if (securityConfig?.pin_hash) {
+            if (deleteMonthPinInput.length !== 4) {
+                setDeleteMonthPinError('El PIN debe tener 4 dígitos.');
+                return;
+            }
+            const enteredHash = await hashPin(deleteMonthPinInput);
+            if (enteredHash !== securityConfig.pin_hash) {
+                setDeleteMonthPinError('PIN de seguridad incorrecto.');
+                return;
+            }
+        }
+
+        const targetKey = deleteTargetMonth.monthKey;
+        setShowDeleteMonthModal(false);
+        setDeleteTargetMonth(null);
+        setDeleteMonthPinInput('');
+        await executeDeleteMonth(targetKey);
     };
 
     const handleQuickExpenseToBudgetItem = async (e: React.FormEvent) => {
@@ -1816,8 +1915,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
     const handleDeleteRecurring = async (id: number) => {
         if (!confirm('¿Eliminar esta suscripción / pago recurrente?')) return;
-        await supabase.from('finance_recurring_transactions').delete().eq('id', id);
-        fetchFinanceData();
+        setRecurring(prev => prev.filter(r => r.id !== id));
+        try {
+            await supabase.from('finance_recurring_transactions').delete().eq('id', id);
+        } catch (err) {
+            console.error('Error deleting recurring transaction:', err);
+        }
     };
 
     // --- Savings Goal Calculation Helpers ---
@@ -2086,30 +2189,52 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     };
 
     const handleDeleteShoppingItem = async (itemId: number) => {
-        await supabase.from('finance_shopping_items').delete().eq('id', itemId);
-        fetchFinanceData();
+        setShoppingItems(prev => prev.filter(i => i.id !== itemId));
+        try {
+            await supabase.from('finance_shopping_items').delete().eq('id', itemId);
+        } catch (err) {
+            console.error('Error deleting shopping item:', err);
+        }
     };
 
     const handleToggleShoppingItem = async (item: FinanceShoppingItem) => {
-        await supabase.from('finance_shopping_items').update({ is_purchased: !item.is_purchased }).eq('id', item.id);
-        fetchFinanceData();
+        setShoppingItems(prev => prev.map(i => i.id === item.id ? { ...i, is_purchased: !item.is_purchased } : i));
+        try {
+            await supabase.from('finance_shopping_items').update({ is_purchased: !item.is_purchased }).eq('id', item.id);
+        } catch (err) {
+            console.error('Error toggling shopping item:', err);
+        }
     };
 
     const handleDeleteShoppingList = async (listId: number) => {
         if (!confirm('¿Eliminar esta lista?')) return;
-        await supabase.from('finance_shopping_lists').delete().eq('id', listId);
-        fetchFinanceData();
+        setShoppingLists(prev => prev.filter(l => l.id !== listId));
+        setShoppingItems(prev => prev.filter(i => i.list_id !== listId));
+        try {
+            await supabase.from('finance_shopping_items').delete().eq('list_id', listId);
+            await supabase.from('finance_shopping_lists').delete().eq('id', listId);
+        } catch (err) {
+            console.error('Error deleting shopping list:', err);
+        }
     };
 
     const handleToggleArchiveShoppingList = async (list: FinanceShoppingList) => {
-        await supabase.from('finance_shopping_lists').update({ is_archived: !list.is_archived }).eq('id', list.id);
-        fetchFinanceData();
+        setShoppingLists(prev => prev.map(l => l.id === list.id ? { ...l, is_archived: !list.is_archived } : l));
+        try {
+            await supabase.from('finance_shopping_lists').update({ is_archived: !list.is_archived }).eq('id', list.id);
+        } catch (err) {
+            console.error('Error toggling archive shopping list:', err);
+        }
     };
 
     const handleResetShoppingList = async (listId: number) => {
         if (!confirm('¿Restablecer esta lista? Se eliminarán todos los artículos actuales para comenzar limpia.')) return;
-        await supabase.from('finance_shopping_items').delete().eq('list_id', listId);
-        fetchFinanceData();
+        setShoppingItems(prev => prev.filter(i => i.list_id !== listId));
+        try {
+            await supabase.from('finance_shopping_items').delete().eq('list_id', listId);
+        } catch (err) {
+            console.error('Error resetting shopping list:', err);
+        }
     };
 
     const handleOpenLoadExpenseModal = (list: FinanceShoppingList) => {
@@ -2235,8 +2360,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
     const handleDeleteDebt = async (debtId: number) => {
         if (!confirm('¿Eliminar este registro de deuda/préstamo?')) return;
-        await supabase.from('finance_debts').delete().eq('id', debtId);
-        fetchFinanceData();
+        setDebts(prev => prev.filter(d => d.id !== debtId));
+        try {
+            await supabase.from('finance_debts').delete().eq('id', debtId);
+        } catch (err) {
+            console.error('Error deleting debt:', err);
+        }
     };
 
     const handleUpdateDebt = async (e: React.FormEvent) => {
@@ -4519,13 +4648,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                         <span className="text-[10px] text-gray-400 block uppercase">Neto</span>
                                                                         <span className="font-semibold text-gray-900 dark:text-white">{net >= 0 ? '+' : ''}{formatCurrency(net)}</span>
                                                                     </div>
-                                                                    <button
-                                                                        onClick={exportMonthCSV}
-                                                                        className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-gray-200 dark:border-zinc-800 ml-1"
-                                                                        title="Exportar CSV"
-                                                                    >
-                                                                        <Download className="w-3.5 h-3.5" />
-                                                                    </button>
+                                                                    <div className="flex items-center gap-1 ml-1">
+                                                                        <button
+                                                                            onClick={exportMonthCSV}
+                                                                            className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-gray-200 dark:border-zinc-800"
+                                                                            title="Exportar CSV"
+                                                                        >
+                                                                            <Download className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handlePromptDeleteMonth(item.monthKey, item.monthName, item.txs.length)}
+                                                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors border border-gray-200 dark:border-zinc-800"
+                                                                            title="Eliminar datos de este mes"
+                                                                        >
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         );
@@ -6409,6 +6547,83 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                     >
                                         <CheckCircle2 className="w-4 h-4" />
                                         Registrar Gasto
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal Confirmar Eliminación de Mes en Cierre con PIN */}
+            <AnimatePresence>
+                {showDeleteMonthModal && deleteTargetMonth && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteMonthModal(false)}>
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-[#0c0c0c] rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 rounded-xl">
+                                        <Trash2 className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Eliminar Mes</h3>
+                                        <p className="text-[11px] text-gray-500">{deleteTargetMonth.monthName}</p>
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => setShowDeleteMonthModal(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg">
+                                    <XIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <div className="p-3 bg-red-50/80 dark:bg-red-950/20 border border-red-200/60 dark:border-red-900/40 rounded-xl space-y-1">
+                                <p className="text-xs font-semibold text-red-700 dark:text-red-300">
+                                    ¿Eliminar todos los registros de este mes?
+                                </p>
+                                <p className="text-[11px] text-red-600/80 dark:text-red-400/80">
+                                    Se borrarán permanentemente los {deleteTargetMonth.count} movimientos y datos de presupuesto asociados a {deleteTargetMonth.monthName}.
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleConfirmDeleteMonthWithPin} className="space-y-4">
+                                {securityConfig?.pin_hash && (
+                                    <div className="space-y-1.5">
+                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                                            <span>Ingresa tu PIN de seguridad (4 dígitos)</span>
+                                            <KeyRound className="w-3.5 h-3.5 text-gray-400" />
+                                        </label>
+                                        <input
+                                            type="password"
+                                            inputMode="numeric"
+                                            maxLength={4}
+                                            required
+                                            autoFocus
+                                            value={deleteMonthPinInput}
+                                            onChange={e => {
+                                                setDeleteMonthPinError('');
+                                                setDeleteMonthPinInput(e.target.value.replace(/\D/g, ''));
+                                            }}
+                                            placeholder="••••"
+                                            className="w-full text-center text-2xl tracking-[0.5em] py-2 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-gray-900 dark:text-white outline-none focus:border-red-500 font-mono"
+                                        />
+                                        {deleteMonthPinError && (
+                                            <p className="text-[11px] text-red-500 font-medium text-center">{deleteMonthPinError}</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDeleteMonthModal(false)}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-medium transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
+                                    >
+                                        Eliminar Mes
                                     </button>
                                 </div>
                             </form>

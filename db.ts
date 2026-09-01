@@ -6,7 +6,7 @@ import { Folder, Note, Playlist, QuickNote, Todo } from './types';
 
 let db: IDBDatabase;
 const DB_NAME_PREFIX = 'PollitoProductivoDB';
-const DB_VERSION = 9; // Incremented version for new schema
+const DB_VERSION = 11; // Incremented version to ensure all student stores are created
 const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'projects', 'habits', 'habit_records', 'student_academic_periods', 'student_subjects', 'student_subject_schedules', 'student_units', 'student_topics', 'student_exams', 'student_resources', 'student_study_sessions', 'student_readings', 'student_grades', 'student_attendance', 'student_decks', 'student_flashcards', 'student_goals', 'student_study_targets'];
 
 // --- Types for Sync Queue ---
@@ -20,14 +20,16 @@ interface SyncOperation {
     userId?: string; // For DELETE_ALL
 }
 
+let activeUsername = 'default';
 
 // --- DB Initialization ---
-export const initDB = (username: string): Promise<IDBDatabase> => {
+export const initDB = (username: string = 'default'): Promise<IDBDatabase> => {
+    activeUsername = username || 'default';
     return new Promise((resolve, reject) => {
         if (db) {
             return resolve(db);
         }
-        const dbName = `${DB_NAME_PREFIX}_${username}`;
+        const dbName = `${DB_NAME_PREFIX}_${activeUsername}`;
         const request = indexedDB.open(dbName, DB_VERSION);
 
         request.onupgradeneeded = (event) => {
@@ -53,6 +55,17 @@ export const initDB = (username: string): Promise<IDBDatabase> => {
     });
 };
 
+export const ensureDB = async (): Promise<IDBDatabase> => {
+    if (db) return db;
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const username = user?.email || 'default';
+        return await initDB(username);
+    } catch {
+        return await initDB('default');
+    }
+};
+
 
 // --- Generic DB Helpers ---
 // Exact whitelist of columns present in Supabase remote tables
@@ -63,7 +76,8 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'recurrence', 'reminder_offset', 'reminder_at', 'notification_sent',
         'kanban_column', 'story_points', 'sprint_id', 'milestone_id', 'tags',
         'dependencies', 'comments', 'attachments', 'assignee', 'calendar_provider',
-        'calendar_event_link', 'notion_page_id', 'notion_url', 'list_id'
+        'calendar_event_link', 'notion_page_id', 'notion_url', 'list_id',
+        'subject_id', 'unit_id', 'academic_type'
     ]),
     subtasks: new Set([
         'id', 'todo_id', 'created_at', 'text', 'completed'
@@ -85,7 +99,8 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'id', 'user_id', 'created_at', 'name'
     ]),
     notes: new Set([
-        'id', 'user_id', 'folder_id', 'created_at', 'updated_at', 'title', 'content'
+        'id', 'user_id', 'folder_id', 'created_at', 'updated_at', 'title', 'content',
+        'subject_id', 'unit_id', 'topic_id'
     ]),
     playlists: new Set([
         'id', 'user_id', 'created_at', 'name', 'type', 'source_id', 'platform', 
@@ -108,6 +123,51 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
     ]),
     ai_conversations: new Set([
         'id', 'user_id', 'created_at', 'title', 'messages'
+    ]),
+    student_academic_periods: new Set([
+        'id', 'user_id', 'name', 'start_date', 'end_date', 'is_active', 'created_at'
+    ]),
+    student_subjects: new Set([
+        'id', 'user_id', 'period_id', 'name', 'code', 'professor', 'room', 'color', 'emoji', 'description', 'target_grade', 'created_at'
+    ]),
+    student_subject_schedules: new Set([
+        'id', 'subject_id', 'day_of_week', 'start_time', 'end_time', 'room'
+    ]),
+    student_units: new Set([
+        'id', 'subject_id', 'name', 'order_index', 'description'
+    ]),
+    student_topics: new Set([
+        'id', 'unit_id', 'name', 'status', 'order_index'
+    ]),
+    student_exams: new Set([
+        'id', 'user_id', 'subject_id', 'unit_id', 'title', 'type', 'date', 'time', 'location', 'weight', 'grade', 'notes', 'status', 'created_at'
+    ]),
+    student_resources: new Set([
+        'id', 'user_id', 'subject_id', 'unit_id', 'title', 'url', 'type', 'description', 'created_at'
+    ]),
+    student_study_sessions: new Set([
+        'id', 'user_id', 'subject_id', 'unit_id', 'topic_id', 'duration_minutes', 'start_time', 'end_time', 'objective', 'notes', 'status', 'created_at'
+    ]),
+    student_readings: new Set([
+        'id', 'user_id', 'subject_id', 'title', 'author', 'type', 'status', 'total_pages', 'current_page', 'link', 'created_at'
+    ]),
+    student_grades: new Set([
+        'id', 'user_id', 'subject_id', 'name', 'score', 'max_score', 'weight', 'created_at'
+    ]),
+    student_attendance: new Set([
+        'id', 'user_id', 'subject_id', 'date', 'status', 'created_at'
+    ]),
+    student_decks: new Set([
+        'id', 'user_id', 'subject_id', 'title', 'description', 'created_at'
+    ]),
+    student_flashcards: new Set([
+        'id', 'deck_id', 'front', 'back', 'status', 'next_review', 'created_at'
+    ]),
+    student_goals: new Set([
+        'id', 'user_id', 'period_id', 'title', 'description', 'target_date', 'status', 'created_at'
+    ]),
+    student_study_targets: new Set([
+        'id', 'user_id', 'period_id', 'weekly_hours_target', 'min_attendance_rate', 'target_gpa', 'updated_at'
     ]),
 };
 
@@ -162,90 +222,188 @@ const sanitizeForSupabase = (tableName: string, data: any) => {
 
 const getStore = (storeName: string, mode: IDBTransactionMode) => {
     if (!db) throw new Error("Database is not initialized. Call initDB first.");
+    if (!db.objectStoreNames.contains(storeName)) {
+        throw new Error(`Object store ${storeName} not found in database.`);
+    }
     const tx = db.transaction(storeName, mode);
     return tx.objectStore(storeName);
 };
 
-export const getAll = <T>(storeName: string): Promise<T[]> => {
-    return new Promise((resolve, reject) => {
-        if (!db) return resolve([]);
-        const store = getStore(storeName, 'readonly');
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result || []);
-        request.onerror = () => reject(request.error);
+export const getAll = async <T>(storeName: string): Promise<T[]> => {
+    try {
+        await ensureDB();
+        return await new Promise((resolve) => {
+            if (!db || !db.objectStoreNames.contains(storeName)) {
+                // Fallback to localStorage if store not in current db version
+                try {
+                    const localData = localStorage.getItem(`db_cache_${storeName}`);
+                    if (localData) return resolve(JSON.parse(localData));
+                } catch {}
+                return resolve([]);
+            }
+            try {
+                const store = getStore(storeName, 'readonly');
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result || []);
+                request.onerror = () => resolve([]);
+            } catch {
+                resolve([]);
+            }
+        });
+    } catch {
+        return [];
+    }
+};
+
+export const get = async <T>(storeName: string, key: IDBValidKey): Promise<T | undefined> => {
+    try {
+        await ensureDB();
+        return await new Promise((resolve) => {
+            if (!db || !db.objectStoreNames.contains(storeName)) return resolve(undefined);
+            try {
+                const store = getStore(storeName, 'readonly');
+                const request = store.get(key);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => resolve(undefined);
+            } catch {
+                resolve(undefined);
+            }
+        });
+    } catch {
+        return undefined;
+    }
+};
+
+const add = async <T>(storeName: string, value: T): Promise<void> => {
+    await ensureDB();
+    return new Promise((resolve) => {
+        if (!db || !db.objectStoreNames.contains(storeName)) {
+            try {
+                const existing = JSON.parse(localStorage.getItem(`db_cache_${storeName}`) || '[]');
+                existing.push(value);
+                localStorage.setItem(`db_cache_${storeName}`, JSON.stringify(existing));
+            } catch {}
+            return resolve();
+        }
+        try {
+            const store = getStore(storeName, 'readwrite');
+            const request = store.add(value);
+            request.onsuccess = () => resolve();
+            request.onerror = () => {
+                // Try put if add failed (e.g. key collision)
+                try {
+                    const putStore = getStore(storeName, 'readwrite');
+                    const putReq = putStore.put(value);
+                    putReq.onsuccess = () => resolve();
+                    putReq.onerror = () => resolve();
+                } catch {
+                    resolve();
+                }
+            };
+        } catch {
+            resolve();
+        }
     });
 };
 
-export const get = <T>(storeName: string, key: IDBValidKey): Promise<T | undefined> => {
-    return new Promise((resolve, reject) => {
-        if (!db) return resolve(undefined);
-        const store = getStore(storeName, 'readonly');
-        const request = store.get(key);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+export const set = async <T>(storeName: string, value: T): Promise<void> => {
+    await ensureDB();
+    return new Promise((resolve) => {
+        if (!db || !db.objectStoreNames.contains(storeName)) {
+            try {
+                let existing: any[] = JSON.parse(localStorage.getItem(`db_cache_${storeName}`) || '[]');
+                const valId = (value as any)?.id;
+                if (valId) {
+                    existing = existing.filter(item => item.id !== valId);
+                }
+                existing.push(value);
+                localStorage.setItem(`db_cache_${storeName}`, JSON.stringify(existing));
+            } catch {}
+            return resolve();
+        }
+        try {
+            const store = getStore(storeName, 'readwrite');
+            const request = store.put(value);
+            request.onsuccess = () => resolve();
+            request.onerror = () => resolve();
+        } catch {
+            resolve();
+        }
     });
 };
 
-const add = <T>(storeName: string, value: T): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if (!db) return reject("DB not initialized");
-        const store = getStore(storeName, 'readwrite');
-        const request = store.add(value);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
+const remove = async (storeName: string, key: IDBValidKey): Promise<void> => {
+    await ensureDB();
+    return new Promise((resolve) => {
+        if (!db || !db.objectStoreNames.contains(storeName)) {
+            try {
+                let existing: any[] = JSON.parse(localStorage.getItem(`db_cache_${storeName}`) || '[]');
+                existing = existing.filter(item => item.id !== key);
+                localStorage.setItem(`db_cache_${storeName}`, JSON.stringify(existing));
+            } catch {}
+            return resolve();
+        }
+        try {
+            const store = getStore(storeName, 'readwrite');
+            const request = store.delete(key);
+            request.onsuccess = () => resolve();
+            request.onerror = () => resolve();
+        } catch {
+            resolve();
+        }
     });
 };
 
-export const set = <T>(storeName: string, value: T): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if (!db) return reject("DB not initialized");
-        const store = getStore(storeName, 'readwrite');
-        const request = store.put(value);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
+const removeMultiple = async (storeName: string, keys: IDBValidKey[]): Promise<void> => {
+    await ensureDB();
+    return new Promise((resolve) => {
+        if (!db || !db.objectStoreNames.contains(storeName)) return resolve();
+        try {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            keys.forEach(key => store.delete(key));
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        } catch {
+            resolve();
+        }
     });
 };
 
-const remove = (storeName: string, key: IDBValidKey): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if (!db) return reject("DB not initialized");
-        const store = getStore(storeName, 'readwrite');
-        const request = store.delete(key);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
+const clearStore = async (storeName: string): Promise<void> => {
+    await ensureDB();
+    return new Promise((resolve) => {
+        if (!db || !db.objectStoreNames.contains(storeName)) return resolve();
+        try {
+            const store = getStore(storeName, 'readwrite');
+            const request = store.clear();
+            request.onsuccess = () => resolve();
+            request.onerror = () => resolve();
+        } catch {
+            resolve();
+        }
     });
 };
 
-const removeMultiple = (storeName: string, keys: IDBValidKey[]): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if (!db) return reject("DB not initialized");
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        keys.forEach(key => store.delete(key));
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-};
-
-const clearStore = (storeName: string): Promise<void> => {
-     return new Promise((resolve, reject) => {
-        if (!db) return reject("DB not initialized");
-        const store = getStore(storeName, 'readwrite');
-        const request = store.clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-}
-
-export const clearAndPutAll = <T>(storeName: string, data: T[]): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if (!db) return reject("DB not initialized");
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        store.clear();
-        data.forEach(item => store.put(item));
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+export const clearAndPutAll = async <T>(storeName: string, data: T[]): Promise<void> => {
+    await ensureDB();
+    return new Promise((resolve) => {
+        if (!db || !db.objectStoreNames.contains(storeName)) {
+            try {
+                localStorage.setItem(`db_cache_${storeName}`, JSON.stringify(data));
+            } catch {}
+            return resolve();
+        }
+        try {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            store.clear();
+            data.forEach(item => store.put(item));
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        } catch {
+            resolve();
+        }
     });
 };
 
@@ -256,18 +414,38 @@ const queueMutation = async (op: Omit<SyncOperation, 'id'>) => {
 };
 
 export const syncableCreate = async (tableName: string, payload: any): Promise<any> => {
-    await add(tableName, payload);
+    // 1. Ensure a unique ID is present
+    const effectivePayload = {
+        ...payload,
+        id: payload.id ?? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `item_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`),
+        created_at: payload.created_at || new Date().toISOString()
+    };
+
+    // 2. Attach authenticated user_id if available
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id && (!effectivePayload.user_id || effectivePayload.user_id === 'local')) {
+            effectivePayload.user_id = user.id;
+        }
+    } catch {}
+
+    // 3. Save locally in IndexedDB / local cache
+    await add(tableName, effectivePayload);
 
     if (navigator.onLine) {
         try {
-            const { id: tempId, ...rawInsertData } = payload;
-            const subtasksToCreate = (tableName === 'todos' && payload.subtasks) ? payload.subtasks : null;
+            const { id: tempId, ...rawInsertData } = effectivePayload;
+            const subtasksToCreate = (tableName === 'todos' && effectivePayload.subtasks) ? effectivePayload.subtasks : null;
             const insertData = sanitizeForSupabase(tableName, rawInsertData);
 
             const { data: newRecord, error } = await supabase.from(tableName).insert(insertData).select().single();
-            if (error) throw error;
+            if (error) {
+                console.warn(`Supabase insert for ${tableName} had an issue, stored locally:`, error);
+                await queueMutation({ type: 'CREATE', tableName, payload: effectivePayload });
+                return effectivePayload;
+            }
             
-            let finalRecord = { ...payload, ...newRecord, subtasks: [] };
+            let finalRecord = { ...effectivePayload, ...newRecord, subtasks: [] };
 
             if (subtasksToCreate && subtasksToCreate.length > 0) {
                 const subtaskPayloads = subtasksToCreate.map((st: any) => ({
@@ -283,25 +461,24 @@ export const syncableCreate = async (tableName: string, payload: any): Promise<a
                 }
             }
             
-            await new Promise<void>((resolve, reject) => {
-                if (!db) return reject("DB not initialized for atomic create.");
-                const tx = db.transaction(tableName, 'readwrite');
-                tx.objectStore(tableName).delete(tempId);
-                tx.objectStore(tableName).put(finalRecord);
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
+            if (db && db.objectStoreNames.contains(tableName)) {
+                try {
+                    const tx = db.transaction(tableName, 'readwrite');
+                    tx.objectStore(tableName).delete(tempId);
+                    tx.objectStore(tableName).put(finalRecord);
+                } catch {}
+            }
             
             return finalRecord;
         } catch (error) {
-            console.error(`Online CREATE failed for ${tableName}, falling back to offline.`, error);
-            await queueMutation({ type: 'CREATE', tableName, payload });
-            return payload;
+            console.warn(`Online CREATE fallback to offline for ${tableName}.`, error);
+            await queueMutation({ type: 'CREATE', tableName, payload: effectivePayload });
+            return effectivePayload;
         }
     } 
     else {
-        await queueMutation({ type: 'CREATE', tableName, payload });
-        return payload;
+        await queueMutation({ type: 'CREATE', tableName, payload: effectivePayload });
+        return effectivePayload;
     }
 };
 
@@ -325,7 +502,11 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
             delete updateData.user_id;
             
             const { data: updatedRecord, error } = await supabase.from(tableName).update(updateData).eq('id', id).select().single();
-            if (error) throw error;
+            if (error) {
+                console.warn(`Supabase update for ${tableName} queued:`, error);
+                await queueMutation({ type: 'UPDATE', tableName, payload });
+                return payload;
+            }
             
             const existingSubtasks = payload.subtasks !== undefined 
                 ? payload.subtasks 
@@ -347,7 +528,7 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
             await set(tableName, finalRecord);
             return finalRecord;
         } catch (error) {
-            console.error(`Online UPDATE failed for ${tableName}, queueing for later.`, error);
+            console.warn(`Online UPDATE failed for ${tableName}, queueing for later.`, error);
             await queueMutation({ type: 'UPDATE', tableName, payload });
             return payload;
         }
@@ -369,9 +550,11 @@ export const syncableDelete = async (tableName: string, key: number | string): P
     if (navigator.onLine) {
         try {
             const { error } = await supabase.from(tableName).delete().eq('id', key);
-            if (error) throw error;
+            if (error) {
+                await queueMutation({ type: 'DELETE', tableName, key });
+            }
         } catch (error) {
-            console.error(`Online DELETE failed for ${tableName}, queueing for later.`, error);
+            console.warn(`Online DELETE failed for ${tableName}, queueing for later.`, error);
             await queueMutation({ type: 'DELETE', tableName, key });
         }
     } else {
