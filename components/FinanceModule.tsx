@@ -3056,28 +3056,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     onClick={() => setSelectedCalendarDay(dateStr)}
                                                                     className={`h-20 p-2 rounded-xl border text-left flex flex-col justify-between transition-all ${
                                                                         isSelected 
-                                                                            ? 'ring-2 ring-primary border-transparent bg-indigo-50/50 dark:bg-indigo-950/30' 
+                                                                            ? 'ring-2 ring-gray-900 dark:ring-white border-transparent bg-gray-50 dark:bg-zinc-900/50' 
                                                                             : isToday 
-                                                                            ? 'border-indigo-500 bg-indigo-50/20 dark:bg-indigo-900/10' 
+                                                                            ? 'border-gray-900 dark:border-white bg-gray-50/50 dark:bg-zinc-900/20' 
                                                                             : 'border-gray-100 dark:border-zinc-800/80 hover:bg-gray-50 dark:hover:bg-zinc-900/50'
                                                                     }`}
                                                                 >
                                                                     <div className="flex justify-between items-center">
-                                                                        <span className={`text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ${isToday ? 'bg-primary text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                                        <span className={`text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ${isToday ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-700 dark:text-gray-300'}`}>
                                                                             {day}
                                                                         </span>
                                                                         {(dayRecs.length > 0 || dayInsts.length > 0) && (
-                                                                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                                                            <span className="w-2 h-2 rounded-full bg-gray-900 dark:bg-white animate-pulse" />
                                                                         )}
                                                                     </div>
                                                                     <div className="space-y-0.5 overflow-hidden">
                                                                         {dayRecs.map(r => (
-                                                                            <div key={r.id} className="text-[10px] truncate bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 px-1 py-0.5 rounded font-medium">
+                                                                            <div key={r.id} className="text-[10px] truncate bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-gray-100 px-1 py-0.5 rounded font-medium">
                                                                                 {r.description}
                                                                             </div>
                                                                         ))}
                                                                         {dayInsts.map(inst => (
-                                                                            <div key={inst.id} className="text-[10px] truncate bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-1 py-0.5 rounded font-medium">
+                                                                            <div key={inst.id} className="text-[10px] truncate bg-gray-200 dark:bg-zinc-700 text-gray-900 dark:text-white px-1 py-0.5 rounded font-medium">
                                                                                 Cuota: {inst.name}
                                                                             </div>
                                                                         ))}
@@ -3106,11 +3106,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                         <p className="font-semibold text-sm">{r.description}</p>
                                                                         <p className="text-xs text-gray-500">Suscripción recurrente</p>
                                                                     </div>
-                                                                    <span className="font-bold text-red-500 text-sm">-{formatCurrency(r.amount_cents)}</span>
+                                                                    <span className="font-bold text-gray-900 dark:text-white text-sm">-{formatCurrency(r.amount_cents)}</span>
                                                                 </div>
                                                                 <div className="text-[11px] text-gray-500 bg-gray-50 dark:bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-zinc-800 flex items-center justify-between">
                                                                     <span>Estado de cobro:</span>
-                                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">Cobro Automático</span>
+                                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Cobro Automático</span>
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -3122,11 +3122,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                         <p className="font-semibold text-sm">{inst.name}</p>
                                                                         <p className="text-xs text-gray-500">Cuota mensual ({inst.paid_installments + 1}/{inst.total_installments})</p>
                                                                     </div>
-                                                                    <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{formatCurrency(inst.installment_amount_cents)}</span>
+                                                                    <span className="font-bold text-gray-900 dark:text-white text-sm">{formatCurrency(inst.installment_amount_cents)}</span>
                                                                 </div>
-                                                                <div className="text-[11px] text-gray-500 bg-indigo-50/50 dark:bg-indigo-950/30 px-2.5 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-900/50 flex items-center justify-between">
+                                                                <div className="text-[11px] text-gray-500 bg-gray-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-zinc-700 flex items-center justify-between">
                                                                     <span>Cobro automático:</span>
-                                                                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">Día {inst.payment_day || inst.start_date.substring(8, 10)} de cada mes</span>
+                                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Día {inst.payment_day || inst.start_date.substring(8, 10)} de cada mes</span>
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -3161,6 +3161,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                         <div>
                                                             <label className="block text-xs font-semibold mb-1 text-gray-500">Frecuencia</label>
                                                             <select value={recFrequency} onChange={e => setRecFrequency(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm">
+                                                                <option value="once">Pago Único</option>
                                                                 <option value="monthly">Mensual</option>
                                                                 <option value="yearly">Anual</option>
                                                                 <option value="weekly">Semanal</option>
@@ -3206,14 +3207,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     </div>
                                                                     <div className="min-w-0">
                                                                         <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{r.description}</p>
-                                                                        <p className="text-xs text-gray-400">Próximo cobro: {r.next_date} • {r.frequency === 'monthly' ? 'Mensual' : r.frequency === 'yearly' ? 'Anual' : 'Semanal'}{targetAcc ? ` • Tarjeta: ${targetAcc.name}` : ''}</p>
+                                                                        <p className="text-xs text-gray-400">Próximo cobro: {r.next_date} • {r.frequency === 'monthly' ? 'Mensual' : r.frequency === 'yearly' ? 'Anual' : r.frequency === 'weekly' ? 'Semanal' : 'Único'}{targetAcc ? ` • Tarjeta: ${targetAcc.name}` : ''}</p>
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-4 shrink-0">
                                                                     <span className="font-semibold text-sm text-gray-900 dark:text-white">-{formatCurrency(r.amount_cents)}</span>
                                                                     <button 
                                                                         onClick={() => handleDeleteRecurring(r.id)} 
-                                                                        className="text-gray-400 hover:text-red-500 p-1.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                                        className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
                                                                     >
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </button>
@@ -3261,7 +3262,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     <div>
                                                                         <div className="flex items-center gap-2">
                                                                             <h4 className="font-bold text-base">{inst.name}</h4>
-                                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${inst.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'}`}>
+                                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${inst.status === 'COMPLETED' ? 'bg-gray-200 text-gray-800 dark:bg-zinc-800 dark:text-gray-200' : 'bg-gray-100 text-gray-900 dark:bg-zinc-800 dark:text-white'}`}>
                                                                                 {inst.status === 'COMPLETED' ? 'Completado' : 'Activo'}
                                                                             </span>
                                                                         </div>
@@ -3301,11 +3302,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
                                                                 {inst.status === 'ACTIVE' ? (
                                                                     <div className="bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 text-gray-500 text-[11px] p-2 rounded-xl text-center flex items-center justify-center gap-1.5 font-medium">
-                                                                        <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                                                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
                                                                         <span>Descuento automático el día {inst.payment_day || 15} de cada mes</span>
                                                                     </div>
                                                                 ) : (
-                                                                    <div className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[11px] p-2 rounded-xl text-center font-medium">
+                                                                    <div className="bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-[11px] p-2 rounded-xl text-center font-medium">
                                                                         ✅ Todas las cuotas han sido pagadas
                                                                     </div>
                                                                 )}
@@ -3429,43 +3430,46 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                         </div>
                                         {/* Create Goal Form */}
                                         <div className="lg:col-span-4">
-                                            <form onSubmit={handleCreateSavingsGoal} className="bg-white dark:bg-[#09090b] p-4.5 rounded-xl border border-gray-200 dark:border-zinc-800 space-y-3.5 shadow-2xs sticky top-4">
-                                                <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                                                    <Target className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" /> Nueva Meta de Ahorro
-                                                </h3>
-                                                <div>
-                                                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Nombre de la Meta</label>
-                                                    <input required type="text" value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="Ej. Fondo de Reserva" className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" />
+                                            <form onSubmit={handleCreateSavingsGoal} className="bg-white dark:bg-[#0c0c0c] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 shadow-xs sticky top-4">
+                                                <div className="space-y-1">
+                                                    <h3 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                                                        <Target className="w-4 h-4 text-gray-700 dark:text-gray-300" /> Nueva Meta
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500">Planifica tu próxima meta de ahorro</p>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Monto Objetivo ($)</label>
+                                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nombre de la Meta</label>
+                                                    <input required type="text" value={goalName} onChange={e => setGoalName(e.target.value)} placeholder="Ej. Fondo de Reserva" className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Monto Objetivo ($)</label>
                                                     <div className="relative">
-                                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-xs">$</span></div>
-                                                        <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full pl-6 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" />
+                                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-400 text-sm">$</span></div>
+                                                        <input required type="number" step="0.01" min="0" onKeyDown={blockNegativeKeys} value={goalTargetAmount} onChange={e => setGoalTargetAmount(e.target.value.replace(/-/g, ''))} placeholder="0.00" className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" />
                                                     </div>
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-2">
+                                                <div className="grid grid-cols-2 gap-3">
                                                     <div>
-                                                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Frecuencia</label>
+                                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Frecuencia</label>
                                                         <select
                                                             value={goalFrequency}
                                                             onChange={e => setGoalFrequency(e.target.value as any)}
-                                                            className="w-full px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-lg text-xs text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
+                                                            className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
                                                         >
-                                                            <option value="MONTHLY">Mensual (30d)</option>
-                                                            <option value="BIWEEKLY">Quincenal (14d)</option>
-                                                            <option value="WEEKLY">Semanal (7d)</option>
+                                                            <option value="MONTHLY">Mensual</option>
+                                                            <option value="BIWEEKLY">Quincenal</option>
+                                                            <option value="WEEKLY">Semanal</option>
                                                         </select>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Fecha límite</label>
-                                                        <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-2.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-lg text-xs text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" />
+                                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Fecha límite</label>
+                                                        <input type="date" value={goalTargetDate} onChange={e => setGoalTargetDate(e.target.value)} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors" />
                                                     </div>
                                                 </div>
 
                                                 {/* Live Cuota Calculator Preview */}
                                                 {goalTargetAmount && parseFloat(goalTargetAmount) > 0 && goalTargetDate && (
-                                                    <div className="p-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-lg space-y-1 text-xs text-gray-700 dark:text-gray-300">
+                                                    <div className="p-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl space-y-1 text-sm text-gray-700 dark:text-gray-300 mt-2">
                                                         {(() => {
                                                             const targetCents = Math.round(parseFloat(goalTargetAmount) * 100);
                                                             const calc = calculateSavingsCuota(targetCents, 0, goalTargetDate, goalFrequency);
@@ -3476,7 +3480,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                                     <span className="font-semibold text-gray-900 dark:text-white block">
                                                                         Cuota: ${calc.cuota.toFixed(2)} / {freqStr}
                                                                     </span>
-                                                                    <p className="text-[11px] text-gray-500">
+                                                                    <p className="text-xs text-gray-500 mt-1">
                                                                         Abonando ${calc.cuota.toFixed(2)} en {calc.periods} períodos ({calc.daysRemaining} días).
                                                                     </p>
                                                                 </>
@@ -3485,7 +3489,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                                     </div>
                                                 )}
 
-                                                <button type="submit" className="w-full bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 py-2.5 rounded-lg text-xs font-semibold transition-colors shadow-xs">Crear Meta de Ahorro</button>
+                                                <button type="submit" className="w-full bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 py-3 rounded-xl text-sm font-semibold transition-colors shadow-xs mt-2">Crear Meta de Ahorro</button>
                                             </form>
                                         </div>
                                     </div>
