@@ -619,6 +619,7 @@ export interface FinanceInstallment {
   paid_installments: number;
   installment_amount_cents: number;
   account_id?: number; // Card or account used
+  category_id?: number; // Category or budget assigned
   start_date: string; // YYYY-MM-DD
   start_month?: string; // YYYY-MM
   payment_day?: number; // Day of month (1-31) for auto-deduction
