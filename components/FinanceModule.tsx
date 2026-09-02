@@ -357,6 +357,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     const [loadExpenseDate, setLoadExpenseDate] = useState('');
 
     useEffect(() => {
+        // Immediate local cache restore for instant rendering of summary and module data
+        try {
+            const cachedFull = localStorage.getItem('finance_full_cache_v2');
+            if (cachedFull) {
+                const parsed = JSON.parse(cachedFull);
+                if (parsed.accounts && Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
+                if (parsed.categories && Array.isArray(parsed.categories)) setCategories(parsed.categories);
+                if (parsed.transactions && Array.isArray(parsed.transactions)) setTransactions(parsed.transactions);
+                if (parsed.budgets && Array.isArray(parsed.budgets)) setBudgets(parsed.budgets);
+                if (parsed.budgetItems && Array.isArray(parsed.budgetItems)) setBudgetItems(parsed.budgetItems);
+                if (parsed.recurring && Array.isArray(parsed.recurring)) setRecurring(parsed.recurring);
+                if (parsed.savingsGoals && Array.isArray(parsed.savingsGoals)) setSavingsGoals(parsed.savingsGoals);
+                if (parsed.shoppingLists && Array.isArray(parsed.shoppingLists)) setShoppingLists(parsed.shoppingLists);
+                if (parsed.shoppingItems && Array.isArray(parsed.shoppingItems)) setShoppingItems(parsed.shoppingItems);
+                if (parsed.debts && Array.isArray(parsed.debts)) setDebts(parsed.debts);
+                if (parsed.installments && Array.isArray(parsed.installments)) setInstallments(parsed.installments);
+            }
+        } catch (e) {
+            console.error('Cache load error:', e);
+        }
+
         fetchFinanceData();
         return () => {
             sessionStorage.removeItem('finance_unlocked_session');
@@ -640,117 +661,122 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                 }
             }
 
-            const [accRes, catRes, txRes, budRes, recRes, goalsRes] = await Promise.all([
-                supabase.from('finance_accounts').select('*').order('created_at'),
-                supabase.from('finance_categories').select('*').order('name'),
-                supabase.from('finance_transactions').select('*').order('date', { ascending: false }).limit(200),
-                supabase.from('finance_budgets').select('*'),
-                supabase.from('finance_recurring_transactions').select('*').order('next_date'),
-                supabase.from('finance_savings_goals').select('*').order('created_at', { ascending: false })
+            // Perform ALL 12 queries concurrently in a single Promise.all with user_id filters for maximum performance
+            const [
+                accRes, catRes, txRes, budRes, recRes, goalsRes,
+                listsRes, itemsRes, debtsRes, instRes, bItemsRes, secRes
+            ] = await Promise.all([
+                supabase.from('finance_accounts').select('*').eq('user_id', user.id).order('created_at'),
+                supabase.from('finance_categories').select('*').eq('user_id', user.id).order('name'),
+                supabase.from('finance_transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(250),
+                supabase.from('finance_budgets').select('*').eq('user_id', user.id),
+                supabase.from('finance_recurring_transactions').select('*').eq('user_id', user.id).order('next_date'),
+                supabase.from('finance_savings_goals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                supabase.from('finance_shopping_lists').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                supabase.from('finance_shopping_items').select('*').eq('user_id', user.id).order('created_at'),
+                supabase.from('finance_debts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                supabase.from('finance_installments').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                supabase.from('finance_budget_items').select('*').eq('user_id', user.id).order('created_at'),
+                supabase.from('finance_security').select('*').eq('user_id', user.id).maybeSingle()
             ]);
 
-            if (accRes.data) setAccounts(accRes.data);
+            const fetchedAccounts = accRes.data || [];
+            const fetchedTransactions = txRes.data || [];
+            const fetchedBudgets = budRes.data || [];
+            const fetchedRecurring = recRes.data || [];
+            const fetchedGoals = goalsRes.data || [];
+            const fetchedLists = listsRes.data || [];
+            const fetchedItems = itemsRes.data || [];
+            const fetchedDebts = debtsRes.data || [];
+            const fetchedInstallments = instRes.data || [];
+            const fetchedBItems = bItemsRes.data || [];
+
+            setAccounts(fetchedAccounts);
+            setTransactions(fetchedTransactions);
+            setBudgets(fetchedBudgets);
+            setRecurring(fetchedRecurring);
+            setSavingsGoals(fetchedGoals);
+            setShoppingLists(fetchedLists);
+            setShoppingItems(fetchedItems);
+            setDebts(fetchedDebts);
+            setInstallments(fetchedInstallments);
+            setBudgetItems(fetchedBItems);
+
+            // Handle categories & prevent ghost categories
+            let currentCategories: FinanceCategory[] = [];
             if (catRes.data) {
-                setCategories(catRes.data);
-                // Only seed default categories if it's the very first time for a fresh account (and not user-deleted)
-                if (user) {
-                    const seededKey = `finance_categories_initialized_${user.id}`;
-                    const hasEverBeenInitialized = localStorage.getItem(seededKey);
-                    if (catRes.data.length === 0 && !hasEverBeenInitialized) {
-                        localStorage.setItem(seededKey, 'true');
-                        const defaultCats = [
-                            { name: 'Supermercado & Alimentación', emoji: '🛒', type: 'EXPENSE', budget_limit_cents: 30000, user_id: user.id, is_archived: false },
-                            { name: 'Vivienda & Alquiler', emoji: '🏠', type: 'EXPENSE', budget_limit_cents: 50000, user_id: user.id, is_archived: false },
-                            { name: 'Transporte & Combustible', emoji: '🚗', type: 'EXPENSE', budget_limit_cents: 15000, user_id: user.id, is_archived: false },
-                            { name: 'Entretenimiento & Ocio', emoji: '🍿', type: 'EXPENSE', budget_limit_cents: 10000, user_id: user.id, is_archived: false },
-                            { name: 'Servicios & Luz', emoji: '💡', type: 'EXPENSE', budget_limit_cents: 12000, user_id: user.id, is_archived: false },
-                            { name: 'Salud & Bienestar', emoji: '🩺', type: 'EXPENSE', budget_limit_cents: 8000, user_id: user.id, is_archived: false },
-                            { name: 'Salario & Nómina', emoji: '💼', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false },
-                            { name: 'Freelance & Honorarios', emoji: '💵', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false },
-                            { name: 'Inversiones', emoji: '📈', type: 'INCOME', budget_limit_cents: 0, user_id: user.id, is_archived: false }
-                        ];
-                        supabase.from('finance_categories').insert(defaultCats).select('*').then(({ data }) => {
-                            if (data) setCategories(data);
-                        });
-                    } else {
-                        localStorage.setItem(seededKey, 'true');
+                const rawDeletedCatIds = localStorage.getItem(`finance_deleted_cat_ids_${user.id}`);
+                const deletedCatIds: number[] = rawDeletedCatIds ? JSON.parse(rawDeletedCatIds) : [];
+                const validCats = catRes.data.filter(c => !deletedCatIds.includes(c.id));
+
+                const seededKey = `finance_categories_initialized_${user.id}`;
+                const hasEverBeenInitialized = localStorage.getItem(seededKey) === 'true';
+
+                if (validCats.length === 0 && !hasEverBeenInitialized && deletedCatIds.length === 0 && fetchedAccounts.length === 0 && fetchedTransactions.length === 0) {
+                    localStorage.setItem(seededKey, 'true');
+                    const currentUserId = user.id;
+                    const defaultCats = [
+                        { name: 'Supermercado & Alimentación', emoji: '🛒', type: 'EXPENSE', budget_limit_cents: 30000, user_id: currentUserId, is_archived: false },
+                        { name: 'Vivienda & Alquiler', emoji: '🏠', type: 'EXPENSE', budget_limit_cents: 50000, user_id: currentUserId, is_archived: false },
+                        { name: 'Transporte & Combustible', emoji: '🚗', type: 'EXPENSE', budget_limit_cents: 15000, user_id: currentUserId, is_archived: false },
+                        { name: 'Entretenimiento & Ocio', emoji: '🍿', type: 'EXPENSE', budget_limit_cents: 10000, user_id: currentUserId, is_archived: false },
+                        { name: 'Servicios & Luz', emoji: '💡', type: 'EXPENSE', budget_limit_cents: 12000, user_id: currentUserId, is_archived: false },
+                        { name: 'Salud & Bienestar', emoji: '🩺', type: 'EXPENSE', budget_limit_cents: 8000, user_id: currentUserId, is_archived: false },
+                        { name: 'Salario & Nómina', emoji: '💼', type: 'INCOME', budget_limit_cents: 0, user_id: currentUserId, is_archived: false },
+                        { name: 'Freelance & Honorarios', emoji: '💵', type: 'INCOME', budget_limit_cents: 0, user_id: currentUserId, is_archived: false },
+                        { name: 'Inversiones', emoji: '📈', type: 'INCOME', budget_limit_cents: 0, user_id: currentUserId, is_archived: false }
+                    ];
+                    const { data: seededData } = await supabase.from('finance_categories').insert(defaultCats).select('*');
+                    if (seededData) {
+                        currentCategories = seededData;
+                        setCategories(seededData);
+                    }
+                } else {
+                    localStorage.setItem(seededKey, 'true');
+                    currentCategories = validCats;
+                    setCategories(validCats);
+                }
+            }
+
+            // Security configuration
+            if (secRes.data) {
+                const sec = secRes.data;
+                setSecurityConfig(sec);
+                localStorage.setItem(localSecKey, JSON.stringify(sec));
+                const reqEnter = sec.require_on_enter ?? sec.require_pin_on_entry ?? false;
+                if (reqEnter && sec.pin_hash) {
+                    const isAlreadyUnlocked = sessionStorage.getItem('finance_unlocked_session') === 'true';
+                    if (!isAlreadyUnlocked) {
+                        setIsUnlocked(false);
                     }
                 }
             }
-            if (txRes.data) setTransactions(txRes.data);
-            if (budRes.data) setBudgets(budRes.data);
-            if (recRes.data) setRecurring(recRes.data);
-            if (goalsRes.data) {
-                setSavingsGoals(goalsRes.data);
-                try {
-                    localStorage.setItem('finance_savings_goals_cache', JSON.stringify(goalsRes.data));
-                } catch {}
-            } else if (goalsRes.error) {
-                try {
-                    const cached = localStorage.getItem('finance_savings_goals_cache');
-                    if (cached) {
-                        const parsed = JSON.parse(cached);
-                        if (parsed) setSavingsGoals(parsed);
-                    }
-                } catch {}
+
+            // Background processors
+            if (fetchedRecurring.length > 0 && fetchedAccounts.length > 0) {
+                autoProcessDueSubscriptions(fetchedRecurring, fetchedAccounts);
+            }
+            if (fetchedInstallments.length > 0 && fetchedAccounts.length > 0) {
+                autoProcessDueInstallments(fetchedInstallments, fetchedAccounts);
             }
 
-            if (recRes.data && accRes.data) {
-                autoProcessDueSubscriptions(recRes.data, accRes.data);
-            }
-
+            // Persist full snapshot to local cache for instant future loads
             try {
-                const [listsRes, itemsRes, debtsRes, instRes, bItemsRes, secRes] = await Promise.all([
-                    supabase.from('finance_shopping_lists').select('*').order('created_at', { ascending: false }),
-                    supabase.from('finance_shopping_items').select('*').order('created_at'),
-                    supabase.from('finance_debts').select('*').order('created_at', { ascending: false }),
-                    supabase.from('finance_installments').select('*').order('created_at', { ascending: false }),
-                    supabase.from('finance_budget_items').select('*').order('created_at'),
-                    supabase.from('finance_security').select('*').eq('user_id', user.id).maybeSingle()
-                ]);
-                if (listsRes.data) setShoppingLists(listsRes.data);
-                if (itemsRes.data) setShoppingItems(itemsRes.data);
-                if (debtsRes.data) setDebts(debtsRes.data);
-                if (bItemsRes.data) setBudgetItems(bItemsRes.data);
-                if (secRes.data) {
-                    const sec = secRes.data;
-                    setSecurityConfig(sec);
-                    localStorage.setItem(localSecKey, JSON.stringify(sec));
-                    const reqEnter = sec.require_on_enter ?? sec.require_pin_on_entry ?? false;
-                    if (reqEnter && sec.pin_hash) {
-                        const isAlreadyUnlocked = sessionStorage.getItem('finance_unlocked_session') === 'true';
-                        if (!isAlreadyUnlocked) {
-                            setIsUnlocked(false);
-                        }
-                    }
-                } else if (cachedSec) {
-                    try {
-                        const parsed = JSON.parse(cachedSec);
-                        if (parsed && parsed.pin_hash) {
-                            setSecurityConfig(parsed);
-                            const { data: insertedSec } = await supabase.from('finance_security').upsert({
-                                user_id: user.id,
-                                pin_hash: parsed.pin_hash,
-                                require_on_enter: parsed.require_on_enter ?? false,
-                                require_on_delete: parsed.require_on_delete ?? true
-                            }, { onConflict: 'user_id' }).select().maybeSingle();
-                            if (insertedSec) {
-                                setSecurityConfig(insertedSec);
-                                localStorage.setItem(localSecKey, JSON.stringify(insertedSec));
-                            }
-                        }
-                    } catch {
-                        // silent
-                    }
-                }
-                if (instRes.data) {
-                    setInstallments(instRes.data);
-                    if (accRes.data) {
-                        autoProcessDueInstallments(instRes.data, accRes.data);
-                    }
-                }
-            } catch (err) {
-                console.log('Extra tables not ready yet', err);
+                localStorage.setItem('finance_full_cache_v2', JSON.stringify({
+                    accounts: fetchedAccounts,
+                    categories: currentCategories,
+                    transactions: fetchedTransactions,
+                    budgets: fetchedBudgets,
+                    budgetItems: fetchedBItems,
+                    recurring: fetchedRecurring,
+                    savingsGoals: fetchedGoals,
+                    shoppingLists: fetchedLists,
+                    shoppingItems: fetchedItems,
+                    debts: fetchedDebts,
+                    installments: fetchedInstallments
+                }));
+            } catch (e) {
+                // silent
             }
         } catch (error) {
             console.error("Error fetching finance data:", error);
@@ -1501,10 +1527,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         setBudgetItems(prev => prev.map(bi => bi.category_id === id ? { ...bi, category_id: null } : bi));
         setTransactions(prev => prev.map(t => t.category_id === id ? { ...t, category_id: null } : t));
 
-        // Mark user categories as initialized so default seed categories are never revived
+        // Mark user categories as initialized and record deleted category ID
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             localStorage.setItem(`finance_categories_initialized_${user.id}`, 'true');
+            try {
+                const rawDeletedCatIds = localStorage.getItem(`finance_deleted_cat_ids_${user.id}`);
+                const deletedCatIds: number[] = rawDeletedCatIds ? JSON.parse(rawDeletedCatIds) : [];
+                if (!deletedCatIds.includes(id)) {
+                    deletedCatIds.push(id);
+                    localStorage.setItem(`finance_deleted_cat_ids_${user.id}`, JSON.stringify(deletedCatIds));
+                }
+            } catch (err) {
+                console.error('Error saving deleted cat id:', err);
+            }
         }
 
         try {
