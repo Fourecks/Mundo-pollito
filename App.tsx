@@ -58,6 +58,7 @@ import ChevronLeftIcon from './components/icons/ChevronLeftIcon';
 import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
 import { NotionService } from './services/notionService';
+import { cleanToPlainText } from './utils/textCleaner';
 import { Settings, Loader2 } from 'lucide-react';
 
 // --- Google API Configuration ---
@@ -4022,8 +4023,10 @@ const App: React.FC = () => {
   
   const handleAddQuickNote = useCallback(async (text: string) => {
       if(!user) return;
+      const cleanText = cleanToPlainText(text);
+      if (!cleanText.trim()) return;
       const tempId = -Date.now();
-      const newNote: QuickNote = { id: tempId, text, user_id: user.id, created_at: new Date().toISOString() };
+      const newNote: QuickNote = { id: tempId, text: cleanText, user_id: user.id, created_at: new Date().toISOString() };
       
       setQuickNotes(qn => [...qn, newNote]);
 

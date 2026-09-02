@@ -7,6 +7,7 @@ import PlusIcon from './icons/PlusIcon';
 import XIcon from './icons/XIcon';
 import CalendarIcon from './icons/CalendarIcon';
 import { Target, Pencil, Check, Trash2, X, Sparkles } from 'lucide-react';
+import { cleanToPlainText } from '../utils/textCleaner';
 
 const formatTime = (timeStr: string) => {
     if (!timeStr) return '';
@@ -287,8 +288,9 @@ const NotesView: React.FC<Pick<TodaysAgendaProps, 'quickNotes' | 'onAddQuickNote
 
     const handleAddNote = (e: React.FormEvent) => {
         e.preventDefault();
-        if (newNoteText.trim()) {
-            onAddQuickNote(newNoteText);
+        const cleaned = cleanToPlainText(newNoteText);
+        if (cleaned.trim()) {
+            onAddQuickNote(cleaned);
             setNewNoteText('');
         }
     };
@@ -316,7 +318,7 @@ const NotesView: React.FC<Pick<TodaysAgendaProps, 'quickNotes' | 'onAddQuickNote
             <div className="space-y-1.5">
                 {quickNotes.map(note => (
                     <div key={note.id} className="flex items-center justify-between bg-white/60 dark:bg-gray-700/50 p-2 rounded-lg group text-sm">
-                        <p className="text-gray-700 dark:text-gray-200 break-words flex-grow text-on-transparent">{note.text}</p>
+                        <p className="text-gray-700 dark:text-gray-200 break-words flex-grow text-on-transparent">{cleanToPlainText(note.text)}</p>
                         <button 
                             onClick={() => onDeleteQuickNote(note.id)} 
                             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 p-1 rounded-full transition-opacity flex-shrink-0 ml-2"

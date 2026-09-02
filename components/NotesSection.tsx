@@ -33,6 +33,7 @@ import {
   X
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
+import { normalizeNoteContentForEditor, sanitizeAndCleanHtml, cleanToPlainText } from '../utils/textCleaner';
 
 interface NotesSectionProps {
   folders: Folder[];
@@ -85,30 +86,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Convert legacy markdown or plain text to HTML for visual editor
-  const markdownToHtml = (str: string): string => {
-    if (!str) return '';
-    if (/<(b|i|u|del|strong|em|h1|h2|h3|p|div|ul|ol|li|blockquote|pre|hr|br)\b[^>]*>/i.test(str)) {
-      return str;
-    }
-    let html = str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-
-    html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-    html = html.replace(/\*(.*?)\*/g, '<i>$1</i>');
-    html = html.replace(/~~(.*?)~~/g, '<del>$1</del>');
-    html = html.replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
-    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-    html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
-    html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
-    html = html.replace(/\n/g, '<br>');
-    return html;
-  };
-
   // Set default selected folder
   useEffect(() => {
     if (!isMobile && (!selectedFolderId || !folders.some(f => f.id === selectedFolderId)) && folders.length > 0) {
@@ -136,7 +113,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     if (selectedNote) {
       activeNoteIdRef.current = selectedNote.id;
       setActiveNoteTitle(selectedNote.title || '');
-      const htmlContent = markdownToHtml(selectedNote.content || '');
+      const htmlContent = normalizeNoteContentForEditor(selectedNote.content || '');
       setActiveNoteContent(htmlContent);
       if (editorRef.current && editorRef.current.innerHTML !== htmlContent) {
         editorRef.current.innerHTML = htmlContent;
@@ -188,6 +165,34 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     saveCurrentNote(activeNoteTitle, activeNoteContent);
   };
 
+  // Intercept paste to clean external tags and verse markup from websites/documents
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const clipboardData = e.clipboardData;
+    const htmlData = clipboardData.getData('text/html');
+    const textData = clipboardData.getData('text/plain');
+
+    let contentToInsert = '';
+    if (htmlData) {
+      contentToInsert = sanitizeAndCleanHtml(htmlData);
+    } else if (textData) {
+      if (/<[a-z][\s\S]*>/i.test(textData) || /&lt;[a-z][\s\S]*&gt;/i.test(textData)) {
+        contentToInsert = sanitizeAndCleanHtml(textData);
+      } else {
+        contentToInsert = textData
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\n/g, '<br>');
+      }
+    }
+
+    if (contentToInsert) {
+      document.execCommand('insertHTML', false, contentToInsert);
+      handleEditorInput();
+    }
+  };
+
   // Apply visual rich text formatting command
   const applyRichCommand = (command: string, value: string = '') => {
     if (!editorRef.current) return;
@@ -199,12 +204,9 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   // Copy note content
   const handleCopyNote = () => {
     if (!activeNoteContent && !activeNoteTitle) return;
-    const plainContent = activeNoteContent
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>|<\/div>|<\/h[1-6]>|<\/li>/gi, '\n')
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ');
-    const fullText = `${activeNoteTitle}\n\n${plainContent}`.trim();
+    const plainContent = cleanToPlainText(activeNoteContent);
+    const cleanTitle = cleanToPlainText(activeNoteTitle);
+    const fullText = `${cleanTitle}\n\n${plainContent}`.trim();
     navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -428,7 +430,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   className="flex-grow text-left truncate"
                 >
                   <h4 className="font-semibold text-sm text-stone-800 dark:text-stone-100 truncate">{note.title || 'Nota sin título'}</h4>
-                  <p className="text-xs text-stone-400 dark:text-stone-500 truncate mt-0.5">{note.content || 'Sin contenido'}</p>
+                  <p className="text-xs text-stone-400 dark:text-stone-500 truncate mt-0.5">{cleanToPlainText(note.content) || 'Sin contenido'}</p>
                 </button>
                 <button
                   onClick={() => setNoteToDelete(note)}
@@ -501,6 +503,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                 contentEditable
                 suppressContentEditableWarning
                 onInput={handleEditorInput}
+                onPaste={handlePaste}
                 onBlur={handleBlurSave}
                 data-placeholder="Escribe tu nota aquí..."
                 className="note-editor-content flex-grow w-full bg-transparent focus:outline-none text-sm text-stone-800 dark:text-stone-200 leading-relaxed custom-scrollbar min-h-[300px] outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-stone-400 dark:empty:before:text-stone-600 empty:before:pointer-events-none"
@@ -677,7 +680,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     </h4>
                   </div>
                   <p className="text-[11px] text-stone-400 dark:text-stone-500 truncate mt-1">
-                    {note.content ? note.content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ') : 'Sin contenido'}
+                    {note.content ? cleanToPlainText(note.content) : 'Sin contenido'}
                   </p>
                 </button>
 
@@ -844,6 +847,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                 contentEditable
                 suppressContentEditableWarning
                 onInput={handleEditorInput}
+                onPaste={handlePaste}
                 onBlur={handleBlurSave}
                 data-placeholder="Comienza a escribir tu nota aquí..."
                 className="note-editor-content flex-grow w-full bg-transparent focus:outline-none text-sm text-stone-800 dark:text-stone-200 leading-relaxed custom-scrollbar min-h-[300px] outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-stone-400 dark:empty:before:text-stone-600 empty:before:pointer-events-none"
