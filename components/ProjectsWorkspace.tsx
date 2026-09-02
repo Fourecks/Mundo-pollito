@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem, Priority, ProjectExpense } from '../types';
+import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem, Priority, ProjectExpense, Folder, Note } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
+import NotesSection from './NotesSection';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, LayoutGrid
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, LayoutGrid
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -11,6 +12,14 @@ import { es } from 'date-fns/locale';
 interface ProjectsWorkspaceProps {
     currentUser?: any;
     projects: Project[];
+    notes: Note[];
+    folders: Folder[];
+    onAddFolder: (name: string, projectId?: number, subjectId?: string) => Promise<Folder | null>;
+    onUpdateFolder: (folderId: number, name: string) => Promise<void>;
+    onDeleteFolder: (folderId: number) => Promise<void>;
+    onAddNote: (folderId: number | null, projectId?: number, subjectId?: string) => Promise<Note | null>;
+    onUpdateNote: (note: Note) => Promise<void>;
+    onDeleteNote: (noteId: number, folderId: number | null) => Promise<void>;
     allTodos: Todo[];
     activeProjectId: number | null;
     invitations?: ProjectInvitation[];
@@ -48,6 +57,14 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
 export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     currentUser,
     projects,
+    notes,
+    folders,
+    onAddFolder,
+    onUpdateFolder,
+    onDeleteFolder,
+    onAddNote,
+    onUpdateNote,
+    onDeleteNote,
     allTodos,
     activeProjectId,
     invitations = [],
@@ -1791,273 +1808,25 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     };
 
     // DOCUMENTATION & FILES TAB (MINIMALIST & ELEGANT DESIGN)
-    const renderDocs = () => {
+        const renderDocs = () => {
         if (!activeProject) return null;
-        const folders = activeProject.doc_folders || [];
-        const docs = activeProject.docs || [];
-        
-        let filteredDocs = selectedFolderId ? docs.filter(d => d.folder_id === selectedFolderId) : docs;
-        if (docSearchText.trim()) {
-            const query = docSearchText.toLowerCase();
-            filteredDocs = filteredDocs.filter(d => 
-                d.title.toLowerCase().includes(query) || 
-                (d.content && d.content.toLowerCase().includes(query)) ||
-                (d.file_name && d.file_name.toLowerCase().includes(query))
-            );
-        }
-
         return (
-            <div className="p-6 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-20">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Documentos y Archivos</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">Repositorio limpio de archivos, especificaciones y notas del proyecto.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {/* Search Bar */}
-                        <div className="relative">
-                            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
-                            <input 
-                                type="text"
-                                placeholder="Buscar documentos..."
-                                value={docSearchText}
-                                onChange={e => setDocSearchText(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-gray-400 text-gray-900 dark:text-white w-40 sm:w-52"
-                            />
-                            {docSearchText && (
-                                <button onClick={() => setDocSearchText('')} className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600">
-                                    <X className="w-3 h-3" />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* View Mode Toggle */}
-                        <div className="flex items-center bg-gray-100 dark:bg-gray-900 p-0.5 rounded-lg border border-gray-200 dark:border-gray-800">
-                            <button
-                                onClick={() => setDocViewMode('grid')}
-                                className={`p-1.5 rounded-md transition-colors ${docViewMode === 'grid' ? 'bg-white dark:bg-[#111] text-gray-900 dark:text-white shadow-xs' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                                title="Vista en cuadrícula"
-                            >
-                                <Grid className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                                onClick={() => setDocViewMode('table')}
-                                className={`p-1.5 rounded-md transition-colors ${docViewMode === 'table' ? 'bg-white dark:bg-[#111] text-gray-900 dark:text-white shadow-xs' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                                title="Vista en tabla"
-                            >
-                                <List className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
-
-                        <button onClick={() => setFolderModal({ isOpen: true, folder: null })} className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors">
-                            <FolderPlus className="w-3.5 h-3.5" /> Nueva Carpeta
-                        </button>
-                        <button onClick={() => setDocModal({ isOpen: true, doc: null, initialFolderId: selectedFolderId || undefined })} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 flex items-center gap-1.5 transition-colors shadow-sm">
-                            <Plus className="w-3.5 h-3.5" /> Nueva Nota
-                        </button>
-                        <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors">
-                            <Paperclip className="w-3.5 h-3.5" /> Subir
-                        </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                    </div>
-                </div>
-
-                {/* Folders Bar */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 border-b border-gray-200 dark:border-gray-800 scrollbar-hide">
-                    <button 
-                        onClick={() => setSelectedFolderId(null)} 
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
-                            selectedFolderId === null ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs' : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
-                        }`}
-                    >
-                        <Folder className="w-3.5 h-3.5" /> Todos ({docs.length})
-                    </button>
-
-                    {folders.map(f => {
-                        const count = docs.filter(d => d.folder_id === f.id).length;
-                        return (
-                            <div key={f.id} className="relative group shrink-0">
-                                <button
-                                    onClick={() => setSelectedFolderId(f.id)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                                        selectedFolderId === f.id ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs' : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800 hover:bg-gray-200 dark:hover:bg-gray-800'
-                                    }`}
-                                >
-                                    <FolderOpen className="w-3.5 h-3.5" /> {f.name} ({count})
-                                </button>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Empty State */}
-                {filteredDocs.length === 0 ? renderEmptyState('No hay archivos ni documentos', 'Sube tus archivos o crea una nueva nota para comenzar.') : docViewMode === 'grid' ? (
-                    /* Grid View */
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredDocs.map(doc => {
-                            const folder = folders.find(f => f.id === doc.folder_id);
-                            const canDeleteDoc = !doc.created_by || doc.created_by.toLowerCase() === currentUserEmail.toLowerCase() || isProjectCreator;
-                            return (
-                                <div key={doc.id} className="bg-white dark:bg-[#0a0a0a] p-4 rounded-xl border border-gray-200 dark:border-gray-800/80 shadow-xs flex flex-col justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-all group">
-                                    <div>
-                                        <div className="flex items-start justify-between gap-2 mb-2">
-                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                {getFileIcon(doc.file_type, doc.file_name)}
-                                                <h3 className="text-xs font-bold text-gray-900 dark:text-white truncate" title={doc.title}>{doc.title}</h3>
-                                            </div>
-                                            {folder && (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-semibold border border-gray-200 dark:border-gray-700 shrink-0">
-                                                    {folder.name}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed mb-3">{doc.content || 'Sin contenido de vista previa'}</p>
-                                    </div>
-
-                                    <div className="pt-3 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-[10px] text-gray-400 font-mono">
-                                                {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
-                                            </span>
-                                            <span className="text-[9px] text-gray-400">
-                                                Por: {doc.created_by ? (doc.created_by.toLowerCase() === currentUserEmail.toLowerCase() ? 'Tú' : doc.created_by.split('@')[0]) : 'Creador'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <button 
-                                                onClick={() => setPreviewDocModal(doc)}
-                                                title="Previsualizar documento"
-                                                className="p-1.5 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-                                            >
-                                                <Eye className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleOpenShareDoc(doc)}
-                                                title="Compartir en canal de chat"
-                                                className="px-2 py-1 text-[11px] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-800 font-medium flex items-center gap-1 transition-colors"
-                                            >
-                                                <MessageSquare className="w-3 h-3 text-blue-500" /> Compartir
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDownloadFile(doc)}
-                                                title="Descargar Archivo"
-                                                className="p-1.5 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-                                            >
-                                                <Download className="w-3.5 h-3.5" />
-                                            </button>
-                                            {canDeleteDoc && (
-                                                <button 
-                                                    onClick={async () => {
-                                                        if (confirm(`¿Estás seguro de eliminar el documento "${doc.title}"?`)) {
-                                                            const updated = (activeProject.docs || []).filter(d => d.id !== doc.id);
-                                                            await onUpdateProject(activeProject.id, { docs: updated });
-                                                        }
-                                                    }}
-                                                    title="Eliminar Documento"
-                                                    className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    /* Table View */
-                    <div className="bg-white dark:bg-[#0a0a0a] rounded-xl border border-gray-200 dark:border-gray-800/80 overflow-hidden shadow-xs">
-                        <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                                <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 text-gray-400 font-medium uppercase tracking-wider text-[10px]">
-                                    <th className="py-2.5 px-4">Documento</th>
-                                    <th className="py-2.5 px-4">Carpeta</th>
-                                    <th className="py-2.5 px-4">Tamaño</th>
-                                    <th className="py-2.5 px-4">Autor</th>
-                                    <th className="py-2.5 px-4">Fecha</th>
-                                    <th className="py-2.5 px-4 text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800/80 text-gray-700 dark:text-gray-300">
-                                {filteredDocs.map(doc => {
-                                    const folder = folders.find(f => f.id === doc.folder_id);
-                                    const canDeleteDoc = !doc.created_by || doc.created_by.toLowerCase() === currentUserEmail.toLowerCase() || isProjectCreator;
-                                    return (
-                                        <tr key={doc.id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors">
-                                            <td className="py-2.5 px-4">
-                                                <div className="flex items-center gap-2">
-                                                    {getFileIcon(doc.file_type, doc.file_name)}
-                                                    <span className="font-semibold text-gray-900 dark:text-white truncate max-w-xs">{doc.title}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-2.5 px-4">
-                                                {folder ? (
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-semibold border border-gray-200 dark:border-gray-700">
-                                                        {folder.name}
-                                                    </span>
-                                                ) : <span className="text-gray-400">-</span>}
-                                            </td>
-                                            <td className="py-2.5 px-4 font-mono text-[11px] text-gray-500">
-                                                {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
-                                            </td>
-                                            <td className="py-2.5 px-4 text-gray-500 text-[11px]">
-                                                {doc.created_by ? (doc.created_by.toLowerCase() === currentUserEmail.toLowerCase() ? 'Tú' : doc.created_by.split('@')[0]) : 'Creador'}
-                                            </td>
-                                            <td className="py-2.5 px-4 text-gray-500 text-[11px]">
-                                                {doc.created_at ? format(parseISO(doc.created_at), 'dd/MM/yyyy') : '-'}
-                                            </td>
-                                            <td className="py-2.5 px-4 text-right">
-                                                <div className="flex items-center justify-end gap-1.5">
-                                                    <button 
-                                                        onClick={() => setPreviewDocModal(doc)}
-                                                        title="Previsualizar"
-                                                        className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded"
-                                                    >
-                                                        <Eye className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleOpenShareDoc(doc)}
-                                                        title="Compartir en canal"
-                                                        className="px-2 py-0.5 text-[10px] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-                                                    >
-                                                        Compartir
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDownloadFile(doc)}
-                                                        title="Descargar"
-                                                        className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded"
-                                                    >
-                                                        <Download className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {canDeleteDoc && (
-                                                        <button 
-                                                            onClick={async () => {
-                                                                if (confirm(`¿Estás seguro de eliminar el documento "${doc.title}"?`)) {
-                                                                    const updated = (activeProject.docs || []).filter(d => d.id !== doc.id);
-                                                                    await onUpdateProject(activeProject.id, { docs: updated });
-                                                                }
-                                                            }}
-                                                            title="Eliminar"
-                                                            className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+            <div className="w-full h-full relative overflow-hidden bg-white dark:bg-[#111]">
+                <NotesSection
+                    folders={folders}
+                    notes={notes}
+                    onAddFolder={onAddFolder}
+                    onUpdateFolder={onUpdateFolder}
+                    onDeleteFolder={onDeleteFolder}
+                    onAddNote={onAddNote}
+                    onUpdateNote={onUpdateNote}
+                    onDeleteNote={onDeleteNote}
+                    projectId={activeProject.id}
+                />
             </div>
         );
     };
 
-    // TEAM CHAT & CHANNELS TAB
     const renderChat = () => {
         if (!activeProject) return null;
         

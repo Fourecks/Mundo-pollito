@@ -273,6 +273,7 @@ interface AppComponentProps {
   // Shared Data
   allTodos: { [key: string]: Todo[] };
   folders: Folder[];
+  notes: Note[];
   projects: Project[];
   habits: Habit[];
   habitRecords: HabitRecord[];
@@ -414,7 +415,7 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const {
     isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
-    allTodos, folders, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos, folders, notes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType, ambientSound, uiSettings,
     activeTrack, activeSpotifyTrack,
     handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
@@ -1104,7 +1105,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
           {openWindows.includes('notes') && (
               <ModalWindow isOpen onClose={() => toggleWindow('notes')} title="Notas" isDraggable isResizable zIndex={getWindowZIndex('notes')} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStatesRef.current.notes} onStateChange={s => handleWindowStateChange('notes', s)} allowFullscreen>
-                  <NotesSection folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
+                  <NotesSection folders={folders} notes={notes} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
               </ModalWindow>
           )}
           {openWindows.includes('pomodoro') && (
@@ -1135,7 +1136,16 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
           {openWindows.includes('student') && (
               <ModalWindow isOpen onClose={() => toggleWindow('student')} title="Estudio" isDraggable isResizable zIndex={getWindowZIndex('student')} onFocus={() => bringToFront('student')} className="w-full max-w-5xl h-[80vh]" windowState={windowStatesRef.current.student} onStateChange={s => handleWindowStateChange('student', s)} allowFullscreen>
-                  <StudentModule />
+                  <StudentModule
+                      notes={notes}
+                      folders={folders}
+                      onAddFolder={handleAddFolder}
+                      onUpdateFolder={handleUpdateFolder}
+                      onDeleteFolder={handleDeleteFolder}
+                      onAddNote={handleAddNote}
+                      onUpdateNote={handleUpdateNote}
+                      onDeleteNote={handleDeleteNote}
+                  />
               </ModalWindow>
           )}
           {openWindows.includes('music') && (
@@ -1148,6 +1158,14 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                   <ProjectsWorkspace
                       currentUser={currentUser}
                       projects={projects}
+                      notes={notes}
+                      folders={folders}
+                      onAddFolder={handleAddFolder}
+                      onUpdateFolder={handleUpdateFolder}
+                      onDeleteFolder={handleDeleteFolder}
+                      onAddNote={handleAddNote}
+                      onUpdateNote={handleUpdateNote}
+                      onDeleteNote={handleDeleteNote}
                       allTodos={flatAllTodos}
                       activeProjectId={viewingProjectId}
                       invitations={projectInvitations}
@@ -1225,7 +1243,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 const MobileApp: React.FC<AppComponentProps> = (props) => {
     const {
       isOnline, isSyncing, currentUser, onLogout, theme, toggleTheme, themeColors, onThemeColorChange, onResetThemeColors,
-      allTodos, folders, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+      allTodos, folders, notes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
       pomodoroState, activeBackground, particleType, ambientSound, uiSettings,
       activeTrack, activeSpotifyTrack,
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
@@ -1567,6 +1585,14 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                         <ProjectsWorkspace
                             currentUser={currentUser}
                             projects={projects}
+                            notes={notes}
+                            folders={folders}
+                            onAddFolder={handleAddFolder}
+                            onUpdateFolder={handleUpdateFolder}
+                            onDeleteFolder={handleDeleteFolder}
+                            onAddNote={handleAddNote}
+                            onUpdateNote={handleUpdateNote}
+                            onDeleteNote={handleDeleteNote}
                             allTodos={flatAllTodos}
                             activeProjectId={viewingProjectId}
                             invitations={projectInvitations}
@@ -1640,7 +1666,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
                 <div className={activeTab === 'notes' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full pt-8 landscape:pt-2">
-                      <NotesSection isMobile={true} folders={folders} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
+                      <NotesSection isMobile={true} folders={folders} notes={notes} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
                     </div>
                 </div>
 
@@ -1652,7 +1678,16 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
                 <div className={activeTab === 'student' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full pt-8 landscape:pt-2">
-                        <StudentModule />
+                        <StudentModule
+                            notes={notes}
+                            folders={folders}
+                            onAddFolder={handleAddFolder}
+                            onUpdateFolder={handleUpdateFolder}
+                            onDeleteFolder={handleDeleteFolder}
+                            onAddNote={handleAddNote}
+                            onUpdateNote={handleUpdateNote}
+                            onDeleteNote={handleDeleteNote}
+                        />
                     </div>
                 </div>
 
@@ -3616,10 +3651,10 @@ const App: React.FC = () => {
   };
 
 
-  const handleAddFolder = useCallback(async (name: string): Promise<Folder | null> => {
+  const handleAddFolder = useCallback(async (name: string, projectId?: number, subjectId?: string): Promise<Folder | null> => {
       if (!user) return null;
       const tempId = -Date.now();
-      const newFolder: Folder = { id: tempId, name, user_id: user.id, created_at: new Date().toISOString(), notes: [] };
+      const newFolder: Folder = { id: tempId, name, user_id: user.id, project_id: projectId || null, subject_id: subjectId || null, created_at: new Date().toISOString(), notes: [] };
       
       setFolders(f => [...f, newFolder]);
       
@@ -3646,11 +3681,11 @@ const App: React.FC = () => {
       await syncableDelete('folders', folderId);
   };
   
-  const handleAddNote = useCallback(async (folderId: number): Promise<Note | null> => {
+  const handleAddNote = useCallback(async (folderId: number | null, projectId?: number, subjectId?: string): Promise<Note | null> => {
     if (!user) return null;
     const tempId = -Date.now();
     const now = new Date().toISOString();
-    const newNote: Note = { id: tempId, folder_id: folderId, user_id: user.id, title: 'Nueva Nota', content: '', created_at: now, updated_at: now };
+    const newNote: Note = { id: tempId, folder_id: folderId, user_id: user.id, project_id: projectId || null, subject_id: subjectId || null, title: 'Nueva Nota', content: '', created_at: now, updated_at: now };
     
     setNotes(n => [...n, newNote]);
     
@@ -3671,7 +3706,7 @@ const App: React.FC = () => {
     setNotes(n => n.map(item => item.id === note.id ? savedNote : item));
   };
 
-  const handleDeleteNote = async (noteId: number, folderId: number) => {
+  const handleDeleteNote = async (noteId: number, folderId: number | null) => {
     setNotes(n => n.filter(item => item.id !== noteId));
     await syncableDelete('notes', noteId);
   };
@@ -5061,7 +5096,7 @@ const App: React.FC = () => {
   const appProps: AppComponentProps = {
     isOnline, isSyncing, currentUser: user, onLogout: () => setIsLogoutConfirmOpen(true), 
     theme, toggleTheme, themeColors: uiSettings.themeColors, onThemeColorChange: handleThemeColorChange, onResetThemeColors: handleResetThemeColors,
-    allTodos: allTodos, folders: foldersWithNotes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
+    allTodos: allTodos, folders: foldersWithNotes, notes: notes, projects, habits, habitRecords, userBackgrounds, playlists, quickNotes, browserSession, selectedDate,
     pomodoroState, activeBackground, particleType: uiSettings.particleType, ambientSound: uiSettings.ambientSound, 
     uiSettings,
     activeTrack, activeSpotifyTrack, 

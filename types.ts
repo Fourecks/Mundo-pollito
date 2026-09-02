@@ -371,16 +371,25 @@ export interface ProjectQuarterlyPriority {
 export interface Note {
   id: number;
   user_id: string;
-  folder_id: number;
+  folder_id: number | null;
+  project_id?: number | null;
+  subject_id?: string | null;
   title: string;
   content: string;
+  is_favorite?: boolean;
+  is_pinned?: boolean;
+  is_archived?: boolean;
+  tags?: string[];
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface Folder {
   id: number;
   user_id: string;
+  project_id?: number | null;
+  subject_id?: string | null;
   name: string;
   created_at: string;
   notes: Note[];

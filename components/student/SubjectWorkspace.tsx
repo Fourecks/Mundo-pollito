@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Subject, Unit, Exam, Topic, Resource, StudySession, Grade, Attendance, Deck, Flashcard } from './types';
+import { Folder, Note } from '../../types';
+import NotesSection from '../NotesSection';
 import { motion, AnimatePresence } from 'framer-motion';
 import { syncableCreate, syncableUpdate, syncableDelete, getAll, ensureDB } from '../../db';
 import { supabase } from '../../supabaseClient';
@@ -7,10 +9,29 @@ import { supabase } from '../../supabaseClient';
 interface Props {
   subject: Subject;
   onBack: () => void;
+  notes?: Note[];
+  folders?: Folder[];
+  onAddFolder?: (name: string, projectId?: number, subjectId?: string) => Promise<Folder | null>;
+  onUpdateFolder?: (folderId: number, name: string) => Promise<void>;
+  onDeleteFolder?: (folderId: number) => Promise<void>;
+  onAddNote?: (folderId: number | null, projectId?: number, subjectId?: string) => Promise<Note | null>;
+  onUpdateNote?: (note: Note) => Promise<void>;
+  onDeleteNote?: (noteId: number, folderId: number | null) => Promise<void>;
 }
 
-export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'units' | 'tasks' | 'exams' | 'resources' | 'study' | 'grades' | 'flashcards'>('overview');
+export const SubjectWorkspace: React.FC<Props> = ({ 
+  subject, 
+  onBack,
+  notes = [],
+  folders = [],
+  onAddFolder = async () => null,
+  onUpdateFolder = async () => {},
+  onDeleteFolder = async () => {},
+  onAddNote = async () => null,
+  onUpdateNote = async () => {},
+  onDeleteNote = async () => {},
+}) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'units' | 'notes' | 'tasks' | 'exams' | 'resources' | 'study' | 'grades' | 'flashcards'>('overview');
   
   // Flashcards State
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -494,13 +515,13 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
 
       {/* Tabs */}
       <div className="px-8 pt-4 border-b border-gray-100 dark:border-white/5 flex gap-6 overflow-x-auto">
-        {(['overview', 'units', 'tasks', 'exams', 'resources', 'study', 'grades', 'flashcards'] as const).map(tab => (
+        {(['overview', 'units', 'notes', 'tasks', 'exams', 'resources', 'study', 'grades', 'flashcards'] as const).map(tab => (
           <button 
             key={tab} 
             onClick={() => setActiveTab(tab)}
             className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
           >
-            {tab === 'study' ? 'Sesiones' : tab === 'resources' ? 'Recursos' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'notes' ? 'Notas' : tab === 'study' ? 'Sesiones' : tab === 'resources' ? 'Recursos' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             {activeTab === tab && (
               <motion.div layoutId="subject-tab" className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full" style={{ backgroundColor: subject.color }} />
             )}
@@ -510,7 +531,7 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50 dark:bg-[#0A0A0A]">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto h-full">
           {activeTab === 'overview' && (
             <div className="space-y-8">
               <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -527,6 +548,22 @@ export const SubjectWorkspace: React.FC<Props> = ({ subject, onBack }) => {
                   <div className="text-3xl font-light mt-2">0</div>
                 </div>
               </section>
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div className="w-full h-[650px] bg-white dark:bg-[#111] rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden shadow-sm">
+              <NotesSection
+                folders={folders}
+                notes={notes}
+                onAddFolder={onAddFolder}
+                onUpdateFolder={onUpdateFolder}
+                onDeleteFolder={onDeleteFolder}
+                onAddNote={onAddNote}
+                onUpdateNote={onUpdateNote}
+                onDeleteNote={onDeleteNote}
+                subjectId={subject.id}
+              />
             </div>
           )}
           

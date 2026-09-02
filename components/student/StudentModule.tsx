@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Todo } from '../../types';
+import { Todo, Folder, Note } from '../../types';
 import { Subject, AcademicPeriod, Exam, Reading, Goal, Grade, StudySession, Attendance } from './types';
 import { getAll, syncableCreate, syncableUpdate, syncableDelete, ensureDB } from '../../db';
 import { supabase } from '../../supabaseClient';
@@ -7,7 +7,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SubjectWorkspace } from './SubjectWorkspace';
 import { AcademicAnalytics } from './AcademicAnalytics';
 
-export const StudentModule: React.FC = () => {
+interface StudentModuleProps {
+  notes?: Note[];
+  folders?: Folder[];
+  onAddFolder?: (name: string, projectId?: number, subjectId?: string) => Promise<Folder | null>;
+  onUpdateFolder?: (folderId: number, name: string) => Promise<void>;
+  onDeleteFolder?: (folderId: number) => Promise<void>;
+  onAddNote?: (folderId: number | null, projectId?: number, subjectId?: string) => Promise<Note | null>;
+  onUpdateNote?: (note: Note) => Promise<void>;
+  onDeleteNote?: (noteId: number, folderId: number | null) => Promise<void>;
+}
+
+export const StudentModule: React.FC<StudentModuleProps> = ({
+  notes = [],
+  folders = [],
+  onAddFolder,
+  onUpdateFolder,
+  onDeleteFolder,
+  onAddNote,
+  onUpdateNote,
+  onDeleteNote,
+}) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [periods, setPeriods] = useState<AcademicPeriod[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
@@ -252,7 +272,20 @@ export const StudentModule: React.FC = () => {
   };
 
   if (activeSubject) {
-    return <SubjectWorkspace subject={activeSubject} onBack={() => { setActiveSubject(null); loadData(); }} />;
+    return (
+      <SubjectWorkspace 
+        subject={activeSubject} 
+        onBack={() => { setActiveSubject(null); loadData(); }}
+        notes={notes}
+        folders={folders}
+        onAddFolder={onAddFolder}
+        onUpdateFolder={onUpdateFolder}
+        onDeleteFolder={onDeleteFolder}
+        onAddNote={onAddNote}
+        onUpdateNote={onUpdateNote}
+        onDeleteNote={onDeleteNote}
+      />
+    );
   }
 
   return (
