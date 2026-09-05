@@ -6,8 +6,8 @@ import { Folder, Note, Playlist, QuickNote, Todo } from './types';
 
 let db: IDBDatabase;
 const DB_NAME_PREFIX = 'PollitoProductivoDB';
-const DB_VERSION = 11; // Incremented version to ensure all student stores are created
-const STORES = ['todos', 'folders', 'notes', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'projects', 'habits', 'habit_records', 'student_academic_periods', 'student_subjects', 'student_subject_schedules', 'student_units', 'student_topics', 'student_exams', 'student_resources', 'student_study_sessions', 'student_readings', 'student_grades', 'student_attendance', 'student_decks', 'student_flashcards', 'student_goals', 'student_study_targets'];
+const DB_VERSION = 12; // Incremented version to ensure note_versions and all stores exist
+const STORES = ['todos', 'folders', 'notes', 'note_versions', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'projects', 'habits', 'habit_records', 'student_academic_periods', 'student_subjects', 'student_subject_schedules', 'student_units', 'student_topics', 'student_exams', 'student_resources', 'student_study_sessions', 'student_readings', 'student_grades', 'student_attendance', 'student_decks', 'student_flashcards', 'student_goals', 'student_study_targets'];
 
 // --- Types for Sync Queue ---
 interface SyncOperation {
@@ -96,11 +96,15 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'invitee_email', 'receiver_email', 'status', 'created_at'
     ]),
     folders: new Set([
-        'id', 'user_id', 'created_at', 'name'
+        'id', 'user_id', 'created_at', 'name', 'project_id', 'subject_id'
     ]),
     notes: new Set([
         'id', 'user_id', 'folder_id', 'created_at', 'updated_at', 'title', 'content',
-        'subject_id', 'unit_id', 'topic_id'
+        'subject_id', 'unit_id', 'topic_id', 'project_id', 'tags', 'is_favorite', 'is_pinned',
+        'is_archived', 'deleted_at'
+    ]),
+    note_versions: new Set([
+        'id', 'note_id', 'user_id', 'title', 'content', 'created_at', 'created_by'
     ]),
     playlists: new Set([
         'id', 'user_id', 'created_at', 'name', 'type', 'source_id', 'platform', 
