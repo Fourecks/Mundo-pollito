@@ -44,14 +44,9 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fade-in" onClick={onClose}>
       <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-      
-      <div 
-        className="relative bg-white dark:bg-[#121212] w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[100000] max-h-[90vh] flex flex-col"
+        className="relative bg-white dark:bg-[#0a0a0a] w-full max-w-md rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[100000] max-h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         <header className="px-6 py-4 border-b border-gray-100 dark:border-gray-900">
