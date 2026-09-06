@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conectar con Notion</title>
+  <title>Conectar con Notion - Pollito Productivo</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,26 +33,26 @@
     }
   </script>
 </head>
-<body class="bg-notion-lightBg dark:bg-notion-darkBg text-notion-lightText dark:text-notion-darkText min-h-screen flex flex-col justify-between p-6">
+<body class="bg-notion-lightBg dark:bg-notion-darkBg text-notion-lightText dark:text-notion-darkText min-h-screen flex flex-col justify-between p-6 transition-colors">
 
-  <!-- AUTO REDIRECT SCREEN (Shown by default while checking) -->
+  <!-- AUTO REDIRECT SCREEN (Shown by default while checking credentials) -->
   <div id="loader-redirect" class="my-auto text-center space-y-4 max-w-sm mx-auto">
     <div class="relative w-16 h-16 mx-auto">
       <div class="absolute inset-0 border-4 border-notion-accent/20 rounded-full"></div>
       <div class="absolute inset-0 border-4 border-notion-accent border-t-transparent rounded-full animate-spin"></div>
-      <div class="absolute inset-0 flex items-center justify-center text-xl">
+      <div class="absolute inset-0 flex items-center justify-center text-xl select-none">
         🐣
       </div>
     </div>
-    <h2 class="text-base font-bold font-fredoka text-slate-800 dark:text-white">
+    <h2 id="loader-title" class="text-base font-bold font-fredoka text-slate-800 dark:text-white">
       Redirigiendo a Notion...
     </h2>
-    <p class="text-xs text-slate-500 dark:text-slate-400">
-      Abriendo la página oficial de Notion para que autorices tus bases de datos de forma directa.
+    <p id="loader-desc" class="text-xs text-slate-500 dark:text-slate-400">
+      Abriendo la página oficial de Notion para que autorices tus bases de datos de tareas.
     </p>
   </div>
 
-  <!-- MANUAL CONFIG SCREEN (Initially hidden, shown only if no credentials preset) -->
+  <!-- CONFIGURATION PANEL (Shown if credentials need manual input or review) -->
   <main id="manual-panel" class="hidden max-w-md w-full mx-auto my-auto space-y-6">
     <!-- Header -->
     <div class="text-center space-y-2">
@@ -62,58 +62,62 @@
           <path d="M15 10 L85 10 C87.76 10 90 12.24 90 15 L90 85 C90 87.76 87.76 90 85 90 L15 90 C12.24 90 10 87.76 10 85 L10 15 C10 12.24 12.24 10 15 10 Z" fill="white" stroke="currentColor" stroke-width="6"/>
           <path d="M26 26 L38 26 L66 62 L66 26 L74 26 L74 74 L62 74 L34 38 L34 74 L26 74 Z" fill="currentColor"/>
         </svg>
-        <span class="text-2xl text-slate-300 font-light">×</span>
+        <span class="text-2xl text-slate-300 font-light select-none">×</span>
         <!-- Pollito Circle -->
-        <div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center shadow-sm">
-          <span class="text-xl">🐣</span>
+        <div class="w-10 h-10 bg-yellow-400 rounded-2xl flex items-center justify-center shadow-sm">
+          <span class="text-xl select-none">🐣</span>
         </div>
       </div>
       <h1 class="text-lg font-bold tracking-tight text-slate-800 dark:text-white pt-2 font-fredoka">
-        Conectar con Notion de Verdad
+        Conectar Notion con tus Tareas
       </h1>
       <p class="text-xs text-slate-500 dark:text-slate-400 px-4">
-        Sincroniza tus tareas directamente con tus páginas de Notion. Selecciona un método de conexión a continuación:
+        Sincroniza tus tareas bidireccionalmente con tu base de datos en Notion.
       </p>
     </div>
 
     <!-- Tab Buttons -->
     <div class="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
-      <button onclick="switchTab('oauth')" id="tab-oauth" class="flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-slate-800 shadow-sm text-slate-800 dark:text-white">
-        🔌 Autorización Oficial (OAuth)
+      <button id="tab-oauth" class="flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-slate-800 shadow-sm text-slate-800 dark:text-white">
+        🔌 Flujo Oficial OAuth
       </button>
-      <button onclick="switchTab('manual')" id="tab-manual" class="flex-1 text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400 rounded-lg transition-all hover:text-slate-800 dark:hover:text-white">
-        🔑 Token Manual (Interno)
+      <button id="tab-manual" class="flex-1 text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400 rounded-lg transition-all hover:text-slate-800 dark:hover:text-white">
+        🔑 Token Interno Manual
       </button>
     </div>
 
     <!-- TAB 1: OAUTH FLOW -->
     <div id="section-oauth" class="space-y-4">
-      <div class="bg-white dark:bg-notion-darkBg/30 p-5 rounded-2xl border border-notion-lightBorder dark:border-notion-darkBorder shadow-sm space-y-4">
-        <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200">
-          🔑 Credenciales de Integración Pública de Notion
-        </h3>
+      <div class="bg-white dark:bg-notion-darkBg/50 p-5 rounded-2xl border border-notion-lightBorder dark:border-notion-darkBorder shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+            <span>🔐</span>
+            <span>Credenciales OAuth de Notion</span>
+          </h3>
+          <span id="env-badge" class="hidden text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 font-medium">
+            VITE_NOTION detectado
+          </span>
+        </div>
         
         <div class="space-y-3">
           <div>
-            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-              ID de Cliente (Client ID)
+            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+              ID de Cliente (VITE_NOTION_CLIENT_ID)
             </label>
-            <input type="text" id="oauth-client-id" placeholder="p. ej. a1796be2..." class="w-full mt-1 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-notion-accent text-xs font-mono shadow-sm">
+            <input type="text" id="oauth-client-id" placeholder="p. ej. 34336c11-9a74-4b52-..." class="w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-notion-accent text-xs font-mono shadow-sm">
           </div>
 
           <div>
-            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-              Secreto de Cliente (Client Secret)
+            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+              Secreto de Cliente (VITE_NOTION_CLIENT_SECRET)
             </label>
-            <input type="password" id="oauth-client-secret" placeholder="secret_..." class="w-full mt-1 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-notion-accent text-xs font-mono shadow-sm">
+            <input type="password" id="oauth-client-secret" placeholder="secret_..." class="w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-notion-accent text-xs font-mono shadow-sm">
           </div>
 
           <!-- Alert error Oauth -->
-          <div id="oauth-error" class="hidden p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-xs">
-            Por favor, rellena todos los campos.
-          </div>
+          <div id="oauth-error" class="hidden p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-xs"></div>
 
-          <button onclick="startOAuthFlow()" class="w-full bg-notion-accent hover:bg-notion-accent/90 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-xs shadow-sm flex items-center justify-center gap-2">
+          <button id="btn-start-oauth" class="w-full bg-notion-accent hover:bg-notion-accent/90 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-xs shadow-sm flex items-center justify-center gap-2">
             <span>Iniciar Autorización en Notion</span>
             <span>➡️</span>
           </button>
@@ -123,30 +127,25 @@
       <!-- Instructions OAuth -->
       <div class="p-4 rounded-2xl bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/50 space-y-2 text-[11px] text-slate-500 dark:text-slate-400">
         <h4 class="font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-          <span>⚙️</span> Configuración Requerida en tu Integración Pública:
+          <span>⚙️</span> Configuración en tu Integración de Notion:
         </h4>
         <ol class="space-y-1.5 list-decimal list-inside pl-1">
           <li>
-            Crea una integración en <a href="https://www.notion.so/my-integrations" target="_blank" class="text-notion-accent font-semibold hover:underline">notion.so/my-integrations</a>.
+            Ve a <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" class="text-notion-accent font-semibold hover:underline">notion.so/my-integrations</a> y crea una integración pública.
           </li>
           <li>
-            En el apartado <strong>"Distribución"</strong> de la integración, cámbiala a <strong>"Pública"</strong>.
+            En <strong>"Distribution"</strong> (Distribución), configúrala como <strong>"Public"</strong>.
           </li>
           <li>
-            Introduce estas URLs permitidas como <strong>Redirect URIs</strong> en Notion (puedes añadir ambas):
-            <div class="space-y-1.5 my-1.5 text-[10px] font-mono">
-              <div class="p-2 bg-slate-200/50 dark:bg-slate-800 rounded-lg select-all break-all text-slate-800 dark:text-slate-200">
-                <span class="block text-[9px] text-slate-400 uppercase font-sans font-bold">Para esta vista previa / test:</span>
-                <span id="redirect-uri-box">Cargando Redirect URI...</span>
+            Añade esta <strong>Redirect URI</strong> exacta en Notion:
+            <div class="mt-1.5 flex items-center gap-1.5">
+              <div id="redirect-uri-box" class="flex-1 p-2 bg-slate-200/50 dark:bg-slate-800 rounded-lg font-mono text-[10px] break-all select-all text-slate-800 dark:text-slate-200">
+                ...
               </div>
-              <div class="p-2 bg-slate-200/50 dark:bg-slate-800 rounded-lg select-all break-all text-slate-800 dark:text-slate-200">
-                <span class="block text-[9px] text-slate-400 uppercase font-sans font-bold">Para tu web real de producción (Render):</span>
-                <span>https://pollito-productivo.onrender.com/notion-callback.html</span>
-              </div>
+              <button id="btn-copy-uri" class="px-2.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-semibold border border-slate-200 dark:border-slate-700 transition-all flex-shrink-0">
+                Copiar
+              </button>
             </div>
-          </li>
-          <li>
-            Copia el <strong>ID de Cliente</strong> y el <strong>Secreto de Cliente</strong> para introducirlos arriba.
           </li>
         </ol>
       </div>
@@ -154,33 +153,32 @@
 
     <!-- TAB 2: MANUAL TOKEN FLOW -->
     <div id="section-manual" class="hidden space-y-4">
-      <div class="bg-white dark:bg-notion-darkBg/30 p-5 rounded-2xl border border-notion-lightBorder dark:border-notion-darkBorder shadow-sm space-y-4">
-        <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200">
-          🔑 Token de Integración Interna de Notion
+      <div class="bg-white dark:bg-notion-darkBg/50 p-5 rounded-2xl border border-notion-lightBorder dark:border-notion-darkBorder shadow-sm space-y-4">
+        <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+          <span>🔑</span>
+          <span>Token de Integración Interna</span>
         </h3>
         
         <div class="space-y-3">
           <div>
-            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
               Token Interno Secreto (secret_...)
             </label>
-            <input type="password" id="manual-token" placeholder="secret_..." class="w-full mt-1 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-notion-accent text-xs font-mono shadow-sm">
+            <input type="password" id="manual-token" placeholder="secret_..." class="w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-notion-accent text-xs font-mono shadow-sm">
           </div>
 
           <div>
-            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+            <label class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
               ID de la Base de Datos (32 caracteres)
             </label>
-            <input type="text" id="manual-db-id" placeholder="p. ej. a70155b..." class="w-full mt-1 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-notion-accent text-xs font-mono shadow-sm">
+            <input type="text" id="manual-db-id" placeholder="p. ej. a70155b9a8..." class="w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-notion-accent text-xs font-mono shadow-sm">
           </div>
 
           <!-- Alert error Manual -->
-          <div id="manual-error" class="hidden p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-xs">
-            Por favor, rellena todos los campos.
-          </div>
+          <div id="manual-error" class="hidden p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-xs"></div>
 
-          <button onclick="validateManualToken()" id="btn-manual-connect" class="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-xs shadow-sm flex items-center justify-center gap-2">
-            <span>Validar y Conectar Token Manual</span>
+          <button id="btn-manual-connect" class="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-xs shadow-sm flex items-center justify-center gap-2">
+            <span>Validar y Conectar Token</span>
           </button>
         </div>
       </div>
@@ -188,11 +186,11 @@
       <!-- Instructions Manual -->
       <div class="p-4 rounded-2xl bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/50 space-y-2 text-[11px] text-slate-500 dark:text-slate-400">
         <h4 class="font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-          <span>⚙️</span> Cómo conectar usando un Token Interno:
+          <span>⚙️</span> Cómo conectar con Integración Interna:
         </h4>
         <ol class="space-y-1 list-decimal list-inside pl-1">
-          <li>Crea una integración interna en <a href="https://www.notion.so/my-integrations" target="_blank" class="text-notion-accent font-semibold hover:underline">notion.so/my-integrations</a>.</li>
-          <li>Abre tu base de datos en Notion, haz clic en <code>...</code> y en <strong>Conexiones</strong> añade tu integración interna.</li>
+          <li>Crea una integración en <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" class="text-notion-accent font-semibold hover:underline">notion.so/my-integrations</a>.</li>
+          <li>En Notion, abre tu base de datos, haz clic en <code>...</code> &gt; <strong>Conexiones</strong> y añade tu integración.</li>
           <li>Copia tu Token Secreto e ID de Base de Datos y pégalos arriba.</li>
         </ol>
       </div>
@@ -201,108 +199,157 @@
 
   <!-- Footer -->
   <footer id="footer-text" class="hidden text-center text-[10px] text-slate-400 dark:text-slate-500 py-4 max-w-xs mx-auto">
-    Tus credenciales reales se transmiten exclusivamente de forma segura HTTPS a los servidores de Notion.
+    Tus credenciales se transmiten de forma segura por HTTPS a Notion.
   </footer>
 
-  <script>
-    // Copy parent theme
-    if (window.opener && window.opener.document.documentElement.classList.contains('dark')) {
-      document.documentElement.classList.add('dark');
-    }
+  <script type="module">
+    // Copy dark mode from parent window if available
+    try {
+      if (window.opener && window.opener.document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.add('dark');
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch(e) {}
 
     const redirectUri = window.location.origin + '/notion-callback.html';
 
-    // Auto-Run / Redirect check
-    window.addEventListener('DOMContentLoaded', () => {
-      const storedClientId = localStorage.getItem('pollito_notion_client_id');
-      const storedClientSecret = localStorage.getItem('pollito_notion_client_secret');
+    // Retrieve environment variables via Vite
+    const envClientId = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_NOTION_CLIENT_ID)
+      ? import.meta.env.VITE_NOTION_CLIENT_ID
+      : (typeof window !== 'undefined' && window.__VITE_NOTION_CLIENT_ID__)
+        ? window.__VITE_NOTION_CLIENT_ID__
+        : '';
+    const envClientSecret = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_NOTION_CLIENT_SECRET)
+      ? import.meta.env.VITE_NOTION_CLIENT_SECRET
+      : (typeof window !== 'undefined' && window.__VITE_NOTION_CLIENT_SECRET__)
+        ? window.__VITE_NOTION_CLIENT_SECRET__
+        : '';
 
-      if (storedClientId && storedClientSecret) {
-        // We have preset client credentials! Trigger automatic seamless redirection instantly.
-        const pendingData = {
-          clientId: storedClientId.trim(),
-          clientSecret: storedClientSecret.trim(),
-          redirectUri: redirectUri
-        };
-        localStorage.setItem('pollito_notion_pending_auth', JSON.stringify(pendingData));
+    // Check URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryClientId = urlParams.get('client_id');
+    const queryClientSecret = urlParams.get('client_secret');
 
-        const notionAuthUrl = `https://api.notion.com/v1/oauth/authorize?client_id=${storedClientId.trim()}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&owner=user`;
-        
-        // Instant redirect
-        window.location.href = notionAuthUrl;
-      } else {
-        // No preset credentials found, show manual configuration panels
-        document.getElementById('loader-redirect').classList.add('hidden');
-        document.getElementById('manual-panel').classList.remove('hidden');
-        document.getElementById('footer-text').classList.remove('hidden');
-        
-        // Set dynamic URI in instructions
-        document.getElementById('redirect-uri-box').innerText = redirectUri;
+    // Check stored credentials
+    const storedClientId = localStorage.getItem('pollito_notion_client_id');
+    const storedClientSecret = localStorage.getItem('pollito_notion_client_secret');
 
-        // Prefill forms if cached
-        try {
-          const cachedAuth = JSON.parse(localStorage.getItem('pollito_notion_pending_auth') || '{}');
-          if (cachedAuth.clientId) document.getElementById('oauth-client-id').value = cachedAuth.clientId;
-          if (cachedAuth.clientSecret) document.getElementById('oauth-client-secret').value = cachedAuth.clientSecret;
-          
-          const settings = JSON.parse(localStorage.getItem('pollito_notion_settings') || '{}');
-          if (settings.token && !settings.isSandbox) {
-            document.getElementById('manual-token').value = settings.token;
-            document.getElementById('manual-db-id').value = settings.databaseId || '';
-          }
-        } catch(e){}
-      }
-    });
+    // Determine resolved credentials
+    const resolvedClientId = (envClientId || queryClientId || storedClientId || '').trim();
+    const resolvedClientSecret = (envClientSecret || queryClientSecret || storedClientSecret || '').trim();
+
+    // Setup tabs
+    const tabOauth = document.getElementById('tab-oauth');
+    const tabManual = document.getElementById('tab-manual');
+    const sectionOauth = document.getElementById('section-oauth');
+    const sectionManual = document.getElementById('section-manual');
+
+    tabOauth.addEventListener('click', () => switchTab('oauth'));
+    tabManual.addEventListener('click', () => switchTab('manual'));
 
     function switchTab(tab) {
-      const oTab = document.getElementById('tab-oauth');
-      const mTab = document.getElementById('tab-manual');
-      const oSec = document.getElementById('section-oauth');
-      const mSec = document.getElementById('section-manual');
-
       if (tab === 'oauth') {
-        oTab.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-slate-800 shadow-sm text-slate-800 dark:text-white";
-        mTab.className = "flex-1 text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400 rounded-lg transition-all hover:text-slate-800 dark:hover:text-white";
-        oSec.classList.remove('hidden');
-        mSec.classList.add('hidden');
+        tabOauth.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-slate-800 shadow-sm text-slate-800 dark:text-white";
+        tabManual.className = "flex-1 text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400 rounded-lg transition-all hover:text-slate-800 dark:hover:text-white";
+        sectionOauth.classList.remove('hidden');
+        sectionManual.classList.add('hidden');
       } else {
-        mTab.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-slate-800 shadow-sm text-slate-800 dark:text-white";
-        oTab.className = "flex-1 text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400 rounded-lg transition-all hover:text-slate-800 dark:hover:text-white";
-        mSec.classList.remove('hidden');
-        oSec.classList.add('hidden');
+        tabManual.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all bg-white dark:bg-slate-800 shadow-sm text-slate-800 dark:text-white";
+        tabOauth.className = "flex-1 text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400 rounded-lg transition-all hover:text-slate-800 dark:hover:text-white";
+        sectionManual.classList.remove('hidden');
+        sectionOauth.classList.add('hidden');
       }
     }
 
-    function startOAuthFlow() {
+    // Copy URI button
+    const btnCopyUri = document.getElementById('btn-copy-uri');
+    const redirectUriBox = document.getElementById('redirect-uri-box');
+    redirectUriBox.innerText = redirectUri;
+
+    btnCopyUri.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(redirectUri);
+        btnCopyUri.innerText = '¡Copiado!';
+        btnCopyUri.classList.add('text-emerald-600', 'font-bold');
+        setTimeout(() => {
+          btnCopyUri.innerText = 'Copiar';
+          btnCopyUri.classList.remove('text-emerald-600', 'font-bold');
+        }, 2000);
+      } catch (err) {
+        redirectUriBox.focus();
+      }
+    });
+
+    // Start OAuth helper
+    function proceedWithOAuth(clientId, clientSecret) {
+      const pendingData = {
+        clientId: clientId.trim(),
+        clientSecret: (clientSecret || '').trim(),
+        redirectUri: redirectUri
+      };
+      localStorage.setItem('pollito_notion_pending_auth', JSON.stringify(pendingData));
+      localStorage.setItem('pollito_notion_client_id', clientId.trim());
+      if (clientSecret) {
+        localStorage.setItem('pollito_notion_client_secret', clientSecret.trim());
+      }
+
+      const notionAuthUrl = `https://api.notion.com/v1/oauth/authorize?client_id=${encodeURIComponent(clientId.trim())}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&owner=user`;
+      window.location.href = notionAuthUrl;
+    }
+
+    document.getElementById('btn-start-oauth').addEventListener('click', () => {
       const clientId = document.getElementById('oauth-client-id').value.trim();
       const clientSecret = document.getElementById('oauth-client-secret').value.trim();
       const errorBox = document.getElementById('oauth-error');
 
       errorBox.classList.add('hidden');
-
-      if (!clientId || !clientSecret) {
-        errorBox.innerText = 'Por favor, introduce el ID de Cliente y Secreto de Cliente de tu integración pública.';
+      if (!clientId) {
+        errorBox.innerText = 'Por favor, introduce el ID de Cliente de tu integración en Notion.';
         errorBox.classList.remove('hidden');
         return;
       }
+      proceedWithOAuth(clientId, clientSecret);
+    });
 
-      const pendingData = {
-        clientId,
-        clientSecret,
-        redirectUri
-      };
-      localStorage.setItem('pollito_notion_pending_auth', JSON.stringify(pendingData));
+    // Main bootstrap logic
+    if (resolvedClientId) {
+      // We have a Client ID! Automatically start OAuth redirect
+      proceedWithOAuth(resolvedClientId, resolvedClientSecret);
+    } else {
+      // Show manual configuration form
+      document.getElementById('loader-redirect').classList.add('hidden');
+      document.getElementById('manual-panel').classList.remove('hidden');
+      document.getElementById('footer-text').classList.remove('hidden');
 
-      const notionAuthUrl = `https://api.notion.com/v1/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&owner=user`;
-      window.location.href = notionAuthUrl;
+      if (envClientId) {
+        document.getElementById('env-badge').classList.remove('hidden');
+        document.getElementById('oauth-client-id').value = envClientId;
+      }
+      if (envClientSecret) {
+        document.getElementById('oauth-client-secret').value = envClientSecret;
+      }
+
+      try {
+        const cachedAuth = JSON.parse(localStorage.getItem('pollito_notion_pending_auth') || '{}');
+        if (!document.getElementById('oauth-client-id').value && cachedAuth.clientId) {
+          document.getElementById('oauth-client-id').value = cachedAuth.clientId;
+        }
+        if (!document.getElementById('oauth-client-secret').value && cachedAuth.clientSecret) {
+          document.getElementById('oauth-client-secret').value = cachedAuth.clientSecret;
+        }
+      } catch(e) {}
     }
 
+    // Proxy fallback for token test
     async function fetchWithProxyFallback(targetUrl, options = {}) {
       const proxyGenerators = [
-        (u) => `https://proxy.cors.sh/${u}`,
-        (u) => `https://cors.eu.org/${u}`,
+        (u) => u.replace('https://api.notion.com/v1', '/api/notion'),
+        (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
         (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
         (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+        (u) => `https://proxy.cors.sh/${u}`,
+        (u) => `https://cors.eu.org/${u}`,
         (u) => u
       ];
 
@@ -321,7 +368,8 @@
       throw lastErr || new Error('No se pudo realizar la petición HTTP.');
     }
 
-    async function validateManualToken() {
+    // Manual token connection
+    document.getElementById('btn-manual-connect').addEventListener('click', async () => {
       const token = document.getElementById('manual-token').value.trim();
       const databaseId = document.getElementById('manual-db-id').value.trim();
       const errorBox = document.getElementById('manual-error');
@@ -330,24 +378,23 @@
       errorBox.classList.add('hidden');
 
       if (!token || !databaseId) {
-        errorBox.innerText = 'Por favor, rellena el Token Interno y el ID de Base de Datos.';
+        errorBox.innerText = 'Por favor, introduce el Token Secreto y el ID de Base de Datos.';
         errorBox.classList.remove('hidden');
         return;
       }
 
       const cleanDbId = databaseId.replace(/-/g, '');
       if (cleanDbId.length !== 32) {
-        errorBox.innerText = 'El ID de la base de datos debe tener exactamente 32 caracteres (omitiendo guiones).';
+        errorBox.innerText = 'El ID de la base de datos debe tener exactamente 32 caracteres.';
         errorBox.classList.remove('hidden');
         return;
       }
 
       btn.disabled = true;
-      btn.innerText = 'Validando conexión...';
+      btn.innerText = 'Validando conexión con Notion...';
 
       try {
         const url = 'https://api.notion.com/v1/databases/' + cleanDbId;
-        
         const response = await fetchWithProxyFallback(url, {
           headers: {
             'Authorization': 'Bearer ' + token,
@@ -358,11 +405,23 @@
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.message || 'Error de conexión HTTP ' + response.status);
+          throw new Error(errData.message || 'Error de conexión con Notion (HTTP ' + response.status + ')');
         }
 
         const data = await response.json();
         const dbName = data.title?.map(t => t.plain_text).join('') || 'Base de Datos de Notion';
+
+        const updatedSettings = {
+          enabled: true,
+          token: token,
+          databaseId: cleanDbId,
+          databaseName: dbName,
+          autoSync: true,
+          completedProperty: 'Completada',
+          priorityProperty: 'Prioridad',
+          dateProperty: 'Fecha'
+        };
+        localStorage.setItem('pollito_notion_settings', JSON.stringify(updatedSettings));
 
         const payload = {
           type: 'NOTION_AUTH_SUCCESS',
@@ -371,11 +430,11 @@
           databaseName: dbName
         };
 
-        if (window.opener) {
+        if (window.opener && !window.opener.closed) {
           window.opener.postMessage(payload, '*');
-          window.close();
+          setTimeout(() => window.close(), 500);
         } else {
-          alert('¡Conexión de token manual validada con éxito! Base de datos: ' + dbName);
+          window.location.href = '/';
         }
 
       } catch (err) {
@@ -384,9 +443,9 @@
         errorBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
-        btn.innerText = 'Validar y Conectar Token Manual';
+        btn.innerText = 'Validar y Conectar Token';
       }
-    }
+    });
   </script>
 </body>
 </html>

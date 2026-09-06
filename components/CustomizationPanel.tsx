@@ -9,7 +9,7 @@ import {
   CloudRain, Stars, Circle, Zap, TreePine, Coffee, Waves, 
   VolumeX, LogOut, Palette, Sparkles, Smile, Battery, 
   ChevronRight, Bell, Clock, Send, Users, AtSign, CheckCircle2, AlertCircle, Radio,
-  Keyboard, Laptop, Monitor, Command, Search, Check
+  Keyboard, Laptop, Monitor, Command, Search, Check, HelpCircle
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import { UnsplashGallery } from './UnsplashGallery';
@@ -79,6 +79,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
   const detectedIsMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/i.test(navigator.userAgent || navigator.platform || '');
   const [selectedOS, setSelectedOS] = useState<'windows' | 'mac'>(detectedIsMac ? 'mac' : 'windows');
   const [shortcutSearch, setShortcutSearch] = useState('');
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
 
   const tabs = [
     { id: 'account', label: 'Cuenta', icon: User },
@@ -214,8 +215,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               { title: 'Temporizador Pomodoro', desc: 'Abre la ventana de concentración y control de descansos', win: ['Alt', 'O'], mac: ['⌥ Option', 'O'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'O'] },
               { title: 'Reproductor de Música', desc: 'Abre la ventana de música ambiental lo-fi y generador de sonidos', win: ['Alt', 'M'], mac: ['⌥ Option', 'M'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'M'] },
               { title: 'Módulo de Estudio', desc: 'Abre el espacio de estudio guiado con técnicas activas', win: ['Alt', 'E'], mac: ['⌥ Option', 'E'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'E'] },
-              { title: 'Informe de Progreso', desc: 'Visualiza tus estadísticas de productividad y rendimiento', win: ['Alt', 'R'], mac: ['⌥ Option', 'R'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'R'] },
-              { title: 'Navegador Web', desc: 'Abre el explorador web integrado de recursos', win: ['Alt', 'B'], mac: ['⌥ Option', 'B'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'B'] },
+              { title: 'Informe de Progreso', desc: 'Visualiza tus estadísticas de productividad y rendimiento', win: ['Alt', 'R'], mac: ['⌥ Option', 'R'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'R'] }
             ]
           },
           {
@@ -262,10 +262,25 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
           <div className="flex flex-col h-full animate-in fade-in duration-200 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Keyboard className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-                  Atajos de Teclado
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Keyboard className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                    Atajos de Teclado
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowShortcutHelp(prev => !prev)}
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold transition-all border cursor-pointer ${
+                      showShortcutHelp
+                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white'
+                        : 'text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                    }`}
+                    title="¿Cómo funcionan los atajos y teclas modificadoras?"
+                    aria-label="Ayuda sobre atajos"
+                  >
+                    ?
+                  </button>
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   Selecciona tu sistema operativo para ver las combinaciones activas.
                 </p>
@@ -292,75 +307,103 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               </div>
             </div>
 
-            {/* Horizontal Platform Selector Cards - Responsive & No Overflow */}
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
-              {/* Windows / Linux Card */}
-              <button
-                type="button"
-                onClick={() => setSelectedOS('windows')}
-                className={`w-full p-3 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left flex items-center gap-3 overflow-hidden ${
-                  selectedOS === 'windows'
-                    ? 'border-zinc-900 dark:border-white bg-zinc-900/[0.04] dark:bg-white/[0.06] shadow-sm'
-                    : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#151618] hover:border-gray-300 dark:hover:border-zinc-700 opacity-75 hover:opacity-100'
-                }`}
-              >
-                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                  selectedOS === 'windows'
-                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
-                    : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'
-                }`}>
-                  <Monitor className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">
+            {/* Minimalist & Elegant Platform Selector Cards + Question Help */}
+            <div className="flex flex-col gap-2.5">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                {/* Windows / PC Card */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedOS('windows')}
+                  className={`group relative p-2.5 sm:p-3 rounded-xl border transition-all text-left flex items-center justify-between cursor-pointer ${
+                    selectedOS === 'windows'
+                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-xs'
+                      : 'bg-zinc-50/60 hover:bg-zinc-100/80 dark:bg-zinc-900/40 dark:hover:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Monitor className={`w-4 h-4 shrink-0 transition-colors ${
+                      selectedOS === 'windows'
+                        ? 'text-white dark:text-zinc-950'
+                        : 'text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300'
+                    }`} />
+                    <span className="text-xs sm:text-[13px] font-medium tracking-tight truncate">
                       Windows / Linux
                     </span>
-                    {selectedOS === 'windows' && (
-                      <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                        <Check className="w-2.5 h-2.5" /> <span className="hidden sm:inline">Activo</span>
-                      </span>
-                    )}
                   </div>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                    Teclas <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">Alt</span> y <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">Ctrl</span>
-                  </p>
-                </div>
-              </button>
+                  <span className={`text-[10px] sm:text-[11px] font-mono shrink-0 px-1.5 py-0.5 rounded-md transition-colors ${
+                    selectedOS === 'windows'
+                      ? 'bg-white/15 dark:bg-zinc-900/10 text-white dark:text-zinc-900 font-medium'
+                      : 'bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                  }`}>
+                    Alt · Ctrl
+                  </span>
+                </button>
 
-              {/* macOS (Apple) Card */}
-              <button
-                type="button"
-                onClick={() => setSelectedOS('mac')}
-                className={`w-full p-3 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left flex items-center gap-3 overflow-hidden ${
-                  selectedOS === 'mac'
-                    ? 'border-zinc-900 dark:border-white bg-zinc-900/[0.04] dark:bg-white/[0.06] shadow-sm'
-                    : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#151618] hover:border-gray-300 dark:hover:border-zinc-700 opacity-75 hover:opacity-100'
-                }`}
-              >
-                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                  selectedOS === 'mac'
-                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
-                    : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'
-                }`}>
-                  <Command className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">
-                      macOS (Apple)
+                {/* macOS Card */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedOS('mac')}
+                  className={`group relative p-2.5 sm:p-3 rounded-xl border transition-all text-left flex items-center justify-between cursor-pointer ${
+                    selectedOS === 'mac'
+                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-xs'
+                      : 'bg-zinc-50/60 hover:bg-zinc-100/80 dark:bg-zinc-900/40 dark:hover:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Command className={`w-4 h-4 shrink-0 transition-colors ${
+                      selectedOS === 'mac'
+                        ? 'text-white dark:text-zinc-950'
+                        : 'text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300'
+                    }`} />
+                    <span className="text-xs sm:text-[13px] font-medium tracking-tight truncate">
+                      macOS
                     </span>
-                    {selectedOS === 'mac' && (
-                      <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                        <Check className="w-2.5 h-2.5" /> <span className="hidden sm:inline">Activo</span>
-                      </span>
-                    )}
                   </div>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                    Teclas <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">⌥ Opt</span> y <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">⌘ Cmd</span>
+                  <span className={`text-[10px] sm:text-[11px] font-mono shrink-0 px-1.5 py-0.5 rounded-md transition-colors ${
+                    selectedOS === 'mac'
+                      ? 'bg-white/15 dark:bg-zinc-900/10 text-white dark:text-zinc-900 font-medium'
+                      : 'bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                  }`}>
+                    ⌥ Opt · ⌘ Cmd
+                  </span>
+                </button>
+              </div>
+
+              {/* Helpful Guide when Question Mark (?) is clicked */}
+              {showShortcutHelp && (
+                <div className="p-3 sm:p-3.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-900/70 border border-zinc-200/80 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-300 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-semibold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                      <HelpCircle className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                      ¿Cómo funcionan los atajos?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowShortcutHelp(false)}
+                      className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 text-xs px-1 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                    Los atajos responden globalmente en todo momento mientras interactúas con la app (salvo mientras estés redactando dentro de un campo de texto o nota).
                   </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                    <div className="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/50">
+                      <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200">En Windows / Linux</div>
+                      <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        Usa <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">Alt</kbd> para ventanas y navegación, y <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">Ctrl</kbd> para edición.
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/50">
+                      <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200">En macOS (Apple)</div>
+                      <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        La tecla <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">⌥ Option</kbd> sustituye a Alt. Las acciones de ventana también aceptan <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">⌘ Cmd</kbd>.
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </button>
+              )}
             </div>
 
             {/* Shortcuts Listing */}

@@ -19,7 +19,9 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        '__VITE_NOTION_CLIENT_ID__': JSON.stringify(env.VITE_NOTION_CLIENT_ID || ''),
+        '__VITE_NOTION_CLIENT_SECRET__': JSON.stringify(env.VITE_NOTION_CLIENT_SECRET || '')
       },
       resolve: {
         alias: {

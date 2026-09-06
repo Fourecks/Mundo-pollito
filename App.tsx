@@ -59,7 +59,7 @@ import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
 import { NotionService } from './services/notionService';
 import { cleanToPlainText } from './utils/textCleaner';
-import { Settings, Loader2, CheckSquare, Calendar, BookOpen, Target, Folder as FolderIcon, Clock, Music, Moon, Sun } from 'lucide-react';
+import { Settings, Loader2, CheckSquare, Calendar, BookOpen, Target, Folder as FolderIcon, Clock, Music, Moon, Sun, GraduationCap, TrendingUp, Minimize2, XSquare, RotateCcw, Monitor, ArrowRight, ArrowLeft, Play, Pause, Zap } from 'lucide-react';
 import CommandPalette, { CommandAction } from './components/CommandPalette';
 
 // --- Google API Configuration ---
@@ -479,6 +479,13 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [focusedWindow, setFocusedWindow] = useState<WindowType | null>(null);
   const [windowZIndices, setWindowZIndices] = useState<{ [key in WindowType]?: number }>({});
   const [highestZIndex, setHighestZIndex] = useState<number>(100);
+
+  const openWindowsRef = useRef<WindowType[]>(openWindows);
+  openWindowsRef.current = openWindows;
+  const minimizedWindowsRef = useRef<WindowType[]>(minimizedWindows);
+  minimizedWindowsRef.current = minimizedWindows;
+  const windowZIndicesRef = useRef<{ [key in WindowType]?: number }>(windowZIndices);
+  windowZIndicesRef.current = windowZIndices;
 
   // --- Windowing and Misc Handlers ---
   const bringToFront = useCallback((windowType: WindowType) => {
@@ -927,6 +934,96 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     }
   }, []);
 
+  const cycleNextWindow = useCallback(() => {
+    const open = openWindowsRef.current;
+    const min = minimizedWindowsRef.current;
+    const visible = open.filter(w => !min.includes(w));
+    if (visible.length === 0) {
+      if (min.length > 0) {
+        bringToFront(min[min.length - 1]);
+      }
+      return;
+    }
+    const current = focusedWindowRef.current;
+    const currentIdx = current ? visible.indexOf(current) : -1;
+    const nextIdx = (currentIdx + 1) % visible.length;
+    bringToFront(visible[nextIdx]);
+  }, [bringToFront]);
+
+  const cyclePrevWindow = useCallback(() => {
+    const open = openWindowsRef.current;
+    const min = minimizedWindowsRef.current;
+    const visible = open.filter(w => !min.includes(w));
+    if (visible.length === 0) {
+      if (min.length > 0) {
+        bringToFront(min[min.length - 1]);
+      }
+      return;
+    }
+    const current = focusedWindowRef.current;
+    const currentIdx = current ? visible.indexOf(current) : -1;
+    const prevIdx = currentIdx <= 0 ? visible.length - 1 : currentIdx - 1;
+    bringToFront(visible[prevIdx]);
+  }, [bringToFront]);
+
+  const restoreLastMinimized = useCallback(() => {
+    const min = minimizedWindowsRef.current;
+    if (min.length > 0) {
+      const last = min[min.length - 1];
+      bringToFront(last);
+    }
+  }, [bringToFront]);
+
+  const minimizeActiveWindow = useCallback(() => {
+    const active = focusedWindowRef.current;
+    if (active) {
+      minimizeWindow(active);
+      return;
+    }
+    const open = openWindowsRef.current;
+    const min = minimizedWindowsRef.current;
+    const visible = open.filter(w => !min.includes(w));
+    if (visible.length > 0) {
+      const z = windowZIndicesRef.current;
+      const sorted = [...visible].sort((a, b) => (z[b] || 0) - (z[a] || 0));
+      minimizeWindow(sorted[0]);
+    }
+  }, [minimizeWindow]);
+
+  const closeActiveWindow = useCallback(() => {
+    const active = focusedWindowRef.current;
+    if (active) {
+      closeWindow(active);
+      return;
+    }
+    const open = openWindowsRef.current;
+    const min = minimizedWindowsRef.current;
+    const visible = open.filter(w => !min.includes(w));
+    if (visible.length > 0) {
+      const z = windowZIndicesRef.current;
+      const sorted = [...visible].sort((a, b) => (z[b] || 0) - (z[a] || 0));
+      closeWindow(sorted[0]);
+    }
+  }, [closeWindow]);
+
+  const toggleShowDesktop = useCallback(() => {
+    const open = openWindowsRef.current;
+    const min = minimizedWindowsRef.current;
+    const visible = open.filter(w => !min.includes(w));
+    if (visible.length > 0) {
+      setMinimizedWindows([...open]);
+      focusedWindowRef.current = null;
+      setFocusedWindow(null);
+    } else if (open.length > 0) {
+      setMinimizedWindows([]);
+      const z = windowZIndicesRef.current;
+      const sorted = [...open].sort((a, b) => (z[b] || 0) - (z[a] || 0));
+      if (sorted.length > 0) {
+        bringToFront(sorted[0]);
+      }
+    }
+  }, [bringToFront]);
+
   const getWindowZIndex = useCallback((windowType: WindowType) => {
     return windowZIndices[windowType] ?? (focusedWindow === windowType ? 100 : 50);
   }, [windowZIndices, focusedWindow]);
@@ -969,21 +1066,42 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     { id: 'projects', title: 'Abrir Proyectos', icon: <FolderIcon className="w-5 h-5 text-indigo-500" />, shortcut: 'Alt+P', macShortcut: '⌥+P', onSelect: () => toggleWindow('projects'), keywords: ['proyectos', 'espacio', 'trabajo'] },
     { id: 'pomodoro', title: 'Abrir Pomodoro', icon: <Clock className="w-5 h-5 text-rose-500" />, shortcut: 'Alt+O', macShortcut: '⌥+O', onSelect: () => toggleWindow('pomodoro'), keywords: ['pomodoro', 'tiempo', 'reloj'] },
     { id: 'music', title: 'Abrir Reproductor', icon: <Music className="w-5 h-5 text-pink-500" />, shortcut: 'Alt+M', macShortcut: '⌥+M', onSelect: () => toggleWindow('music'), keywords: ['musica', 'reproductor', 'audio'] },
+    { id: 'student', title: 'Abrir Módulo de Estudio', icon: <GraduationCap className="w-5 h-5 text-cyan-500" />, shortcut: 'Alt+E', macShortcut: '⌥+E', onSelect: () => toggleWindow('student'), keywords: ['estudio', 'flashcards', 'tecnicas'] },
+    { id: 'progreso', title: 'Abrir Informe de Progreso', icon: <TrendingUp className="w-5 h-5 text-emerald-500" />, shortcut: 'Alt+R', macShortcut: '⌥+R', onSelect: () => toggleWindow('progreso'), keywords: ['progreso', 'estadisticas', 'informe'] },
+    { id: 'pomodoro_toggle', title: 'Iniciar / Pausar Pomodoro', icon: <Play className="w-5 h-5 text-rose-400" />, shortcut: 'Alt+Espacio', macShortcut: '⌥+Espacio', onSelect: handlePomodoroToggle, keywords: ['pomodoro', 'pausar', 'iniciar', 'play', 'pause'] },
+    { id: 'zen_mode', title: 'Alternar Modo Enfoque Zen', icon: <Zap className="w-5 h-5 text-amber-500" />, shortcut: 'Alt+Z', macShortcut: '⌥+Z', onSelect: () => setIsFocusMode(prev => !prev), keywords: ['zen', 'enfoque', 'focus', 'modo'] },
+    { id: 'minimize_active', title: 'Minimizar Ventana Activa', icon: <Minimize2 className="w-5 h-5 text-gray-500" />, shortcut: 'Alt+W', macShortcut: '⌥+W', onSelect: minimizeActiveWindow, keywords: ['minimizar', 'ocultar', 'ventana'] },
+    { id: 'close_active', title: 'Cerrar Ventana Activa', icon: <XSquare className="w-5 h-5 text-red-400" />, shortcut: 'Alt+Q', macShortcut: '⌥+Q', onSelect: closeActiveWindow, keywords: ['cerrar', 'salir', 'ventana'] },
+    { id: 'restore_last', title: 'Restaurar Última Ventana Minimizada', icon: <RotateCcw className="w-5 h-5 text-blue-400" />, shortcut: 'Alt+U', macShortcut: '⌥+U', onSelect: restoreLastMinimized, keywords: ['restaurar', 'abrir', 'ventana'] },
+    { id: 'cycle_next', title: 'Siguiente Ventana', icon: <ArrowRight className="w-5 h-5 text-gray-400" />, shortcut: 'Alt+]', macShortcut: '⌥+]', onSelect: cycleNextWindow, keywords: ['siguiente', 'cambiar', 'ventana'] },
+    { id: 'cycle_prev', title: 'Ventana Anterior', icon: <ArrowLeft className="w-5 h-5 text-gray-400" />, shortcut: 'Alt+[', macShortcut: '⌥+[', onSelect: cyclePrevWindow, keywords: ['anterior', 'cambiar', 'ventana'] },
+    { id: 'toggle_desktop', title: 'Mostrar Escritorio / Ocultar Todo', icon: <Monitor className="w-5 h-5 text-indigo-400" />, shortcut: 'Alt+0', macShortcut: '⌥+0', onSelect: toggleShowDesktop, keywords: ['escritorio', 'desktop', 'minimizar todo'] },
     { id: 'theme', title: `Cambiar a modo ${theme === 'light' ? 'Oscuro' : 'Claro'}`, icon: theme === 'light' ? <Moon className="w-5 h-5 text-gray-500" /> : <Sun className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+D', macShortcut: '⌥+D', onSelect: toggleTheme, keywords: ['tema', 'oscuro', 'claro', 'modo'] },
     { id: 'settings', title: 'Abrir Configuración', icon: <Settings className="w-5 h-5 text-gray-500" />, shortcut: 'Alt+S', macShortcut: '⌘+,', onSelect: () => setIsCustomizationPanelOpen(true), keywords: ['configuracion', 'ajustes', 'personalizar'] }
-  ], [toggleWindow, toggleTheme, theme]);
+  ], [
+    toggleWindow, 
+    toggleTheme, 
+    theme, 
+    handlePomodoroToggle, 
+    minimizeActiveWindow, 
+    closeActiveWindow, 
+    restoreLastMinimized, 
+    cycleNextWindow, 
+    cyclePrevWindow, 
+    toggleShowDesktop
+  ]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Toggle command palette: Ctrl+K or Cmd+K
-      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyK' || e.key.toLowerCase() === 'k')) {
+      // Toggle command palette: Ctrl+K or Cmd+K or Ctrl+P or Cmd+P
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyK' || e.key.toLowerCase() === 'k' || e.code === 'KeyP' || e.key.toLowerCase() === 'p')) {
         e.preventDefault();
         setIsCommandPaletteOpen(prev => !prev);
         return;
       }
 
       // Settings shortcut: Cmd+, on Mac or Alt+S / Alt+, on Windows
-      if ((e.metaKey && (e.code === 'Comma' || e.key === ',')) || (e.altKey && (e.code === 'KeyS' || e.code === 'Comma'))) {
+      if ((e.metaKey && (e.code === 'Comma' || e.key === ',')) || (e.altKey && (e.code === 'KeyS' || e.code === 'Comma' || e.key === ','))) {
         const target = e.target as HTMLElement;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'SELECT' && !target.isContentEditable) {
           e.preventDefault();
@@ -995,12 +1113,88 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       // Global shortcuts (only trigger if not focused on an input/textarea to avoid interfering with typing)
       const target = e.target as HTMLElement;
       if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'SELECT' && !target.isContentEditable) {
-        // Modifiers supported: Alt (Option on Mac) or (Cmd/Ctrl + Shift)
+        const code = e.code;
+        const key = e.key ? e.key.toLowerCase() : '';
+
+        // 1. Pomodoro Toggle: Alt+Space / Option+Space
+        if (e.altKey && (code === 'Space' || key === ' ' || e.keyCode === 32)) {
+          e.preventDefault();
+          handlePomodoroToggle();
+          return;
+        }
+
+        // 2. Cycle Next Window: Alt + ] / Alt + ArrowRight / Option + ]
+        if (e.altKey && (code === 'BracketRight' || key === ']' || code === 'ArrowRight' || key === 'arrowright')) {
+          e.preventDefault();
+          cycleNextWindow();
+          return;
+        }
+
+        // 3. Cycle Previous Window: Alt + [ / Alt + ArrowLeft / Option + [
+        if (e.altKey && (code === 'BracketLeft' || key === '[' || code === 'ArrowLeft' || key === 'arrowleft')) {
+          e.preventDefault();
+          cyclePrevWindow();
+          return;
+        }
+
+        // 4. Restore Last Minimized Window:
+        // Win: Alt+U or Alt+Shift+Z. Mac: Option+U or Cmd+Shift+Z
+        if (
+          (e.altKey && (code === 'KeyU' || key === 'u')) ||
+          ((e.metaKey || e.ctrlKey || e.altKey) && e.shiftKey && (code === 'KeyZ' || key === 'z'))
+        ) {
+          e.preventDefault();
+          restoreLastMinimized();
+          return;
+        }
+
+        // 5. Minimize Active Window:
+        // Win: Alt+W. Mac: Option+W or Cmd+M
+        if (
+          (e.altKey && (code === 'KeyW' || key === 'w' || key === '∑')) ||
+          (e.metaKey && !e.shiftKey && (code === 'KeyM' || key === 'm'))
+        ) {
+          e.preventDefault();
+          minimizeActiveWindow();
+          return;
+        }
+
+        // 6. Close Active Window:
+        // Win: Alt+Q. Mac: Option+Q or Cmd+Shift+W
+        if (
+          (e.altKey && (code === 'KeyQ' || key === 'q' || key === 'œ')) ||
+          ((e.metaKey || e.ctrlKey) && e.shiftKey && (code === 'KeyW' || key === 'w'))
+        ) {
+          e.preventDefault();
+          closeActiveWindow();
+          return;
+        }
+
+        // 7. Show Desktop / Hide All:
+        // Win: Alt+0 or Alt+Shift+D. Mac: Option+0 or Option+Shift+D
+        if (
+          (e.altKey && (code === 'Digit0' || key === '0' || key === 'º')) ||
+          (e.altKey && e.shiftKey && (code === 'KeyD' || key === 'd'))
+        ) {
+          e.preventDefault();
+          toggleShowDesktop();
+          return;
+        }
+
+        // 8. Zen Mode Toggle:
+        // Win: Alt+Z or Alt+Shift+F. Mac: Option+Z or Option+Shift+F
+        if (
+          (e.altKey && (code === 'KeyZ' || key === 'z' || key === 'Ω')) ||
+          (e.altKey && e.shiftKey && (code === 'KeyF' || key === 'f'))
+        ) {
+          e.preventDefault();
+          setIsFocusMode(prev => !prev);
+          return;
+        }
+
+        // 9. Module toggles (Alt or Cmd+Shift / Ctrl+Shift)
         const hasModifier = e.altKey || ((e.metaKey || e.ctrlKey) && e.shiftKey);
         if (hasModifier) {
-          const code = e.code;
-          const key = e.key ? e.key.toLowerCase() : '';
-          
           if (code === 'KeyA' || key === 'a' || key === 'å') {
             e.preventDefault();
             toggleWindow('todo');
@@ -1029,6 +1223,12 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           } else if (code === 'KeyM' || key === 'm' || key === 'µ') {
             e.preventDefault();
             toggleWindow('music');
+          } else if (code === 'KeyE' || key === 'e' || key === '´') {
+            e.preventDefault();
+            toggleWindow('student');
+          } else if (code === 'KeyR' || key === 'r' || key === '®') {
+            e.preventDefault();
+            toggleWindow('progreso');
           } else if (code === 'KeyD' || key === 'd' || key === '∂') {
             e.preventDefault();
             toggleTheme();
@@ -1042,7 +1242,17 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [toggleWindow, toggleTheme]);
+  }, [
+    toggleWindow, 
+    toggleTheme, 
+    handlePomodoroToggle, 
+    cycleNextWindow, 
+    cyclePrevWindow, 
+    restoreLastMinimized, 
+    minimizeActiveWindow, 
+    closeActiveWindow, 
+    toggleShowDesktop
+  ]);
 
   return (
     <div className="h-screen w-screen text-gray-800 dark:text-gray-100 font-sans overflow-hidden">
@@ -4625,6 +4835,27 @@ const App: React.FC = () => {
       return { success: false, message: err.message || 'Error desconocido al sincronizar.' };
     }
   }, [user]);
+
+  // Listen for Notion OAuth authentication completion
+  useEffect(() => {
+    const handleNotionAuthSuccess = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'NOTION_AUTH_SUCCESS') {
+        const { databaseName } = event.data;
+        setQuickCaptureMessage(`🎉 Notion conectado: ${databaseName || 'Base de datos'}. Sincronizando tareas...`);
+        setTimeout(() => {
+          handleSyncNotion().then(res => {
+            if (res && res.success) {
+              setQuickCaptureMessage(res.message);
+            }
+          }).catch(err => {
+            console.error('Error auto-syncing Notion after OAuth:', err);
+          });
+        }, 500);
+      }
+    };
+    window.addEventListener('message', handleNotionAuthSuccess);
+    return () => window.removeEventListener('message', handleNotionAuthSuccess);
+  }, [handleSyncNotion]);
   
   // --- Google Calendar Sync ---
   const handleGCalSettingsChange = useCallback(async (settings: GCalSettings) => {

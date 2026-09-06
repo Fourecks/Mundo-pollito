@@ -557,24 +557,40 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
   // Connect / Sync Notion Handlers
   const handleConnectNotionOAuth = () => {
+    const clientId = ((import.meta as any).env?.VITE_NOTION_CLIENT_ID || (typeof __VITE_NOTION_CLIENT_ID__ !== 'undefined' ? __VITE_NOTION_CLIENT_ID__ : '') || '').trim();
+    const clientSecret = ((import.meta as any).env?.VITE_NOTION_CLIENT_SECRET || (typeof __VITE_NOTION_CLIENT_SECRET__ !== 'undefined' ? __VITE_NOTION_CLIENT_SECRET__ : '') || '').trim();
+
+    if (clientId) {
+      localStorage.setItem('pollito_notion_client_id', clientId);
+    }
+    if (clientSecret) {
+      localStorage.setItem('pollito_notion_client_secret', clientSecret);
+    }
+
+    const queryParams = new URLSearchParams();
+    if (clientId) queryParams.set('client_id', clientId);
+    if (clientSecret) queryParams.set('client_secret', clientSecret);
+
+    const loginUrl = `/notion-login.html${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
     const width = 600;
     const height = 750;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
     
     const popup = window.open(
-      '/notion-login.html',
+      loginUrl,
       'NotionAuthPopup',
       `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
     );
     
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      window.location.href = '/notion-login.html';
+      window.location.href = loginUrl;
     }
   };
 
   useEffect(() => {
-    const handleNotionMessage = (event: MessageEvent) => {
+    const handleNotionMessage = async (event: MessageEvent) => {
       if (event.data && event.data.type === 'NOTION_AUTH_SUCCESS') {
         const { token, databaseId, databaseName } = event.data;
         const updated: NotionSettings = {
@@ -583,6 +599,9 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
           databaseId: databaseId || '',
           databaseName: databaseName || 'Base de datos de Notion',
           autoSync: true,
+          completedProperty: 'Completada',
+          priorityProperty: 'Prioridad',
+          dateProperty: 'Fecha',
         };
         NotionService.saveSettings(updated);
         setNotionSettings(updated);
@@ -590,14 +609,47 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
         setNotionDbIdInput(databaseId || '');
         setNotionDbNameInput(databaseName || '');
         setNotionEnabledInput(true);
-        setNotionSaveMsg(`¡Conectado exitosamente con Notion (${databaseName || 'Base de datos'})!`);
-        setTimeout(() => setNotionSaveMsg(null), 4000);
+        setNotionSaveMsg(`¡Conectado exitosamente con Notion (${databaseName || 'Base de datos'})! Sincronizando tareas...`);
+
+        // Trigger automatic sync with Notion tasks
+        if (onSyncNotion) {
+          setIsSyncingNotion(true);
+          try {
+            const res = await onSyncNotion();
+            setNotionSaveMsg(`¡Conectado! ${res.message}`);
+          } catch (err: any) {
+            console.error('Error during initial Notion sync:', err);
+          } finally {
+            setIsSyncingNotion(false);
+          }
+        }
+
+        setTimeout(() => setNotionSaveMsg(null), 5000);
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'pollito_notion_settings' && e.newValue) {
+        try {
+          const fresh = JSON.parse(e.newValue);
+          if (fresh.enabled && fresh.token && fresh.databaseId) {
+            setNotionSettings(fresh);
+            setNotionTokenInput(fresh.token || '');
+            setNotionDbIdInput(fresh.databaseId || '');
+            setNotionDbNameInput(fresh.databaseName || '');
+            setNotionEnabledInput(true);
+          }
+        } catch(err) {}
       }
     };
 
     window.addEventListener('message', handleNotionMessage);
-    return () => window.removeEventListener('message', handleNotionMessage);
-  }, []);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('message', handleNotionMessage);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [onSyncNotion]);
 
   const handleNotionSyncClick = async () => {
     if (!onSyncNotion) return;
