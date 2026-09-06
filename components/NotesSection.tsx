@@ -1033,7 +1033,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
             <div className="flex flex-col h-full min-h-0 relative">
               
               {/* Note Header / Meta Bar */}
-              <div className="px-5 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3 select-none flex-shrink-0 relative z-20">
+              <div className="px-5 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3 select-none flex-shrink-0 relative z-40">
                 
                 {/* Left side: Back on mobile, Pin, Favorite, Status */}
                 <div className="flex items-center gap-2 min-w-0">

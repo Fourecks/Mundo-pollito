@@ -25,6 +25,8 @@ interface ModalWindowProps {
   noHeader?: boolean;
   allowFullscreen?: boolean;
   overflowVisible?: boolean;
+  isMinimized?: boolean;
+  onMinimize?: () => void;
 }
 
 const ModalWindowComponent: React.FC<ModalWindowProps> = ({ 
@@ -44,7 +46,9 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
   onFocus, 
   noHeader = false,
   allowFullscreen = false,
-  overflowVisible = false
+  overflowVisible = false,
+  isMinimized = false,
+  onMinimize,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +91,6 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     if (isFullscreen) {
       document.body.setAttribute('data-fullscreen-window', 'true');
     } else {
-      // Small delay to prevent flashing if switching between windows
       setTimeout(() => {
         if (!document.querySelector('.is-fullscreen-window')) {
           document.body.removeAttribute('data-fullscreen-window');
@@ -329,73 +332,6 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
 
   if (!isOpen) return null;
 
-  // Fullscreen Mode
-  if (isFullscreen) {
-    return (
-    <ModalWindowContext.Provider value={{ startInteraction }}>
-      <div
-        ref={modalRef}
-        onClick={onFocus}
-        className="fixed inset-0 flex flex-col bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 overflow-hidden select-auto animate-fade-in pointer-events-auto is-fullscreen-window"
-        role="dialog"
-        aria-modal="true"
-        style={{ zIndex: 60000 }}
-      >
-        {!noHeader && (
-          <header 
-            className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-md shrink-0 select-none"
-            onDoubleClick={() => setIsFullscreen(false)}
-            title="Doble clic para restaurar ventana"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate">{title}</h2>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {allowFullscreen && (
-                <button
-                  type="button"
-                  onClick={() => setIsFullscreen(false)}
-                  className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer"
-                  title="Salir de pantalla completa (Restaurar)"
-                  aria-label="Salir de pantalla completa"
-                >
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className="h-4 w-4" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth={2}
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="4 14 10 14 10 20" />
-                    <polyline points="20 10 14 10 14 4" />
-                    <line x1="14" y1="10" x2="21" y2="3" />
-                    <line x1="3" y1="21" x2="10" y2="14" />
-                  </svg>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
-                title="Cerrar ventana"
-                aria-label="Cerrar ventana"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-          </header>
-        )}
-        <main className={`flex-1 min-h-0 w-full flex flex-col relative ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}>
-          {children}
-        </main>
-      </div>
-    </ModalWindowContext.Provider>
-    );
-  }
-
   // Resizer Handle
   const Resizer = () => (
     <div
@@ -417,7 +353,18 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
   const isCustomPlaced = activePos !== null && activeSize !== null;
 
   // Single persistent DOM root: NEVER unmounts or remounts children!
-  const computedStyle: React.CSSProperties = (isCustomPlaced || isInteracting) && activePos && activeSize ? {
+  const computedStyle: React.CSSProperties = isFullscreen ? {
+    position: 'fixed',
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '100%',
+    transform: 'none',
+    margin: 0,
+    zIndex: 60000,
+    opacity: isMinimized ? 0 : 1,
+    pointerEvents: isMinimized ? 'none' : 'auto',
+  } : (isCustomPlaced || isInteracting) && activePos && activeSize ? {
     position: 'fixed',
     left: `${activePos.x}px`,
     top: `${activePos.y}px`,
@@ -426,6 +373,8 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     transform: 'none',
     margin: 0,
     zIndex: zIndex ?? 50,
+    opacity: isMinimized ? 0 : 1,
+    pointerEvents: isMinimized ? 'none' : 'auto',
   } : {
     position: 'fixed',
     left: '50%',
@@ -433,6 +382,8 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     transform: 'translate(-50%, -50%)',
     margin: 0,
     zIndex: zIndex ?? 50,
+    opacity: isMinimized ? 0 : 1,
+    pointerEvents: isMinimized ? 'none' : 'auto',
   };
 
   return (
@@ -459,13 +410,15 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
         onMouseDown={() => onFocus?.()}
         style={computedStyle}
         className={`
-          ${!frameless ? `bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}` : 'relative flex flex-col'}
-          ${(!isCustomPlaced && !isInteracting) ? (className || 'w-[92vw] max-w-3xl h-[80vh]') : ''}
-          ${(!isCustomPlaced && !isInteracting) ? 'animate-deploy' : ''}
-          pointer-events-auto select-auto
+          ${isFullscreen ? `fixed inset-0 flex flex-col bg-white dark:bg-[#121214] text-gray-900 dark:text-gray-100 overflow-hidden select-auto is-fullscreen-window ${className?.includes('animate-') ? 'animate-fade-in' : ''}` 
+          : !frameless ? `bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}` : 'relative flex flex-col'}
+          ${(!isFullscreen && !isCustomPlaced && !isInteracting) ? (className || 'w-[92vw] max-w-3xl h-[80vh]') : ''}
+          ${(!isFullscreen && !isCustomPlaced && !isInteracting) ? 'animate-deploy' : ''}
+          ${isMinimized ? 'scale-90 pointer-events-none' : 'scale-100 pointer-events-auto select-auto'}
+          transition-[opacity,transform] duration-300
         `}
       >
-        {frameless ? (
+        {frameless && !isFullscreen ? (
           <>
 
             {children}
@@ -502,18 +455,43 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
                   <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">{title}</h2>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  {onMinimize && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMinimize();
+                      }}
+                      className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                      title="Minimizar ventana"
+                      aria-label="Minimizar ventana"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    </button>
+                  )}
                   {allowFullscreen && (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setIsFullscreen(true);
+                        setIsFullscreen(!isFullscreen);
                       }}
                       className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                      title="Pantalla completa"
-                      aria-label="Pantalla completa"
+                      title={isFullscreen ? "Restaurar tamaño" : "Pantalla completa"}
+                      aria-label={isFullscreen ? "Restaurar tamaño" : "Pantalla completa"}
                     >
-                      <ExpandIcon className="h-4 w-4" />
+                      {isFullscreen ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="4 14 10 14 10 20" />
+                          <polyline points="20 10 14 10 14 4" />
+                          <line x1="14" y1="10" x2="21" y2="3" />
+                          <line x1="3" y1="21" x2="10" y2="14" />
+                        </svg>
+                      ) : (
+                        <ExpandIcon className="h-4 w-4" />
+                      )}
                     </button>
                   )}
                   <button
@@ -536,7 +514,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
             </main>
           </>
         )}
-        {isResizable && <Resizer />}
+        {isResizable && !isFullscreen && <Resizer />}
       </div>
     </>
     </ModalWindowContext.Provider>
