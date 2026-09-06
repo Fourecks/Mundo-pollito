@@ -69,7 +69,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   // Editor State
   const [activeNoteTitle, setActiveNoteTitle] = useState('');
   const [activeNoteContent, setActiveNoteContent] = useState('');
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [noteSaveStatus, setNoteSaveStatus] = useState<Record<number, 'saved' | 'saving' | 'error'>>({});
+  const pendingSaveRef = useRef<{ noteId: number; title: string; content: string } | null>(null);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isReadingMode, setIsReadingMode] = useState(false);
   const [showDetailsPanel, setShowDetailsPanel] = useState(false);
@@ -178,8 +179,81 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     });
   }, [notes, currentView, selectedFolderId, selectedTag, searchTerm, sortOrder]);
 
+  // Auto-Save Mechanism
+  const executeSave = useCallback(
+    async (targetNoteId: number, titleToSave: string, contentToSave: string) => {
+      if (!targetNoteId) return;
+
+      const current = notes.find(n => n.id === targetNoteId);
+      if (!current) return;
+
+      // Check if unchanged
+      if (
+        activeNoteIdRef.current === targetNoteId &&
+        titleToSave === lastSavedContentRef.current.title &&
+        contentToSave === lastSavedContentRef.current.content
+      ) {
+        setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'saved' }));
+        if (pendingSaveRef.current?.noteId === targetNoteId) {
+          pendingSaveRef.current = null;
+        }
+        return;
+      }
+
+      setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'saving' }));
+      try {
+        const sanitizedContent = sanitizeAndCleanHtml(contentToSave);
+        const updated: Note = {
+          ...current,
+          title: titleToSave,
+          content: sanitizedContent,
+          updated_at: new Date().toISOString(),
+        };
+
+        await onUpdateNote(updated);
+        if (activeNoteIdRef.current === targetNoteId) {
+          lastSavedContentRef.current = { title: titleToSave, content: sanitizedContent };
+        }
+        setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'saved' }));
+        if (pendingSaveRef.current?.noteId === targetNoteId) {
+          pendingSaveRef.current = null;
+        }
+      } catch (err) {
+        console.error('Error saving note:', err);
+        setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'error' }));
+      }
+    },
+    [notes, onUpdateNote]
+  );
+
+  const scheduleAutoSave = (newTitle: string, newContent: string) => {
+    const activeId = activeNoteIdRef.current;
+    if (!activeId) return;
+
+    setNoteSaveStatus(prev => ({ ...prev, [activeId]: 'saving' }));
+    pendingSaveRef.current = { noteId: activeId, title: newTitle, content: newContent };
+
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      executeSave(activeId, newTitle, newContent);
+    }, 350);
+  };
+
   // Load note into editor when selection changes
   useEffect(() => {
+    // 1. Flush any pending save from the previous note before loading new note
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
+    }
+    if (pendingSaveRef.current) {
+      const { noteId: pId, title: pTitle, content: pContent } = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      executeSave(pId, pTitle, pContent);
+    }
+
     if (selectedNote) {
       const plainTitle = selectedNote.title || '';
       setActiveNoteTitle(plainTitle);
@@ -199,8 +273,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       historyIndexRef.current = 0;
       setCanUndo(false);
       setCanRedo(false);
-
-      loadNoteVersions(selectedNote.id);
     } else {
       setActiveNoteTitle('');
       setActiveNoteContent('');
@@ -216,84 +288,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       setCanRedo(false);
     }
   }, [selectedNoteId]);
-
-  // Load note versions from IndexedDB
-  const loadNoteVersions = async (noteId: number) => {
-    try {
-      await ensureDB();
-      const allVer = await getAll<NoteVersion>('note_versions');
-      const filtered = allVer
-        .filter(v => v.note_id === noteId)
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setNoteVersions(filtered);
-    } catch (e) {
-      console.warn('Could not load note versions:', e);
-    }
-  };
-
-  // Create version snapshot
-  const createVersionSnapshot = async (note: Note) => {
-    try {
-      await ensureDB();
-      await syncableCreate('note_versions', {
-        note_id: note.id,
-        title: note.title || '',
-        content: note.content || '',
-        created_at: new Date().toISOString(),
-      });
-      loadNoteVersions(note.id);
-    } catch (e) {
-      console.warn('Error saving note snapshot:', e);
-    }
-  };
-
-  // Auto-Save Mechanism
-  const executeSave = useCallback(
-    async (titleToSave: string, contentToSave: string) => {
-      const activeId = activeNoteIdRef.current;
-      if (!activeId) return;
-
-      const current = notes.find(n => n.id === activeId);
-      if (!current) return;
-
-      // Check if unchanged
-      if (
-        titleToSave === lastSavedContentRef.current.title &&
-        contentToSave === lastSavedContentRef.current.content
-      ) {
-        return;
-      }
-
-      setSaveStatus('saving');
-      try {
-        const sanitizedContent = sanitizeAndCleanHtml(contentToSave);
-        const updated: Note = {
-          ...current,
-          title: titleToSave,
-          content: sanitizedContent,
-          updated_at: new Date().toISOString(),
-        };
-
-        await onUpdateNote(updated);
-        lastSavedContentRef.current = { title: titleToSave, content: sanitizedContent };
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Error saving note:', err);
-        setSaveStatus('error');
-      }
-    },
-    [notes, onUpdateNote]
-  );
-
-  const scheduleAutoSave = (newTitle: string, newContent: string) => {
-    setSaveStatus('saving');
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      executeSave(newTitle, newContent);
-    }, 800);
-  };
 
   // Push state snapshot to custom Undo/Redo stack
   const pushHistorySnapshot = useCallback((customTitle?: string, customContent?: string) => {
@@ -593,11 +587,25 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     pushHistorySnapshot();
   };
 
-  // Editor Keyboard shortcuts for Undo/Redo
+  // Editor Keyboard shortcuts for Undo/Redo & Fast Formatting / Save
   const handleEditorKeyDown = (e: React.KeyboardEvent) => {
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
     if (isCtrlOrCmd) {
       const key = e.key.toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (selectedNoteId) {
+          if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+            autoSaveTimeoutRef.current = null;
+          }
+          const t = titleRef.current ? titleRef.current.innerHTML : activeNoteTitle;
+          const c = editorRef.current ? editorRef.current.innerHTML : activeNoteContent;
+          executeSave(selectedNoteId, t, c);
+        }
+        return;
+      }
       if (key === 'z' && !e.shiftKey) {
         e.preventDefault();
         e.stopPropagation();
@@ -608,6 +616,21 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         e.preventDefault();
         e.stopPropagation();
         handleRedo();
+        return;
+      }
+      if (key === 'b') {
+        e.preventDefault();
+        handleApplyCommand('bold');
+        return;
+      }
+      if (key === 'i') {
+        e.preventDefault();
+        handleApplyCommand('italic');
+        return;
+      }
+      if (key === 'u') {
+        e.preventDefault();
+        handleApplyCommand('underline');
         return;
       }
     }
@@ -1071,20 +1094,25 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   </button>
 
                   {/* Save Indicator */}
-                  <div 
-                    className="flex-shrink-0 flex items-center justify-center w-6 h-6 ml-1 relative z-50 cursor-default select-none transition-all duration-300"
-                    title={saveStatus === 'saving' ? 'Guardando cambios...' : saveStatus === 'saved' ? 'Guardado correctamente' : 'Error al guardar'}
-                  >
-                    {saveStatus === 'saving' && (
-                      <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
-                    )}
-                    {saveStatus === 'saved' && (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_4px_rgba(16,185,129,0.5)] transition-transform scale-100" />
-                    )}
-                    {saveStatus === 'error' && (
-                      <AlertCircle className="w-4 h-4 text-rose-500 drop-shadow-[0_0_4px_rgba(244,63,94,0.5)]" />
-                    )}
-                  </div>
+                  {(() => {
+                    const currentNoteSaveStatus = selectedNoteId ? (noteSaveStatus[selectedNoteId] || 'saved') : 'saved';
+                    return (
+                      <div 
+                        className="flex-shrink-0 flex items-center justify-center w-6 h-6 ml-1 relative z-50 cursor-default select-none transition-all duration-300"
+                        title={currentNoteSaveStatus === 'saving' ? 'Guardando cambios...' : currentNoteSaveStatus === 'saved' ? 'Guardado correctamente' : 'Error al guardar'}
+                      >
+                        {currentNoteSaveStatus === 'saving' && (
+                          <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
+                        )}
+                        {currentNoteSaveStatus === 'saved' && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_4px_rgba(16,185,129,0.5)] transition-transform scale-100" />
+                        )}
+                        {currentNoteSaveStatus === 'error' && (
+                          <AlertCircle className="w-4 h-4 text-rose-500 drop-shadow-[0_0_4px_rgba(244,63,94,0.5)]" />
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Right side: Restore / Archive / Trash / Reading / Export / Print / Focus / Details / Close */}

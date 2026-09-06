@@ -960,42 +960,81 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   const commandActions = useMemo<CommandAction[]>(() => [
-    { id: 'add_task', title: 'Nueva Tarea', icon: <CheckSquare className="w-5 h-5 text-emerald-500" />, shortcut: 'Alt+A', onSelect: () => { toggleWindow('todo'); setTimeout(() => window.dispatchEvent(new CustomEvent('focus-todo-input')), 100); }, keywords: ['nueva', 'añadir', 'tarea', 'crear'] },
-    { id: 'todo', title: 'Abrir Lista de Tareas', icon: <CheckSquare className="w-5 h-5 text-emerald-500" />, shortcut: 'Alt+T', onSelect: () => toggleWindow('todo'), keywords: ['tareas', 'todo', 'lista'] },
-    { id: 'calendar', title: 'Abrir Calendario', icon: <Calendar className="w-5 h-5 text-blue-500" />, shortcut: 'Alt+C', onSelect: () => toggleWindow('calendar'), keywords: ['calendario', 'eventos', 'agenda'] },
-    { id: 'notes', title: 'Abrir Notas', icon: <BookOpen className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+N', onSelect: () => toggleWindow('notes'), keywords: ['notas', 'escribir', 'text'] },
-    { id: 'habits', title: 'Abrir Hábitos', icon: <Target className="w-5 h-5 text-purple-500" />, shortcut: 'Alt+H', onSelect: () => toggleWindow('habits'), keywords: ['habitos', 'rutina', 'tracker'] },
-    { id: 'finance', title: 'Abrir Finanzas', icon: <Target className="w-5 h-5 text-green-500" />, shortcut: 'Alt+F', onSelect: () => toggleWindow('finance'), keywords: ['finanzas', 'dinero', 'presupuesto'] },
-    { id: 'projects', title: 'Abrir Proyectos', icon: <FolderIcon className="w-5 h-5 text-indigo-500" />, shortcut: 'Alt+P', onSelect: () => toggleWindow('projects'), keywords: ['proyectos', 'espacio', 'trabajo'] },
-    { id: 'pomodoro', title: 'Abrir Pomodoro', icon: <Clock className="w-5 h-5 text-rose-500" />, shortcut: 'Alt+O', onSelect: () => toggleWindow('pomodoro'), keywords: ['pomodoro', 'tiempo', 'reloj'] },
-    { id: 'music', title: 'Abrir Reproductor', icon: <Music className="w-5 h-5 text-pink-500" />, shortcut: 'Alt+M', onSelect: () => toggleWindow('music'), keywords: ['musica', 'reproductor', 'audio'] },
-    { id: 'theme', title: `Cambiar a modo ${theme === 'light' ? 'Oscuro' : 'Claro'}`, icon: theme === 'light' ? <Moon className="w-5 h-5 text-gray-500" /> : <Sun className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+D', onSelect: toggleTheme, keywords: ['tema', 'oscuro', 'claro', 'modo'] },
-    { id: 'settings', title: 'Abrir Configuración', icon: <Settings className="w-5 h-5 text-gray-500" />, onSelect: () => setIsCustomizationPanelOpen(true), keywords: ['configuracion', 'ajustes', 'personalizar'] }
+    { id: 'add_task', title: 'Nueva Tarea', icon: <CheckSquare className="w-5 h-5 text-emerald-500" />, shortcut: 'Alt+A', macShortcut: '⌥+A', onSelect: () => { toggleWindow('todo'); setTimeout(() => window.dispatchEvent(new CustomEvent('focus-todo-input')), 100); }, keywords: ['nueva', 'añadir', 'tarea', 'crear'] },
+    { id: 'todo', title: 'Abrir Lista de Tareas', icon: <CheckSquare className="w-5 h-5 text-emerald-500" />, shortcut: 'Alt+T', macShortcut: '⌥+T', onSelect: () => toggleWindow('todo'), keywords: ['tareas', 'todo', 'lista'] },
+    { id: 'calendar', title: 'Abrir Calendario', icon: <Calendar className="w-5 h-5 text-blue-500" />, shortcut: 'Alt+C', macShortcut: '⌥+C', onSelect: () => toggleWindow('calendar'), keywords: ['calendario', 'eventos', 'agenda'] },
+    { id: 'notes', title: 'Abrir Notas', icon: <BookOpen className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+N', macShortcut: '⌥+N', onSelect: () => toggleWindow('notes'), keywords: ['notas', 'escribir', 'text'] },
+    { id: 'habits', title: 'Abrir Hábitos', icon: <Target className="w-5 h-5 text-purple-500" />, shortcut: 'Alt+H', macShortcut: '⌥+H', onSelect: () => toggleWindow('habits'), keywords: ['habitos', 'rutina', 'tracker'] },
+    { id: 'finance', title: 'Abrir Finanzas', icon: <Target className="w-5 h-5 text-green-500" />, shortcut: 'Alt+F', macShortcut: '⌥+F', onSelect: () => toggleWindow('finance'), keywords: ['finanzas', 'dinero', 'presupuesto'] },
+    { id: 'projects', title: 'Abrir Proyectos', icon: <FolderIcon className="w-5 h-5 text-indigo-500" />, shortcut: 'Alt+P', macShortcut: '⌥+P', onSelect: () => toggleWindow('projects'), keywords: ['proyectos', 'espacio', 'trabajo'] },
+    { id: 'pomodoro', title: 'Abrir Pomodoro', icon: <Clock className="w-5 h-5 text-rose-500" />, shortcut: 'Alt+O', macShortcut: '⌥+O', onSelect: () => toggleWindow('pomodoro'), keywords: ['pomodoro', 'tiempo', 'reloj'] },
+    { id: 'music', title: 'Abrir Reproductor', icon: <Music className="w-5 h-5 text-pink-500" />, shortcut: 'Alt+M', macShortcut: '⌥+M', onSelect: () => toggleWindow('music'), keywords: ['musica', 'reproductor', 'audio'] },
+    { id: 'theme', title: `Cambiar a modo ${theme === 'light' ? 'Oscuro' : 'Claro'}`, icon: theme === 'light' ? <Moon className="w-5 h-5 text-gray-500" /> : <Sun className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+D', macShortcut: '⌥+D', onSelect: toggleTheme, keywords: ['tema', 'oscuro', 'claro', 'modo'] },
+    { id: 'settings', title: 'Abrir Configuración', icon: <Settings className="w-5 h-5 text-gray-500" />, shortcut: 'Alt+S', macShortcut: '⌘+,', onSelect: () => setIsCustomizationPanelOpen(true), keywords: ['configuracion', 'ajustes', 'personalizar'] }
   ], [toggleWindow, toggleTheme, theme]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Toggle command palette
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      // Toggle command palette: Ctrl+K or Cmd+K
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyK' || e.key.toLowerCase() === 'k')) {
         e.preventDefault();
         setIsCommandPaletteOpen(prev => !prev);
+        return;
+      }
+
+      // Settings shortcut: Cmd+, on Mac or Alt+S / Alt+, on Windows
+      if ((e.metaKey && (e.code === 'Comma' || e.key === ',')) || (e.altKey && (e.code === 'KeyS' || e.code === 'Comma'))) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'SELECT' && !target.isContentEditable) {
+          e.preventDefault();
+          setIsCustomizationPanelOpen(true);
+          return;
+        }
       }
       
       // Global shortcuts (only trigger if not focused on an input/textarea to avoid interfering with typing)
       const target = e.target as HTMLElement;
       if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'SELECT' && !target.isContentEditable) {
-        if (e.altKey) {
-          switch (e.key.toLowerCase()) {
-            case 'a': e.preventDefault(); toggleWindow('todo'); setTimeout(() => window.dispatchEvent(new CustomEvent('focus-todo-input')), 100); break;
-            case 't': e.preventDefault(); toggleWindow('todo'); break;
-            case 'c': e.preventDefault(); toggleWindow('calendar'); break;
-            case 'n': e.preventDefault(); toggleWindow('notes'); break;
-            case 'h': e.preventDefault(); toggleWindow('habits'); break;
-            case 'f': e.preventDefault(); toggleWindow('finance'); break;
-            case 'p': e.preventDefault(); toggleWindow('projects'); break;
-            case 'o': e.preventDefault(); toggleWindow('pomodoro'); break;
-            case 'm': e.preventDefault(); toggleWindow('music'); break;
-            case 'd': e.preventDefault(); toggleTheme(); break;
+        // Modifiers supported: Alt (Option on Mac) or (Cmd/Ctrl + Shift)
+        const hasModifier = e.altKey || ((e.metaKey || e.ctrlKey) && e.shiftKey);
+        if (hasModifier) {
+          const code = e.code;
+          const key = e.key ? e.key.toLowerCase() : '';
+          
+          if (code === 'KeyA' || key === 'a' || key === 'å') {
+            e.preventDefault();
+            toggleWindow('todo');
+            setTimeout(() => window.dispatchEvent(new CustomEvent('focus-todo-input')), 100);
+          } else if (code === 'KeyT' || key === 't') {
+            e.preventDefault();
+            toggleWindow('todo');
+          } else if (code === 'KeyC' || key === 'c' || key === 'ç') {
+            e.preventDefault();
+            toggleWindow('calendar');
+          } else if (code === 'KeyN' || key === 'n' || key === '~' || key === 'ñ') {
+            e.preventDefault();
+            toggleWindow('notes');
+          } else if (code === 'KeyH' || key === 'h' || key === '˙') {
+            e.preventDefault();
+            toggleWindow('habits');
+          } else if (code === 'KeyF' || key === 'f' || key === 'ƒ') {
+            e.preventDefault();
+            toggleWindow('finance');
+          } else if (code === 'KeyP' || key === 'p' || key === 'π') {
+            e.preventDefault();
+            toggleWindow('projects');
+          } else if (code === 'KeyO' || key === 'o' || key === 'ø') {
+            e.preventDefault();
+            toggleWindow('pomodoro');
+          } else if (code === 'KeyM' || key === 'm' || key === 'µ') {
+            e.preventDefault();
+            toggleWindow('music');
+          } else if (code === 'KeyD' || key === 'd' || key === '∂') {
+            e.preventDefault();
+            toggleTheme();
+          } else if (code === 'KeyS' || key === 's' || key === 'ß') {
+            e.preventDefault();
+            setIsCustomizationPanelOpen(true);
           }
         }
       }

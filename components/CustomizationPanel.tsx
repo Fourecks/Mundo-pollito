@@ -8,7 +8,8 @@ import {
   Video as VideoIconLucide, Volume2, CloudOff, Snowflake, 
   CloudRain, Stars, Circle, Zap, TreePine, Coffee, Waves, 
   VolumeX, LogOut, Palette, Sparkles, Smile, Battery, 
-  ChevronRight, Bell, Clock, Send, Users, AtSign, CheckCircle2, AlertCircle, Radio
+  ChevronRight, Bell, Clock, Send, Users, AtSign, CheckCircle2, AlertCircle, Radio,
+  Keyboard, Laptop, Monitor, Command, Search, Check
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import { UnsplashGallery } from './UnsplashGallery';
@@ -69,15 +70,20 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
     onToggleSubscription
   } = props;
   
-  const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'notifications' | 'backgrounds' | 'ambience' | 'emoji'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'shortcuts' | 'notifications' | 'backgrounds' | 'ambience' | 'emoji'>('account');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bgSubTab, setBgSubTab] = useState<'unsplash' | 'custom'>('unsplash');
   const [view, setView] = useState<'all' | 'favorites'>('all');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  
+  const detectedIsMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/i.test(navigator.userAgent || navigator.platform || '');
+  const [selectedOS, setSelectedOS] = useState<'windows' | 'mac'>(detectedIsMac ? 'mac' : 'windows');
+  const [shortcutSearch, setShortcutSearch] = useState('');
 
   const tabs = [
     { id: 'account', label: 'Cuenta', icon: User },
     { id: 'colors', label: 'Apariencia', icon: Palette },
+    { id: 'shortcuts', label: 'Atajos', icon: Keyboard },
     { id: 'notifications', label: 'Notificaciones', icon: Bell },
     { id: 'backgrounds', label: 'Fondos', icon: ImageIconLucide },
     { id: 'ambience', label: 'Efectos', icon: Sparkles },
@@ -179,6 +185,257 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
             </div>
           </div>
         );
+
+      case 'shortcuts': {
+        const shortcutCategories = [
+          {
+            id: 'navigation',
+            name: 'Navegación de Ventanas y Módulos',
+            items: [
+              { title: 'Nueva Tarea', desc: 'Abre la lista de tareas y enfoca directamente el campo de entrada', win: ['Alt', 'A'], mac: ['⌥ Option', 'A'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'A'] },
+              { title: 'Lista de Tareas', desc: 'Abre o enfoca la ventana de tareas y subtareas', win: ['Alt', 'T'], mac: ['⌥ Option', 'T'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'T'] },
+              { title: 'Calendario y Agenda', desc: 'Accede a la vista mensual, semanal y eventos del día', win: ['Alt', 'C'], mac: ['⌥ Option', 'C'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'C'] },
+              { title: 'Bloc de Notas', desc: 'Abre el editor de notas y documentos enriquecidos', win: ['Alt', 'N'], mac: ['⌥ Option', 'N'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'N'] },
+              { title: 'Hábitos y Rutinas', desc: 'Seguimiento visual de hábitos diarios y rachas activas', win: ['Alt', 'H'], mac: ['⌥ Option', 'H'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'H'] },
+              { title: 'Finanzas y Gastos', desc: 'Control de ingresos, transacciones y presupuestos', win: ['Alt', 'F'], mac: ['⌥ Option', 'F'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'F'] },
+              { title: 'Espacio de Proyectos', desc: 'Gestión de proyectos, carpetas y materias académicas', win: ['Alt', 'P'], mac: ['⌥ Option', 'P'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'P'] },
+              { title: 'Temporizador Pomodoro', desc: 'Sesiones de concentración y control de descansos', win: ['Alt', 'O'], mac: ['⌥ Option', 'O'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'O'] },
+              { title: 'Reproductor de Música', desc: 'Música ambiental lo-fi y generador de sonidos', win: ['Alt', 'M'], mac: ['⌥ Option', 'M'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'M'] },
+            ]
+          },
+          {
+            id: 'system',
+            name: 'Sistema y Productividad',
+            items: [
+              { title: 'Paleta de Comandos', desc: 'Búsqueda rápida y ejecución de cualquier acción en la app', win: ['Ctrl', 'K'], mac: ['⌘ Cmd', 'K'], winAlt: null, macAlt: null },
+              { title: 'Alternar Tema Claro / Oscuro', desc: 'Cambia al instante entre tema claro y tema oscuro', win: ['Alt', 'D'], mac: ['⌥ Option', 'D'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'D'] },
+              { title: 'Ajustes y Configuración', desc: 'Abre este panel de personalización y preferencias', win: ['Alt', 'S'], mac: ['⌘ Cmd', ','], winAlt: ['Alt', ','], macAlt: ['⌥ Option', 'S'] },
+            ]
+          },
+          {
+            id: 'editor',
+            name: 'Editor de Notas y Formato de Texto',
+            items: [
+              { title: 'Guardar Nota Inmediatamente', desc: 'Fuerza el guardado instantáneo en base de datos local y sincronizada', win: ['Ctrl', 'S'], mac: ['⌘ Cmd', 'S'], winAlt: null, macAlt: null },
+              { title: 'Deshacer Cambio', desc: 'Revierte la última edición realizada en la nota actual', win: ['Ctrl', 'Z'], mac: ['⌘ Cmd', 'Z'], winAlt: null, macAlt: null },
+              { title: 'Rehacer Cambio', desc: 'Reaplica la acción que acabas de deshacer', win: ['Ctrl', 'Y'], mac: ['⌘ Cmd', '⇧ Shift', 'Z'], winAlt: ['Ctrl', '⇧ Shift', 'Z'], macAlt: ['⌘ Cmd', 'Y'] },
+              { title: 'Formato Negrita', desc: 'Aplica o retira el estilo de negrita del texto seleccionado', win: ['Ctrl', 'B'], mac: ['⌘ Cmd', 'B'], winAlt: null, macAlt: null },
+              { title: 'Formato Cursiva', desc: 'Aplica o retira la cursiva del texto seleccionado', win: ['Ctrl', 'I'], mac: ['⌘ Cmd', 'I'], winAlt: null, macAlt: null },
+              { title: 'Formato Subrayado', desc: 'Aplica o retira el subrayado del texto seleccionado', win: ['Ctrl', 'U'], mac: ['⌘ Cmd', 'U'], winAlt: null, macAlt: null },
+            ]
+          }
+        ];
+
+        const query = shortcutSearch.toLowerCase().trim();
+        const filteredCategories = shortcutCategories.map(cat => {
+          const items = cat.items.filter(item => {
+            if (!query) return true;
+            return (
+              item.title.toLowerCase().includes(query) ||
+              item.desc.toLowerCase().includes(query) ||
+              item.win.join(' ').toLowerCase().includes(query) ||
+              item.mac.join(' ').toLowerCase().includes(query)
+            );
+          });
+          return { ...cat, items };
+        }).filter(cat => cat.items.length > 0);
+
+        return (
+          <div className="flex flex-col h-full animate-in fade-in duration-200 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Keyboard className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                  Atajos de Teclado
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Selecciona tu sistema operativo para visualizar las combinaciones correspondientes.
+                </p>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative w-full sm:w-60">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar atajo..."
+                  value={shortcutSearch}
+                  onChange={e => setShortcutSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-gray-100 dark:bg-gray-800/80 border border-transparent focus:border-gray-300 dark:focus:border-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none transition-all"
+                />
+                {shortcutSearch && (
+                  <button 
+                    onClick={() => setShortcutSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Horizontal Platform Selector Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* Windows / Linux Card */}
+              <div
+                onClick={() => setSelectedOS('windows')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedOS('windows'); }}
+                className={`relative p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  selectedOS === 'windows'
+                    ? 'border-zinc-900 dark:border-white bg-zinc-900/[0.03] dark:bg-white/[0.04] shadow-xs'
+                    : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#151618] hover:border-gray-300 dark:hover:border-zinc-700 opacity-70 hover:opacity-100'
+                }`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
+                    selectedOS === 'windows'
+                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
+                      : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'
+                  }`}>
+                    <Monitor className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Windows & Linux</h4>
+                      {selectedOS === 'windows' && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 flex items-center gap-0.5">
+                          <Check className="w-3 h-3" /> Activo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Combinaciones con teclas <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">Alt</span> y <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">Ctrl</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="hidden sm:flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded text-gray-700 dark:text-zinc-300">Alt</kbd>
+                    <span className="text-[10px] text-gray-400">+</span>
+                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded text-gray-700 dark:text-zinc-300">A</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* macOS (Apple) Card */}
+              <div
+                onClick={() => setSelectedOS('mac')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedOS('mac'); }}
+                className={`relative p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  selectedOS === 'mac'
+                    ? 'border-zinc-900 dark:border-white bg-zinc-900/[0.03] dark:bg-white/[0.04] shadow-xs'
+                    : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#151618] hover:border-gray-300 dark:hover:border-zinc-700 opacity-70 hover:opacity-100'
+                }`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
+                    selectedOS === 'mac'
+                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
+                      : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'
+                  }`}>
+                    <Command className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">macOS (Apple)</h4>
+                      {selectedOS === 'mac' && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 flex items-center gap-0.5">
+                          <Check className="w-3 h-3" /> Activo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Combinaciones con teclas <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">⌥ Option</span> y <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">⌘ Cmd</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="hidden sm:flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded text-gray-700 dark:text-zinc-300">⌥</kbd>
+                    <span className="text-[10px] text-gray-400">+</span>
+                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded text-gray-700 dark:text-zinc-300">A</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Shortcuts Listing */}
+            <div className="space-y-6 pb-4">
+              {filteredCategories.length === 0 ? (
+                <div className="py-12 text-center text-gray-400 text-sm">
+                  No se encontraron atajos para "{shortcutSearch}"
+                </div>
+              ) : (
+                filteredCategories.map(cat => (
+                  <div key={cat.id} className="space-y-2.5">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-zinc-500 px-1">
+                      {cat.name}
+                    </h4>
+
+                    <div className="rounded-2xl border border-gray-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-[#151618] divide-y divide-gray-100 dark:divide-zinc-800/80 shadow-xs">
+                      {cat.items.map((item, idx) => {
+                        const keys = selectedOS === 'mac' ? item.mac : item.win;
+                        const altKeys = selectedOS === 'mac' ? item.macAlt : item.winAlt;
+
+                        return (
+                          <div 
+                            key={idx} 
+                            className="p-3.5 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/70 dark:hover:bg-zinc-800/40 transition-colors"
+                          >
+                            <div className="space-y-0.5 pr-2">
+                              <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">
+                                {item.title}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-1">
+                                {item.desc}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap shrink-0 self-start sm:self-center">
+                              {/* Primary Keys */}
+                              <div className="flex items-center gap-1">
+                                {keys.map((k, ki) => (
+                                  <React.Fragment key={ki}>
+                                    {ki > 0 && <span className="text-xs text-gray-400 dark:text-zinc-600 font-bold px-0.5">+</span>}
+                                    <kbd className="inline-flex items-center justify-center min-w-[26px] h-7 px-2 text-xs font-semibold font-mono rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 border border-gray-200 dark:border-zinc-700 shadow-xs">
+                                      {k}
+                                    </kbd>
+                                  </React.Fragment>
+                                ))}
+                              </div>
+
+                              {/* Alternative keys if available */}
+                              {altKeys && (
+                                <div className="flex items-center gap-1 pl-1 text-[11px] text-gray-400 dark:text-zinc-500">
+                                  <span>ó</span>
+                                  {altKeys.map((k, ki) => (
+                                    <React.Fragment key={ki}>
+                                      {ki > 0 && <span className="text-[10px] text-gray-400 dark:text-zinc-600 font-bold">+</span>}
+                                      <kbd className="inline-flex items-center justify-center min-w-[22px] h-6 px-1.5 text-[11px] font-semibold font-mono rounded-md bg-gray-50 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border border-gray-200 dark:border-zinc-700">
+                                        {k}
+                                      </kbd>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      }
 
       case 'notifications':
         const hours = Array.from({ length: 24 }, (_, i) => i);

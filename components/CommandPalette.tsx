@@ -7,6 +7,7 @@ export interface CommandAction {
   title: string;
   icon: React.ReactNode;
   shortcut?: string;
+  macShortcut?: string;
   onSelect: () => void;
   keywords?: string[];
 }
@@ -21,6 +22,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, action
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/i.test(navigator.userAgent || navigator.platform || '');
 
   // Filter actions based on query
   const filteredActions = actions.filter(action => {
@@ -112,15 +115,19 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, action
                       </div>
                       <span className="text-sm font-medium">{action.title}</span>
                     </div>
-                    {action.shortcut && (
-                      <div className="flex items-center gap-1">
-                        {action.shortcut.split('+').map(key => (
-                          <span key={key} className="px-2 py-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-md text-[10px] font-semibold uppercase shadow-sm text-gray-600 dark:text-zinc-400">
-                            {key}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    {(() => {
+                      const displayShortcut = isMac ? (action.macShortcut || action.shortcut) : (action.shortcut || action.macShortcut);
+                      if (!displayShortcut) return null;
+                      return (
+                        <div className="flex items-center gap-1">
+                          {displayShortcut.split('+').map(key => (
+                            <span key={key} className="px-2 py-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-md text-[10px] font-semibold uppercase shadow-sm text-gray-600 dark:text-zinc-400">
+                              {key}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </button>
                 );
               })}
