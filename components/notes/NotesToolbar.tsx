@@ -316,7 +316,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
       tip: { title: 'Nota', class: 'note-callout-tip' },
     };
     const c = configs[type];
-    const calloutHtml = `<div class="note-callout ${c.class} p-3.5 my-3 rounded-xl flex items-start gap-2.5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60"><div class="flex-1 text-xs leading-relaxed"><strong>${c.title}:</strong> Escribe aquí el detalle...</div></div><p><br></p>`;
+    const calloutHtml = `<div class="note-callout relative group ${c.class} p-3.5 my-3 rounded-xl flex items-start gap-2.5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60"><div class="flex-1 text-xs leading-relaxed"><strong>${c.title}:</strong> Escribe aquí el detalle...</div><button contenteditable="false" class="callout-delete-btn opacity-0 group-hover:opacity-100 absolute top-1.5 right-1.5 p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer" title="Eliminar cuadro">✕</button></div><p><br></p>`;
     onInsertHtml(calloutHtml);
     setTimeout(updateActiveFormats, 40);
   };
@@ -537,7 +537,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { runCommand('formatBlock', '<h1>'); setShowHeadingMenu(false); }}
+              onClick={() => { runCommand('formatBlock', activeFormats.formatBlock === '<h1>' ? '<p>' : '<h1>'); setShowHeadingMenu(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold flex items-center gap-2 cursor-pointer ${
                 activeFormats.formatBlock === '<h1>' ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-800 dark:text-zinc-100'
               }`}
@@ -547,7 +547,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { runCommand('formatBlock', '<h2>'); setShowHeadingMenu(false); }}
+              onClick={() => { runCommand('formatBlock', activeFormats.formatBlock === '<h2>' ? '<p>' : '<h2>'); setShowHeadingMenu(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-2 cursor-pointer ${
                 activeFormats.formatBlock === '<h2>' ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-800 dark:text-zinc-100'
               }`}
@@ -557,7 +557,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { runCommand('formatBlock', '<h3>'); setShowHeadingMenu(false); }}
+              onClick={() => { runCommand('formatBlock', activeFormats.formatBlock === '<h3>' ? '<p>' : '<h3>'); setShowHeadingMenu(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium flex items-center gap-2 cursor-pointer ${
                 activeFormats.formatBlock === '<h3>' ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-800 dark:text-zinc-100'
               }`}
@@ -567,7 +567,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { runCommand('formatBlock', '<h4>'); setShowHeadingMenu(false); }}
+              onClick={() => { runCommand('formatBlock', activeFormats.formatBlock === '<h4>' ? '<p>' : '<h4>'); setShowHeadingMenu(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium flex items-center gap-2 cursor-pointer ${
                 activeFormats.formatBlock === '<h4>' ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-800 dark:text-zinc-100'
               }`}
@@ -865,7 +865,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
           >
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyStyle('text-align', 'left'); runCommand('justifyLeft'); setShowAlignMenu(false); }}
+              onClick={() => { const targetAlign = activeFormats.justifyLeft ? 'left' : 'left'; onApplyStyle('text-align', targetAlign); runCommand('justifyLeft'); setShowAlignMenu(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
                 activeFormats.justifyLeft ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
               }`}
@@ -875,7 +875,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyStyle('text-align', 'center'); runCommand('justifyCenter'); setShowAlignMenu(false); }}
+              onClick={() => { const targetAlign = activeFormats.justifyCenter ? 'left' : 'center'; onApplyStyle('text-align', targetAlign); runCommand(targetAlign === 'left' ? 'justifyLeft' : 'justifyCenter'); setShowAlignMenu(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
                 activeFormats.justifyCenter ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
               }`}
@@ -885,7 +885,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyStyle('text-align', 'right'); runCommand('justifyRight'); setShowAlignMenu(false); }}
+              onClick={() => { const targetAlign = activeFormats.justifyRight ? 'left' : 'right'; onApplyStyle('text-align', targetAlign); runCommand(targetAlign === 'left' ? 'justifyLeft' : 'justifyRight'); setShowAlignMenu(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
                 activeFormats.justifyRight ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
               }`}
@@ -895,7 +895,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyStyle('text-align', 'justify'); runCommand('justifyFull'); setShowAlignMenu(false); }}
+              onClick={() => { const targetAlign = activeFormats.justifyFull ? 'left' : 'justify'; onApplyStyle('text-align', targetAlign); runCommand(targetAlign === 'left' ? 'justifyLeft' : 'justifyFull'); setShowAlignMenu(false); }}
               className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
                 activeFormats.justifyFull ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
               }`}

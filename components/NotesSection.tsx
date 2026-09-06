@@ -1071,22 +1071,29 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   </button>
 
                   {/* Save Indicator */}
-                  <div className="flex items-center gap-1 text-[11px] text-zinc-400 ml-1">
+                  <div className="flex items-center gap-1 text-[11px] text-zinc-400 ml-1 relative group cursor-default">
                     {saveStatus === 'saving' && (
                       <span className="flex items-center gap-1 text-zinc-500">
                         <CloudLightning className="w-3.5 h-3.5 animate-pulse" />
-                        <span className="hidden sm:inline">Guardando...</span>
+                        <span className="hidden md:inline">Guardando...</span>
                       </span>
                     )}
                     {saveStatus === 'saved' && (
                       <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Guardado</span>
+                        <span className="hidden md:inline">Guardado</span>
                       </span>
                     )}
                     {saveStatus === 'error' && (
-                      <span className="text-zinc-900 dark:text-zinc-100 font-semibold">Error al guardar</span>
+                      <span className="flex items-center gap-1 text-zinc-900 dark:text-zinc-100 font-semibold">
+                        Error <span className="hidden md:inline">al guardar</span>
+                      </span>
                     )}
+                    
+                    {/* Tooltip for small screens */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-[10px] font-medium rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-[100] md:hidden">
+                      {saveStatus === 'saving' ? 'Guardando...' : saveStatus === 'saved' ? 'Guardado' : 'Error al guardar'}
+                    </div>
                   </div>
                 </div>
 
@@ -1285,6 +1292,22 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     contentEditable={!isReadingMode}
                     suppressContentEditableWarning
                     onInput={handleEditorInput}
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      if (target.closest('.callout-delete-btn')) {
+                        e.preventDefault();
+                        const callout = target.closest('.note-callout');
+                        if (callout) {
+                          callout.remove();
+                          handleEditorInput();
+                        }
+                      } else {
+                        const link = target.closest('a');
+                        if (link && link.hasAttribute('href')) {
+                          window.open(link.getAttribute('href')!, '_blank');
+                        }
+                      }
+                    }}
                     onFocus={() => {
                       lastActiveTargetRef.current = 'body';
                       saveActiveSelection();
