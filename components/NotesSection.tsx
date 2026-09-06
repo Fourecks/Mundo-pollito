@@ -18,7 +18,7 @@ import {
   Minimize2,
   SlidersHorizontal,
   Info,
-  CheckCircle2,
+  CheckCircle2, Loader2, AlertCircle,
   CloudLightning,
   BookOpen,
 } from 'lucide-react';
@@ -1072,43 +1072,18 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
                   {/* Save Indicator */}
                   <div 
-                    className="flex-shrink-0 flex items-center gap-1.5 ml-1 relative z-50 cursor-default select-none"
+                    className="flex-shrink-0 flex items-center justify-center w-6 h-6 ml-1 relative z-50 cursor-default select-none transition-all duration-300"
                     title={saveStatus === 'saving' ? 'Guardando cambios...' : saveStatus === 'saved' ? 'Guardado correctamente' : 'Error al guardar'}
                   >
-                    {/* Ring Loader Badge */}
-                    <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
-                      <div 
-                        className={`absolute inset-0 rounded-full border-2 transition-all duration-300 ${
-                          saveStatus === 'saving'
-                            ? 'border-amber-500/30 border-t-amber-500 animate-spin'
-                            : saveStatus === 'saved'
-                            ? 'border-emerald-500 dark:border-emerald-400'
-                            : 'border-rose-500'
-                        }`}
-                      />
-                      {saveStatus === 'saving' && (
-                        <CloudLightning className="w-3 h-3 text-amber-600 dark:text-amber-400 animate-pulse relative z-10" />
-                      )}
-                      {saveStatus === 'saved' && (
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 font-bold relative z-10 scale-105 transition-transform" />
-                      )}
-                      {saveStatus === 'error' && (
-                        <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 relative z-10">!</span>
-                      )}
-                    </div>
-
-                    {/* Text Label - Hidden on small screen/window, shown ONLY on wide screen */}
-                    <span className="hidden sm:inline text-xs font-medium leading-none">
-                      {saveStatus === 'saving' && (
-                        <span className="text-amber-600 dark:text-amber-400 font-semibold">Guardando...</span>
-                      )}
-                      {saveStatus === 'saved' && (
-                        <span className="text-emerald-600 dark:text-emerald-400">Guardado</span>
-                      )}
-                      {saveStatus === 'error' && (
-                        <span className="text-rose-600 dark:text-rose-400 font-semibold">Error</span>
-                      )}
-                    </span>
+                    {saveStatus === 'saving' && (
+                      <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
+                    )}
+                    {saveStatus === 'saved' && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_4px_rgba(16,185,129,0.5)] transition-transform scale-100" />
+                    )}
+                    {saveStatus === 'error' && (
+                      <AlertCircle className="w-4 h-4 text-rose-500 drop-shadow-[0_0_4px_rgba(244,63,94,0.5)]" />
+                    )}
                   </div>
                 </div>
 
