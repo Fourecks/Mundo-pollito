@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Bold,
@@ -79,6 +79,25 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
   const [showHeadingMenu, setShowHeadingMenu] = useState(false);
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const [showCalloutMenu, setShowCalloutMenu] = useState(false);
+
+  // Active formats state for toolbar buttons
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikeThrough: false,
+    subscript: false,
+    superscript: false,
+    unorderedList: false,
+    orderedList: false,
+    justifyLeft: false,
+    justifyCenter: false,
+    justifyRight: false,
+    justifyFull: false,
+    code: false,
+    blockquote: false,
+    formatBlock: '',
+  });
   
   // Modals
   const [showTableModal, setShowTableModal] = useState(false);
@@ -98,6 +117,87 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
   const headingMenuRef = useRef<HTMLDivElement>(null);
   const alignMenuRef = useRef<HTMLDivElement>(null);
   const calloutMenuRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize active formatting states from active DOM selection
+  const updateActiveFormats = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    const sel = window.getSelection();
+    let inCode = false;
+    let inBlockquote = false;
+    let blockTag = '';
+
+    if (sel && sel.rangeCount > 0) {
+      let node: Node | null = sel.anchorNode;
+      while (node && node !== document.body) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const el = node as HTMLElement;
+          const tagName = el.tagName.toLowerCase();
+          if (tagName === 'code' || tagName === 'pre') inCode = true;
+          if (tagName === 'blockquote') inBlockquote = true;
+          if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'].includes(tagName) && !blockTag) {
+            blockTag = `<${tagName}>`;
+          }
+        }
+        node = node.parentNode;
+      }
+    }
+
+    try {
+      const isBold = document.queryCommandState('bold');
+      const isItalic = document.queryCommandState('italic');
+      const isUnderline = document.queryCommandState('underline');
+      const isStrike = document.queryCommandState('strikeThrough');
+      const isSub = document.queryCommandState('subscript');
+      const isSuper = document.queryCommandState('superscript');
+      const isUl = document.queryCommandState('insertUnorderedList');
+      const isOl = document.queryCommandState('insertOrderedList');
+      const isLeft = document.queryCommandState('justifyLeft');
+      const isCenter = document.queryCommandState('justifyCenter');
+      const isRight = document.queryCommandState('justifyRight');
+      const isJustify = document.queryCommandState('justifyFull');
+      const fbVal = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+
+      setActiveFormats({
+        bold: isBold,
+        italic: isItalic,
+        underline: isUnderline,
+        strikeThrough: isStrike,
+        subscript: isSub,
+        superscript: isSuper,
+        unorderedList: isUl,
+        orderedList: isOl,
+        justifyLeft: isLeft,
+        justifyCenter: isCenter,
+        justifyRight: isRight,
+        justifyFull: isJustify,
+        code: inCode,
+        blockquote: inBlockquote,
+        formatBlock: blockTag || (fbVal ? `<${fbVal.replace(/[<>]/g, '')}>` : ''),
+      });
+    } catch {
+      // Ignored
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', updateActiveFormats);
+    return () => {
+      document.removeEventListener('selectionchange', updateActiveFormats);
+    };
+  }, [updateActiveFormats]);
+
+  const runCommand = (command: string, value?: string) => {
+    onApplyCommand(command, value);
+    setTimeout(updateActiveFormats, 40);
+  };
+
+  const getButtonClass = (isActive: boolean) => {
+    return `p-1.5 rounded-md transition-all cursor-pointer ${
+      isActive
+        ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold shadow-xs ring-1 ring-zinc-800 dark:ring-zinc-200'
+        : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
+    }`;
+  };
 
   useEffect(() => {
     if (propSelectedFont) {
@@ -131,6 +231,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
     setShowFontMenu(false);
     if (onSelectFont) onSelectFont(fontValue);
     onApplyStyle('font-family', fontValue);
+    setTimeout(updateActiveFormats, 40);
   };
 
   // Handle Numeric Font Size in Pixels
@@ -138,30 +239,35 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
     setSelectedFontSize(sizePx);
     setShowSizeMenu(false);
     onApplyStyle('font-size', `${sizePx}px`);
+    setTimeout(updateActiveFormats, 40);
   };
 
   const handleStepFontSize = (delta: number) => {
     const newSize = Math.max(10, Math.min(64, selectedFontSize + delta));
     setSelectedFontSize(newSize);
     onApplyStyle('font-size', `${newSize}px`);
+    setTimeout(updateActiveFormats, 40);
   };
 
   // Handle Color Application
   const handleApplyColor = (color: string) => {
     setShowColorMenu(false);
     onApplyStyle('color', color);
+    setTimeout(updateActiveFormats, 40);
   };
 
   // Handle Highlight Application
   const handleApplyHighlight = (color: string) => {
     setShowHighlightMenu(false);
     onApplyStyle('background-color', color);
+    setTimeout(updateActiveFormats, 40);
   };
 
   // Insert Checklist Item
   const handleInsertChecklist = () => {
     const checklistHtml = `<div class="note-task-item flex items-start gap-2 my-1.5"><input type="checkbox" class="note-checkbox mt-1 w-4 h-4 rounded accent-zinc-800 dark:accent-zinc-200 cursor-pointer" /><span class="task-text flex-1">Nueva tarea...</span></div><p><br></p>`;
     onInsertHtml(checklistHtml);
+    setTimeout(updateActiveFormats, 40);
   };
 
   // Insert Table
@@ -182,6 +288,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
     tableHtml += `</tbody></table><p><br></p>`;
     onInsertHtml(tableHtml);
     setShowTableModal(false);
+    setTimeout(updateActiveFormats, 40);
   };
 
   // Insert Callouts
@@ -197,6 +304,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
     const c = configs[type];
     const calloutHtml = `<div class="note-callout ${c.class} p-3.5 my-3 rounded-xl flex items-start gap-2.5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60"><div class="flex-1 text-xs leading-relaxed"><strong>${c.title}:</strong> Escribe aquí el detalle...</div></div><p><br></p>`;
     onInsertHtml(calloutHtml);
+    setTimeout(updateActiveFormats, 40);
   };
 
   // Insert Link
@@ -367,11 +475,25 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
         <button
           onMouseDown={preventFocusLoss}
           onClick={() => setShowHeadingMenu(!showHeadingMenu)}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors border border-zinc-200 dark:border-zinc-800 cursor-pointer"
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
+            ['<h1>', '<h2>', '<h3>', '<h4>'].includes(activeFormats.formatBlock)
+              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-900 dark:border-zinc-100 font-semibold shadow-xs'
+              : 'hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-800'
+          }`}
           title="Formato de bloque / Encabezados"
         >
-          <Type className="w-3.5 h-3.5 text-zinc-500" />
-          <span>Formato</span>
+          <Type className="w-3.5 h-3.5" />
+          <span>
+            {activeFormats.formatBlock === '<h1>'
+              ? 'H1'
+              : activeFormats.formatBlock === '<h2>'
+              ? 'H2'
+              : activeFormats.formatBlock === '<h3>'
+              ? 'H3'
+              : activeFormats.formatBlock === '<h4>'
+              ? 'H4'
+              : 'Formato'}
+          </span>
           <ChevronDown className="w-2.5 h-2.5 opacity-50" />
         </button>
 
@@ -379,40 +501,50 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
           <div className="absolute top-full left-0 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100]">
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyCommand('formatBlock', '<p>'); setShowHeadingMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-200 flex items-center gap-2 cursor-pointer"
+              onClick={() => { runCommand('formatBlock', '<p>'); setShowHeadingMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
+                activeFormats.formatBlock === '<p>' ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-200'
+              }`}
             >
               <span className="w-5 text-zinc-400 font-mono">P</span>
               <span>Párrafo normal</span>
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyCommand('formatBlock', '<h1>'); setShowHeadingMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-800 dark:text-zinc-100 font-bold flex items-center gap-2 cursor-pointer"
+              onClick={() => { runCommand('formatBlock', '<h1>'); setShowHeadingMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold flex items-center gap-2 cursor-pointer ${
+                activeFormats.formatBlock === '<h1>' ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-800 dark:text-zinc-100'
+              }`}
             >
               <Heading1 className="w-4 h-4 text-zinc-500" />
               <span>Encabezado 1</span>
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyCommand('formatBlock', '<h2>'); setShowHeadingMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-800 dark:text-zinc-100 font-semibold flex items-center gap-2 cursor-pointer"
+              onClick={() => { runCommand('formatBlock', '<h2>'); setShowHeadingMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-2 cursor-pointer ${
+                activeFormats.formatBlock === '<h2>' ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-800 dark:text-zinc-100'
+              }`}
             >
               <Heading2 className="w-4 h-4 text-zinc-500" />
               <span>Encabezado 2</span>
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyCommand('formatBlock', '<h3>'); setShowHeadingMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-800 dark:text-zinc-100 font-medium flex items-center gap-2 cursor-pointer"
+              onClick={() => { runCommand('formatBlock', '<h3>'); setShowHeadingMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium flex items-center gap-2 cursor-pointer ${
+                activeFormats.formatBlock === '<h3>' ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-800 dark:text-zinc-100'
+              }`}
             >
               <Heading3 className="w-4 h-4 text-zinc-500" />
               <span>Encabezado 3</span>
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyCommand('formatBlock', '<h4>'); setShowHeadingMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-800 dark:text-zinc-100 font-medium flex items-center gap-2 cursor-pointer"
+              onClick={() => { runCommand('formatBlock', '<h4>'); setShowHeadingMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium flex items-center gap-2 cursor-pointer ${
+                activeFormats.formatBlock === '<h4>' ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-800 dark:text-zinc-100'
+              }`}
             >
               <Heading4 className="w-4 h-4 text-zinc-500" />
               <span>Encabezado 4</span>
@@ -427,48 +559,48 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
       <div className="flex items-center gap-0.5 flex-shrink-0">
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('bold')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 font-bold transition-colors cursor-pointer"
+          onClick={() => runCommand('bold')}
+          className={getButtonClass(activeFormats.bold)}
           title="Negrita (Ctrl+B)"
         >
           <Bold className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('italic')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 italic transition-colors cursor-pointer"
+          onClick={() => runCommand('italic')}
+          className={getButtonClass(activeFormats.italic)}
           title="Cursiva (Ctrl+I)"
         >
           <Italic className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('underline')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 underline transition-colors cursor-pointer"
+          onClick={() => runCommand('underline')}
+          className={getButtonClass(activeFormats.underline)}
           title="Subrayado (Ctrl+U)"
         >
           <UnderlineIcon className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('strikeThrough')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          onClick={() => runCommand('strikeThrough')}
+          className={getButtonClass(activeFormats.strikeThrough)}
           title="Tachado"
         >
           <Strikethrough className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('subscript')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          onClick={() => runCommand('subscript')}
+          className={getButtonClass(activeFormats.subscript)}
           title="Subíndice (X₂)"
         >
           <Subscript className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('superscript')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          onClick={() => runCommand('superscript')}
+          className={getButtonClass(activeFormats.superscript)}
           title="Superíndice (X²)"
         >
           <Superscript className="w-3.5 h-3.5" />
@@ -483,8 +615,9 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
             } else {
               onInsertHtml(`<code class="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-1.5 py-0.5 rounded font-mono text-xs">código</code>&nbsp;`);
             }
+            setTimeout(updateActiveFormats, 40);
           }}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 font-mono text-xs transition-colors cursor-pointer"
+          className={getButtonClass(activeFormats.code)}
           title="Código en línea"
         >
           <Code className="w-3.5 h-3.5" />
@@ -589,10 +722,22 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
         <button
           onMouseDown={preventFocusLoss}
           onClick={() => setShowAlignMenu(!showAlignMenu)}
-          className="flex items-center gap-1 p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          className={`flex items-center gap-1 p-1.5 rounded-md transition-colors cursor-pointer ${
+            activeFormats.justifyCenter || activeFormats.justifyRight || activeFormats.justifyFull
+              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-semibold shadow-xs ring-1 ring-zinc-800 dark:ring-zinc-200'
+              : 'hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
+          }`}
           title="Alineación de texto"
         >
-          <AlignLeft className="w-3.5 h-3.5" />
+          {activeFormats.justifyCenter ? (
+            <AlignCenter className="w-3.5 h-3.5" />
+          ) : activeFormats.justifyRight ? (
+            <AlignRight className="w-3.5 h-3.5" />
+          ) : activeFormats.justifyFull ? (
+            <AlignJustify className="w-3.5 h-3.5" />
+          ) : (
+            <AlignLeft className="w-3.5 h-3.5" />
+          )}
           <ChevronDown className="w-2.5 h-2.5 opacity-50" />
         </button>
 
@@ -600,32 +745,40 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
           <div className="absolute top-full left-0 mt-1 w-36 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100]">
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyStyle('text-align', 'left'); onApplyCommand('justifyLeft'); setShowAlignMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer"
+              onClick={() => { onApplyStyle('text-align', 'left'); runCommand('justifyLeft'); setShowAlignMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
+                activeFormats.justifyLeft ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
+              }`}
             >
               <AlignLeft className="w-3.5 h-3.5" />
               <span>Izquierda</span>
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyStyle('text-align', 'center'); onApplyCommand('justifyCenter'); setShowAlignMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer"
+              onClick={() => { onApplyStyle('text-align', 'center'); runCommand('justifyCenter'); setShowAlignMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
+                activeFormats.justifyCenter ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
+              }`}
             >
               <AlignCenter className="w-3.5 h-3.5" />
               <span>Centrado</span>
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyStyle('text-align', 'right'); onApplyCommand('justifyRight'); setShowAlignMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer"
+              onClick={() => { onApplyStyle('text-align', 'right'); runCommand('justifyRight'); setShowAlignMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
+                activeFormats.justifyRight ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
+              }`}
             >
               <AlignRight className="w-3.5 h-3.5" />
               <span>Derecha</span>
             </button>
             <button
               onMouseDown={preventFocusLoss}
-              onClick={() => { onApplyStyle('text-align', 'justify'); onApplyCommand('justifyFull'); setShowAlignMenu(false); }}
-              className="w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer"
+              onClick={() => { onApplyStyle('text-align', 'justify'); runCommand('justifyFull'); setShowAlignMenu(false); }}
+              className={`w-full text-left px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs flex items-center gap-2 cursor-pointer ${
+                activeFormats.justifyFull ? 'font-bold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800' : 'text-zinc-700 dark:text-zinc-300'
+              }`}
             >
               <AlignJustify className="w-3.5 h-3.5" />
               <span>Justificado</span>
@@ -640,16 +793,16 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
       <div className="flex items-center gap-0.5 flex-shrink-0">
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('insertUnorderedList')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          onClick={() => runCommand('insertUnorderedList')}
+          className={getButtonClass(activeFormats.unorderedList)}
           title="Lista con viñetas"
         >
           <List className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('insertOrderedList')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          onClick={() => runCommand('insertOrderedList')}
+          className={getButtonClass(activeFormats.orderedList)}
           title="Lista numerada"
         >
           <ListOrdered className="w-3.5 h-3.5" />
@@ -657,23 +810,23 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
         <button
           onMouseDown={preventFocusLoss}
           onClick={handleInsertChecklist}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
           title="Lista de tareas / Checklist interactivo"
         >
           <CheckSquare className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('indent')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          onClick={() => runCommand('indent')}
+          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
           title="Aumentar sangría"
         >
           <Indent className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('outdent')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          onClick={() => runCommand('outdent')}
+          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
           title="Disminuir sangría"
         >
           <Outdent className="w-3.5 h-3.5" />
@@ -686,8 +839,8 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
       <div className="flex items-center gap-0.5 flex-shrink-0">
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('formatBlock', '<blockquote>')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+          onClick={() => runCommand('formatBlock', '<blockquote>')}
+          className={getButtonClass(activeFormats.blockquote)}
           title="Cita destacada"
         >
           <Quote className="w-3.5 h-3.5" />
@@ -695,8 +848,8 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
 
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('formatBlock', '<pre>')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          onClick={() => runCommand('formatBlock', '<pre>')}
+          className={getButtonClass(activeFormats.formatBlock === '<pre>')}
           title="Bloque de código"
         >
           <Terminal className="w-3.5 h-3.5" />

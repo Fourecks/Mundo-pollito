@@ -20,6 +20,7 @@ import {
   Info,
   CheckCircle2,
   CloudLightning,
+  BookOpen,
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import { normalizeNoteContentForEditor, sanitizeAndCleanHtml } from '../utils/textCleaner';
@@ -70,6 +71,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   const [activeNoteContent, setActiveNoteContent] = useState('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isReadingMode, setIsReadingMode] = useState(false);
   const [showDetailsPanel, setShowDetailsPanel] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [noteVersions, setNoteVersions] = useState<NoteVersion[]>([]);
@@ -800,6 +802,18 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     setShowVersionModal(false);
   };
 
+  // Close Note & flush pending save
+  const handleCloseNote = useCallback(() => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    if (activeNoteIdRef.current && (activeNoteTitle !== lastSavedContentRef.current.title || activeNoteContent !== lastSavedContentRef.current.content)) {
+      executeSave(activeNoteTitle, activeNoteContent);
+    }
+    setSelectedNoteId(null);
+    setIsReadingMode(false);
+  }, [activeNoteTitle, activeNoteContent, executeSave]);
+
   // Export & Print
   const handleExportMarkdown = () => {
     if (!selectedNote) return;
@@ -1114,6 +1128,25 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     </>
                   )}
 
+                  {/* Reading Mode Toggle */}
+                  <button
+                    onClick={() => {
+                      setIsReadingMode(!isReadingMode);
+                      if (!isReadingMode) {
+                        setShowDetailsPanel(false);
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isReadingMode
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/70 dark:text-amber-200 dark:border-amber-800 shadow-xs'
+                        : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700'
+                    }`}
+                    title={isReadingMode ? 'Salir de Modo Lectura' : 'Modo Lectura (oculta herramientas y optimiza tipografía)'}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{isReadingMode ? 'Modo Lectura' : 'Lectura'}</span>
+                  </button>
+
                   <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1" />
 
                   {/* Export Markdown */}
@@ -1160,21 +1193,50 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     <Info className="w-4 h-4" />
                   </button>
 
+                  <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1" />
+
+                  {/* Close Note Button */}
+                  <button
+                    onClick={handleCloseNote}
+                    className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                    title="Cerrar nota abierta"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
                 </div>
               </div>
 
-              {/* 3. ROBUST RICH TEXT TOOLBAR */}
-              <div className="relative z-30 flex-shrink-0">
-                <NotesToolbar
-                  onApplyCommand={handleApplyCommand}
-                  onInsertHtml={handleInsertHtml}
-                  onApplyStyle={handleApplyStyle}
-                  onUndo={handleUndo}
-                  onRedo={handleRedo}
-                  canUndo={canUndo}
-                  canRedo={canRedo}
-                />
-              </div>
+              {/* 3. ROBUST RICH TEXT TOOLBAR (Hidden in Reading Mode) */}
+              {!isReadingMode && (
+                <div className="relative z-30 flex-shrink-0">
+                  <NotesToolbar
+                    onApplyCommand={handleApplyCommand}
+                    onInsertHtml={handleInsertHtml}
+                    onApplyStyle={handleApplyStyle}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    canUndo={canUndo}
+                    canRedo={canRedo}
+                  />
+                </div>
+              )}
+
+              {/* Reading Mode banner / subtle helper */}
+              {isReadingMode && (
+                <div className="bg-amber-50/80 dark:bg-amber-950/30 border-b border-amber-200/60 dark:border-amber-900/40 px-6 py-2 flex items-center justify-between text-xs text-amber-800 dark:text-amber-200">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span><strong>Modo Lectura Activo</strong> — Herramientas ocultas y espaciado tipográfico optimizado</span>
+                  </div>
+                  <button
+                    onClick={() => setIsReadingMode(false)}
+                    className="px-2.5 py-1 rounded bg-amber-200/80 dark:bg-amber-900/70 hover:bg-amber-300 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-100 font-medium transition-colors cursor-pointer text-[11px]"
+                  >
+                    Salir de lectura
+                  </button>
+                </div>
+              )}
 
               {/* 4. Canvas Body Area with Optional Details Panel */}
               <div 
@@ -1183,11 +1245,15 @@ const NotesSection: React.FC<NotesSectionProps> = ({
               >
                 
                 {/* Editor Surface */}
-                <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-6 md:p-10 max-w-4xl mx-auto w-full">
+                <div className={`flex-1 flex flex-col overflow-y-auto custom-scrollbar transition-all duration-200 ${
+                  isReadingMode
+                    ? 'p-8 md:p-14 max-w-3xl mx-auto w-full'
+                    : 'p-6 md:p-10 max-w-4xl mx-auto w-full'
+                }`}>
                   {/* Rich Note Title */}
                   <h1
                     ref={titleRef}
-                    contentEditable
+                    contentEditable={!isReadingMode}
                     suppressContentEditableWarning
                     data-placeholder="Título de la nota..."
                     onInput={handleTitleInput}
@@ -1206,13 +1272,17 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                         editorRef.current?.focus();
                       }
                     }}
-                    className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white placeholder-zinc-300 dark:placeholder-zinc-700 bg-transparent border-0 focus:outline-none focus:ring-0 mb-4 tracking-tight min-h-[1.4em] empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-300 dark:empty:before:text-zinc-600 empty:before:pointer-events-none"
+                    className={`font-bold text-zinc-900 dark:text-white placeholder-zinc-300 dark:placeholder-zinc-700 bg-transparent border-0 focus:outline-none focus:ring-0 tracking-tight min-h-[1.4em] empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-300 dark:empty:before:text-zinc-600 empty:before:pointer-events-none transition-all ${
+                      isReadingMode
+                        ? 'text-3xl md:text-4xl pb-4 mb-6 border-b border-zinc-200/80 dark:border-zinc-800/80 leading-tight font-serif'
+                        : 'text-2xl md:text-3xl mb-4'
+                    }`}
                   />
 
                   {/* ContentEditable Div */}
                   <div
                     ref={editorRef}
-                    contentEditable
+                    contentEditable={!isReadingMode}
                     suppressContentEditableWarning
                     onInput={handleEditorInput}
                     onFocus={() => {
@@ -1225,12 +1295,16 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     onSelect={saveActiveSelection}
                     onKeyDown={handleEditorKeyDown}
                     data-placeholder="Escribe tus notas aquí..."
-                    className="flex-1 focus:outline-none note-editor-content leading-relaxed text-zinc-800 dark:text-zinc-200 min-h-[400px]"
+                    className={`flex-1 focus:outline-none note-editor-content min-h-[400px] transition-all ${
+                      isReadingMode
+                        ? 'text-lg md:text-xl leading-relaxed md:leading-loose text-zinc-800 dark:text-zinc-200 selection:bg-amber-200 dark:selection:bg-amber-900/60 font-serif'
+                        : 'leading-relaxed text-zinc-800 dark:text-zinc-200'
+                    }`}
                   />
                 </div>
 
                 {/* Optional Details Panel */}
-                {showDetailsPanel && (
+                {!isReadingMode && showDetailsPanel && (
                   <NoteDetailsPanel
                     note={selectedNote}
                     folders={folders}
