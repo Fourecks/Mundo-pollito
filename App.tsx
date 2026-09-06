@@ -59,7 +59,7 @@ import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
 import { NotionService } from './services/notionService';
 import { cleanToPlainText } from './utils/textCleaner';
-import { Settings, Loader2, CheckSquare, Calendar, BookOpen, Target, Folder, Clock, Music, Moon, Sun } from 'lucide-react';
+import { Settings, Loader2, CheckSquare, Calendar, BookOpen, Target, Folder as FolderIcon, Clock, Music, Moon, Sun } from 'lucide-react';
 import CommandPalette, { CommandAction } from './components/CommandPalette';
 
 // --- Google API Configuration ---
@@ -966,7 +966,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     { id: 'notes', title: 'Abrir Notas', icon: <BookOpen className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+N', onSelect: () => toggleWindow('notes'), keywords: ['notas', 'escribir', 'text'] },
     { id: 'habits', title: 'Abrir Hábitos', icon: <Target className="w-5 h-5 text-purple-500" />, shortcut: 'Alt+H', onSelect: () => toggleWindow('habits'), keywords: ['habitos', 'rutina', 'tracker'] },
     { id: 'finance', title: 'Abrir Finanzas', icon: <Target className="w-5 h-5 text-green-500" />, shortcut: 'Alt+F', onSelect: () => toggleWindow('finance'), keywords: ['finanzas', 'dinero', 'presupuesto'] },
-    { id: 'projects', title: 'Abrir Proyectos', icon: <Folder className="w-5 h-5 text-indigo-500" />, shortcut: 'Alt+P', onSelect: () => toggleWindow('projects'), keywords: ['proyectos', 'espacio', 'trabajo'] },
+    { id: 'projects', title: 'Abrir Proyectos', icon: <FolderIcon className="w-5 h-5 text-indigo-500" />, shortcut: 'Alt+P', onSelect: () => toggleWindow('projects'), keywords: ['proyectos', 'espacio', 'trabajo'] },
     { id: 'pomodoro', title: 'Abrir Pomodoro', icon: <Clock className="w-5 h-5 text-rose-500" />, shortcut: 'Alt+O', onSelect: () => toggleWindow('pomodoro'), keywords: ['pomodoro', 'tiempo', 'reloj'] },
     { id: 'music', title: 'Abrir Reproductor', icon: <Music className="w-5 h-5 text-pink-500" />, shortcut: 'Alt+M', onSelect: () => toggleWindow('music'), keywords: ['musica', 'reproductor', 'audio'] },
     { id: 'theme', title: `Cambiar a modo ${theme === 'light' ? 'Oscuro' : 'Claro'}`, icon: theme === 'light' ? <Moon className="w-5 h-5 text-gray-500" /> : <Sun className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+D', onSelect: toggleTheme, keywords: ['tema', 'oscuro', 'claro', 'modo'] },
