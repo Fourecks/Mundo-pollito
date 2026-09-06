@@ -414,7 +414,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
           : !frameless ? `bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}` : 'relative flex flex-col'}
           ${(!isFullscreen && !isCustomPlaced && !isInteracting) ? (className || 'w-[92vw] max-w-3xl h-[80vh]') : ''}
           ${(!isFullscreen && !isCustomPlaced && !isInteracting) ? 'animate-deploy' : ''}
-          ${isMinimized ? 'scale-90 pointer-events-none' : 'scale-100 pointer-events-auto select-auto'}
+          ${isMinimized ? '!hidden pointer-events-none opacity-0' : 'scale-100 pointer-events-auto select-auto opacity-100'}
           transition-[opacity,transform] duration-300
         `}
       >

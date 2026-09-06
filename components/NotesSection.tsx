@@ -1071,29 +1071,24 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   </button>
 
                   {/* Save Indicator */}
-                  <div className="flex items-center gap-1 text-[11px] text-zinc-400 ml-1 relative group cursor-default">
+                  <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100/80 dark:bg-zinc-800/70 border border-zinc-200/60 dark:border-zinc-700/60 text-xs font-medium text-zinc-600 dark:text-zinc-300 ml-1 relative z-50 cursor-default">
                     {saveStatus === 'saving' && (
-                      <span className="flex items-center gap-1 text-zinc-500">
+                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
                         <CloudLightning className="w-3.5 h-3.5 animate-pulse" />
-                        <span className="hidden md:inline">Guardando...</span>
+                        <span>Guardando...</span>
                       </span>
                     )}
                     {saveStatus === 'saved' && (
-                      <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span className="hidden md:inline">Guardado</span>
+                        <span>Guardado</span>
                       </span>
                     )}
                     {saveStatus === 'error' && (
-                      <span className="flex items-center gap-1 text-zinc-900 dark:text-zinc-100 font-semibold">
-                        Error <span className="hidden md:inline">al guardar</span>
+                      <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
+                        <span>Error al guardar</span>
                       </span>
                     )}
-                    
-                    {/* Tooltip for small screens */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-[10px] font-medium rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-[100] md:hidden">
-                      {saveStatus === 'saving' ? 'Guardando...' : saveStatus === 'saved' ? 'Guardado' : 'Error al guardar'}
-                    </div>
                   </div>
                 </div>
 
@@ -1154,12 +1149,12 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     <BookOpen className="w-4 h-4" />
                   </button>
 
-                  <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-0.5" />
+                  <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-0.5 hidden sm:block" />
 
                   {/* Export Markdown */}
                   <button
                     onClick={handleExportMarkdown}
-                    className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors hidden sm:block"
                     title="Exportar como Markdown"
                   >
                     <Download className="w-4 h-4" />
@@ -1168,7 +1163,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   {/* Print */}
                   <button
                     onClick={handlePrintNote}
-                    className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors hidden sm:block"
                     title="Imprimir nota"
                   >
                     <Printer className="w-4 h-4" />

@@ -62,7 +62,7 @@ const Dock: React.FC<DockProps> = ({ onButtonClick, openWindows, focusedWindow }
                 </span>
               </button>
               {isOpen && (
-                <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-gray-500 dark:bg-gray-400" />
+                <div className="absolute -bottom-0.5 w-1.5 h-1.5 rounded-full bg-primary ring-2 ring-white dark:ring-gray-800 shadow-xs" />
               )}
             </div>
           );
