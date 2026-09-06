@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Todo,
   GoogleCalendarEvent,
@@ -8,6 +9,15 @@ import {
   Project,
   Priority,
 } from '../types';
+
+const CalendarPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  if (!mounted || typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+};
 import { CalendarSyncService } from '../services/calendarSyncService';
 import { NotionService, NotionSettings } from '../services/notionService';
 import { config } from '../config';
@@ -1432,272 +1442,277 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
 
       {/* 4. DAY PREVIEW POPOVER MODAL (For +N More) */}
       {dayPreviewDate && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
-          <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary">
-                  <CalendarIcon className="w-4 h-4" />
+        <CalendarPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+            <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary">
+                    <CalendarIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                      Eventos del día
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                      {dayPreviewDate}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                    Eventos del día
-                  </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                    {dayPreviewDate}
-                  </p>
-                </div>
+                <button
+                  onClick={() => setDayPreviewDate(null)}
+                  className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                >
+                  <CloseIcon />
+                </button>
               </div>
-              <button
-                onClick={() => setDayPreviewDate(null)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-              >
-                <CloseIcon />
-              </button>
-            </div>
 
-            <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-              {((itemsByDate[dayPreviewDate]?.tasks || []).filter(filteredTasksAndEvents.filterTask)).map((t) => {
-                const priorityLabel = t.priority === 'low' ? 'Baja' : t.priority === 'high' || t.priority === 'urgent' ? 'Alta' : 'Media';
-                const priorityBg = t.priority === 'high' || t.priority === 'urgent' ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300 border-red-200 dark:border-red-800' : t.priority === 'medium' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+              <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {((itemsByDate[dayPreviewDate]?.tasks || []).filter(filteredTasksAndEvents.filterTask)).map((t) => {
+                  const priorityLabel = t.priority === 'low' ? 'Baja' : t.priority === 'high' || t.priority === 'urgent' ? 'Alta' : 'Media';
+                  const priorityBg = t.priority === 'high' || t.priority === 'urgent' ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300 border-red-200 dark:border-red-800' : t.priority === 'medium' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800';
 
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => {
-                      setDayPreviewDate(null);
-                      setSelectedEventDetails({ type: 'task', task: t });
-                    }}
-                    className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 transition-all flex items-center justify-between text-xs cursor-pointer group shadow-xs hover:shadow-sm"
-                  >
-                    <div className="flex items-center gap-2.5 truncate">
-                      <div className="flex-shrink-0 text-primary">
-                        {t.calendar_provider === 'google' ? <GoogleIcon /> : t.calendar_provider === 'outlook' ? <OutlookIcon /> : t.notion_page_id ? <NotionIcon /> : <CalendarIcon className="w-3.5 h-3.5 text-slate-400" />}
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => {
+                        setDayPreviewDate(null);
+                        setSelectedEventDetails({ type: 'task', task: t });
+                      }}
+                      className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 transition-all flex items-center justify-between text-xs cursor-pointer group shadow-xs hover:shadow-sm"
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <div className="flex-shrink-0 text-primary">
+                          {t.calendar_provider === 'google' ? <GoogleIcon /> : t.calendar_provider === 'outlook' ? <OutlookIcon /> : t.notion_page_id ? <NotionIcon /> : <CalendarIcon className="w-3.5 h-3.5 text-slate-400" />}
+                        </div>
+                        <span className={`font-semibold truncate text-slate-800 dark:text-slate-200 ${t.completed ? 'line-through opacity-60' : ''}`}>
+                          {t.text}
+                        </span>
                       </div>
-                      <span className={`font-semibold truncate text-slate-800 dark:text-slate-200 ${t.completed ? 'line-through opacity-60' : ''}`}>
-                        {t.text}
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border flex-shrink-0 ${priorityBg}`}>
+                        {priorityLabel}
                       </span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border flex-shrink-0 ${priorityBg}`}>
-                      {priorityLabel}
-                    </span>
+                  );
+                })}
+
+                {((itemsByDate[dayPreviewDate]?.tasks || []).filter(filteredTasksAndEvents.filterTask)).length === 0 && (
+                  <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-xs font-medium">
+                    No hay tareas ni eventos programados en este día.
                   </div>
-                );
-              })}
+                )}
+              </div>
 
-              {((itemsByDate[dayPreviewDate]?.tasks || []).filter(filteredTasksAndEvents.filterTask)).length === 0 && (
-                <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-xs font-medium">
-                  No hay tareas ni eventos programados en este día.
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-              <button
-                onClick={() => {
-                  const target = dayPreviewDate;
-                  setDayPreviewDate(null);
-                  handleOpenCreator(target);
-                }}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5"
-              >
-                <span>+ Añadir tarea en este día</span>
-              </button>
+              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                <button
+                  onClick={() => {
+                    const target = dayPreviewDate;
+                    setDayPreviewDate(null);
+                    handleOpenCreator(target);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5"
+                >
+                  <span>+ Añadir tarea en este día</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </CalendarPortal>
       )}
 
       {/* 5. CREATE TASK / EVENT MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
-          <form
-            onSubmit={handleCreateSubmit}
-            className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
-              <h3 className="font-extrabold text-lg text-gray-900 dark:text-white flex items-center gap-2">
-                <PlusIcon />
-                <span>Programar Tarea / Evento</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
-              >
-                <CloseIcon />
-              </button>
-            </div>
+        <CalendarPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+            <form
+              onSubmit={handleCreateSubmit}
+              className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+                <h3 className="font-extrabold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                  <PlusIcon />
+                  <span>Programar Tarea / Evento</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
 
-            {/* Title Input */}
-            <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                Título del Evento / Tarea *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej: Reunión de Estrategia o Entregar Reporte"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary focus:outline-none"
-              />
-            </div>
-
-            {/* Date & Time Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Title Input */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  Fecha
+                  Título del Evento / Tarea *
                 </label>
                 <input
-                  type="date"
+                  type="text"
                   required
-                  value={newDueDate}
-                  onChange={(e) => {
-                    setNewDueDate(e.target.value);
-                    setNewEndDate(e.target.value);
-                  }}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
+                  placeholder="Ej: Reunión de Estrategia o Entregar Reporte"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary focus:outline-none"
                 />
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                    Horario
+              {/* Date & Time Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    Fecha
                   </label>
-                  <label className="text-[11px] text-gray-500 flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newIsAllDay}
-                      onChange={(e) => setNewIsAllDay(e.target.checked)}
-                      className="rounded text-primary focus:ring-primary"
-                    />
-                    <span>Todo el día</span>
-                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newDueDate}
+                    onChange={(e) => {
+                      setNewDueDate(e.target.value);
+                      setNewEndDate(e.target.value);
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
+                  />
                 </div>
 
-                {!newIsAllDay ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="time"
-                      value={newStartTime}
-                      onChange={(e) => setNewStartTime(e.target.value)}
-                      className="w-full px-2 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
-                    />
-                    <span className="text-gray-400">-</span>
-                    <input
-                      type="time"
-                      value={newEndTime}
-                      onChange={(e) => setNewEndTime(e.target.value)}
-                      className="w-full px-2 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
-                    />
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                      Horario
+                    </label>
+                    <label className="text-[11px] text-gray-500 flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newIsAllDay}
+                        onChange={(e) => setNewIsAllDay(e.target.checked)}
+                        className="rounded text-primary focus:ring-primary"
+                      />
+                      <span>Todo el día</span>
+                    </label>
                   </div>
-                ) : (
-                  <div className="px-3 py-2 text-xs text-gray-400 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-                    Evento de día completo
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Priority & Sync Destination */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {!newIsAllDay ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        value={newStartTime}
+                        onChange={(e) => setNewStartTime(e.target.value)}
+                        className="w-full px-2 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
+                      />
+                      <span className="text-gray-400">-</span>
+                      <input
+                        type="time"
+                        value={newEndTime}
+                        onChange={(e) => setNewEndTime(e.target.value)}
+                        className="w-full px-2 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
+                      />
+                    </div>
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-gray-400 bg-gray-50 dark:bg-gray-900/40 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                      Evento de día completo
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Priority & Sync Destination */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    Prioridad
+                  </label>
+                  <select
+                    value={newPriority === 'urgent' ? 'high' : newPriority}
+                    onChange={(e) => setNewPriority(e.target.value as Priority)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
+                  >
+                    <option value="low">Baja</option>
+                    <option value="medium">Media</option>
+                    <option value="high">Alta</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    Sincronizar a
+                  </label>
+                  <select
+                    value={newSyncDestination}
+                    onChange={(e) => setNewSyncDestination(e.target.value as any)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold"
+                  >
+                    <option value="pollito">Solo Tareas Locales</option>
+                    <option value="google" disabled={!activeGoogleToken}>
+                      Google Calendar {!activeGoogleToken ? '(No conectado)' : ''}
+                    </option>
+                    <option value="outlook" disabled={!localOutlookAccount}>
+                      Microsoft Outlook {!localOutlookAccount ? '(No conectado)' : ''}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes textarea */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  Prioridad
+                  Notas / Descripción
                 </label>
-                <select
-                  value={newPriority === 'urgent' ? 'high' : newPriority}
-                  onChange={(e) => setNewPriority(e.target.value as Priority)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
-                >
-                  <option value="low">Baja</option>
-                  <option value="medium">Media</option>
-                  <option value="high">Alta</option>
-                </select>
+                <textarea
+                  rows={2}
+                  placeholder="Añade detalles, enlace de reunión, etc."
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:outline-none"
+                />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  Sincronizar a
-                </label>
-                <select
-                  value={newSyncDestination}
-                  onChange={(e) => setNewSyncDestination(e.target.value as any)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold"
+              {/* Submit buttons */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl"
                 >
-                  <option value="pollito">Solo Tareas Locales</option>
-                  <option value="google" disabled={!activeGoogleToken}>
-                    Google Calendar {!activeGoogleToken ? '(No conectado)' : ''}
-                  </option>
-                  <option value="outlook" disabled={!localOutlookAccount}>
-                    Microsoft Outlook {!localOutlookAccount ? '(No conectado)' : ''}
-                  </option>
-                </select>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingNew}
+                  className="px-5 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-dark rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1.5"
+                >
+                  {isSubmittingNew ? 'Guardando...' : 'Crear Evento'}
+                </button>
               </div>
-            </div>
-
-            {/* Notes textarea */}
-            <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                Notas / Descripción
-              </label>
-              <textarea
-                rows={2}
-                placeholder="Añade detalles, enlace de reunión, etc."
-                value={newNotes}
-                onChange={(e) => setNewNotes(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:outline-none"
-              />
-            </div>
-
-            {/* Submit buttons */}
-            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmittingNew}
-                className="px-5 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-dark rounded-xl shadow transition-transform active:scale-95 flex items-center gap-1.5"
-              >
-                {isSubmittingNew ? 'Guardando...' : 'Crear Evento'}
-              </button>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
+        </CalendarPortal>
       )}
 
       {/* 6. EVENT DETAILS MODAL */}
       {selectedEventDetails && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
-          <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
-              <div className="flex items-center gap-2">
-                {selectedEventDetails.type === 'google' && <GoogleIcon />}
-                {selectedEventDetails.type === 'outlook' && <OutlookIcon />}
-                {selectedEventDetails.type === 'task' && <CalendarIcon className="w-4 h-4 text-emerald-600" />}
-                <h3 className="font-extrabold text-base text-gray-900 dark:text-white">
-                  {selectedEventDetails.type === 'task'
-                    ? 'Detalle de Tarea'
-                    : selectedEventDetails.type === 'google'
-                    ? 'Evento de Google Calendar'
-                    : 'Evento de Outlook'}
-                </h3>
+        <CalendarPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+            <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-2">
+                  {selectedEventDetails.type === 'google' && <GoogleIcon />}
+                  {selectedEventDetails.type === 'outlook' && <OutlookIcon />}
+                  {selectedEventDetails.type === 'task' && <CalendarIcon className="w-4 h-4 text-emerald-600" />}
+                  <h3 className="font-extrabold text-base text-gray-900 dark:text-white">
+                    {selectedEventDetails.type === 'task'
+                      ? 'Detalle de Tarea'
+                      : selectedEventDetails.type === 'google'
+                      ? 'Evento de Google Calendar'
+                      : 'Evento de Outlook'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedEventDetails(null)}
+                  className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                >
+                  <CloseIcon />
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedEventDetails(null)}
-                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
-              >
-                <CloseIcon />
-              </button>
-            </div>
 
             {/* Task Details */}
             {selectedEventDetails.task && (
@@ -1876,11 +1891,13 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
             )}
           </div>
         </div>
+        </CalendarPortal>
       )}
 
       {/* 7. INTEGRATIONS MANAGER MODAL */}
       {showIntegrationsModal && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+        <CalendarPortal>
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto text-gray-800 dark:text-gray-100">
             
             {/* Header */}
@@ -2193,6 +2210,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
             </div>
           </div>
         </div>
+        </CalendarPortal>
       )}
     </div>
   );

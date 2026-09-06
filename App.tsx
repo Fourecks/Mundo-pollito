@@ -59,7 +59,8 @@ import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
 import { NotionService } from './services/notionService';
 import { cleanToPlainText } from './utils/textCleaner';
-import { Settings, Loader2 } from 'lucide-react';
+import { Settings, Loader2, CheckSquare, Calendar, BookOpen, Target, Folder, Clock, Music, Moon, Sun } from 'lucide-react';
+import CommandPalette, { CommandAction } from './components/CommandPalette';
 
 // --- Google API Configuration ---
 const CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (process.env as any).GOOGLE_CLIENT_ID || config.GOOGLE_CLIENT_ID;
@@ -559,6 +560,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   useEffect(() => {
     const storedWindows = localStorage.getItem(getUserKey('windowStates'));
     const storedOpenWindows = localStorage.getItem(getUserKey('openWindows'));
+    const storedZIndices = localStorage.getItem(getUserKey('windowZIndices'));
+    const storedMinimized = localStorage.getItem(getUserKey('minimizedWindows'));
+    const storedFocused = localStorage.getItem(getUserKey('focusedWindow'));
+
     if (storedWindows) {
       try {
         const parsed = JSON.parse(storedWindows);
@@ -566,20 +571,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           const cleaned: { [key in WindowType]?: WindowState } = {};
           (Object.keys(parsed) as WindowType[]).forEach((k) => {
             const item = parsed[k];
-            if (
-              item &&
-              item.size &&
-              typeof item.size.width === 'number' &&
-              typeof item.size.height === 'number' &&
-              item.size.width >= 150 &&
-              item.size.height >= 100 &&
-              item.pos &&
-              typeof item.pos.x === 'number' &&
-              typeof item.pos.y === 'number'
-            ) {
+            if (item && typeof item === 'object') {
               cleaned[k] = {
-                pos: item.pos,
-                size: item.size,
+                pos: (item.pos && typeof item.pos.x === 'number' && typeof item.pos.y === 'number') ? item.pos : { x: 100, y: 100 },
+                size: (item.size && typeof item.size.width === 'number' && typeof item.size.height === 'number') ? item.size : { width: 800, height: 600 },
                 isFullscreen: Boolean(item.isFullscreen)
               };
             }
@@ -590,16 +585,101 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         console.error('Error parsing stored window states:', e);
       }
     }
+
+    let parsedOpen: WindowType[] = [];
     if (storedOpenWindows) {
       try {
-        setOpenWindows(JSON.parse(storedOpenWindows));
+        const parsed = JSON.parse(storedOpenWindows);
+        if (Array.isArray(parsed)) {
+          parsedOpen = parsed;
+          setOpenWindows(parsed);
+        }
       } catch (e) {
         console.error('Error parsing stored open windows:', e);
       }
     }
+
+    if (storedMinimized) {
+      try {
+        const parsed = JSON.parse(storedMinimized);
+        if (Array.isArray(parsed)) {
+          setMinimizedWindows(parsed);
+        }
+      } catch (e) {
+        console.error('Error parsing stored minimized windows:', e);
+      }
+    }
+
+    if (storedZIndices) {
+      try {
+        const parsed = JSON.parse(storedZIndices);
+        if (parsed && typeof parsed === 'object') {
+          setWindowZIndices(parsed);
+          const zValues = Object.values(parsed).filter((v): v is number => typeof v === 'number');
+          const maxZ = zValues.length > 0 ? Math.max(100, ...zValues) : 100;
+          setHighestZIndex(maxZ);
+
+          // Find the top focused window among open windows
+          if (storedFocused && parsedOpen.includes(storedFocused as WindowType)) {
+            setFocusedWindow(storedFocused as WindowType);
+            focusedWindowRef.current = storedFocused as WindowType;
+          } else if (parsedOpen.length > 0) {
+            let topWin: WindowType | null = null;
+            let topZ = -1;
+            parsedOpen.forEach(win => {
+              const z = parsed[win] ?? 50;
+              if (z > topZ) {
+                topZ = z;
+                topWin = win;
+              }
+            });
+            if (topWin) {
+              setFocusedWindow(topWin);
+              focusedWindowRef.current = topWin;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing stored window Z-indices:', e);
+      }
+    }
   }, [getUserKey]);
 
-  useEffect(() => { localStorage.setItem(getUserKey('openWindows'), JSON.stringify(openWindows)); }, [openWindows, getUserKey]);
+  useEffect(() => { 
+    try {
+      localStorage.setItem(getUserKey('openWindows'), JSON.stringify(openWindows)); 
+    } catch (e) {
+      console.error('Error saving open windows:', e);
+    }
+  }, [openWindows, getUserKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(getUserKey('windowZIndices'), JSON.stringify(windowZIndices));
+    } catch (e) {
+      console.error('Error saving window z-indices:', e);
+    }
+  }, [windowZIndices, getUserKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(getUserKey('minimizedWindows'), JSON.stringify(minimizedWindows));
+    } catch (e) {
+      console.error('Error saving minimized windows:', e);
+    }
+  }, [minimizedWindows, getUserKey]);
+
+  useEffect(() => {
+    try {
+      if (focusedWindow) {
+        localStorage.setItem(getUserKey('focusedWindow'), focusedWindow);
+      } else {
+        localStorage.removeItem(getUserKey('focusedWindow'));
+      }
+    } catch (e) {
+      console.error('Error saving focused window:', e);
+    }
+  }, [focusedWindow, getUserKey]);
 
   const handleWindowStateChange = useCallback((windowType: WindowType, newState: WindowState) => {
     windowStatesRef.current[windowType] = newState;
@@ -877,8 +957,62 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       return userName.charAt(0).toUpperCase() + userName.slice(1);
   }, [currentUser.email]);
 
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
+  const commandActions = useMemo<CommandAction[]>(() => [
+    { id: 'add_task', title: 'Nueva Tarea', icon: <CheckSquare className="w-5 h-5 text-emerald-500" />, shortcut: 'Alt+A', onSelect: () => { toggleWindow('todo'); setTimeout(() => window.dispatchEvent(new CustomEvent('focus-todo-input')), 100); }, keywords: ['nueva', 'añadir', 'tarea', 'crear'] },
+    { id: 'todo', title: 'Abrir Lista de Tareas', icon: <CheckSquare className="w-5 h-5 text-emerald-500" />, shortcut: 'Alt+T', onSelect: () => toggleWindow('todo'), keywords: ['tareas', 'todo', 'lista'] },
+    { id: 'calendar', title: 'Abrir Calendario', icon: <Calendar className="w-5 h-5 text-blue-500" />, shortcut: 'Alt+C', onSelect: () => toggleWindow('calendar'), keywords: ['calendario', 'eventos', 'agenda'] },
+    { id: 'notes', title: 'Abrir Notas', icon: <BookOpen className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+N', onSelect: () => toggleWindow('notes'), keywords: ['notas', 'escribir', 'text'] },
+    { id: 'habits', title: 'Abrir Hábitos', icon: <Target className="w-5 h-5 text-purple-500" />, shortcut: 'Alt+H', onSelect: () => toggleWindow('habits'), keywords: ['habitos', 'rutina', 'tracker'] },
+    { id: 'finance', title: 'Abrir Finanzas', icon: <Target className="w-5 h-5 text-green-500" />, shortcut: 'Alt+F', onSelect: () => toggleWindow('finance'), keywords: ['finanzas', 'dinero', 'presupuesto'] },
+    { id: 'projects', title: 'Abrir Proyectos', icon: <Folder className="w-5 h-5 text-indigo-500" />, shortcut: 'Alt+P', onSelect: () => toggleWindow('projects'), keywords: ['proyectos', 'espacio', 'trabajo'] },
+    { id: 'pomodoro', title: 'Abrir Pomodoro', icon: <Clock className="w-5 h-5 text-rose-500" />, shortcut: 'Alt+O', onSelect: () => toggleWindow('pomodoro'), keywords: ['pomodoro', 'tiempo', 'reloj'] },
+    { id: 'music', title: 'Abrir Reproductor', icon: <Music className="w-5 h-5 text-pink-500" />, shortcut: 'Alt+M', onSelect: () => toggleWindow('music'), keywords: ['musica', 'reproductor', 'audio'] },
+    { id: 'theme', title: `Cambiar a modo ${theme === 'light' ? 'Oscuro' : 'Claro'}`, icon: theme === 'light' ? <Moon className="w-5 h-5 text-gray-500" /> : <Sun className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+D', onSelect: toggleTheme, keywords: ['tema', 'oscuro', 'claro', 'modo'] },
+    { id: 'settings', title: 'Abrir Configuración', icon: <Settings className="w-5 h-5 text-gray-500" />, onSelect: () => setIsCustomizationPanelOpen(true), keywords: ['configuracion', 'ajustes', 'personalizar'] }
+  ], [toggleWindow, toggleTheme, theme]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Toggle command palette
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+      
+      // Global shortcuts (only trigger if not focused on an input/textarea to avoid interfering with typing)
+      const target = e.target as HTMLElement;
+      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'SELECT' && !target.isContentEditable) {
+        if (e.altKey) {
+          switch (e.key.toLowerCase()) {
+            case 'a': e.preventDefault(); toggleWindow('todo'); setTimeout(() => window.dispatchEvent(new CustomEvent('focus-todo-input')), 100); break;
+            case 't': e.preventDefault(); toggleWindow('todo'); break;
+            case 'c': e.preventDefault(); toggleWindow('calendar'); break;
+            case 'n': e.preventDefault(); toggleWindow('notes'); break;
+            case 'h': e.preventDefault(); toggleWindow('habits'); break;
+            case 'f': e.preventDefault(); toggleWindow('finance'); break;
+            case 'p': e.preventDefault(); toggleWindow('projects'); break;
+            case 'o': e.preventDefault(); toggleWindow('pomodoro'); break;
+            case 'm': e.preventDefault(); toggleWindow('music'); break;
+            case 'd': e.preventDefault(); toggleTheme(); break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [toggleWindow, toggleTheme]);
+
   return (
     <div className="h-screen w-screen text-gray-800 dark:text-gray-100 font-sans overflow-hidden">
+        <CommandPalette 
+          isOpen={isCommandPaletteOpen} 
+          onClose={() => setIsCommandPaletteOpen(false)} 
+          actions={commandActions} 
+        />
+        
         {(pomodoroState.isActive && (pomodoroState.showBackgroundTimer || isFocusMode)) && (
           <BackgroundTimer 
             timeLeft={pomodoroState.timeLeft} 

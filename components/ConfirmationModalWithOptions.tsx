@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalOption {
     label: string;
@@ -35,7 +36,7 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
 }) => {
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[99999] overflow-y-auto animate-fade-in"
       aria-modal="true"
@@ -52,6 +53,7 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed font-normal">
           {message}
         </p>
+
         <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
           {options.map((option, index) => (
              <button
@@ -77,6 +79,11 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };
 
 export default ConfirmationModalWithOptions;

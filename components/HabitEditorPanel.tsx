@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Habit, HabitFrequency, FrequencyType } from '../types';
 import CloseIcon from './icons/CloseIcon';
 
@@ -106,7 +107,7 @@ const HabitEditorPanel: React.FC<HabitEditorPanelProps> = ({ isOpen, onClose, on
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fade-in" onClick={onClose}>
       <div 
         className="relative w-full max-w-md bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-3xl shadow-2xl flex flex-col z-[100000] overflow-visible max-h-[90vh]"
@@ -343,6 +344,11 @@ const HabitEditorPanel: React.FC<HabitEditorPanelProps> = ({ isOpen, onClose, on
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };
 
 export default HabitEditorPanel;

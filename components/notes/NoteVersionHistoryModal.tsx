@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { History, RotateCcw, Clock, X, Check, FileText } from 'lucide-react';
 import { Note, NoteVersion } from '../../types';
 import { cleanToPlainText } from '../../utils/textCleaner';
@@ -20,7 +21,7 @@ export const NoteVersionHistoryModal: React.FC<NoteVersionHistoryModalProps> = (
     versions.length > 0 ? versions[0] : null
   );
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in select-none overflow-y-auto" onClick={onClose}>
       <div 
         className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-3xl shadow-2xl w-full max-w-3xl h-[80vh] max-h-[600px] flex flex-col overflow-hidden text-left"
@@ -138,4 +139,11 @@ export const NoteVersionHistoryModal: React.FC<NoteVersionHistoryModalProps> = (
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };
+
+export default NoteVersionHistoryModal;

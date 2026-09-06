@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Todo, Subtask, Priority, RecurrenceRule, Project, CalendarProvider } from '../types';
 import { NotionService } from '../services/notionService';
 import { CalendarSyncService } from '../services/calendarSyncService';
@@ -343,7 +344,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
 
   if (!isOpen || !todo) return null;
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
@@ -968,6 +969,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
       />
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };
 
 export default TaskDetailsModal;

@@ -1,4 +1,5 @@
 import React, { useState, useRef, FormEvent, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { GoogleGenAI } from "@google/genai";
 import SparklesIcon from './icons/SparklesIcon';
 import SendIcon from './icons/SendIcon';
@@ -505,9 +506,9 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
                 </form>
             </footer>
 
-             {isSettingsOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in" onClick={() => setIsSettingsOpen(false)}>
-                    <div className="bg-yellow-50/95 dark:bg-gray-800/95 border border-yellow-200 dark:border-gray-700 rounded-2xl shadow-2xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto animate-pop-in" onClick={e => e.stopPropagation()}>
+             {isSettingsOpen && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in" onClick={() => setIsSettingsOpen(false)}>
+                    <div className="bg-yellow-50/95 dark:bg-gray-800/95 border border-yellow-200 dark:border-gray-700 rounded-3xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto animate-pop-in" onClick={e => e.stopPropagation()}>
                         <header className="flex items-center justify-between pb-2 mb-3 border-b border-yellow-300/50 dark:border-gray-700/50">
                             <h3 className="font-bold text-lg text-pink-500 dark:text-pink-400">Ajustes de Personalidad</h3>
                             <button onClick={() => setIsSettingsOpen(false)} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-pink-100 dark:hover:bg-gray-700 transition-colors"><CloseIcon /></button>
@@ -533,7 +534,8 @@ const Browser: React.FC<BrowserProps> = ({ session, setSession, onClose, current
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
              )}
             <ConfirmationModal
                 isOpen={confirmDeleteState.isOpen}

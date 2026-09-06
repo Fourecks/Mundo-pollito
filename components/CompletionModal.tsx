@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 interface CompletionModalProps {
   isOpen: boolean;
@@ -9,7 +10,7 @@ interface CompletionModalProps {
 const CompletionModal: React.FC<CompletionModalProps> = ({ isOpen, onClose, quote }) => {
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[99999] overflow-y-auto animate-fade-in"
       aria-modal="true"
@@ -38,6 +39,11 @@ const CompletionModal: React.FC<CompletionModalProps> = ({ isOpen, onClose, quot
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };
 
 export default CompletionModal;

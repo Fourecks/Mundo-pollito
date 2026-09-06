@@ -9,6 +9,14 @@ const TodoInput: React.FC<TodoInputProps> = ({ onAddTodo }) => {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    const handleFocusInput = () => {
+      textareaRef.current?.focus();
+    };
+    window.addEventListener('focus-todo-input', handleFocusInput);
+    return () => window.removeEventListener('focus-todo-input', handleFocusInput);
+  }, []);
+
   // Voice input state
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
