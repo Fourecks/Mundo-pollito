@@ -17,12 +17,12 @@ interface ConfirmationModalWithOptionsProps {
 const getButtonStyle = (style: ModalOption['style']) => {
     switch (style) {
         case 'danger':
-            return 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500';
+            return 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200';
         case 'primary':
-            return 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white';
+            return 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200';
         case 'default':
         default:
-            return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700';
+            return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700';
     }
 }
 
@@ -37,22 +37,22 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
 
   return (
     <div
-      className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-[99999] p-4 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-[99999] p-4 overflow-y-auto animate-fade-in"
       aria-modal="true"
       role="dialog"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-5 text-left z-[100000] animate-pop-in max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-xl p-5 text-left z-[100000] animate-pop-in max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
           {title}
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed font-normal">
           {message}
         </p>
-        <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
           {options.map((option, index) => (
              <button
                 key={index}
@@ -61,7 +61,7 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
                   option.onClick();
                   onClose();
                 }}
-                className={`w-full py-2 px-3 text-xs font-semibold rounded-lg transition-colors ${getButtonStyle(option.style)}`}
+                className={`w-full py-2 px-3 text-xs font-medium rounded-lg transition-colors cursor-pointer ${getButtonStyle(option.style)}`}
             >
                 {option.label}
             </button>
@@ -69,7 +69,7 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+            className="w-full py-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
           >
             Cancelar
           </button>

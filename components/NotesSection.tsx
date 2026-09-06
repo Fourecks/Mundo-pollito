@@ -23,7 +23,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
-import { normalizeNoteContentForEditor, sanitizeAndCleanHtml } from '../utils/textCleaner';
+import { normalizeNoteContentForEditor, sanitizeAndCleanHtml, cleanToPlainText } from '../utils/textCleaner';
 import { getAll, syncableCreate, ensureDB } from '../db';
 import { NoteView, SortOrder } from './notes/NotesTypes';
 import { NotesNavigationSidebar } from './notes/NotesNavigationSidebar';
@@ -1390,7 +1390,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         <ConfirmationModal
           isOpen={true}
           title="¿Archivar esta nota?"
-          message={`La nota "${noteToArchive.title || 'Sin título'}" se moverá a la sección de Archivadas. Podrás consultarla o restaurarla cuando quieras.`}
+          message={`La nota "${cleanToPlainText(noteToArchive.title) || 'Sin título'}" se moverá a la sección de Archivadas. Podrás consultarla o restaurarla cuando quieras.`}
           confirmText="Archivar Nota"
           cancelText="Cancelar"
           confirmVariant="warning"
@@ -1405,7 +1405,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         <ConfirmationModal
           isOpen={true}
           title="¿Mover a la papelera?"
-          message={`La nota "${noteToTrash.title || 'Sin título'}" se enviará a la papelera. Se cerrará del editor y podrás restaurarla desde la sección Papelera.`}
+          message={`La nota "${cleanToPlainText(noteToTrash.title) || 'Sin título'}" se enviará a la papelera. Podrás restaurarla desde la sección Papelera.`}
           confirmText="Mover a Papelera"
           cancelText="Cancelar"
           confirmVariant="danger"
@@ -1420,7 +1420,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         <ConfirmationModal
           isOpen={true}
           title="¿Eliminar definitivamente?"
-          message={`La nota "${noteToPermanentDelete.title || 'Sin título'}" se eliminará permanentemente. Esta acción es irreversible.`}
+          message={`La nota "${cleanToPlainText(noteToPermanentDelete.title) || 'Sin título'}" se eliminará permanentemente. Esta acción es irreversible.`}
           confirmText="Eliminar Permanentemente"
           cancelText="Cancelar"
           confirmVariant="danger"

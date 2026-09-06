@@ -73,7 +73,7 @@ export const NoteVersionHistoryModal: React.FC<NoteVersionHistoryModalProps> = (
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="truncate">{ver.title || 'Sin título'}</span>
+                    <span className="truncate">{cleanToPlainText(ver.title) || 'Sin título'}</span>
                     {idx === 0 && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium">
                         Actual
@@ -102,7 +102,7 @@ export const NoteVersionHistoryModal: React.FC<NoteVersionHistoryModalProps> = (
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 mb-3 flex-shrink-0">
                   <div>
                     <h4 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
-                      {selectedVersion.title || 'Sin título'}
+                      {cleanToPlainText(selectedVersion.title) || 'Sin título'}
                     </h4>
                     <span className="text-[11px] text-zinc-400">
                       Guardado el {new Date(selectedVersion.created_at).toLocaleString()}
