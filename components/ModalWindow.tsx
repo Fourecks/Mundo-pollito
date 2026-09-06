@@ -167,8 +167,16 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     const info = interactionStateRef.current;
     if (!info.active || !info.type || !modalRef.current) return;
 
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    // Safety: if mouse button was released outside, terminate interaction immediately
+    if ('buttons' in e && e.buttons === 0 && !('touches' in e)) {
+      onPointerUp();
+      return;
+    }
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
 
     const deltaX = clientX - info.startX;
     const deltaY = clientY - info.startY;
@@ -179,6 +187,8 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
       
       const newX = Math.max(-currentW + minVisibleHeaderX, Math.min(window.innerWidth - minVisibleHeaderX, info.originX + deltaX));
       const newY = Math.max(0, Math.min(window.innerHeight - 44, info.originY + deltaY));
+
+      if (!Number.isFinite(newX) || !Number.isFinite(newY)) return;
 
       info.lastX = Math.round(newX);
       info.lastY = Math.round(newY);
@@ -202,6 +212,8 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
 
       const newW = Math.round(Math.min(maxW, Math.max(minW, info.originWidth + deltaX)));
       const newH = Math.round(Math.min(maxH, Math.max(minH, info.originHeight + deltaY)));
+
+      if (!Number.isFinite(newW) || !Number.isFinite(newH)) return;
 
       info.lastW = newW;
       info.lastH = newH;
@@ -227,13 +239,24 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
       rafIdRef.current = null;
     }
 
-    window.removeEventListener('mousemove', onPointerMove);
+    window.removeEventListener('mousemove', onPointerMove as any);
     window.removeEventListener('mouseup', onPointerUp);
-    window.removeEventListener('touchmove', onPointerMove);
+    window.removeEventListener('touchmove', onPointerMove as any);
     window.removeEventListener('touchend', onPointerUp);
+    window.removeEventListener('touchcancel', onPointerUp);
+    window.removeEventListener('pointermove', onPointerMove as any);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    window.removeEventListener('blur', onPointerUp);
+    window.removeEventListener('mouseleave', onPointerUp);
 
-    const finalPos = { x: info.lastX, y: info.lastY };
-    const finalSize = { width: info.lastW, height: info.lastH };
+    const safeX = Number.isFinite(info.lastX) ? info.lastX : 100;
+    const safeY = Number.isFinite(info.lastY) ? info.lastY : 100;
+    const safeW = Number.isFinite(info.lastW) && info.lastW >= 150 ? info.lastW : 500;
+    const safeH = Number.isFinite(info.lastH) && info.lastH >= 100 ? info.lastH : 400;
+
+    const finalPos = { x: safeX, y: safeY };
+    const finalSize = { width: safeW, height: safeH };
 
     info.active = false;
     info.type = null;
@@ -271,10 +294,10 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     if (!modalRef.current) return;
     const rect = modalRef.current.getBoundingClientRect();
 
-    const initialX = currentPosRef.current ? currentPosRef.current.x : Math.round(rect.left);
-    const initialY = currentPosRef.current ? currentPosRef.current.y : Math.round(rect.top);
-    const initialW = currentSizeRef.current ? currentSizeRef.current.width : Math.round(rect.width);
-    const initialH = currentSizeRef.current ? currentSizeRef.current.height : Math.round(rect.height);
+    const initialX = (currentPosRef.current && Number.isFinite(currentPosRef.current.x)) ? currentPosRef.current.x : Math.round(rect.left);
+    const initialY = (currentPosRef.current && Number.isFinite(currentPosRef.current.y)) ? currentPosRef.current.y : Math.round(rect.top);
+    const initialW = (currentSizeRef.current && Number.isFinite(currentSizeRef.current.width) && currentSizeRef.current.width >= 150) ? currentSizeRef.current.width : Math.round(rect.width);
+    const initialH = (currentSizeRef.current && Number.isFinite(currentSizeRef.current.height) && currentSizeRef.current.height >= 100) ? currentSizeRef.current.height : Math.round(rect.height);
 
     const initialPos = { x: initialX, y: initialY };
     const initialSize = { width: initialW, height: initialH };
@@ -313,22 +336,37 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     };
 
     setIsInteracting(true);
-    window.addEventListener('mousemove', onPointerMove, { passive: true });
+    window.addEventListener('mousemove', onPointerMove as any, { passive: true });
     window.addEventListener('mouseup', onPointerUp);
-    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    window.addEventListener('touchmove', onPointerMove as any, { passive: true });
     window.addEventListener('touchend', onPointerUp);
+    window.addEventListener('touchcancel', onPointerUp);
+    window.addEventListener('pointermove', onPointerMove as any, { passive: true });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('blur', onPointerUp);
+    window.addEventListener('mouseleave', onPointerUp);
   }, [onFocus, onPointerMove, onPointerUp]);
 
   // Clean up any lingering window listeners and rAF
   useEffect(() => {
+    if (!isOpen && interactionStateRef.current.active) {
+      onPointerUp();
+    }
     return () => {
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-      window.removeEventListener('mousemove', onPointerMove);
+      window.removeEventListener('mousemove', onPointerMove as any);
       window.removeEventListener('mouseup', onPointerUp);
-      window.removeEventListener('touchmove', onPointerMove);
+      window.removeEventListener('touchmove', onPointerMove as any);
       window.removeEventListener('touchend', onPointerUp);
+      window.removeEventListener('touchcancel', onPointerUp);
+      window.removeEventListener('pointermove', onPointerMove as any);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      window.removeEventListener('blur', onPointerUp);
+      window.removeEventListener('mouseleave', onPointerUp);
     };
-  }, [onPointerMove, onPointerUp]);
+  }, [isOpen, onPointerMove, onPointerUp]);
 
   if (!isOpen) return null;
 
@@ -392,12 +430,15 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
       {/* Invisible backdrop during active drag/resize so iframes & inputs don't intercept pointer events */}
       {isInteracting && (
         <div 
-          className="fixed inset-0 select-none pointer-events-auto"
+          className="fixed inset-0 select-none pointer-events-auto cursor-move"
           style={{ 
             zIndex: 999999, 
             cursor: interactionStateRef.current.type === 'resize' ? 'nwse-resize' : 'move',
             userSelect: 'none'
           }}
+          onClick={onPointerUp}
+          onPointerUp={onPointerUp}
+          onTouchEnd={onPointerUp}
         />
       )}
 

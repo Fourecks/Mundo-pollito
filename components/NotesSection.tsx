@@ -1071,24 +1071,44 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   </button>
 
                   {/* Save Indicator */}
-                  <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100/80 dark:bg-zinc-800/70 border border-zinc-200/60 dark:border-zinc-700/60 text-xs font-medium text-zinc-600 dark:text-zinc-300 ml-1 relative z-50 cursor-default">
-                    {saveStatus === 'saving' && (
-                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
-                        <CloudLightning className="w-3.5 h-3.5 animate-pulse" />
-                        <span>Guardando...</span>
-                      </span>
-                    )}
-                    {saveStatus === 'saved' && (
-                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Guardado</span>
-                      </span>
-                    )}
-                    {saveStatus === 'error' && (
-                      <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-semibold">
-                        <span>Error al guardar</span>
-                      </span>
-                    )}
+                  <div 
+                    className="flex-shrink-0 flex items-center gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-zinc-100/90 dark:bg-zinc-800/80 border border-zinc-200/70 dark:border-zinc-700/70 text-xs font-medium ml-1 relative z-50 cursor-default select-none transition-all"
+                    title={saveStatus === 'saving' ? 'Guardando cambios...' : saveStatus === 'saved' ? 'Guardado correctamente' : 'Error al guardar'}
+                  >
+                    {/* Ring Loader Badge */}
+                    <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
+                      <div 
+                        className={`absolute inset-0 rounded-full border-2 transition-all duration-300 ${
+                          saveStatus === 'saving'
+                            ? 'border-amber-500/30 border-t-amber-500 animate-spin'
+                            : saveStatus === 'saved'
+                            ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-500/15'
+                            : 'border-rose-500 bg-rose-500/15'
+                        }`}
+                      />
+                      {saveStatus === 'saving' && (
+                        <CloudLightning className="w-3 h-3 text-amber-600 dark:text-amber-400 animate-pulse relative z-10" />
+                      )}
+                      {saveStatus === 'saved' && (
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 font-bold relative z-10 scale-105 transition-transform" />
+                      )}
+                      {saveStatus === 'error' && (
+                        <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 relative z-10">!</span>
+                      )}
+                    </div>
+
+                    {/* Text Label - Shown on medium/large screens */}
+                    <span className="hidden sm:inline text-xs font-medium">
+                      {saveStatus === 'saving' && (
+                        <span className="text-amber-600 dark:text-amber-400 font-semibold">Guardando...</span>
+                      )}
+                      {saveStatus === 'saved' && (
+                        <span className="text-emerald-600 dark:text-emerald-400">Guardado</span>
+                      )}
+                      {saveStatus === 'error' && (
+                        <span className="text-rose-600 dark:text-rose-400 font-semibold">Error</span>
+                      )}
+                    </span>
                   </div>
                 </div>
 
