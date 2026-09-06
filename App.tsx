@@ -571,13 +571,17 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               item.size &&
               typeof item.size.width === 'number' &&
               typeof item.size.height === 'number' &&
-              item.size.width >= 200 &&
-              item.size.height >= 120 &&
+              item.size.width >= 150 &&
+              item.size.height >= 100 &&
               item.pos &&
               typeof item.pos.x === 'number' &&
               typeof item.pos.y === 'number'
             ) {
-              cleaned[k] = item;
+              cleaned[k] = {
+                pos: item.pos,
+                size: item.size,
+                isFullscreen: Boolean(item.isFullscreen)
+              };
             }
           });
           windowStatesRef.current = cleaned;

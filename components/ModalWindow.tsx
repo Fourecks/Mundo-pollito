@@ -84,8 +84,14 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     return null;
   });
 
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(windowState?.isFullscreen));
   const [isInteracting, setIsInteracting] = useState(false);
+
+  useEffect(() => {
+    if (windowState?.isFullscreen !== undefined) {
+      setIsFullscreen(Boolean(windowState.isFullscreen));
+    }
+  }, [windowState?.isFullscreen]);
 
   useEffect(() => {
     if (isFullscreen) {
@@ -270,12 +276,28 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     onStateChange?.({
       pos: finalPos,
       size: finalSize,
+      isFullscreen,
     });
-  }, [onPointerMove, onStateChange]);
+  }, [isFullscreen, onPointerMove, onStateChange]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!allowFullscreen) return;
+    setIsFullscreen((prev) => {
+      const next = !prev;
+      onStateChange?.({
+        pos: currentPosRef.current || { x: 100, y: 100 },
+        size: currentSizeRef.current || { width: 800, height: 600 },
+        isFullscreen: next,
+      });
+      return next;
+    });
+  }, [allowFullscreen, onStateChange]);
 
   const startInteraction = useCallback((e: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>, type: 'drag' | 'resize') => {
     onFocus?.();
     e.stopPropagation();
+
+    if (isFullscreen) return;
 
     if (type === 'drag') {
       const target = e.target as HTMLElement;
@@ -464,7 +486,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
                 className={`flex items-center justify-between px-4 py-2.5 border-b border-gray-200/70 dark:border-gray-700/70 bg-gray-50/80 dark:bg-gray-900/60 backdrop-blur-md shrink-0 select-none ${isDraggable ? 'cursor-move touch-none' : 'cursor-default'}`}
                 onDoubleClick={() => {
                   if (allowFullscreen) {
-                    setIsFullscreen(true);
+                    toggleFullscreen();
                   } else if (isCustomPlaced) {
                     // Reset to center
                     setPos(null);
@@ -508,7 +530,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setIsFullscreen(!isFullscreen);
+                        toggleFullscreen();
                       }}
                       className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
                       title={isFullscreen ? "Restaurar tamaño" : "Pantalla completa"}

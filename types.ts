@@ -3,6 +3,8 @@ import { GenerateContentResponse } from '@google/genai';
 export interface WindowState {
   pos: { x: number; y: number };
   size: { width: number; height: number };
+  isFullscreen?: boolean;
+  isOpen?: boolean;
 }
 
 export type Priority = 'low' | 'medium' | 'high';

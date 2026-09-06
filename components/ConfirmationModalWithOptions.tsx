@@ -37,13 +37,13 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center z-[99999] p-4 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-[99999] overflow-y-auto animate-fade-in"
       aria-modal="true"
       role="dialog"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-xl p-5 text-left z-[100000] animate-pop-in max-h-[90vh] overflow-y-auto"
+        className="relative w-full sm:max-w-sm bg-white dark:bg-zinc-900 border-t sm:border border-zinc-200/80 dark:border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-xl p-5 text-left z-[100000] animate-pop-in max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
