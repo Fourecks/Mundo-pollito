@@ -6,8 +6,6 @@ import {
   Clock,
   FileText,
   History,
-  Link,
-  Check,
   X,
   Plus,
   BookOpen,
@@ -42,7 +40,6 @@ export const NoteDetailsPanel: React.FC<NoteDetailsPanelProps> = ({
   onClose,
 }) => {
   const [newTagInput, setNewTagInput] = useState('');
-  const [copiedLink, setCopiedLink] = useState(false);
   const [tocItems, setTocItems] = useState<TocItem[]>([]);
 
   // Calculate stats
@@ -79,13 +76,6 @@ export const NoteDetailsPanel: React.FC<NoteDetailsPanelProps> = ({
     }
   };
 
-  const handleCopyNoteLink = () => {
-    const link = `${window.location.origin}/#note-${note.id}`;
-    navigator.clipboard.writeText(link);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
-
   return (
     <div className="w-72 flex-shrink-0 h-full bg-zinc-50 dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col p-4 text-xs select-none custom-scrollbar overflow-y-auto">
       
@@ -97,7 +87,7 @@ export const NoteDetailsPanel: React.FC<NoteDetailsPanelProps> = ({
         </h3>
         <button
           onClick={onClose}
-          className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800"
+          className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -160,7 +150,7 @@ export const NoteDetailsPanel: React.FC<NoteDetailsPanelProps> = ({
               #{t}
               <button
                 onClick={() => onRemoveTag(t)}
-                className="hover:text-zinc-900 dark:hover:text-white rounded-full ml-0.5"
+                className="hover:text-zinc-900 dark:hover:text-white rounded-full ml-0.5 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -186,7 +176,7 @@ export const NoteDetailsPanel: React.FC<NoteDetailsPanelProps> = ({
           <button
             type="submit"
             disabled={!newTagInput.trim()}
-            className="p-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white disabled:opacity-30 hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white disabled:opacity-30 hover:bg-zinc-800 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -216,26 +206,16 @@ export const NoteDetailsPanel: React.FC<NoteDetailsPanelProps> = ({
       )}
 
       {/* Utility Actions */}
-      <div className="mt-auto pt-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+      <div className="mt-auto pt-3 border-t border-zinc-200 dark:border-zinc-800">
         <button
           onClick={onOpenVersionHistory}
-          className="w-full flex items-center justify-between p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-all"
+          className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-all cursor-pointer shadow-2xs"
         >
           <div className="flex items-center gap-2">
-            <History className="w-3.5 h-3.5 text-zinc-500" />
+            <History className="w-4 h-4 text-zinc-500" />
             <span>Historial de Versiones</span>
           </div>
           <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
-        </button>
-
-        <button
-          onClick={handleCopyNoteLink}
-          className="w-full flex items-center justify-between p-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-all"
-        >
-          <div className="flex items-center gap-2">
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-100" /> : <Link className="w-3.5 h-3.5 text-zinc-400" />}
-            <span>{copiedLink ? '¡Enlace copiado!' : 'Copiar Enlace'}</span>
-          </div>
         </button>
       </div>
 

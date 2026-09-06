@@ -12,7 +12,6 @@ import {
   Archive,
   RotateCcw,
   Sparkles,
-  Share2,
   Printer,
   Download,
   Maximize2,
@@ -341,6 +340,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       await onUpdateNote(updated);
       if (selectedNoteId === noteToArchive.id) {
         setSelectedNoteId(null);
+        setIsFocusMode(false);
       }
       setNoteToArchive(null);
     } catch (e) {
@@ -359,6 +359,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       await onUpdateNote(updated);
       if (selectedNoteId === noteToTrash.id) {
         setSelectedNoteId(null);
+        setIsFocusMode(false);
       }
       setNoteToTrash(null);
     } catch (e) {
@@ -372,6 +373,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       await onDeleteNote(noteToPermanentDelete.id, noteToPermanentDelete.folder_id);
       if (selectedNoteId === noteToPermanentDelete.id) {
         setSelectedNoteId(null);
+        setIsFocusMode(false);
       }
       setNoteToPermanentDelete(null);
     } catch (e) {
@@ -494,7 +496,167 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   };
 
   const handlePrintNote = () => {
-    window.print();
+    if (!selectedNote) return;
+    const folderName = folders.find(f => f.id === selectedNote.folder_id)?.name;
+    const noteTitle = selectedNote.title || 'Sin título';
+    const noteContent = editorRef.current ? editorRef.current.innerHTML : (selectedNote.content || '');
+    const dateFormatted = new Date(selectedNote.updated_at || selectedNote.created_at).toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const tagsHtml = (selectedNote.tags || []).length > 0 
+      ? `<div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+          ${(selectedNote.tags || []).map(t => `<span style="font-size: 11px; background: #f4f4f5; color: #3f3f46; border: 1px solid #e4e4e7; border-radius: 4px; padding: 2px 6px;">#${t}</span>`).join('')}
+         </div>`
+      : '';
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.id = 'print-note-iframe';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="utf-8">
+        <title>${noteTitle}</title>
+        <style>
+          @page {
+            margin: 20mm;
+            size: auto;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #18181b;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            line-height: 1.65;
+            font-size: 14px;
+          }
+          .header {
+            border-bottom: 2px solid #e4e4e7;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+          }
+          .title {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            color: #09090b;
+          }
+          .meta {
+            font-size: 12px;
+            color: #71717a;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+          }
+          .content {
+            font-size: 14px;
+            color: #27272a;
+          }
+          .content h1 { font-size: 22px; font-weight: 700; margin-top: 20px; margin-bottom: 8px; }
+          .content h2 { font-size: 18px; font-weight: 600; margin-top: 16px; margin-bottom: 6px; }
+          .content h3 { font-size: 16px; font-weight: 600; margin-top: 14px; margin-bottom: 4px; }
+          .content p { margin: 0 0 12px 0; }
+          .content ul, .content ol { margin: 0 0 12px 0; padding-left: 24px; }
+          .content blockquote {
+            border-left: 3px solid #3b82f6;
+            margin: 12px 0;
+            padding: 6px 12px;
+            background: #f8fafc;
+            color: #475569;
+            font-style: italic;
+          }
+          .content pre, .content code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background: #f4f4f5;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 13px;
+          }
+          .content pre {
+            padding: 12px;
+            overflow-x: auto;
+            border: 1px solid #e4e4e7;
+          }
+          .content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0;
+          }
+          .content th, .content td {
+            border: 1px solid #e4e4e7;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 13px;
+          }
+          .content th {
+            background: #f4f4f5;
+            font-weight: 600;
+          }
+          .content hr {
+            border: 0;
+            border-top: 1px solid #e4e4e7;
+            margin: 16px 0;
+          }
+          .content img {
+            max-width: 100%;
+            height: auto;
+          }
+          .callout {
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 12px 0;
+            border-left: 4px solid;
+          }
+          .callout-info { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+          .callout-warning { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+          .callout-success { background: #f0fdf4; border-color: #22c55e; color: #166534; }
+          .callout-danger { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 class="title">${noteTitle}</h1>
+          <div class="meta">
+            ${folderName ? `<span>📁 Carpeta: <strong>${folderName}</strong></span>` : ''}
+            <span>🕒 Modificado: ${dateFormatted}</span>
+          </div>
+          ${tagsHtml}
+        </div>
+        <div class="content">
+          ${noteContent}
+        </div>
+      </body>
+      </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 1000);
+    }, 250);
   };
 
   return (
@@ -770,6 +932,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           confirmVariant="warning"
           onConfirm={handleConfirmArchiveNote}
           onCancel={() => setNoteToArchive(null)}
+          onClose={() => setNoteToArchive(null)}
         />
       )}
 
@@ -784,6 +947,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           confirmVariant="danger"
           onConfirm={handleConfirmTrashNote}
           onCancel={() => setNoteToTrash(null)}
+          onClose={() => setNoteToTrash(null)}
         />
       )}
 
@@ -798,6 +962,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           confirmVariant="danger"
           onConfirm={handleConfirmPermanentDelete}
           onCancel={() => setNoteToPermanentDelete(null)}
+          onClose={() => setNoteToPermanentDelete(null)}
         />
       )}
 
@@ -812,6 +977,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           confirmVariant="danger"
           onConfirm={handleConfirmDeleteFolder}
           onCancel={() => setFolderToDelete(null)}
+          onClose={() => setFolderToDelete(null)}
         />
       )}
 
