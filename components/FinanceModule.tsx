@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient";
 import {
   FinanceAccount,
@@ -465,6 +466,15 @@ const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
       </AnimatePresence>
     </div>
   );
+};
+
+const FinancePortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  if (!mounted || typeof document === "undefined") return null;
+  return createPortal(children, document.body);
 };
 
 interface FinanceModuleProps {
@@ -8009,22 +8019,24 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
         </div>
       </div>
 
-      {/* Quick Add Modal */}
-      <AnimatePresence>
-        {showTxModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowTxModal(false)}
-          >
+      {/* Portaled Modals (renders to document.body, outside window boundaries) */}
+      <FinancePortal>
+        {/* Quick Add Modal */}
+        <AnimatePresence>
+          {showTxModal && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[90vh] overflow-y-auto custom-scrollbar"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 overflow-y-auto"
+              onClick={() => setShowTxModal(false)}
             >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[90vh] overflow-y-auto custom-scrollbar my-auto"
+              >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold">
                   Registrar{" "}
@@ -10784,6 +10796,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
           </motion.div>
         )}
       </AnimatePresence>
+      </FinancePortal>
     </div>
   );
 };

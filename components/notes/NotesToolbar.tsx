@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Bold,
   Italic,
@@ -228,7 +229,7 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
   const currentFontObj = FONT_FAMILY_OPTIONS.find(f => f.value === selectedFont) || FONT_FAMILY_OPTIONS[0];
 
   return (
-    <div className="px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center gap-1 overflow-x-auto custom-scrollbar bg-zinc-50/80 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-200 select-none text-xs">
+    <div className="px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800/80 flex flex-wrap items-center gap-1 bg-zinc-50/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-200 select-none text-xs relative z-40">
       
       {/* 1. Undo / Redo */}
       <div className="flex items-center gap-0.5">
@@ -738,10 +739,10 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
         <Eraser className="w-3.5 h-3.5" />
       </button>
 
-      {/* Table Insertion Modal */}
-      {showTableModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 w-full max-w-xs text-left">
+      {/* Modals rendered to body */}
+      {typeof document !== 'undefined' && showTableModal && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 w-full max-w-xs text-left">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <TableIcon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
@@ -799,13 +800,14 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Link Modal */}
-      {showLinkModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 w-full max-w-sm text-left">
+      {typeof document !== 'undefined' && showLinkModal && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 w-full max-w-sm text-left">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <LinkIcon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
@@ -861,13 +863,14 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Image Modal */}
-      {showImageModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 w-full max-w-sm text-left">
+      {typeof document !== 'undefined' && showImageModal && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 w-full max-w-sm text-left">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
@@ -923,7 +926,8 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

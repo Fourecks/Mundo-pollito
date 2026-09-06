@@ -534,12 +534,12 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
       {/* 2. NOTE EDITOR MAIN CANVAS */}
       {(!isMobile || selectedNoteId) && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-white dark:bg-zinc-950 relative">
+        <div className="flex-1 flex flex-col h-full min-h-0 bg-white dark:bg-zinc-950 relative overflow-hidden">
           {selectedNote ? (
-            <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex flex-col h-full min-h-0 relative">
               
               {/* Note Header / Meta Bar */}
-              <div className="px-5 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3 select-none flex-shrink-0">
+              <div className="px-5 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3 select-none flex-shrink-0 relative z-20">
                 
                 {/* Left side: Back on mobile, Pin, Favorite, Status */}
                 <div className="flex items-center gap-2 min-w-0">
@@ -684,13 +684,15 @@ const NotesSection: React.FC<NotesSectionProps> = ({
               </div>
 
               {/* 3. ROBUST RICH TEXT TOOLBAR */}
-              <NotesToolbar
-                onApplyCommand={handleApplyCommand}
-                onInsertHtml={handleInsertHtml}
-              />
+              <div className="relative z-30 flex-shrink-0">
+                <NotesToolbar
+                  onApplyCommand={handleApplyCommand}
+                  onInsertHtml={handleInsertHtml}
+                />
+              </div>
 
               {/* 4. Canvas Body Area with Optional Details Panel */}
-              <div className="flex-1 flex overflow-hidden">
+              <div className="flex-1 min-h-0 flex overflow-hidden relative z-10">
                 
                 {/* Editor Surface */}
                 <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-6 md:p-10 max-w-4xl mx-auto w-full">
