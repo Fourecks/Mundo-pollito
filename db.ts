@@ -505,7 +505,12 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
             delete updateData.created_at;
             delete updateData.user_id;
             
-            const { data: updatedRecord, error } = await supabase.from(tableName).update(updateData).eq('id', id).select().single();
+            // Fast timeout so network stalls never hang updates
+            const updatePromise = supabase.from(tableName).update(updateData).eq('id', id).select().single();
+            const timeoutPromise = new Promise<{ data: any; error: any }>((resolve) =>
+                setTimeout(() => resolve({ data: null, error: new Error('Supabase update timeout') }), 2500)
+            );
+            const { data: updatedRecord, error } = await Promise.race([updatePromise, timeoutPromise]);
             if (error) {
                 console.warn(`Supabase update for ${tableName} queued:`, error);
                 await queueMutation({ type: 'UPDATE', tableName, payload });

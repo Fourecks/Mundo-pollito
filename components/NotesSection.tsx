@@ -93,7 +93,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   const activeNoteIdRef = useRef<number | null>(null);
   const isTypingRef = useRef<boolean>(false);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSavedContentRef = useRef<{ title: string; content: string }>({ title: '', content: '' });
+  const lastSavedContentMapRef = useRef<Map<number, { title: string; content: string }>>(new Map());
   const lastActiveTargetRef = useRef<'title' | 'body'>('body');
   const savedRangeRef = useRef<Range | null>(null);
 
@@ -117,6 +117,12 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       projectId ? n.project_id === projectId : subjectId ? n.subject_id === subjectId : (!n.project_id && !n.subject_id)
     );
   }, [allNotes, projectId, subjectId]);
+
+  // Keep live refs to notes for synchronous lookup in async callbacks
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const allNotesRef = useRef(allNotes);
+  allNotesRef.current = allNotes;
 
   // Selected note object
   const selectedNote = React.useMemo(() => {
@@ -179,20 +185,32 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     });
   }, [notes, currentView, selectedFolderId, selectedTag, searchTerm, sortOrder]);
 
-  // Auto-Save Mechanism
+  // Auto-Save Mechanism with per-note tracking & instant persistence
   const executeSave = useCallback(
     async (targetNoteId: number, titleToSave: string, contentToSave: string) => {
       if (!targetNoteId) return;
 
-      const current = notes.find(n => n.id === targetNoteId);
-      if (!current) return;
+      const sanitizedContent = sanitizeAndCleanHtml(contentToSave);
 
-      // Check if unchanged
+      // Check if unchanged for this specific note
+      const lastSaved = lastSavedContentMapRef.current.get(targetNoteId);
       if (
-        activeNoteIdRef.current === targetNoteId &&
-        titleToSave === lastSavedContentRef.current.title &&
-        contentToSave === lastSavedContentRef.current.content
+        lastSaved &&
+        titleToSave === lastSaved.title &&
+        sanitizedContent === lastSaved.content
       ) {
+        setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'saved' }));
+        if (pendingSaveRef.current?.noteId === targetNoteId) {
+          pendingSaveRef.current = null;
+        }
+        return;
+      }
+
+      const current = notesRef.current.find(n => n.id === targetNoteId) ||
+                      allNotesRef.current.find(n => n.id === targetNoteId) ||
+                      (selectedNote?.id === targetNoteId ? selectedNote : null);
+
+      if (!current) {
         setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'saved' }));
         if (pendingSaveRef.current?.noteId === targetNoteId) {
           pendingSaveRef.current = null;
@@ -202,7 +220,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
       setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'saving' }));
       try {
-        const sanitizedContent = sanitizeAndCleanHtml(contentToSave);
         const updated: Note = {
           ...current,
           title: titleToSave,
@@ -211,9 +228,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         };
 
         await onUpdateNote(updated);
-        if (activeNoteIdRef.current === targetNoteId) {
-          lastSavedContentRef.current = { title: titleToSave, content: sanitizedContent };
-        }
+        lastSavedContentMapRef.current.set(targetNoteId, { title: titleToSave, content: sanitizedContent });
         setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'saved' }));
         if (pendingSaveRef.current?.noteId === targetNoteId) {
           pendingSaveRef.current = null;
@@ -223,7 +238,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'error' }));
       }
     },
-    [notes, onUpdateNote]
+    [onUpdateNote, selectedNote]
   );
 
   const scheduleAutoSave = (newTitle: string, newContent: string) => {
@@ -238,7 +253,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     }
     autoSaveTimeoutRef.current = setTimeout(() => {
       executeSave(activeId, newTitle, newContent);
-    }, 350);
+    }, 300);
   };
 
   // Load note into editor when selection changes
@@ -251,6 +266,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     if (pendingSaveRef.current) {
       const { noteId: pId, title: pTitle, content: pContent } = pendingSaveRef.current;
       pendingSaveRef.current = null;
+      // Execute save for previous note in background
       executeSave(pId, pTitle, pContent);
     }
 
@@ -262,7 +278,10 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       }
       const cleanContent = normalizeNoteContentForEditor(selectedNote.content || '');
       setActiveNoteContent(cleanContent);
-      lastSavedContentRef.current = { title: plainTitle, content: cleanContent };
+      
+      if (!lastSavedContentMapRef.current.has(selectedNote.id)) {
+        lastSavedContentMapRef.current.set(selectedNote.id, { title: plainTitle, content: cleanContent });
+      }
 
       if (editorRef.current) {
         editorRef.current.innerHTML = cleanContent;
@@ -829,9 +848,16 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   const handleCloseNote = useCallback(() => {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
     }
-    if (activeNoteIdRef.current && (activeNoteTitle !== lastSavedContentRef.current.title || activeNoteContent !== lastSavedContentRef.current.content)) {
-      executeSave(activeNoteTitle, activeNoteContent);
+    if (activeNoteIdRef.current) {
+      const activeId = activeNoteIdRef.current;
+      const t = titleRef.current ? titleRef.current.innerHTML : activeNoteTitle;
+      const c = editorRef.current ? editorRef.current.innerHTML : activeNoteContent;
+      const lastSaved = lastSavedContentMapRef.current.get(activeId);
+      if (!lastSaved || t !== lastSaved.title || c !== lastSaved.content) {
+        executeSave(activeId, t, c);
+      }
     }
     setSelectedNoteId(null);
     setIsReadingMode(false);
@@ -1046,6 +1072,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           onEditingFolderNameChange={setEditingFolderName}
           onSaveRenameFolder={handleSaveRenameFolder}
           isMobile={isMobile}
+          noteSaveStatus={noteSaveStatus}
         />
       )}
 

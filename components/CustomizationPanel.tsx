@@ -189,39 +189,57 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
       case 'shortcuts': {
         const shortcutCategories = [
           {
-            id: 'navigation',
-            name: 'Navegación de Ventanas y Módulos',
+            id: 'windows_management',
+            name: 'Gestión y Multitarea de Ventanas',
             items: [
-              { title: 'Nueva Tarea', desc: 'Abre la lista de tareas y enfoca directamente el campo de entrada', win: ['Alt', 'A'], mac: ['⌥ Option', 'A'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'A'] },
+              { title: 'Cambiar a Ventana de Atrás', desc: 'Alterna el foco a la ventana inmediatamente detrás de la actual', win: ['Alt', '['], mac: ['⌥ Option', '['], winAlt: ['Alt', '←'], macAlt: ['⌥ Option', '←'] },
+              { title: 'Cambiar a Ventana Siguiente', desc: 'Avanza y enfoca cíclicamente la siguiente ventana abierta', win: ['Alt', ']'], mac: ['⌥ Option', ']'], winAlt: ['Alt', '→'], macAlt: ['⌥ Option', '→'] },
+              { title: 'Restaurar Última Minimizada', desc: 'Desminimiza y trae al frente la última ventana minimizada', win: ['Alt', 'U'], mac: ['⌥ Option', 'U'], winAlt: ['Alt', '⇧ Shift', 'Z'], macAlt: ['⌘ Cmd', '⇧ Shift', 'Z'] },
+              { title: 'Minimizar Ventana Activa', desc: 'Oculta la ventana que tienes enfocada en este momento', win: ['Alt', 'W'], mac: ['⌥ Option', 'W'], winAlt: null, macAlt: ['⌘ Cmd', 'M'] },
+              { title: 'Cerrar Ventana Activa', desc: 'Cierra por completo la ventana actual enfocada', win: ['Alt', 'Q'], mac: ['⌥ Option', 'Q'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'W'] },
+              { title: 'Mostrar Escritorio / Ocultar Todo', desc: 'Minimiza todas las ventanas abiertas o las restaura si ya están ocultas', win: ['Alt', '0'], mac: ['⌥ Option', '0'], winAlt: ['Alt', '⇧ Shift', 'D'], macAlt: ['⌥ Option', '⇧ Shift', 'D'] },
+            ]
+          },
+          {
+            id: 'modules',
+            name: 'Módulos y Aplicaciones',
+            items: [
+              { title: 'Nueva Tarea Rápida', desc: 'Abre la lista de tareas y enfoca directamente el campo de entrada', win: ['Alt', 'A'], mac: ['⌥ Option', 'A'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'A'] },
               { title: 'Lista de Tareas', desc: 'Abre o enfoca la ventana de tareas y subtareas', win: ['Alt', 'T'], mac: ['⌥ Option', 'T'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'T'] },
               { title: 'Calendario y Agenda', desc: 'Accede a la vista mensual, semanal y eventos del día', win: ['Alt', 'C'], mac: ['⌥ Option', 'C'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'C'] },
               { title: 'Bloc de Notas', desc: 'Abre el editor de notas y documentos enriquecidos', win: ['Alt', 'N'], mac: ['⌥ Option', 'N'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'N'] },
               { title: 'Hábitos y Rutinas', desc: 'Seguimiento visual de hábitos diarios y rachas activas', win: ['Alt', 'H'], mac: ['⌥ Option', 'H'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'H'] },
               { title: 'Finanzas y Gastos', desc: 'Control de ingresos, transacciones y presupuestos', win: ['Alt', 'F'], mac: ['⌥ Option', 'F'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'F'] },
               { title: 'Espacio de Proyectos', desc: 'Gestión de proyectos, carpetas y materias académicas', win: ['Alt', 'P'], mac: ['⌥ Option', 'P'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'P'] },
-              { title: 'Temporizador Pomodoro', desc: 'Sesiones de concentración y control de descansos', win: ['Alt', 'O'], mac: ['⌥ Option', 'O'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'O'] },
-              { title: 'Reproductor de Música', desc: 'Música ambiental lo-fi y generador de sonidos', win: ['Alt', 'M'], mac: ['⌥ Option', 'M'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'M'] },
+              { title: 'Temporizador Pomodoro', desc: 'Abre la ventana de concentración y control de descansos', win: ['Alt', 'O'], mac: ['⌥ Option', 'O'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'O'] },
+              { title: 'Reproductor de Música', desc: 'Abre la ventana de música ambiental lo-fi y generador de sonidos', win: ['Alt', 'M'], mac: ['⌥ Option', 'M'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'M'] },
+              { title: 'Módulo de Estudio', desc: 'Abre el espacio de estudio guiado con técnicas activas', win: ['Alt', 'E'], mac: ['⌥ Option', 'E'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'E'] },
+              { title: 'Informe de Progreso', desc: 'Visualiza tus estadísticas de productividad y rendimiento', win: ['Alt', 'R'], mac: ['⌥ Option', 'R'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'R'] },
+              { title: 'Navegador Web', desc: 'Abre el explorador web integrado de recursos', win: ['Alt', 'B'], mac: ['⌥ Option', 'B'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'B'] },
             ]
           },
           {
-            id: 'system',
-            name: 'Sistema y Productividad',
+            id: 'productivity',
+            name: 'Productividad y Sistema',
             items: [
-              { title: 'Paleta de Comandos', desc: 'Búsqueda rápida y ejecución de cualquier acción en la app', win: ['Ctrl', 'K'], mac: ['⌘ Cmd', 'K'], winAlt: null, macAlt: null },
-              { title: 'Alternar Tema Claro / Oscuro', desc: 'Cambia al instante entre tema claro y tema oscuro', win: ['Alt', 'D'], mac: ['⌥ Option', 'D'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'D'] },
-              { title: 'Ajustes y Configuración', desc: 'Abre este panel de personalización y preferencias', win: ['Alt', 'S'], mac: ['⌘ Cmd', ','], winAlt: ['Alt', ','], macAlt: ['⌥ Option', 'S'] },
+              { title: 'Paleta de Comandos Universal', desc: 'Búsqueda instantánea y ejecución de cualquier acción', win: ['Ctrl', 'K'], mac: ['⌘ Cmd', 'K'], winAlt: ['Ctrl', 'P'], macAlt: ['⌘ Cmd', 'P'] },
+              { title: 'Iniciar / Pausar Pomodoro', desc: 'Alterna el temporizador de concentración desde cualquier lugar', win: ['Alt', 'Espacio'], mac: ['⌥ Option', 'Espacio'], winAlt: null, macAlt: null },
+              { title: 'Alternar Modo Enfoque Zen', desc: 'Oculta elementos de distracción para una concentración total', win: ['Alt', 'Z'], mac: ['⌥ Option', 'Z'], winAlt: ['Alt', '⇧ Shift', 'F'], macAlt: ['⌥ Option', '⇧ Shift', 'F'] },
+              { title: 'Alternar Tema Claro / Oscuro', desc: 'Cambia al instante entre la interfaz clara y oscura', win: ['Alt', 'D'], mac: ['⌥ Option', 'D'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'D'] },
+              { title: 'Ajustes y Personalización', desc: 'Abre este panel de preferencias y configuración', win: ['Alt', 'S'], mac: ['⌘ Cmd', ','], winAlt: ['Alt', ','], macAlt: ['⌥ Option', 'S'] },
             ]
           },
           {
             id: 'editor',
             name: 'Editor de Notas y Formato de Texto',
             items: [
-              { title: 'Guardar Nota Inmediatamente', desc: 'Fuerza el guardado instantáneo en base de datos local y sincronizada', win: ['Ctrl', 'S'], mac: ['⌘ Cmd', 'S'], winAlt: null, macAlt: null },
+              { title: 'Guardar Nota Inmediatamente', desc: 'Fuerza el guardado instantáneo sin esperar el auto-guardado', win: ['Ctrl', 'S'], mac: ['⌘ Cmd', 'S'], winAlt: null, macAlt: null },
               { title: 'Deshacer Cambio', desc: 'Revierte la última edición realizada en la nota actual', win: ['Ctrl', 'Z'], mac: ['⌘ Cmd', 'Z'], winAlt: null, macAlt: null },
               { title: 'Rehacer Cambio', desc: 'Reaplica la acción que acabas de deshacer', win: ['Ctrl', 'Y'], mac: ['⌘ Cmd', '⇧ Shift', 'Z'], winAlt: ['Ctrl', '⇧ Shift', 'Z'], macAlt: ['⌘ Cmd', 'Y'] },
               { title: 'Formato Negrita', desc: 'Aplica o retira el estilo de negrita del texto seleccionado', win: ['Ctrl', 'B'], mac: ['⌘ Cmd', 'B'], winAlt: null, macAlt: null },
               { title: 'Formato Cursiva', desc: 'Aplica o retira la cursiva del texto seleccionado', win: ['Ctrl', 'I'], mac: ['⌘ Cmd', 'I'], winAlt: null, macAlt: null },
               { title: 'Formato Subrayado', desc: 'Aplica o retira el subrayado del texto seleccionado', win: ['Ctrl', 'U'], mac: ['⌘ Cmd', 'U'], winAlt: null, macAlt: null },
+              { title: 'Formato Tachado', desc: 'Aplica o retira el tachado del texto seleccionado', win: ['Ctrl', '⇧ Shift', 'X'], mac: ['⌘ Cmd', '⇧ Shift', 'X'], winAlt: null, macAlt: null },
             ]
           }
         ];
@@ -241,20 +259,20 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
         }).filter(cat => cat.items.length > 0);
 
         return (
-          <div className="flex flex-col h-full animate-in fade-in duration-200 space-y-6">
+          <div className="flex flex-col h-full animate-in fade-in duration-200 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <Keyboard className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                   Atajos de Teclado
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Selecciona tu sistema operativo para visualizar las combinaciones correspondientes.
+                  Selecciona tu sistema operativo para ver las combinaciones activas.
                 </p>
               </div>
 
               {/* Search Bar */}
-              <div className="relative w-full sm:w-60">
+              <div className="relative w-full sm:w-56">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
@@ -274,95 +292,75 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
               </div>
             </div>
 
-            {/* Horizontal Platform Selector Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Horizontal Platform Selector Cards - Responsive & No Overflow */}
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
               {/* Windows / Linux Card */}
-              <div
+              <button
+                type="button"
                 onClick={() => setSelectedOS('windows')}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedOS('windows'); }}
-                className={`relative p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                className={`w-full p-3 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left flex items-center gap-3 overflow-hidden ${
                   selectedOS === 'windows'
-                    ? 'border-zinc-900 dark:border-white bg-zinc-900/[0.03] dark:bg-white/[0.04] shadow-xs'
-                    : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#151618] hover:border-gray-300 dark:hover:border-zinc-700 opacity-70 hover:opacity-100'
+                    ? 'border-zinc-900 dark:border-white bg-zinc-900/[0.04] dark:bg-white/[0.06] shadow-sm'
+                    : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#151618] hover:border-gray-300 dark:hover:border-zinc-700 opacity-75 hover:opacity-100'
                 }`}
               >
-                <div className="flex items-center gap-3.5">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
-                    selectedOS === 'windows'
-                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
-                      : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'
-                  }`}>
-                    <Monitor className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Windows & Linux</h4>
-                      {selectedOS === 'windows' && (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 flex items-center gap-0.5">
-                          <Check className="w-3 h-3" /> Activo
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      Combinaciones con teclas <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">Alt</span> y <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">Ctrl</span>
-                    </p>
-                  </div>
+                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  selectedOS === 'windows'
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
+                    : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'
+                }`}>
+                  <Monitor className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-
-                <div className="hidden sm:flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded text-gray-700 dark:text-zinc-300">Alt</kbd>
-                    <span className="text-[10px] text-gray-400">+</span>
-                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded text-gray-700 dark:text-zinc-300">A</kbd>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      Windows / Linux
+                    </span>
+                    {selectedOS === 'windows' && (
+                      <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                        <Check className="w-2.5 h-2.5" /> <span className="hidden sm:inline">Activo</span>
+                      </span>
+                    )}
                   </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                    Teclas <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">Alt</span> y <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">Ctrl</span>
+                  </p>
                 </div>
-              </div>
+              </button>
 
               {/* macOS (Apple) Card */}
-              <div
+              <button
+                type="button"
                 onClick={() => setSelectedOS('mac')}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedOS('mac'); }}
-                className={`relative p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                className={`w-full p-3 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-left flex items-center gap-3 overflow-hidden ${
                   selectedOS === 'mac'
-                    ? 'border-zinc-900 dark:border-white bg-zinc-900/[0.03] dark:bg-white/[0.04] shadow-xs'
-                    : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#151618] hover:border-gray-300 dark:hover:border-zinc-700 opacity-70 hover:opacity-100'
+                    ? 'border-zinc-900 dark:border-white bg-zinc-900/[0.04] dark:bg-white/[0.06] shadow-sm'
+                    : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#151618] hover:border-gray-300 dark:hover:border-zinc-700 opacity-75 hover:opacity-100'
                 }`}
               >
-                <div className="flex items-center gap-3.5">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
-                    selectedOS === 'mac'
-                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
-                      : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'
-                  }`}>
-                    <Command className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">macOS (Apple)</h4>
-                      {selectedOS === 'mac' && (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 flex items-center gap-0.5">
-                          <Check className="w-3 h-3" /> Activo
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      Combinaciones con teclas <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">⌥ Option</span> y <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">⌘ Cmd</span>
-                    </p>
-                  </div>
+                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  selectedOS === 'mac'
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
+                    : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'
+                }`}>
+                  <Command className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-
-                <div className="hidden sm:flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded text-gray-700 dark:text-zinc-300">⌥</kbd>
-                    <span className="text-[10px] text-gray-400">+</span>
-                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-gray-100 dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded text-gray-700 dark:text-zinc-300">A</kbd>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      macOS (Apple)
+                    </span>
+                    {selectedOS === 'mac' && (
+                      <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                        <Check className="w-2.5 h-2.5" /> <span className="hidden sm:inline">Activo</span>
+                      </span>
+                    )}
                   </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                    Teclas <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">⌥ Opt</span> y <span className="font-mono font-medium text-gray-700 dark:text-zinc-300">⌘ Cmd</span>
+                  </p>
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Shortcuts Listing */}
@@ -373,7 +371,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
                 </div>
               ) : (
                 filteredCategories.map(cat => (
-                  <div key={cat.id} className="space-y-2.5">
+                  <div key={cat.id} className="space-y-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-zinc-500 px-1">
                       {cat.name}
                     </h4>
@@ -386,24 +384,24 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
                         return (
                           <div 
                             key={idx} 
-                            className="p-3.5 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/70 dark:hover:bg-zinc-800/40 transition-colors"
+                            className="p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-gray-50/70 dark:hover:bg-zinc-800/40 transition-colors"
                           >
-                            <div className="space-y-0.5 pr-2">
-                              <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">
+                            <div className="space-y-0.5 min-w-0 flex-1 pr-2">
+                              <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-zinc-100">
                                 {item.title}
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-1">
+                              <p className="text-[11px] sm:text-xs text-gray-500 dark:text-zinc-400 line-clamp-2">
                                 {item.desc}
                               </p>
                             </div>
 
-                            <div className="flex items-center gap-2 flex-wrap shrink-0 self-start sm:self-center">
+                            <div className="flex items-center gap-1.5 flex-wrap shrink-0 self-start sm:self-center">
                               {/* Primary Keys */}
                               <div className="flex items-center gap-1">
                                 {keys.map((k, ki) => (
                                   <React.Fragment key={ki}>
                                     {ki > 0 && <span className="text-xs text-gray-400 dark:text-zinc-600 font-bold px-0.5">+</span>}
-                                    <kbd className="inline-flex items-center justify-center min-w-[26px] h-7 px-2 text-xs font-semibold font-mono rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 border border-gray-200 dark:border-zinc-700 shadow-xs">
+                                    <kbd className="inline-flex items-center justify-center min-w-[24px] h-6 sm:h-7 px-1.5 sm:px-2 text-[11px] sm:text-xs font-semibold font-mono rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 border border-gray-200 dark:border-zinc-700 shadow-xs">
                                       {k}
                                     </kbd>
                                   </React.Fragment>
@@ -412,12 +410,12 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
 
                               {/* Alternative keys if available */}
                               {altKeys && (
-                                <div className="flex items-center gap-1 pl-1 text-[11px] text-gray-400 dark:text-zinc-500">
+                                <div className="flex items-center gap-1 pl-1 text-[10px] text-gray-400 dark:text-zinc-500">
                                   <span>ó</span>
                                   {altKeys.map((k, ki) => (
                                     <React.Fragment key={ki}>
-                                      {ki > 0 && <span className="text-[10px] text-gray-400 dark:text-zinc-600 font-bold">+</span>}
-                                      <kbd className="inline-flex items-center justify-center min-w-[22px] h-6 px-1.5 text-[11px] font-semibold font-mono rounded-md bg-gray-50 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border border-gray-200 dark:border-zinc-700">
+                                      {ki > 0 && <span className="text-[9px] text-gray-400 dark:text-zinc-600 font-bold">+</span>}
+                                      <kbd className="inline-flex items-center justify-center min-w-[20px] h-5 sm:h-6 px-1.5 text-[10px] sm:text-[11px] font-semibold font-mono rounded-md bg-gray-50 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border border-gray-200 dark:border-zinc-700">
                                         {k}
                                       </kbd>
                                     </React.Fragment>
@@ -784,18 +782,17 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-[99999] flex flex-col justify-end pointer-events-auto">
+      <div className="fixed inset-0 z-[100000] flex items-center justify-center p-2 sm:p-4 pointer-events-auto">
         <motion.div 
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+          className="fixed inset-0 bg-black/70 backdrop-blur-md" 
           onClick={onClose} 
         />
         <motion.div 
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+          initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="relative w-full h-[90vh] bg-white dark:bg-[#1a1b1e] rounded-t-3xl overflow-hidden shadow-2xl flex flex-col"
+          className="relative w-full max-w-lg h-[88vh] bg-white dark:bg-[#1a1b1e] rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-gray-200/60 dark:border-gray-800 z-10"
         >
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full z-10" />
           {panelContent}
         </motion.div>
       </div>
@@ -803,10 +800,10 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 pointer-events-none">
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 pointer-events-none">
       <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto" 
+        className="fixed inset-0 bg-black/70 backdrop-blur-md pointer-events-auto" 
         onClick={onClose} 
       />
       <motion.div
@@ -817,7 +814,7 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 10 }}
         transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-        className="w-full max-w-[840px] h-[640px] max-h-[85vh] relative pointer-events-auto shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)] rounded-[20px] overflow-hidden bg-white dark:bg-[#1a1b1e] border border-gray-100 dark:border-gray-800"
+        className="w-full max-w-[860px] h-[650px] max-h-[88vh] relative pointer-events-auto shadow-[0_25px_70px_-15px_rgba(0,0,0,0.4)] dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.8)] rounded-3xl overflow-hidden bg-white dark:bg-[#1a1b1e] border border-gray-200/80 dark:border-gray-800"
       >
         {panelContent}
       </motion.div>

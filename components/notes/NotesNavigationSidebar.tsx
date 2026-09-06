@@ -21,6 +21,8 @@ import {
   X,
   Sparkles,
   ArchiveRestore,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { Folder, Note } from '../../types';
 import { NoteView, SortOrder } from './NotesTypes';
@@ -53,6 +55,7 @@ interface NotesNavigationSidebarProps {
   onEditingFolderNameChange: (name: string) => void;
   onSaveRenameFolder: () => void;
   isMobile?: boolean;
+  noteSaveStatus?: Record<number, 'saved' | 'saving' | 'error'>;
 }
 
 export const NotesNavigationSidebar: React.FC<NotesNavigationSidebarProps> = ({
@@ -82,6 +85,7 @@ export const NotesNavigationSidebar: React.FC<NotesNavigationSidebarProps> = ({
   onEditingFolderNameChange,
   onSaveRenameFolder,
   isMobile = false,
+  noteSaveStatus = {},
 }) => {
   // Sidebar drill-down level: 'menu' | 'notes'
   const [sidebarLevel, setSidebarLevel] = useState<'menu' | 'notes'>('menu');
@@ -526,8 +530,18 @@ export const NotesNavigationSidebar: React.FC<NotesNavigationSidebarProps> = ({
                       {plainTitle}
                     </h4>
 
-                    {/* Quick status icons */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Quick status icons & save status */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {noteSaveStatus[note.id] === 'saving' && (
+                        <div className="flex items-center gap-1 text-[10px] text-amber-500 font-medium animate-pulse" title="Guardando nota...">
+                          <Loader2 className="w-3 h-3 animate-spin text-amber-500" />
+                        </div>
+                      )}
+                      {noteSaveStatus[note.id] === 'error' && (
+                        <div className="flex items-center text-rose-500" title="Error al guardar">
+                          <AlertCircle className="w-3 h-3 text-rose-500" />
+                        </div>
+                      )}
                       {note.is_pinned && <Pin className="w-3 h-3 text-zinc-500 fill-zinc-500" />}
                       {note.is_favorite && <Star className="w-3 h-3 text-zinc-500 fill-zinc-500" />}
                     </div>

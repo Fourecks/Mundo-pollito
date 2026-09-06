@@ -1523,7 +1523,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
       {/* 5. CREATE TASK / EVENT MODAL */}
       {showCreateModal && (
         <CalendarPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+          <div className="fixed inset-0 z-[100010] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md overflow-y-auto animate-fadeIn">
             <form
               onSubmit={handleCreateSubmit}
               className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto"
@@ -1691,7 +1691,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
       {/* 6. EVENT DETAILS MODAL */}
       {selectedEventDetails && (
         <CalendarPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+          <div className="fixed inset-0 z-[100010] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md overflow-y-auto animate-fadeIn">
             <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2">
@@ -1897,7 +1897,7 @@ export const CalendarModule: React.FC<CalendarModuleProps> = ({
       {/* 7. INTEGRATIONS MANAGER MODAL */}
       {showIntegrationsModal && (
         <CalendarPortal>
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+          <div className="fixed inset-0 z-[100010] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md overflow-y-auto animate-fadeIn">
           <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto text-gray-800 dark:text-gray-100">
             
             {/* Header */}

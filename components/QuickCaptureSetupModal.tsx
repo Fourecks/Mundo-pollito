@@ -26,8 +26,8 @@ const QuickCaptureSetupModal: React.FC<QuickCaptureSetupModalProps> = ({ isOpen,
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl z-[100000] w-full max-w-lg max-h-[90vh] flex flex-col animate-pop-in" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-4 overflow-y-auto animate-fade-in" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl shadow-2xl z-[100011] w-full max-w-lg max-h-[90vh] flex flex-col animate-pop-in" onClick={e => e.stopPropagation()}>
                 <header className="flex-shrink-0 p-3 text-center relative border-b border-secondary-light/50 dark:border-gray-700/50 flex items-center justify-center">
                     <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Configurar Captura Rápida</h3>
                     <button onClick={onClose} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">

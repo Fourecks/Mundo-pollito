@@ -345,11 +345,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
   if (!isOpen || !todo) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[100010] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
       <div 
-        className="relative w-full max-w-lg bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl flex flex-col z-[100000] overflow-hidden max-h-[90vh]"
+        className="relative w-full max-w-lg bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl flex flex-col z-[100011] overflow-hidden max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
