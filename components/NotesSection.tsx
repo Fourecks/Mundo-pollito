@@ -534,19 +534,19 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
       {/* 2. NOTE EDITOR MAIN CANVAS */}
       {(!isMobile || selectedNoteId) && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-white dark:bg-slate-950 relative">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-white dark:bg-zinc-950 relative">
           {selectedNote ? (
             <div className="flex flex-col h-full overflow-hidden">
               
               {/* Note Header / Meta Bar */}
-              <div className="px-5 py-2.5 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-slate-950/70 backdrop-blur-md flex items-center justify-between gap-3 select-none flex-shrink-0">
+              <div className="px-5 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between gap-3 select-none flex-shrink-0">
                 
                 {/* Left side: Back on mobile, Pin, Favorite, Status */}
                 <div className="flex items-center gap-2 min-w-0">
                   {isMobile && (
                     <button
                       onClick={() => setSelectedNoteId(null)}
-                      className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 mr-1"
+                      className="p-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 mr-1"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
@@ -554,10 +554,10 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
                   <button
                     onClick={handleTogglePin}
-                    className={`p-1.5 rounded-lg transition-colors ${
+                    className={`p-1.5 rounded-md transition-colors ${
                       selectedNote.is_pinned
-                        ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
-                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                     }`}
                     title={selectedNote.is_pinned ? 'Desfijar nota' : 'Fijar nota al inicio'}
                   >
@@ -566,10 +566,10 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
                   <button
                     onClick={handleToggleFavorite}
-                    className={`p-1.5 rounded-lg transition-colors ${
+                    className={`p-1.5 rounded-md transition-colors ${
                       selectedNote.is_favorite
-                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-500'
-                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                     }`}
                     title={selectedNote.is_favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                   >
@@ -577,21 +577,21 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   </button>
 
                   {/* Save Indicator */}
-                  <div className="flex items-center gap-1 text-[11px] text-slate-400 ml-1">
+                  <div className="flex items-center gap-1 text-[11px] text-zinc-400 ml-1">
                     {saveStatus === 'saving' && (
-                      <span className="flex items-center gap-1 text-sky-500">
+                      <span className="flex items-center gap-1 text-zinc-500">
                         <CloudLightning className="w-3.5 h-3.5 animate-pulse" />
                         <span className="hidden sm:inline">Guardando...</span>
                       </span>
                     )}
                     {saveStatus === 'saved' && (
-                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                      <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Guardado</span>
                       </span>
                     )}
                     {saveStatus === 'error' && (
-                      <span className="text-rose-500 font-semibold">Error al guardar</span>
+                      <span className="text-zinc-900 dark:text-zinc-100 font-semibold">Error al guardar</span>
                     )}
                   </div>
                 </div>
@@ -603,29 +603,29 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   {(selectedNote.is_archived || selectedNote.deleted_at) ? (
                     <button
                       onClick={() => handleRestoreNote(selectedNote)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all"
+                      className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-white font-medium text-xs flex items-center gap-1.5 transition-all"
                       title="Restaurar nota a activas"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restaurar Nota</span>
+                      <span>Restaurar</span>
                     </button>
                   ) : (
-                    /* IF ACTIVE: SHOW COLORED ARCHIVE AND TRASH BUTTONS */
+                    /* IF ACTIVE: SHOW ARCHIVE AND TRASH BUTTONS */
                     <>
-                      {/* Archivar (Ámbar) */}
+                      {/* Archivar */}
                       <button
                         onClick={() => setNoteToArchive(selectedNote)}
-                        className="px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                        className="px-2.5 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-xs font-medium flex items-center gap-1.5 transition-all"
                         title="Archivar nota"
                       >
                         <Archive className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Archivar</span>
                       </button>
 
-                      {/* Enviar a Papelera (Rojo) */}
+                      {/* Enviar a Papelera */}
                       <button
                         onClick={() => setNoteToTrash(selectedNote)}
-                        className="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                        className="px-2.5 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-xs font-medium flex items-center gap-1.5 transition-all"
                         title="Mover nota a la papelera"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -634,12 +634,12 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     </>
                   )}
 
-                  <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
+                  <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1" />
 
                   {/* Export Markdown */}
                   <button
                     onClick={handleExportMarkdown}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     title="Exportar como Markdown"
                   >
                     <Download className="w-4 h-4" />
@@ -648,7 +648,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   {/* Print */}
                   <button
                     onClick={handlePrintNote}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     title="Imprimir nota"
                   >
                     <Printer className="w-4 h-4" />
@@ -657,10 +657,10 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   {/* Focus Mode Toggle */}
                   <button
                     onClick={() => setIsFocusMode(!isFocusMode)}
-                    className={`p-1.5 rounded-lg transition-colors ${
+                    className={`p-1.5 rounded-md transition-colors ${
                       isFocusMode
-                        ? 'bg-sky-500 text-white'
-                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                        : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                     }`}
                     title={isFocusMode ? 'Salir de modo enfoque' : 'Modo enfoque'}
                   >
@@ -670,10 +670,10 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   {/* Details Panel Toggle */}
                   <button
                     onClick={() => setShowDetailsPanel(!showDetailsPanel)}
-                    className={`p-1.5 rounded-lg transition-colors ${
+                    className={`p-1.5 rounded-md transition-colors ${
                       showDetailsPanel
-                        ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400'
-                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium'
+                        : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                     }`}
                     title="Detalles y estadísticas"
                   >
@@ -700,7 +700,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     placeholder="Título de la nota..."
                     value={activeNoteTitle}
                     onChange={handleTitleChange}
-                    className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-700 bg-transparent border-0 focus:outline-none focus:ring-0 mb-4 tracking-tight"
+                    className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white placeholder-zinc-300 dark:placeholder-zinc-700 bg-transparent border-0 focus:outline-none focus:ring-0 mb-4 tracking-tight"
                   />
 
                   {/* ContentEditable Div */}
@@ -708,8 +708,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     ref={editorRef}
                     contentEditable
                     onInput={handleEditorInput}
-                    data-placeholder="Escribe tus pensamientos, notas de estudio, tareas o presiona la barra de herramientas para dar formato..."
-                    className="flex-1 focus:outline-none note-editor-content leading-relaxed text-slate-800 dark:text-slate-200 min-h-[400px]"
+                    data-placeholder="Escribe tus notas aquí..."
+                    className="flex-1 focus:outline-none note-editor-content leading-relaxed text-zinc-800 dark:text-zinc-200 min-h-[400px]"
                   />
                 </div>
 
@@ -732,18 +732,18 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           ) : (
             /* Empty State: No note selected */
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none">
-              <div className="w-16 h-16 rounded-3xl bg-sky-50 dark:bg-sky-950/40 text-sky-500 flex items-center justify-center mb-4 shadow-sm">
-                <FileText className="w-8 h-8" />
+              <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center justify-center mb-4 border border-zinc-200 dark:border-zinc-700">
+                <FileText className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
                 Ninguna nota seleccionada
               </h3>
-              <p className="text-xs text-slate-400 max-w-sm mb-5 leading-relaxed">
-                Selecciona una nota del panel lateral para editarla, o crea una nueva nota para comenzar.
+              <p className="text-xs text-zinc-400 max-w-xs mb-5 leading-relaxed">
+                Selecciona una nota del panel lateral para editarla, o crea una nueva.
               </p>
               <button
                 onClick={handleCreateNote}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-white font-medium text-xs transition-all shadow-xs"
               >
                 <FilePlus className="w-4 h-4" />
                 <span>Crear Nueva Nota</span>
