@@ -31,7 +31,8 @@ export function hasHtmlTags(str: string): boolean {
 /**
  * Converts any dirty or raw HTML (like copied JW.org Bible verses, Web articles, etc.)
  * into clean, standard semantic HTML suitable for the note editor.
- * Removes intrusive inline background-colors, colors, font-families, and anchor wrappers.
+ * Removes intrusive scripts and dangerous tags while safely preserving user typography,
+ * font-family, font-size, colors, highlights, tables, checklists, and callouts.
  */
 export function sanitizeAndCleanHtml(input: string): string {
   if (!input) return '';
@@ -44,14 +45,11 @@ export function sanitizeAndCleanHtml(input: string): string {
   }
 
   if (typeof document === 'undefined') {
-    // Fallback regex cleanup for server/build environments
+    // Fallback cleanup for server/build environments
     return raw
       .replace(/<span\b[^>]*class=["']verseNum["'][^>]*>(?:<a\b[^>]*>)?([\s\S]*?)(?:<\/a>)?<\/span>/gi, '<b>$1</b>')
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<[^>]+style=["'][^"']*["']/gi, (match) => {
-        return match.replace(/style=["'][^"']*["']/gi, '');
-      });
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
   }
 
   try {
@@ -60,7 +58,7 @@ export function sanitizeAndCleanHtml(input: string): string {
     const body = doc.body;
 
     // 1. Remove dangerous or non-content elements
-    const removeElements = body.querySelectorAll('script, style, meta, link, iframe, object, embed, form, button');
+    const removeElements = body.querySelectorAll('script, meta, link, iframe, object, embed, form');
     removeElements.forEach(el => el.remove());
 
     // 2. Handle verse numbers or specific anchor tags (e.g. from JW.org or online Bible tools)
@@ -86,38 +84,28 @@ export function sanitizeAndCleanHtml(input: string): string {
         const textNode = doc.createTextNode(a.textContent || '');
         a.parentNode?.replaceChild(textNode, a);
       } else {
-        // Clean external links
-        a.removeAttribute('style');
-        a.removeAttribute('class');
+        // Keep external link attributes safe
         a.setAttribute('target', '_blank');
         a.setAttribute('rel', 'noopener noreferrer');
       }
     });
 
-    // 4. Strip intrusive inline styles & classes from all remaining elements
-    const allElements = body.querySelectorAll('*');
-    allElements.forEach(el => {
-      // Remove inline styles like background-color, font-family, font-size, color, etc.
-      el.removeAttribute('style');
-      el.removeAttribute('class');
-      el.removeAttribute('id');
-
-      // Unwrap useless spans that have no semantic value
-      if (el.tagName.toLowerCase() === 'span') {
-        const parent = el.parentNode;
-        if (parent) {
-          while (el.firstChild) {
-            parent.insertBefore(el.firstChild, el);
-          }
-          parent.removeChild(el);
+    // 4. Clean only unneeded empty spans without attributes
+    const emptySpans = body.querySelectorAll('span:not([style]):not([class]):not([id])');
+    emptySpans.forEach(el => {
+      const parent = el.parentNode;
+      if (parent) {
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el);
         }
+        parent.removeChild(el);
       }
     });
 
     let cleaned = body.innerHTML.trim();
 
     // Clean multiple empty paragraphs or breaklines
-    cleaned = cleaned.replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>');
+    cleaned = cleaned.replace(/(<br\s*\/?>\s*){4,}/gi, '<br><br><br>');
     return cleaned || raw;
   } catch {
     return raw;

@@ -85,11 +85,14 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   const [editingFolderName, setEditingFolderName] = useState('');
 
   // Refs
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const activeNoteIdRef = useRef<number | null>(null);
   const isTypingRef = useRef<boolean>(false);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef<{ title: string; content: string }>({ title: '', content: '' });
+  const lastActiveTargetRef = useRef<'title' | 'body'>('body');
+  const savedRangeRef = useRef<Range | null>(null);
 
   // Filter notes and folders if scoped to project or subject
   const folders = React.useMemo(() => {
@@ -168,10 +171,14 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   // Load note into editor when selection changes
   useEffect(() => {
     if (selectedNote) {
-      setActiveNoteTitle(selectedNote.title || '');
+      const plainTitle = selectedNote.title || '';
+      setActiveNoteTitle(plainTitle);
+      if (titleRef.current) {
+        titleRef.current.innerHTML = plainTitle;
+      }
       const cleanContent = normalizeNoteContentForEditor(selectedNote.content || '');
       setActiveNoteContent(cleanContent);
-      lastSavedContentRef.current = { title: selectedNote.title || '', content: cleanContent };
+      lastSavedContentRef.current = { title: plainTitle, content: cleanContent };
 
       if (editorRef.current) {
         editorRef.current.innerHTML = cleanContent;
@@ -180,6 +187,9 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     } else {
       setActiveNoteTitle('');
       setActiveNoteContent('');
+      if (titleRef.current) {
+        titleRef.current.innerHTML = '';
+      }
       if (editorRef.current) {
         editorRef.current.innerHTML = '';
       }
@@ -235,16 +245,16 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
       setSaveStatus('saving');
       try {
-        const sanitized = sanitizeAndCleanHtml(contentToSave);
+        const sanitizedContent = sanitizeAndCleanHtml(contentToSave);
         const updated: Note = {
           ...current,
           title: titleToSave,
-          content: sanitized,
+          content: sanitizedContent,
           updated_at: new Date().toISOString(),
         };
 
         await onUpdateNote(updated);
-        lastSavedContentRef.current = { title: titleToSave, content: sanitized };
+        lastSavedContentRef.current = { title: titleToSave, content: sanitizedContent };
         setSaveStatus('saved');
       } catch (err) {
         console.error('Error saving note:', err);
@@ -264,8 +274,10 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     }, 800);
   };
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTitle = e.target.value;
+  const handleTitleInput = () => {
+    if (!titleRef.current) return;
+    isTypingRef.current = true;
+    const newTitle = titleRef.current.innerHTML;
     setActiveNoteTitle(newTitle);
     scheduleAutoSave(newTitle, activeNoteContent);
   };
@@ -278,19 +290,156 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     scheduleAutoSave(activeNoteTitle, newContent);
   };
 
+  // Save active selection range across editor & title
+  const saveActiveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      if (titleRef.current && titleRef.current.contains(range.commonAncestorContainer)) {
+        lastActiveTargetRef.current = 'title';
+        savedRangeRef.current = range.cloneRange();
+      } else if (editorRef.current && editorRef.current.contains(range.commonAncestorContainer)) {
+        lastActiveTargetRef.current = 'body';
+        savedRangeRef.current = range.cloneRange();
+      }
+    }
+  };
+
+  // Apply CSS Styles (Fonts, Sizes, Colors, Alignments) directly to Selection or Element
+  const handleApplyStyle = (styleProperty: string, value: string) => {
+    const sel = window.getSelection();
+    let range: Range | null = null;
+
+    if (sel && sel.rangeCount > 0) {
+      range = sel.getRangeAt(0);
+    } else if (savedRangeRef.current) {
+      range = savedRangeRef.current;
+    }
+
+    const isInsideTitle = !!(titleRef.current && range && titleRef.current.contains(range.commonAncestorContainer));
+    const isInsideEditor = !!(editorRef.current && range && editorRef.current.contains(range.commonAncestorContainer));
+
+    if (range && !range.collapsed && (isInsideTitle || isInsideEditor)) {
+      const span = document.createElement('span');
+      span.style.setProperty(styleProperty, value);
+      if (styleProperty === 'font-size') span.style.lineHeight = '1.4';
+      if (styleProperty === 'background-color' && value !== 'transparent') {
+        span.style.padding = '1px 3px';
+        span.style.borderRadius = '3px';
+      }
+
+      try {
+        const contents = range.extractContents();
+        span.appendChild(contents);
+        range.insertNode(span);
+
+        if (sel) {
+          sel.removeAllRanges();
+          const newRange = document.createRange();
+          newRange.selectNodeContents(span);
+          sel.addRange(newRange);
+          savedRangeRef.current = newRange.cloneRange();
+        }
+      } catch (err) {
+        console.warn('Could not wrap selection:', err);
+      }
+
+      if (isInsideTitle) {
+        handleTitleInput();
+      } else {
+        handleEditorInput();
+      }
+      return;
+    }
+
+    // Apply directly if entire block or cursor
+    if (lastActiveTargetRef.current === 'title' && titleRef.current) {
+      titleRef.current.focus();
+      if (styleProperty === 'font-family') {
+        titleRef.current.style.fontFamily = value;
+      } else if (styleProperty === 'font-size') {
+        titleRef.current.style.fontSize = value;
+      } else if (styleProperty === 'color') {
+        titleRef.current.style.color = value === 'inherit' ? '' : value;
+      } else if (styleProperty === 'background-color') {
+        titleRef.current.style.backgroundColor = value === 'transparent' ? '' : value;
+      } else if (styleProperty === 'text-align') {
+        titleRef.current.style.textAlign = value;
+      }
+      handleTitleInput();
+    } else if (editorRef.current) {
+      editorRef.current.focus();
+      if (styleProperty === 'font-family') {
+        editorRef.current.style.fontFamily = value;
+      } else if (styleProperty === 'font-size') {
+        document.execCommand('fontSize', false, '3');
+      }
+      if (range && isInsideEditor) {
+        const span = document.createElement('span');
+        span.style.setProperty(styleProperty, value);
+        span.innerHTML = '&#8203;';
+        range.insertNode(span);
+        const newRange = document.createRange();
+        newRange.setStart(span.firstChild || span, 1);
+        newRange.collapse(true);
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
+      }
+      handleEditorInput();
+    }
+  };
+
   // Rich Text Commands
   const handleApplyCommand = (command: string, value: string = '') => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
+    const targetEl = lastActiveTargetRef.current === 'title' ? titleRef.current : editorRef.current;
+    if (!targetEl) return;
+    targetEl.focus();
+
+    if (savedRangeRef.current) {
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedRangeRef.current);
+      }
+    }
+
+    try {
+      document.execCommand('styleWithCSS', false, 'true');
+    } catch (e) {
+      // Ignore if not supported
+    }
+
     document.execCommand(command, false, value);
-    handleEditorInput();
+
+    if (lastActiveTargetRef.current === 'title') {
+      handleTitleInput();
+    } else {
+      handleEditorInput();
+    }
   };
 
   const handleInsertHtml = (html: string) => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
+    const targetEl = lastActiveTargetRef.current === 'title' ? titleRef.current : editorRef.current;
+    if (!targetEl) return;
+    targetEl.focus();
+
+    if (savedRangeRef.current) {
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedRangeRef.current);
+      }
+    }
+
     document.execCommand('insertHTML', false, html);
-    handleEditorInput();
+
+    if (lastActiveTargetRef.current === 'title') {
+      handleTitleInput();
+    } else {
+      handleEditorInput();
+    }
   };
 
   // Navigation Handlers
@@ -850,6 +999,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                 <NotesToolbar
                   onApplyCommand={handleApplyCommand}
                   onInsertHtml={handleInsertHtml}
+                  onApplyStyle={handleApplyStyle}
                 />
               </div>
 
@@ -858,20 +1008,44 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                 
                 {/* Editor Surface */}
                 <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-6 md:p-10 max-w-4xl mx-auto w-full">
-                  {/* Note Title Input */}
-                  <input
-                    type="text"
-                    placeholder="Título de la nota..."
-                    value={activeNoteTitle}
-                    onChange={handleTitleChange}
-                    className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white placeholder-zinc-300 dark:placeholder-zinc-700 bg-transparent border-0 focus:outline-none focus:ring-0 mb-4 tracking-tight"
+                  {/* Rich Note Title */}
+                  <h1
+                    ref={titleRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    data-placeholder="Título de la nota..."
+                    onInput={handleTitleInput}
+                    onFocus={() => {
+                      lastActiveTargetRef.current = 'title';
+                      saveActiveSelection();
+                    }}
+                    onBlur={saveActiveSelection}
+                    onMouseUp={saveActiveSelection}
+                    onKeyUp={saveActiveSelection}
+                    onSelect={saveActiveSelection}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        editorRef.current?.focus();
+                      }
+                    }}
+                    className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white placeholder-zinc-300 dark:placeholder-zinc-700 bg-transparent border-0 focus:outline-none focus:ring-0 mb-4 tracking-tight min-h-[1.4em] empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-300 dark:empty:before:text-zinc-600 empty:before:pointer-events-none"
                   />
 
                   {/* ContentEditable Div */}
                   <div
                     ref={editorRef}
                     contentEditable
+                    suppressContentEditableWarning
                     onInput={handleEditorInput}
+                    onFocus={() => {
+                      lastActiveTargetRef.current = 'body';
+                      saveActiveSelection();
+                    }}
+                    onBlur={saveActiveSelection}
+                    onMouseUp={saveActiveSelection}
+                    onKeyUp={saveActiveSelection}
+                    onSelect={saveActiveSelection}
                     data-placeholder="Escribe tus notas aquí..."
                     className="flex-1 focus:outline-none note-editor-content leading-relaxed text-zinc-800 dark:text-zinc-200 min-h-[400px]"
                   />
