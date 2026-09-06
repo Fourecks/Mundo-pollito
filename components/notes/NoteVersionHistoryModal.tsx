@@ -21,8 +21,11 @@ export const NoteVersionHistoryModal: React.FC<NoteVersionHistoryModalProps> = (
   );
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fade-in select-none overflow-y-auto">
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl w-full max-w-3xl h-[80vh] max-h-[600px] flex flex-col overflow-hidden text-left">
+    <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-zinc-950/60 backdrop-blur-sm animate-fade-in select-none overflow-y-auto" onClick={onClose}>
+      <div 
+        className="bg-white dark:bg-zinc-900 border-t sm:border border-zinc-200 dark:border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-3xl h-[80vh] max-h-[600px] flex flex-col overflow-hidden text-left"
+        onClick={e => e.stopPropagation()}
+      >
         
         {/* Modal Header */}
         <div className="p-4 px-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">

@@ -143,7 +143,7 @@ export function cleanToPlainText(input: string): string {
       div.innerHTML = prepped;
       const parsedText = div.textContent || div.innerText || '';
       return parsedText
-        .replace(/<[^>]*>?/g, '') // remove any residual angle-bracket fragments
+        .replace(/<[^>]*>/g, '') // remove any residual angle-bracket fragments
         .replace(/&nbsp;/g, ' ')
         .replace(/[ \t]+/g, ' ')
         .replace(/\n{3,}/g, '\n\n')
@@ -157,7 +157,7 @@ export function cleanToPlainText(input: string): string {
   return text
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|h[1-6]|li|tr|blockquote|pre)>/gi, '\n')
-    .replace(/<[^>]+>?/g, '') // strip all tags
+    .replace(/<[^>]+>/g, '') // strip all tags
     .replace(/<[^>]*$/g, '') // remove trailing broken tag
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
@@ -201,3 +201,4 @@ export function normalizeNoteContentForEditor(str: string): string {
 
   return html;
 }
+console.log(cleanToPlainText('<h1>Mi titulo</h1>'));

@@ -132,13 +132,13 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[99999] p-4 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-[99999] overflow-y-auto animate-fade-in"
       aria-modal="true"
       role="dialog"
       onClick={onClose}
     >
       <div
-        className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700/80 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-auto transform transition-all duration-300 scale-95 opacity-0 animate-pop-in max-h-[90vh] overflow-y-auto"
+        className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-t sm:border border-gray-200/80 dark:border-gray-700/80 rounded-t-2xl sm:rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-auto transform transition-all duration-300 animate-pop-in max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <h2 className="text-xl font-bold text-primary-dark dark:text-primary text-center mb-4">

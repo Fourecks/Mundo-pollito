@@ -239,17 +239,6 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
       rafIdRef.current = null;
     }
 
-    window.removeEventListener('mousemove', onPointerMove as any);
-    window.removeEventListener('mouseup', onPointerUp);
-    window.removeEventListener('touchmove', onPointerMove as any);
-    window.removeEventListener('touchend', onPointerUp);
-    window.removeEventListener('touchcancel', onPointerUp);
-    window.removeEventListener('pointermove', onPointerMove as any);
-    window.removeEventListener('pointerup', onPointerUp);
-    window.removeEventListener('pointercancel', onPointerUp);
-    window.removeEventListener('blur', onPointerUp);
-    window.removeEventListener('mouseleave', onPointerUp);
-
     const safeX = Number.isFinite(info.lastX) ? info.lastX : 100;
     const safeY = Number.isFinite(info.lastY) ? info.lastY : 100;
     const safeW = Number.isFinite(info.lastW) && info.lastW >= 150 ? info.lastW : 500;
@@ -352,6 +341,12 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     };
 
     setIsInteracting(true);
+  }, [onFocus, isFullscreen]);
+
+  // Handle binding/unbinding of window events based on interaction state
+  useEffect(() => {
+    if (!isInteracting) return;
+
     window.addEventListener('mousemove', onPointerMove as any, { passive: true });
     window.addEventListener('mouseup', onPointerUp);
     window.addEventListener('touchmove', onPointerMove as any, { passive: true });
@@ -362,13 +357,7 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     window.addEventListener('pointercancel', onPointerUp);
     window.addEventListener('blur', onPointerUp);
     window.addEventListener('mouseleave', onPointerUp);
-  }, [onFocus, onPointerMove, onPointerUp]);
 
-  // Clean up any lingering window listeners and rAF
-  useEffect(() => {
-    if (!isOpen && interactionStateRef.current.active) {
-      onPointerUp();
-    }
     return () => {
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
       window.removeEventListener('mousemove', onPointerMove as any);
@@ -382,7 +371,14 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
       window.removeEventListener('blur', onPointerUp);
       window.removeEventListener('mouseleave', onPointerUp);
     };
-  }, [isOpen, onPointerMove, onPointerUp]);
+  }, [isInteracting, onPointerMove, onPointerUp]);
+
+  // Ensure cleanup on unmount or if modal closes while interacting
+  useEffect(() => {
+    if (!isOpen && interactionStateRef.current.active) {
+      onPointerUp();
+    }
+  }, [isOpen, onPointerUp]);
 
   if (!isOpen) return null;
 

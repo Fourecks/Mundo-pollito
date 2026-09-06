@@ -1089,8 +1089,8 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
 
       {/* Modals rendered to body via portal */}
       {typeof document !== 'undefined' && showTableModal && createPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 w-full max-w-xs text-left">
+        <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-zinc-950/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 w-full max-w-xs text-left">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <TableIcon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
@@ -1149,11 +1149,11 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
       {/* Link Modal */}
       {typeof document !== 'undefined' && showLinkModal && createPortal(
         <div 
-          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
           onClick={() => setShowLinkModal(false)}
         >
           <div 
-            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 w-full max-w-sm text-left max-h-[90vh] overflow-y-auto"
+            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 w-full max-w-sm text-left max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -1213,11 +1213,11 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
       {/* Image Modal */}
       {typeof document !== 'undefined' && showImageModal && createPortal(
         <div 
-          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
           onClick={() => setShowImageModal(false)}
         >
           <div 
-            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 w-full max-w-sm text-left max-h-[90vh] overflow-y-auto"
+            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 w-full max-w-sm text-left max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">

@@ -344,11 +344,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
   if (!isOpen || !todo) return null;
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+    <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-fade-in">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div 
-        className="relative w-full max-w-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/80 dark:border-gray-700 rounded-2xl shadow-2xl flex flex-col z-[100000] overflow-hidden max-h-[90vh]"
+        className="relative w-full max-w-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-t sm:border border-gray-200/80 dark:border-gray-700 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col z-[100000] overflow-hidden max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -870,8 +870,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
 
       {/* Account Selection Modal */}
       {isAccountPickerOpen && (
-        <div className="fixed inset-0 z-[100010] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-700">
               <h4 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
                 <CalendarIcon className="w-4 h-4 text-primary" />
