@@ -49,6 +49,10 @@ interface NotesToolbarProps {
   onApplyCommand: (command: string, value?: string) => void;
   onApplyStyle: (styleProperty: string, value: string) => void;
   onInsertHtml: (html: string) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   selectedFont?: string;
   onSelectFont?: (font: string) => void;
 }
@@ -57,6 +61,10 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
   onApplyCommand,
   onApplyStyle,
   onInsertHtml,
+  onUndo,
+  onRedo,
+  canUndo = true,
+  canRedo = true,
   selectedFont: propSelectedFont,
   onSelectFont,
 }) => {
@@ -224,16 +232,32 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
       <div className="flex items-center gap-0.5">
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('undo')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+          onClick={() => {
+            if (onUndo) onUndo();
+            else onApplyCommand('undo');
+          }}
+          disabled={!canUndo}
+          className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+            !canUndo 
+              ? 'opacity-30 cursor-not-allowed text-zinc-400 dark:text-zinc-600' 
+              : 'hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+          }`}
           title="Deshacer (Ctrl+Z)"
         >
           <Undo className="w-3.5 h-3.5" />
         </button>
         <button
           onMouseDown={preventFocusLoss}
-          onClick={() => onApplyCommand('redo')}
-          className="p-1.5 rounded-md hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+          onClick={() => {
+            if (onRedo) onRedo();
+            else onApplyCommand('redo');
+          }}
+          disabled={!canRedo}
+          className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+            !canRedo 
+              ? 'opacity-30 cursor-not-allowed text-zinc-400 dark:text-zinc-600' 
+              : 'hover:bg-zinc-200/70 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+          }`}
           title="Rehacer (Ctrl+Y)"
         >
           <Redo className="w-3.5 h-3.5" />
@@ -454,11 +478,8 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
           onClick={() => {
             const sel = window.getSelection();
             if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-              const range = sel.getRangeAt(0);
-              const code = document.createElement('code');
-              code.className = "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-1.5 py-0.5 rounded font-mono text-xs";
-              code.appendChild(range.extractContents());
-              range.insertNode(code);
+              const selectedText = sel.toString();
+              onInsertHtml(`<code class="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-1.5 py-0.5 rounded font-mono text-xs">${selectedText || 'código'}</code>`);
             } else {
               onInsertHtml(`<code class="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-1.5 py-0.5 rounded font-mono text-xs">código</code>&nbsp;`);
             }

@@ -504,6 +504,7 @@ export const NotesNavigationSidebar: React.FC<NotesNavigationSidebarProps> = ({
           <div className="flex-grow overflow-y-auto custom-scrollbar p-2 space-y-1">
             {filteredNotes.map(note => {
               const isSelected = selectedNoteId === note.id;
+              const plainTitle = note.title ? cleanToPlainText(note.title) : 'Nota sin título';
               const plainSummary = note.content ? cleanToPlainText(note.content) : 'Sin contenido';
               const date = new Date(note.updated_at);
               const formattedDate = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -522,7 +523,7 @@ export const NotesNavigationSidebar: React.FC<NotesNavigationSidebarProps> = ({
                     <h4 className={`text-xs font-semibold truncate flex-1 ${
                       isSelected ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-800 dark:text-zinc-200'
                     }`}>
-                      {note.title || 'Nota sin título'}
+                      {plainTitle}
                     </h4>
 
                     {/* Quick status icons */}

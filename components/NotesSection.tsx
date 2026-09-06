@@ -94,6 +94,14 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   const lastActiveTargetRef = useRef<'title' | 'body'>('body');
   const savedRangeRef = useRef<Range | null>(null);
 
+  // Undo / Redo History Engine
+  const historyStackRef = useRef<Array<{ title: string; content: string }>>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const isHistoryApplyingRef = useRef<boolean>(false);
+  const typingHistoryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
   // Filter notes and folders if scoped to project or subject
   const folders = React.useMemo(() => {
     return allFolders.filter(f =>
@@ -183,6 +191,13 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       if (editorRef.current) {
         editorRef.current.innerHTML = cleanContent;
       }
+
+      // Initialize undo/redo history stack for the freshly selected note
+      historyStackRef.current = [{ title: plainTitle, content: cleanContent }];
+      historyIndexRef.current = 0;
+      setCanUndo(false);
+      setCanRedo(false);
+
       loadNoteVersions(selectedNote.id);
     } else {
       setActiveNoteTitle('');
@@ -193,6 +208,10 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       if (editorRef.current) {
         editorRef.current.innerHTML = '';
       }
+      historyStackRef.current = [];
+      historyIndexRef.current = -1;
+      setCanUndo(false);
+      setCanRedo(false);
     }
   }, [selectedNoteId]);
 
@@ -274,12 +293,107 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     }, 800);
   };
 
+  // Push state snapshot to custom Undo/Redo stack
+  const pushHistorySnapshot = useCallback((customTitle?: string, customContent?: string) => {
+    if (isHistoryApplyingRef.current) return;
+    const currentTitle = customTitle !== undefined ? customTitle : (titleRef.current ? titleRef.current.innerHTML : activeNoteTitle);
+    const currentContent = customContent !== undefined ? customContent : (editorRef.current ? editorRef.current.innerHTML : activeNoteContent);
+
+    const stack = historyStackRef.current;
+    const currentIndex = historyIndexRef.current;
+
+    // Don't push identical consecutive states
+    if (currentIndex >= 0 && currentIndex < stack.length) {
+      const last = stack[currentIndex];
+      if (last.title === currentTitle && last.content === currentContent) {
+        return;
+      }
+    }
+
+    // Truncate redo stack when new changes are made
+    const nextStack = stack.slice(0, currentIndex + 1);
+    nextStack.push({ title: currentTitle, content: currentContent });
+
+    // Limit maximum undo stack history to 60 snapshots
+    if (nextStack.length > 60) {
+      nextStack.shift();
+    }
+
+    historyStackRef.current = nextStack;
+    historyIndexRef.current = nextStack.length - 1;
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(false);
+  }, [activeNoteTitle, activeNoteContent]);
+
+  // Undo Handler
+  const handleUndo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+
+    // Capture any pending live typing into current position if we are at top
+    const currentTitle = titleRef.current ? titleRef.current.innerHTML : activeNoteTitle;
+    const currentContent = editorRef.current ? editorRef.current.innerHTML : activeNoteContent;
+    const currentSnapshot = historyStackRef.current[historyIndexRef.current];
+
+    if (currentSnapshot && (currentSnapshot.title !== currentTitle || currentSnapshot.content !== currentContent)) {
+      historyStackRef.current[historyIndexRef.current] = { title: currentTitle, content: currentContent };
+    }
+
+    historyIndexRef.current -= 1;
+    const target = historyStackRef.current[historyIndexRef.current];
+    if (!target) return;
+
+    isHistoryApplyingRef.current = true;
+    if (titleRef.current) titleRef.current.innerHTML = target.title;
+    if (editorRef.current) editorRef.current.innerHTML = target.content;
+    setActiveNoteTitle(target.title);
+    setActiveNoteContent(target.content);
+    scheduleAutoSave(target.title, target.content);
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(historyIndexRef.current < historyStackRef.current.length - 1);
+
+    setTimeout(() => {
+      isHistoryApplyingRef.current = false;
+    }, 40);
+  }, [activeNoteTitle, activeNoteContent]);
+
+  // Redo Handler
+  const handleRedo = useCallback(() => {
+    if (historyIndexRef.current >= historyStackRef.current.length - 1) return;
+
+    historyIndexRef.current += 1;
+    const target = historyStackRef.current[historyIndexRef.current];
+    if (!target) return;
+
+    isHistoryApplyingRef.current = true;
+    if (titleRef.current) titleRef.current.innerHTML = target.title;
+    if (editorRef.current) editorRef.current.innerHTML = target.content;
+    setActiveNoteTitle(target.title);
+    setActiveNoteContent(target.content);
+    scheduleAutoSave(target.title, target.content);
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(historyIndexRef.current < historyStackRef.current.length - 1);
+
+    setTimeout(() => {
+      isHistoryApplyingRef.current = false;
+    }, 40);
+  }, [activeNoteTitle, activeNoteContent]);
+
+  const scheduleTypingSnapshot = () => {
+    if (typingHistoryTimeoutRef.current) {
+      clearTimeout(typingHistoryTimeoutRef.current);
+    }
+    typingHistoryTimeoutRef.current = setTimeout(() => {
+      pushHistorySnapshot();
+    }, 500);
+  };
+
   const handleTitleInput = () => {
     if (!titleRef.current) return;
     isTypingRef.current = true;
     const newTitle = titleRef.current.innerHTML;
     setActiveNoteTitle(newTitle);
     scheduleAutoSave(newTitle, activeNoteContent);
+    scheduleTypingSnapshot();
   };
 
   const handleEditorInput = () => {
@@ -288,6 +402,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     const newContent = editorRef.current.innerHTML;
     setActiveNoteContent(newContent);
     scheduleAutoSave(activeNoteTitle, newContent);
+    scheduleTypingSnapshot();
   };
 
   // Save active selection range across editor & title
@@ -307,6 +422,9 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
   // Apply CSS Styles (Fonts, Sizes, Colors, Alignments) directly to Selection or Element
   const handleApplyStyle = (styleProperty: string, value: string) => {
+    // Record history snapshot before modification
+    pushHistorySnapshot();
+
     const sel = window.getSelection();
     let range: Range | null = null;
 
@@ -319,10 +437,16 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     const isInsideTitle = !!(titleRef.current && range && titleRef.current.contains(range.commonAncestorContainer));
     const isInsideEditor = !!(editorRef.current && range && editorRef.current.contains(range.commonAncestorContainer));
 
+    // Case 1: Active text selection inside title or body
     if (range && !range.collapsed && (isInsideTitle || isInsideEditor)) {
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+
       const span = document.createElement('span');
       span.style.setProperty(styleProperty, value);
-      if (styleProperty === 'font-size') span.style.lineHeight = '1.4';
+      if (styleProperty === 'font-size') span.style.lineHeight = '1.35';
       if (styleProperty === 'background-color' && value !== 'transparent') {
         span.style.padding = '1px 3px';
         span.style.borderRadius = '3px';
@@ -349,10 +473,11 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       } else {
         handleEditorInput();
       }
+      pushHistorySnapshot();
       return;
     }
 
-    // Apply directly if entire block or cursor
+    // Case 2: Direct styling on element or caret position
     if (lastActiveTargetRef.current === 'title' && titleRef.current) {
       titleRef.current.focus();
       if (styleProperty === 'font-family') {
@@ -369,11 +494,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       handleTitleInput();
     } else if (editorRef.current) {
       editorRef.current.focus();
-      if (styleProperty === 'font-family') {
-        editorRef.current.style.fontFamily = value;
-      } else if (styleProperty === 'font-size') {
-        document.execCommand('fontSize', false, '3');
-      }
       if (range && isInsideEditor) {
         const span = document.createElement('span');
         span.style.setProperty(styleProperty, value);
@@ -385,14 +505,37 @@ const NotesSection: React.FC<NotesSectionProps> = ({
         if (sel) {
           sel.removeAllRanges();
           sel.addRange(newRange);
+          savedRangeRef.current = newRange.cloneRange();
+        }
+      } else {
+        if (styleProperty === 'font-family') {
+          editorRef.current.style.fontFamily = value;
+        } else if (styleProperty === 'text-align') {
+          if (value === 'center') document.execCommand('justifyCenter');
+          else if (value === 'right') document.execCommand('justifyRight');
+          else if (value === 'justify') document.execCommand('justifyFull');
+          else document.execCommand('justifyLeft');
         }
       }
       handleEditorInput();
     }
+
+    pushHistorySnapshot();
   };
 
   // Rich Text Commands
   const handleApplyCommand = (command: string, value: string = '') => {
+    if (command === 'undo') {
+      handleUndo();
+      return;
+    }
+    if (command === 'redo') {
+      handleRedo();
+      return;
+    }
+
+    pushHistorySnapshot();
+
     const targetEl = lastActiveTargetRef.current === 'title' ? titleRef.current : editorRef.current;
     if (!targetEl) return;
     targetEl.focus();
@@ -418,9 +561,13 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     } else {
       handleEditorInput();
     }
+
+    pushHistorySnapshot();
   };
 
   const handleInsertHtml = (html: string) => {
+    pushHistorySnapshot();
+
     const targetEl = lastActiveTargetRef.current === 'title' ? titleRef.current : editorRef.current;
     if (!targetEl) return;
     targetEl.focus();
@@ -439,6 +586,28 @@ const NotesSection: React.FC<NotesSectionProps> = ({
       handleTitleInput();
     } else {
       handleEditorInput();
+    }
+
+    pushHistorySnapshot();
+  };
+
+  // Editor Keyboard shortcuts for Undo/Redo
+  const handleEditorKeyDown = (e: React.KeyboardEvent) => {
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    if (isCtrlOrCmd) {
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleUndo();
+        return;
+      }
+      if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleRedo();
+        return;
+      }
     }
   };
 
@@ -1000,11 +1169,18 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   onApplyCommand={handleApplyCommand}
                   onInsertHtml={handleInsertHtml}
                   onApplyStyle={handleApplyStyle}
+                  onUndo={handleUndo}
+                  onRedo={handleRedo}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
                 />
               </div>
 
               {/* 4. Canvas Body Area with Optional Details Panel */}
-              <div className="flex-1 min-h-0 flex overflow-hidden relative z-10">
+              <div 
+                className="flex-1 min-h-0 flex overflow-hidden relative z-10"
+                onKeyDown={handleEditorKeyDown}
+              >
                 
                 {/* Editor Surface */}
                 <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-6 md:p-10 max-w-4xl mx-auto w-full">
@@ -1024,6 +1200,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     onKeyUp={saveActiveSelection}
                     onSelect={saveActiveSelection}
                     onKeyDown={(e) => {
+                      handleEditorKeyDown(e);
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         editorRef.current?.focus();
@@ -1046,6 +1223,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     onMouseUp={saveActiveSelection}
                     onKeyUp={saveActiveSelection}
                     onSelect={saveActiveSelection}
+                    onKeyDown={handleEditorKeyDown}
                     data-placeholder="Escribe tus notas aquí..."
                     className="flex-1 focus:outline-none note-editor-content leading-relaxed text-zinc-800 dark:text-zinc-200 min-h-[400px]"
                   />

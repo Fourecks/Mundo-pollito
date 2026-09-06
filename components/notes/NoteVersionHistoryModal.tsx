@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { History, RotateCcw, Clock, X, Check, FileText } from 'lucide-react';
 import { Note, NoteVersion } from '../../types';
+import { cleanToPlainText } from '../../utils/textCleaner';
 
 interface NoteVersionHistoryModalProps {
   note: Note;
@@ -34,7 +35,7 @@ export const NoteVersionHistoryModal: React.FC<NoteVersionHistoryModalProps> = (
                 Historial de Versiones
               </h3>
               <p className="text-[11px] text-zinc-400 truncate max-w-md">
-                Nota: <span className="font-medium text-zinc-700 dark:text-zinc-300">{note.title || 'Sin título'}</span>
+                Nota: <span className="font-medium text-zinc-700 dark:text-zinc-300">{cleanToPlainText(note.title) || 'Sin título'}</span>
               </p>
             </div>
           </div>

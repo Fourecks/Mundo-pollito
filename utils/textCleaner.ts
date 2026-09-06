@@ -121,28 +121,50 @@ export function cleanToPlainText(input: string): string {
 
   let text = input;
 
-  // If escaped HTML, decode it first
-  if (text.includes('&lt;') && text.includes('&gt;')) {
-    text = decodeHtmlEntities(text);
+  // Multi-pass unescape to handle single or double HTML entity encoding (e.g. &lt;span... or &amp;lt;span...)
+  for (let i = 0; i < 3; i++) {
+    if (text.includes('&lt;') || text.includes('&gt;') || text.includes('&amp;') || text.includes('&quot;') || text.includes('&#')) {
+      text = decodeHtmlEntities(text);
+    } else {
+      break;
+    }
   }
 
   // Handle verse number tags specifically to preserve the number with a space
   text = text.replace(/<span\b[^>]*class=["']verseNum["'][^>]*>(?:<a\b[^>]*>)?([\s\S]*?)(?:<\/a>)?<\/span>/gi, '$1 ');
 
-  // Replace block tags and breaks with newlines
-  text = text
+  if (typeof document !== 'undefined') {
+    try {
+      const div = document.createElement('div');
+      // Convert block tags and breaks to newlines before parsing so lines don't collide
+      const prepped = text
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|h[1-6]|li|tr|blockquote|pre)>/gi, '\n');
+      div.innerHTML = prepped;
+      const parsedText = div.textContent || div.innerText || '';
+      return parsedText
+        .replace(/<[^>]*>/g, '') // remove any residual angle-bracket fragments
+        .replace(/&nbsp;/g, ' ')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    } catch {
+      // fallback to regex below
+    }
+  }
+
+  // Fallback regex cleanup
+  return text
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|h[1-6]|li|tr|blockquote|pre)>/gi, '\n')
-    .replace(/<[^>]+>/g, '') // strip all other tags
+    .replace(/<[^>]+>/g, '') // strip all tags
+    .replace(/<[^>]*$/g, '') // remove trailing broken tag
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-
-  // Normalize spaces and extra newlines
-  return text
+    .replace(/&#39;/g, "'")
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
