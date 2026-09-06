@@ -167,12 +167,6 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
     const info = interactionStateRef.current;
     if (!info.active || !info.type || !modalRef.current) return;
 
-    // Safety: if mouse button was released outside, terminate interaction immediately
-    if ('buttons' in e && e.buttons === 0 && !('touches' in e)) {
-      onPointerUp();
-      return;
-    }
-
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
 
@@ -436,9 +430,6 @@ const ModalWindowComponent: React.FC<ModalWindowProps> = ({
             cursor: interactionStateRef.current.type === 'resize' ? 'nwse-resize' : 'move',
             userSelect: 'none'
           }}
-          onClick={onPointerUp}
-          onPointerUp={onPointerUp}
-          onTouchEnd={onPointerUp}
         />
       )}
 

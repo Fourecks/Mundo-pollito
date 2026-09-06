@@ -1072,7 +1072,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
 
                   {/* Save Indicator */}
                   <div 
-                    className="flex-shrink-0 flex items-center gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-zinc-100/90 dark:bg-zinc-800/80 border border-zinc-200/70 dark:border-zinc-700/70 text-xs font-medium ml-1 relative z-50 cursor-default select-none transition-all"
+                    className="flex-shrink-0 flex items-center gap-1.5 ml-1 relative z-50 cursor-default select-none"
                     title={saveStatus === 'saving' ? 'Guardando cambios...' : saveStatus === 'saved' ? 'Guardado correctamente' : 'Error al guardar'}
                   >
                     {/* Ring Loader Badge */}
@@ -1082,8 +1082,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                           saveStatus === 'saving'
                             ? 'border-amber-500/30 border-t-amber-500 animate-spin'
                             : saveStatus === 'saved'
-                            ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-500/15'
-                            : 'border-rose-500 bg-rose-500/15'
+                            ? 'border-emerald-500 dark:border-emerald-400'
+                            : 'border-rose-500'
                         }`}
                       />
                       {saveStatus === 'saving' && (
@@ -1097,8 +1097,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                       )}
                     </div>
 
-                    {/* Text Label - Shown on medium/large screens */}
-                    <span className="hidden sm:inline text-xs font-medium">
+                    {/* Text Label - Hidden on small screen/window, shown ONLY on wide screen */}
+                    <span className="hidden sm:inline text-xs font-medium leading-none">
                       {saveStatus === 'saving' && (
                         <span className="text-amber-600 dark:text-amber-400 font-semibold">Guardando...</span>
                       )}
