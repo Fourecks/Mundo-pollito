@@ -79,6 +79,8 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
   const [showHeadingMenu, setShowHeadingMenu] = useState(false);
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const [showCalloutMenu, setShowCalloutMenu] = useState(false);
+  const [customTextColor, setCustomTextColor] = useState('#1e293b');
+  const [customHighlightColor, setCustomHighlightColor] = useState('#fef08a');
 
   // Active formats state for toolbar buttons
   const [activeFormats, setActiveFormats] = useState({
@@ -208,13 +210,15 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
   // Close menus on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (fontMenuRef.current && !fontMenuRef.current.contains(e.target as Node)) setShowFontMenu(false);
-      if (sizeMenuRef.current && !sizeMenuRef.current.contains(e.target as Node)) setShowSizeMenu(false);
-      if (colorMenuRef.current && !colorMenuRef.current.contains(e.target as Node)) setShowColorMenu(false);
-      if (highlightMenuRef.current && !highlightMenuRef.current.contains(e.target as Node)) setShowHighlightMenu(false);
-      if (headingMenuRef.current && !headingMenuRef.current.contains(e.target as Node)) setShowHeadingMenu(false);
-      if (alignMenuRef.current && !alignMenuRef.current.contains(e.target as Node)) setShowAlignMenu(false);
-      if (calloutMenuRef.current && !calloutMenuRef.current.contains(e.target as Node)) setShowCalloutMenu(false);
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (fontMenuRef.current && !fontMenuRef.current.contains(target)) setShowFontMenu(false);
+      if (sizeMenuRef.current && !sizeMenuRef.current.contains(target)) setShowSizeMenu(false);
+      if (colorMenuRef.current && !colorMenuRef.current.contains(target)) setShowColorMenu(false);
+      if (highlightMenuRef.current && !highlightMenuRef.current.contains(target)) setShowHighlightMenu(false);
+      if (headingMenuRef.current && !headingMenuRef.current.contains(target)) setShowHeadingMenu(false);
+      if (alignMenuRef.current && !alignMenuRef.current.contains(target)) setShowAlignMenu(false);
+      if (calloutMenuRef.current && !calloutMenuRef.current.contains(target)) setShowCalloutMenu(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -250,15 +254,25 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
   };
 
   // Handle Color Application
-  const handleApplyColor = (color: string) => {
-    setShowColorMenu(false);
+  const handleApplyColor = (color: string, shouldClose: boolean = false) => {
+    if (color && color !== 'inherit') {
+      setCustomTextColor(color);
+    }
+    if (shouldClose) {
+      setShowColorMenu(false);
+    }
     onApplyStyle('color', color);
     setTimeout(updateActiveFormats, 40);
   };
 
   // Handle Highlight Application
-  const handleApplyHighlight = (color: string) => {
-    setShowHighlightMenu(false);
+  const handleApplyHighlight = (color: string, shouldClose: boolean = false) => {
+    if (color && color !== 'transparent') {
+      setCustomHighlightColor(color);
+    }
+    if (shouldClose) {
+      setShowHighlightMenu(false);
+    }
     onApplyStyle('background-color', color);
     setTimeout(updateActiveFormats, 40);
   };
@@ -389,7 +403,11 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
         </button>
 
         {showFontMenu && (
-          <div className="absolute top-full left-0 mt-1 w-60 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100] max-h-64 overflow-y-auto custom-scrollbar">
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-full left-0 mt-1 w-60 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100] max-h-64 overflow-y-auto custom-scrollbar"
+          >
             <div className="px-3 py-1 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
               Tipografías Disponibles
             </div>
@@ -437,7 +455,11 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
           </button>
 
           {showSizeMenu && (
-            <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100] max-h-56 overflow-y-auto custom-scrollbar">
+            <div
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100] max-h-56 overflow-y-auto custom-scrollbar"
+            >
               <div className="px-3 py-1 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                 Tamaño en Píxeles
               </div>
@@ -498,7 +520,11 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
         </button>
 
         {showHeadingMenu && (
-          <div className="absolute top-full left-0 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100]">
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-full left-0 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100]"
+          >
             <button
               onMouseDown={preventFocusLoss}
               onClick={() => { runCommand('formatBlock', '<p>'); setShowHeadingMenu(false); }}
@@ -641,31 +667,75 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
           </button>
 
           {showColorMenu && (
-            <div className="absolute top-full left-0 mt-1 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl p-2.5 z-[100]">
-              <div className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                Color de Texto
+            <div
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full left-0 mt-1.5 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl p-3 z-[100]"
+            >
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-100 dark:border-zinc-800">
+                <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                  Color de Texto
+                </span>
+                <button
+                  onClick={() => setShowColorMenu(false)}
+                  className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  title="Cerrar paleta"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <div className="grid grid-cols-4 gap-1.5 mb-2">
+
+              {/* Swatches */}
+              <div className="grid grid-cols-6 gap-1.5 mb-2.5">
                 {COLOR_SWATCHES.map((swatch) => (
                   <button
                     key={swatch.name}
                     onMouseDown={preventFocusLoss}
-                    onClick={() => handleApplyColor(swatch.color)}
-                    className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 hover:scale-105 transition-transform flex items-center justify-center cursor-pointer"
+                    onClick={() => handleApplyColor(swatch.color, true)}
+                    className="w-7 h-7 rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 hover:scale-110 active:scale-95 transition-transform flex items-center justify-center cursor-pointer shadow-xs"
                     style={{ backgroundColor: swatch.color === 'inherit' ? '#f4f4f5' : swatch.color }}
                     title={swatch.name}
                   >
-                    {swatch.color === 'inherit' && <span className="text-[9px] font-semibold text-zinc-600">A</span>}
+                    {swatch.color === 'inherit' && <span className="text-[10px] font-bold text-zinc-700">A</span>}
                   </button>
                 ))}
               </div>
-              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                <span className="text-[11px] text-zinc-500">Personalizado:</span>
-                <input
-                  type="color"
-                  onChange={(e) => handleApplyColor(e.target.value)}
-                  className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
-                />
+
+              {/* Custom Color Picker & Hex Input */}
+              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-1.5">
+                <div className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+                  Personalizado
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 flex-shrink-0 cursor-pointer shadow-xs">
+                    <input
+                      type="color"
+                      value={customTextColor}
+                      onInput={(e) => handleApplyColor((e.target as HTMLInputElement).value, false)}
+                      onChange={(e) => handleApplyColor(e.target.value, false)}
+                      className="absolute inset-0 w-[150%] h-[150%] -top-2 -left-2 cursor-pointer border-0 bg-transparent p-0"
+                      title="Seleccionar color personalizado"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={customTextColor}
+                    onChange={(e) => {
+                      setCustomTextColor(e.target.value);
+                      if (/^#([0-9A-F]{3}){1,2}$/i.test(e.target.value)) {
+                        handleApplyColor(e.target.value, false);
+                      }
+                    }}
+                    placeholder="#1e293b"
+                    className="flex-1 px-2 py-1 text-xs font-mono rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  />
+                  <button
+                    onClick={() => handleApplyColor(customTextColor, true)}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                  >
+                    Listo
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -684,31 +754,77 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
           </button>
 
           {showHighlightMenu && (
-            <div className="absolute top-full left-0 mt-1 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl p-2.5 z-[100]">
-              <div className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                Color de Resaltado
+            <div
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full left-0 mt-1.5 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl p-3 z-[100]"
+            >
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-100 dark:border-zinc-800">
+                <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                  Color de Resaltado
+                </span>
+                <button
+                  onClick={() => setShowHighlightMenu(false)}
+                  className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  title="Cerrar paleta"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <div className="grid grid-cols-4 gap-1.5 mb-2">
+
+              {/* Swatches */}
+              <div className="grid grid-cols-4 gap-1.5 mb-2.5">
                 {HIGHLIGHT_SWATCHES.map((swatch) => (
                   <button
                     key={swatch.name}
                     onMouseDown={preventFocusLoss}
-                    onClick={() => handleApplyHighlight(swatch.color)}
-                    className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 hover:scale-105 transition-transform flex items-center justify-center cursor-pointer"
+                    onClick={() => handleApplyHighlight(swatch.color, true)}
+                    className="h-7 rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 hover:scale-105 active:scale-95 transition-transform flex items-center justify-center cursor-pointer shadow-xs px-1"
                     style={{ backgroundColor: swatch.color === 'transparent' ? '#ffffff' : swatch.color }}
                     title={swatch.name}
                   >
-                    {swatch.color === 'transparent' && <span className="text-[9px] font-semibold text-zinc-400">∅</span>}
+                    <span className="text-[10px] font-medium text-zinc-800">
+                      {swatch.label}
+                    </span>
                   </button>
                 ))}
               </div>
-              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                <span className="text-[11px] text-zinc-500">Personalizado:</span>
-                <input
-                  type="color"
-                  onChange={(e) => handleApplyHighlight(e.target.value)}
-                  className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
-                />
+
+              {/* Custom Highlight Picker */}
+              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-1.5">
+                <div className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+                  Personalizado
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 flex-shrink-0 cursor-pointer shadow-xs">
+                    <input
+                      type="color"
+                      value={customHighlightColor}
+                      onInput={(e) => handleApplyHighlight((e.target as HTMLInputElement).value, false)}
+                      onChange={(e) => handleApplyHighlight(e.target.value, false)}
+                      className="absolute inset-0 w-[150%] h-[150%] -top-2 -left-2 cursor-pointer border-0 bg-transparent p-0"
+                      title="Seleccionar resaltador personalizado"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={customHighlightColor}
+                    onChange={(e) => {
+                      setCustomHighlightColor(e.target.value);
+                      if (/^#([0-9A-F]{3}){1,2}$/i.test(e.target.value)) {
+                        handleApplyHighlight(e.target.value, false);
+                      }
+                    }}
+                    placeholder="#fef08a"
+                    className="flex-1 px-2 py-1 text-xs font-mono rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                  />
+                  <button
+                    onClick={() => handleApplyHighlight(customHighlightColor, true)}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                  >
+                    Listo
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -742,7 +858,11 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
         </button>
 
         {showAlignMenu && (
-          <div className="absolute top-full left-0 mt-1 w-36 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100]">
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-full left-0 mt-1 w-36 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100]"
+          >
             <button
               onMouseDown={preventFocusLoss}
               onClick={() => { onApplyStyle('text-align', 'left'); runCommand('justifyLeft'); setShowAlignMenu(false); }}
@@ -877,7 +997,11 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
           </button>
 
           {showCalloutMenu && (
-            <div className="absolute top-full left-0 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100]">
+            <div
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full left-0 mt-1 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-[100]"
+            >
               <button
                 onMouseDown={preventFocusLoss}
                 onClick={() => handleInsertCallout('info')}

@@ -1090,18 +1090,18 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                   </div>
                 </div>
 
-                {/* Right side: Restore / Archive / Trash / Focus / Details */}
-                <div className="flex items-center gap-1.5 flex-shrink-0">
+                {/* Right side: Restore / Archive / Trash / Reading / Export / Print / Focus / Details / Close */}
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
                   
                   {/* IF IN ARCHIVE OR TRASH: SHOW RESTORE BUTTON */}
                   {(selectedNote.is_archived || selectedNote.deleted_at) ? (
                     <button
                       onClick={() => handleRestoreNote(selectedNote)}
-                      className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-white font-medium text-xs flex items-center gap-1.5 transition-all"
+                      className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-white transition-all cursor-pointer flex items-center justify-center"
                       title="Restaurar nota a activas"
+                      aria-label="Restaurar nota a activas"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restaurar</span>
+                      <RotateCcw className="w-4 h-4" />
                     </button>
                   ) : (
                     /* IF ACTIVE: SHOW ARCHIVE AND TRASH BUTTONS */
@@ -1109,21 +1109,21 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                       {/* Archivar */}
                       <button
                         onClick={() => setNoteToArchive(selectedNote)}
-                        className="px-2.5 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-xs font-medium flex items-center gap-1.5 transition-all"
+                        className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-all cursor-pointer flex items-center justify-center"
                         title="Archivar nota"
+                        aria-label="Archivar nota"
                       >
-                        <Archive className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Archivar</span>
+                        <Archive className="w-4 h-4" />
                       </button>
 
                       {/* Enviar a Papelera */}
                       <button
                         onClick={() => setNoteToTrash(selectedNote)}
-                        className="px-2.5 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-xs font-medium flex items-center gap-1.5 transition-all"
-                        title="Mover nota a la papelera"
+                        className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-all cursor-pointer flex items-center justify-center"
+                        title="Mover a la papelera"
+                        aria-label="Mover nota a la papelera"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Papelera</span>
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </>
                   )}
@@ -1136,18 +1136,18 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                         setShowDetailsPanel(false);
                       }
                     }}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
                       isReadingMode
                         ? 'bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/70 dark:text-amber-200 dark:border-amber-800 shadow-xs'
-                        : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700'
+                        : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700'
                     }`}
                     title={isReadingMode ? 'Salir de Modo Lectura' : 'Modo Lectura (oculta herramientas y optimiza tipografía)'}
+                    aria-label={isReadingMode ? 'Salir de Modo Lectura' : 'Modo Lectura'}
                   >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{isReadingMode ? 'Modo Lectura' : 'Lectura'}</span>
+                    <BookOpen className="w-4 h-4" />
                   </button>
 
-                  <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1" />
+                  <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-0.5" />
 
                   {/* Export Markdown */}
                   <button
