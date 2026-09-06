@@ -1073,8 +1073,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     { id: 'minimize_active', title: 'Minimizar Ventana Activa', icon: <Minimize2 className="w-5 h-5 text-gray-500" />, shortcut: 'Alt+W', macShortcut: '⌥+W', onSelect: minimizeActiveWindow, keywords: ['minimizar', 'ocultar', 'ventana'] },
     { id: 'close_active', title: 'Cerrar Ventana Activa', icon: <XSquare className="w-5 h-5 text-red-400" />, shortcut: 'Alt+Q', macShortcut: '⌥+Q', onSelect: closeActiveWindow, keywords: ['cerrar', 'salir', 'ventana'] },
     { id: 'restore_last', title: 'Restaurar Última Ventana Minimizada', icon: <RotateCcw className="w-5 h-5 text-blue-400" />, shortcut: 'Alt+U', macShortcut: '⌥+U', onSelect: restoreLastMinimized, keywords: ['restaurar', 'abrir', 'ventana'] },
-    { id: 'cycle_next', title: 'Siguiente Ventana', icon: <ArrowRight className="w-5 h-5 text-gray-400" />, shortcut: 'Alt+]', macShortcut: '⌥+]', onSelect: cycleNextWindow, keywords: ['siguiente', 'cambiar', 'ventana'] },
-    { id: 'cycle_prev', title: 'Ventana Anterior', icon: <ArrowLeft className="w-5 h-5 text-gray-400" />, shortcut: 'Alt+[', macShortcut: '⌥+[', onSelect: cyclePrevWindow, keywords: ['anterior', 'cambiar', 'ventana'] },
+    { id: 'cycle_next', title: 'Siguiente Ventana', icon: <ArrowRight className="w-5 h-5 text-gray-400" />, shortcut: 'Alt+→ (o Alt+])', macShortcut: '⌥+→ (o ⌥+])', onSelect: cycleNextWindow, keywords: ['siguiente', 'cambiar', 'ventana'] },
+    { id: 'cycle_prev', title: 'Ventana Anterior', icon: <ArrowLeft className="w-5 h-5 text-gray-400" />, shortcut: 'Alt+← (o Alt+[)', macShortcut: '⌥+← (o ⌥+[)', onSelect: cyclePrevWindow, keywords: ['anterior', 'cambiar', 'ventana'] },
     { id: 'toggle_desktop', title: 'Mostrar Escritorio / Ocultar Todo', icon: <Monitor className="w-5 h-5 text-indigo-400" />, shortcut: 'Alt+0', macShortcut: '⌥+0', onSelect: toggleShowDesktop, keywords: ['escritorio', 'desktop', 'minimizar todo'] },
     { id: 'theme', title: `Cambiar a modo ${theme === 'light' ? 'Oscuro' : 'Claro'}`, icon: theme === 'light' ? <Moon className="w-5 h-5 text-gray-500" /> : <Sun className="w-5 h-5 text-yellow-500" />, shortcut: 'Alt+D', macShortcut: '⌥+D', onSelect: toggleTheme, keywords: ['tema', 'oscuro', 'claro', 'modo'] },
     { id: 'settings', title: 'Abrir Configuración', icon: <Settings className="w-5 h-5 text-gray-500" />, shortcut: 'Alt+S', macShortcut: '⌘+,', onSelect: () => setIsCustomizationPanelOpen(true), keywords: ['configuracion', 'ajustes', 'personalizar'] }
@@ -1123,15 +1123,37 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           return;
         }
 
-        // 2. Cycle Next Window: Alt + ] / Alt + ArrowRight / Option + ]
-        if (e.altKey && (code === 'BracketRight' || key === ']' || code === 'ArrowRight' || key === 'arrowright')) {
+        // 2. Cycle Next Window:
+        // - Alt / Option + ArrowRight
+        // - Alt / Option + ] or } (works with or without Shift, handles Spanish Mac layouts)
+        // - Mac Native: Cmd + ` or Cmd + < or Cmd + ~
+        const isNextWindowKey = 
+          code === 'ArrowRight' || key === 'arrowright' ||
+          code === 'BracketRight' || key === ']' || key === '}' || 
+          key === '»' || key === '›' || key === '”' || key === '’';
+
+        const isMacNativeCycleNext = 
+          e.metaKey && !e.shiftKey && (code === 'Backquote' || key === '`' || key === '~' || key === '<' || key === 'º' || key === '§');
+
+        if ((e.altKey && isNextWindowKey) || isMacNativeCycleNext) {
           e.preventDefault();
           cycleNextWindow();
           return;
         }
 
-        // 3. Cycle Previous Window: Alt + [ / Alt + ArrowLeft / Option + [
-        if (e.altKey && (code === 'BracketLeft' || key === '[' || code === 'ArrowLeft' || key === 'arrowleft')) {
+        // 3. Cycle Previous Window:
+        // - Alt / Option + ArrowLeft
+        // - Alt / Option + [ or { (works with or without Shift, handles Spanish Mac layouts)
+        // - Mac Native: Cmd + Shift + ` or Cmd + Shift + < or Cmd + Shift + ~
+        const isPrevWindowKey = 
+          code === 'ArrowLeft' || key === 'arrowleft' ||
+          code === 'BracketLeft' || key === '[' || key === '{' || 
+          key === '«' || key === '‹' || key === '“' || key === '‘';
+
+        const isMacNativeCyclePrev = 
+          e.metaKey && e.shiftKey && (code === 'Backquote' || key === '`' || key === '~' || key === '<' || key === 'º' || key === '§');
+
+        if ((e.altKey && isPrevWindowKey) || isMacNativeCyclePrev) {
           e.preventDefault();
           cyclePrevWindow();
           return;

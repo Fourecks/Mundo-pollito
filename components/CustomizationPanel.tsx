@@ -193,8 +193,8 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
             id: 'windows_management',
             name: 'Gestión y Multitarea de Ventanas',
             items: [
-              { title: 'Cambiar a Ventana de Atrás', desc: 'Alterna el foco a la ventana inmediatamente detrás de la actual', win: ['Alt', '['], mac: ['⌥ Option', '['], winAlt: ['Alt', '←'], macAlt: ['⌥ Option', '←'] },
-              { title: 'Cambiar a Ventana Siguiente', desc: 'Avanza y enfoca cíclicamente la siguiente ventana abierta', win: ['Alt', ']'], mac: ['⌥ Option', ']'], winAlt: ['Alt', '→'], macAlt: ['⌥ Option', '→'] },
+              { title: 'Cambiar a Ventana Siguiente', desc: 'Avanza y enfoca cíclicamente la siguiente ventana abierta', win: ['Alt', '→'], mac: ['⌥ Option', '→'], winAlt: ['Alt', ']'], macAlt: ['⌥ Option', '} / ]'] },
+              { title: 'Cambiar a Ventana de Atrás', desc: 'Alterna el foco a la ventana inmediatamente detrás de la actual', win: ['Alt', '←'], mac: ['⌥ Option', '←'], winAlt: ['Alt', '['], macAlt: ['⌥ Option', '{ / ['] },
               { title: 'Restaurar Última Minimizada', desc: 'Desminimiza y trae al frente la última ventana minimizada', win: ['Alt', 'U'], mac: ['⌥ Option', 'U'], winAlt: ['Alt', '⇧ Shift', 'Z'], macAlt: ['⌘ Cmd', '⇧ Shift', 'Z'] },
               { title: 'Minimizar Ventana Activa', desc: 'Oculta la ventana que tienes enfocada en este momento', win: ['Alt', 'W'], mac: ['⌥ Option', 'W'], winAlt: null, macAlt: ['⌘ Cmd', 'M'] },
               { title: 'Cerrar Ventana Activa', desc: 'Cierra por completo la ventana actual enfocada', win: ['Alt', 'Q'], mac: ['⌥ Option', 'Q'], winAlt: null, macAlt: ['⌘ Cmd', '⇧ Shift', 'W'] },
@@ -397,8 +397,8 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
                     </div>
                     <div className="p-2 rounded-lg bg-white dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/50">
                       <div className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200">En macOS (Apple)</div>
-                      <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        La tecla <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">⌥ Option</kbd> sustituye a Alt. Las acciones de ventana también aceptan <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">⌘ Cmd</kbd>.
+                      <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-normal">
+                        La tecla <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">⌥ Option</kbd> sustituye a Alt. Para alternar ventanas en teclado en español usa <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">⌥ + → / ←</kbd> o corchetes/llaves con o sin Shift (<kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">⌥ + &#125; / ]</kbd>), o <kbd className="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[9.5px]">⌘ + `</kbd>.
                       </div>
                     </div>
                   </div>
