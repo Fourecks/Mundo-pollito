@@ -21,7 +21,7 @@ export const NoteVersionHistoryModal: React.FC<NoteVersionHistoryModalProps> = (
   );
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs animate-fade-in select-none">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fade-in select-none overflow-y-auto">
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl w-full max-w-3xl h-[80vh] max-h-[600px] flex flex-col overflow-hidden text-left">
         
         {/* Modal Header */}

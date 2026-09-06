@@ -65,11 +65,11 @@ const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
 
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60000]"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex justify-end"
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl flex flex-col transition-transform duration-300 transform animate-slide-in border-l border-gray-200 dark:border-gray-800"
+            className="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl flex flex-col transition-transform duration-300 transform animate-slide-in border-l border-gray-200 dark:border-gray-800 z-[100000]"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}

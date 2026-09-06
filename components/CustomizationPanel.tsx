@@ -527,10 +527,10 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-[90000] flex flex-col justify-end pointer-events-auto">
+      <div className="fixed inset-0 z-[99999] flex flex-col justify-end pointer-events-auto">
         <motion.div 
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" 
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
           onClick={onClose} 
         />
         <motion.div 
@@ -546,10 +546,10 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[90000] flex items-center justify-center p-4 pointer-events-none">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 pointer-events-none">
       <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-gray-900/30 backdrop-blur-[2px] pointer-events-auto" 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto" 
         onClick={onClose} 
       />
       <motion.div

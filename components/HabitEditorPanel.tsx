@@ -107,11 +107,11 @@ const HabitEditorPanel: React.FC<HabitEditorPanelProps> = ({ isOpen, onClose, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[90000] flex items-center justify-center p-3 sm:p-4 animate-fade-in">
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs" onClick={onClose} />
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
       
       <div 
-        className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex flex-col z-[90001] overflow-visible max-h-[92vh]"
+        className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col z-[100000] overflow-visible max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}

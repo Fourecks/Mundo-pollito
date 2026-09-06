@@ -9,8 +9,8 @@ const ReminderModal: React.FC<ReminderModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[90000] flex items-center justify-center" onClick={onClose}>
-      <div className="bg-white p-4 rounded-lg" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 overflow-y-auto animate-fade-in" onClick={onClose}>
+      <div className="relative bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700" onClick={e => e.stopPropagation()}>
         <h2>Reminder Modal</h2>
         <button onClick={onClose}>Close</button>
       </div>
