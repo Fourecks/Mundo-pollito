@@ -2,12 +2,13 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem, Priority, ProjectExpense, Folder, Note } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
-import NotesSection from './NotesSection';
+import ProjectNoteEditorModal from './ProjectNoteEditorModal';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, LayoutGrid
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, LayoutGrid, Upload, BookOpen, FilePlus
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { cleanToPlainText } from '../utils/textCleaner';
 
 interface ProjectsWorkspaceProps {
     currentUser?: any;
@@ -213,6 +214,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // Document View, Preview & Channel Share States
     const [docViewMode, setDocViewMode] = useState<'grid' | 'table'>('grid');
     const [docSearchText, setDocSearchText] = useState<string>('');
+    const [editingProjectNote, setEditingProjectNote] = useState<Note | null>(null);
+    const [showOnlyNotesView, setShowOnlyNotesView] = useState<boolean>(false);
+    const [isDraggingFiles, setIsDraggingFiles] = useState<boolean>(false);
     const [shareDocModal, setShareDocModal] = useState<{ isOpen: boolean; doc: ProjectDoc | null }>({ isOpen: false, doc: null });
     const [shareTargetChannelId, setShareTargetChannelId] = useState<string>('general');
     const [shareComment, setShareComment] = useState<string>('');
@@ -804,14 +808,97 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         handleOpenShareDoc(doc);
     };
 
-    // Helper: File Upload to Docs with auto-compression and size limits
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
+    // Helper: Share Note into Channel via Share Modal
+    const handleOpenShareNote = (note: Note) => {
+        const docLike: ProjectDoc = {
+            id: `note-${note.id}`,
+            project_id: activeProject?.id || 0,
+            title: note.title || 'Nota sin título',
+            content: note.content || '',
+            category: 'Meeting Notes',
+            file_type: 'note',
+            file_name: `${(note.title || 'Nota').replace(/[^\w\s-]/gi, '')}.md`,
+            created_by: currentUserEmail,
+            created_at: note.created_at,
+            updated_at: note.updated_at
+        };
+        handleOpenShareDoc(docLike);
+    };
+
+    // Helper: Delete Document
+    const handleDeleteDoc = (docId: string) => {
+        if (!activeProject) return;
+        if (window.confirm('¿Estás seguro de eliminar este documento o archivo?')) {
+            const updatedDocs = (activeProject.docs || []).filter(d => d.id !== docId);
+            onUpdateProject(activeProject.id, { docs: updatedDocs });
+        }
+    };
+
+    // Helper: Delete Doc Folder
+    const handleDeleteDocFolder = (folderId: string) => {
+        if (!activeProject) return;
+        if (window.confirm('¿Eliminar esta carpeta de documentos? Los archivos contenidos se conservarán en la raíz del proyecto.')) {
+            const updatedFolders = (activeProject.doc_folders || []).filter(f => f.id !== folderId);
+            const updatedDocs = (activeProject.docs || []).map(d => d.folder_id === folderId ? { ...d, folder_id: null } : d);
+            onUpdateProject(activeProject.id, { doc_folders: updatedFolders, docs: updatedDocs });
+            if (selectedFolderId === folderId) {
+                setSelectedFolderId(null);
+            }
+        }
+    };
+
+    // Helper: Create a Note for this Project (syncs with main Notes module and opens rich note editor)
+    const handleCreateProjectNote = async () => {
+        if (!activeProject) return;
+        const newNote = await onAddNote(null, activeProject.id);
+        if (newNote) {
+            setEditingProjectNote(newNote);
+        }
+    };
+
+    // Helper: Delete a Note belonging to this Project
+    const handleDeleteProjectNote = async (noteId: number) => {
+        if (window.confirm('¿Estás seguro de eliminar esta nota?')) {
+            await onDeleteNote(noteId, null);
+            if (editingProjectNote?.id === noteId) {
+                setEditingProjectNote(null);
+            }
+        }
+    };
+
+    // Helper: Generic File Processor (for file input and drag-and-drop)
+    const processFileUpload = (file: File) => {
         if (!file || !activeProject) return;
 
         const ext = file.name.split('.').pop()?.toLowerCase() || '';
 
-        // If it's an image, compress it first to save cloud and local space
+        const saveDocument = (fileObj: File, fileUrl: string, fileSize: number) => {
+            let category: ProjectDoc['category'] = 'Other';
+            if (['xlsx', 'xls', 'csv'].includes(ext)) category = 'Specifications';
+            else if (['docx', 'doc', 'pdf'].includes(ext)) category = 'Requirements';
+            else if (['png', 'jpg', 'jpeg', 'svg', 'webp', 'gif'].includes(ext)) category = 'Ideas';
+
+            const newDoc: ProjectDoc = {
+                id: crypto.randomUUID(),
+                project_id: activeProject!.id,
+                folder_id: selectedFolderId,
+                title: fileObj.name,
+                content: `Archivo adjunto: ${fileObj.name} (${(fileSize / 1024).toFixed(1)} KB)`,
+                category,
+                file_url: fileUrl,
+                file_name: fileObj.name,
+                file_type: fileObj.type || ext,
+                file_size: fileSize,
+                created_by: currentUserEmail,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            const updatedDocs = [newDoc, ...(activeProject!.docs || [])];
+            onUpdateProject(activeProject!.id, { docs: updatedDocs });
+        };
+
+        // If it's an image, compress it first to save space
         if (file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = (event) => {
@@ -821,7 +908,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     let width = img.width;
                     let height = img.height;
 
-                    // Maximum dimensions to prevent massive canvas memory usage
                     const MAX_WIDTH = 1200;
                     const MAX_HEIGHT = 1200;
                     if (width > MAX_WIDTH || height > MAX_HEIGHT) {
@@ -839,7 +925,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
                         ctx.drawImage(img, 0, 0, width, height);
-                        // Export as compressed JPEG (0.7 quality is extremely lightweight and clear)
                         const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
                         saveDocument(file, compressedDataUrl, Math.round(compressedDataUrl.length * 0.75));
                     } else {
@@ -850,10 +935,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             };
             reader.readAsDataURL(file);
         } else {
-            // General file size validation (max 1.5 MB)
-            if (file.size > 1.5 * 1024 * 1024) {
-                alert(`El archivo "${file.name}" supera el límite permitido de 1.5 MB.\n\nPor favor, sube un archivo más pequeño o utiliza enlaces a servicios en la nube (como Google Drive, OneDrive o Dropbox) para archivos grandes.`);
-                if (e.target) e.target.value = '';
+            // General file size validation (max 2.5 MB)
+            if (file.size > 2.5 * 1024 * 1024) {
+                alert(`El archivo "${file.name}" supera el límite recomendado de 2.5 MB.\n\nPor favor, sube un archivo más ligero o enlaza a tu nube.`);
                 return;
             }
 
@@ -863,31 +947,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             };
             reader.readAsDataURL(file);
         }
+    };
 
-        function saveDocument(file: File, fileUrl: string, fileSize: number) {
-            let category: ProjectDoc['category'] = 'Other';
-            if (['xlsx', 'xls', 'csv'].includes(ext)) category = 'Specifications';
-            else if (['docx', 'doc', 'pdf'].includes(ext)) category = 'Requirements';
-            else if (['png', 'jpg', 'jpeg', 'svg'].includes(ext)) category = 'Ideas';
-
-            const newDoc: ProjectDoc = {
-                id: crypto.randomUUID(),
-                project_id: activeProject!.id,
-                folder_id: selectedFolderId,
-                title: file.name,
-                content: `Archivo adjunto: ${file.name} (${(fileSize / 1024).toFixed(1)} KB)`,
-                category,
-                file_url: fileUrl,
-                file_name: file.name,
-                file_type: file.type || ext,
-                file_size: fileSize,
-                created_by: currentUserEmail,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            };
-
-            const updatedDocs = [newDoc, ...(activeProject!.docs || [])];
-            onUpdateProject(activeProject!.id, { docs: updatedDocs });
+    // Helper: File Upload from input
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            processFileUpload(file);
             if (e.target) e.target.value = '';
         }
     };
@@ -1807,22 +1873,636 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // DOCUMENTATION & FILES TAB (MINIMALIST & ELEGANT DESIGN)
-        const renderDocs = () => {
+    // DOCUMENTATION & FILES TAB (ARCHIVOS, IMÁGENES, NOTAS DEL PROYECTO Y COMPARTIR)
+    const renderDocs = () => {
         if (!activeProject) return null;
+
+        const allProjectDocs = activeProject.docs || [];
+        const projectFolders = activeProject.doc_folders || [];
+        const projectNotes = notes.filter(n => n.project_id === activeProject.id && !n.deleted_at);
+
+        // Filter docs by search and folder
+        let filteredDocs = allProjectDocs;
+        if (selectedFolderId) {
+            filteredDocs = filteredDocs.filter(d => d.folder_id === selectedFolderId);
+        }
+        if (docSearchText.trim()) {
+            const query = docSearchText.toLowerCase();
+            filteredDocs = filteredDocs.filter(d => 
+                (d.title || '').toLowerCase().includes(query) || 
+                (d.file_name || '').toLowerCase().includes(query) ||
+                (d.content || '').toLowerCase().includes(query)
+            );
+        }
+
+        const activeFolderObj = projectFolders.find(f => f.id === selectedFolderId);
+
         return (
-            <div className="w-full h-full relative overflow-hidden bg-white dark:bg-[#111]">
-                <NotesSection
-                    folders={folders}
-                    notes={notes}
-                    onAddFolder={onAddFolder}
-                    onUpdateFolder={onUpdateFolder}
-                    onDeleteFolder={onDeleteFolder}
-                    onAddNote={onAddNote}
-                    onUpdateNote={onUpdateNote}
-                    onDeleteNote={onDeleteNote}
-                    projectId={activeProject.id}
+            <div className="w-full h-full flex flex-col bg-gray-50/50 dark:bg-[#0c0c0c] overflow-hidden">
+                {/* Hidden File Input for uploading files & images */}
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.zip"
                 />
+
+                {/* HEADER CON BUSCADOR Y ACCIONES DE ARCHIVOS */}
+                <div className="px-6 py-3.5 bg-white dark:bg-[#111] border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                    {/* Título y estado de sección */}
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                            <FolderOpen className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <span>Documentos y Archivos</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 font-bold">
+                                    {allProjectDocs.length} archivos
+                                </span>
+                            </h2>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                {activeFolderObj ? `Carpeta activa: ${activeFolderObj.name}` : 'Todos los documentos, imágenes y archivos adjuntos'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Acciones principales */}
+                    <div className="flex items-center gap-2">
+                        {/* Buscador */}
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                placeholder="Buscar archivos..."
+                                value={docSearchText}
+                                onChange={e => setDocSearchText(e.target.value)}
+                                className="pl-8 pr-3 py-1.5 text-xs bg-gray-100 dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 w-44 sm:w-56"
+                            />
+                            {docSearchText && (
+                                <button
+                                    type="button"
+                                    onClick={() => setDocSearchText('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Conmutador de vista Cuadrícula / Tabla */}
+                        <div className="flex items-center p-0.5 bg-gray-100 dark:bg-black/40 rounded-lg border border-gray-200 dark:border-gray-800">
+                            <button
+                                type="button"
+                                onClick={() => setDocViewMode('grid')}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                    docViewMode === 'grid'
+                                        ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs'
+                                        : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                }`}
+                                title="Vista en Cuadrícula"
+                            >
+                                <Grid className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDocViewMode('table')}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                    docViewMode === 'table'
+                                        ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs'
+                                        : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                }`}
+                                title="Vista en Tabla"
+                            >
+                                <List className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        {/* Nueva Carpeta */}
+                        <button
+                            type="button"
+                            onClick={() => setFolderModal({ isOpen: true, folder: null })}
+                            className="px-2.5 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-black border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-zinc-900 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
+                            title="Nueva Carpeta de Documentos"
+                        >
+                            <FolderPlus className="w-3.5 h-3.5 text-amber-500" />
+                            <span className="hidden sm:inline">Carpeta</span>
+                        </button>
+
+                        {/* Subir Archivo / Imagen */}
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
+                            title="Subir archivos o imágenes desde tu equipo"
+                        >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Subir Archivo / Imagen</span>
+                        </button>
+
+                        {/* Crear Nota (con modal propio de edición enriquecida y sincronizada con el módulo de notas) */}
+                        <button
+                            type="button"
+                            onClick={handleCreateProjectNote}
+                            className="px-3 py-1.5 text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
+                            title="Crear una nota para este proyecto (se abre el editor completo y aparece en el módulo de Notas)"
+                        >
+                            <FilePlus className="w-3.5 h-3.5 text-amber-400 dark:text-amber-600" />
+                            <span className="hidden md:inline">Nueva Nota</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* CONTENIDO PRINCIPAL: VISTA DE ARCHIVOS E IMÁGENES */}
+                <div className="w-full flex-1 flex overflow-hidden">
+                        {/* BARRA LATERAL DE CARPETAS */}
+                        <div className="w-56 sm:w-64 bg-white dark:bg-[#111] border-r border-gray-200 dark:border-gray-800 flex flex-col shrink-0">
+                            <div className="p-3 border-b border-gray-100 dark:border-gray-800/80 flex items-center justify-between">
+                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Carpetas</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setFolderModal({ isOpen: true, folder: null })}
+                                    className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                    title="Nueva Carpeta"
+                                >
+                                    <FolderPlus className="w-4 h-4 text-amber-500" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                                {/* Todas las carpetas */}
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedFolderId(null)}
+                                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+                                        selectedFolderId === null
+                                            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800/60'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <FolderOpen className="w-4 h-4 text-blue-500 shrink-0" />
+                                        <span className="truncate">Todos los Archivos</span>
+                                    </div>
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 font-bold">
+                                        {allProjectDocs.length}
+                                    </span>
+                                </button>
+
+                                {/* Lista de carpetas del proyecto */}
+                                {projectFolders.map(folder => {
+                                    const count = allProjectDocs.filter(d => d.folder_id === folder.id).length;
+                                    const isSelected = selectedFolderId === folder.id;
+                                    return (
+                                        <div
+                                            key={folder.id}
+                                            className={`group w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors ${
+                                                isSelected
+                                                    ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
+                                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800/60'
+                                            }`}
+                                        >
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedFolderId(folder.id)}
+                                                className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                                            >
+                                                <FolderIcon className={`w-4 h-4 shrink-0 ${isSelected ? 'text-blue-500' : 'text-amber-500'}`} />
+                                                <span className="truncate">{folder.name}</span>
+                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 font-bold">
+                                                    {count}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteDocFolder(folder.id);
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded transition-opacity"
+                                                    title="Eliminar Carpeta"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* Botón de acceso a las Notas del Proyecto en la barra lateral */}
+                                <div className="pt-3 mt-3 border-t border-gray-100 dark:border-gray-800/80">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDocsSubTab('notes')}
+                                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                                            <span className="truncate">Notas de Proyecto</span>
+                                        </div>
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-bold">
+                                            {projectNotes.length}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ÁREA DE ARCHIVOS Y DOCUMENTOS */}
+                        <div 
+                            className={`flex-1 overflow-y-auto p-4 sm:p-6 transition-colors ${
+                                isDraggingFiles ? 'bg-blue-50/50 dark:bg-blue-950/20 border-2 border-dashed border-blue-500' : ''
+                            }`}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                setIsDraggingFiles(true);
+                            }}
+                            onDragLeave={(e) => {
+                                e.preventDefault();
+                                setIsDraggingFiles(false);
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                setIsDraggingFiles(false);
+                                const droppedFiles = e.dataTransfer.files;
+                                if (droppedFiles && droppedFiles.length > 0) {
+                                    for (let i = 0; i < droppedFiles.length; i++) {
+                                        processFileUpload(droppedFiles[i]);
+                                    }
+                                }
+                            }}
+                        >
+                            {/* Banner informativo de carpeta activa si aplica */}
+                            {activeFolderObj && (
+                                <div className="mb-4 flex items-center justify-between p-3 bg-white dark:bg-[#141414] border border-gray-200 dark:border-gray-800 rounded-xl shadow-xs">
+                                    <div className="flex items-center gap-2">
+                                        <FolderIcon className="w-4 h-4 text-amber-500" />
+                                        <span className="text-xs font-bold text-gray-900 dark:text-white">Carpeta: {activeFolderObj.name}</span>
+                                        <span className="text-[11px] text-gray-400">({filteredDocs.length} archivos)</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedFolderId(null)}
+                                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                    >
+                                        Ver todos los archivos
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Dropzone hint discreta */}
+                            <div className="mb-5 p-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-700/80 bg-white/60 dark:bg-black/20 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                <div className="flex items-center gap-2">
+                                    <Upload className="w-4 h-4 text-blue-500 shrink-0" />
+                                    <span>Arrastra y suelta aquí imágenes, PDFs o documentos, o</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                                    >
+                                        Examinar archivos
+                                    </button>
+                                    <span>•</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDocModal({ isOpen: true, doc: null, initialFolderId: selectedFolderId || undefined })}
+                                        className="text-xs font-semibold text-gray-700 dark:text-gray-300 hover:underline"
+                                    >
+                                        Crear documento de texto
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Listado de Documentos o Estado Vacío */}
+                            {filteredDocs.length === 0 ? (
+                                <div className="py-12 text-center bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-xs">
+                                    <div className="w-14 h-14 mx-auto rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 flex items-center justify-center text-blue-500 mb-3">
+                                        <FolderOpen className="w-7 h-7" />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">
+                                        {docSearchText ? 'No se encontraron documentos coincidentes' : 'No hay documentos o archivos aún'}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-5">
+                                        {docSearchText 
+                                            ? 'Prueba con otro término de búsqueda o revisa en otra carpeta.' 
+                                            : 'Sube imágenes de diseño, especificaciones en PDF, hojas de cálculo o redacta notas para el equipo.'
+                                        }
+                                    </p>
+                                    <div className="flex flex-wrap items-center justify-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="px-3.5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 shadow-xs transition-colors"
+                                        >
+                                            <Upload className="w-3.5 h-3.5" />
+                                            <span>Subir Primer Archivo</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCreateProjectNote}
+                                            className="px-3.5 py-2 text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 rounded-lg flex items-center gap-2 shadow-xs transition-colors"
+                                        >
+                                            <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                                            <span>Crear Nota de Proyecto</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : docViewMode === 'grid' ? (
+                                /* VISTA CUADRÍCULA */
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {filteredDocs.map(doc => {
+                                        const isImage = doc.file_type?.startsWith('image/') || doc.file_url?.startsWith('data:image/') || ['png', 'jpg', 'jpeg', 'svg', 'webp', 'gif'].some(ext => (doc.file_name || doc.title).toLowerCase().endsWith(ext));
+                                        const folder = projectFolders.find(f => f.id === doc.folder_id);
+                                        const sizeFormatted = doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Texto';
+
+                                        return (
+                                            <div
+                                                key={doc.id}
+                                                className="group bg-white dark:bg-[#141414] border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden hover:shadow-md dark:hover:border-gray-700 transition-all flex flex-col justify-between"
+                                            >
+                                                {/* Previsualización superior */}
+                                                <div 
+                                                    onClick={() => setPreviewDocModal(doc)}
+                                                    className="cursor-pointer bg-gray-50 dark:bg-black/40 border-b border-gray-100 dark:border-gray-800/80 relative overflow-hidden flex items-center justify-center h-36"
+                                                >
+                                                    {isImage && doc.file_url ? (
+                                                        <img
+                                                            src={doc.file_url}
+                                                            alt={doc.title}
+                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                        />
+                                                    ) : (
+                                                        <div className="flex flex-col items-center justify-center p-4 text-center">
+                                                            {getFileIcon(doc.file_type, doc.file_name)}
+                                                            <span className="mt-2 text-[10px] font-mono uppercase font-bold text-gray-400 dark:text-gray-500">
+                                                                {doc.file_name?.split('.').pop() || doc.category || 'DOC'}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Badge de categoría / tipo */}
+                                                    <span className="absolute top-2 left-2 text-[9.5px] font-semibold px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-white">
+                                                        {folder ? folder.name : (doc.category || 'Archivo')}
+                                                    </span>
+
+                                                    {/* Hover Overlay con botón ver */}
+                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                        <span className="px-2.5 py-1 rounded-md bg-white text-black text-[11px] font-semibold flex items-center gap-1 shadow-sm">
+                                                            <Eye className="w-3 h-3" /> Vista Previa
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Metadatos */}
+                                                <div className="p-3 flex-1 flex flex-col justify-between">
+                                                    <div>
+                                                        <h4 
+                                                            className="text-xs font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                                                            title={doc.title}
+                                                        >
+                                                            {doc.title}
+                                                        </h4>
+                                                        <div className="mt-1 flex items-center justify-between text-[10.5px] text-gray-400">
+                                                            <span>{sizeFormatted}</span>
+                                                            <span>{format(parseISO(doc.created_at), 'dd MMM yyyy', { locale: es })}</span>
+                                                        </div>
+                                                        {doc.created_by && (
+                                                            <p className="mt-1 text-[10px] text-gray-400 truncate">
+                                                                Por: {doc.created_by.split('@')[0]}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Botones de acción */}
+                                                    <div className="pt-2.5 mt-2.5 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between gap-1">
+                                                        {/* Compartir a Canal */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenShareDoc(doc);
+                                                            }}
+                                                            className="px-2 py-1 rounded-md text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center gap-1 transition-colors"
+                                                            title="Compartir documento en un canal (público o privado con contraseña)"
+                                                        >
+                                                            <MessageSquare className="w-3.5 h-3.5" />
+                                                            <span>Compartir</span>
+                                                        </button>
+
+                                                        <div className="flex items-center gap-1">
+                                                            {/* Descargar */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDownloadFile(doc);
+                                                                }}
+                                                                className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                title="Descargar archivo"
+                                                            >
+                                                                <Download className="w-3.5 h-3.5" />
+                                                            </button>
+
+                                                            {/* Eliminar */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDeleteDoc(doc.id);
+                                                                }}
+                                                                className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                                title="Eliminar archivo"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                /* VISTA TABLA / LISTA */
+                                <div className="bg-white dark:bg-[#141414] border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden shadow-xs">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-gray-50 dark:bg-black/50 text-gray-400 font-semibold border-b border-gray-200 dark:border-gray-800">
+                                                <tr>
+                                                    <th className="py-2.5 px-4">Archivo / Documento</th>
+                                                    <th className="py-2.5 px-3">Carpeta</th>
+                                                    <th className="py-2.5 px-3">Tamaño</th>
+                                                    <th className="py-2.5 px-3">Fecha</th>
+                                                    <th className="py-2.5 px-3">Subido por</th>
+                                                    <th className="py-2.5 px-4 text-right">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                                                {filteredDocs.map(doc => {
+                                                    const folder = projectFolders.find(f => f.id === doc.folder_id);
+                                                    const sizeFormatted = doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Texto';
+
+                                                    return (
+                                                        <tr 
+                                                            key={doc.id}
+                                                            className="hover:bg-gray-50/80 dark:hover:bg-zinc-800/40 transition-colors"
+                                                        >
+                                                            <td className="py-2.5 px-4">
+                                                                <div 
+                                                                    onClick={() => setPreviewDocModal(doc)}
+                                                                    className="cursor-pointer flex items-center gap-2.5 min-w-0"
+                                                                >
+                                                                    {getFileIcon(doc.file_type, doc.file_name)}
+                                                                    <span className="font-semibold text-gray-900 dark:text-white hover:underline truncate">
+                                                                        {doc.title}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-gray-500 dark:text-gray-400">
+                                                                {folder ? folder.name : '—'}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-gray-500 dark:text-gray-400 font-mono text-[11px]">
+                                                                {sizeFormatted}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-gray-500 dark:text-gray-400">
+                                                                {format(parseISO(doc.created_at), 'dd/MM/yyyy', { locale: es })}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-gray-400 truncate max-w-[120px]">
+                                                                {doc.created_by?.split('@')[0] || '—'}
+                                                            </td>
+                                                            <td className="py-2.5 px-4 text-right">
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setPreviewDocModal(doc)}
+                                                                        className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                        title="Vista Previa"
+                                                                    >
+                                                                        <Eye className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleOpenShareDoc(doc)}
+                                                                        className="p-1 text-blue-500 hover:text-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                                                                        title="Compartir en Canal (con clave si es privado)"
+                                                                    >
+                                                                        <MessageSquare className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDownloadFile(doc)}
+                                                                        className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                        title="Descargar"
+                                                                    >
+                                                                        <Download className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteDoc(doc.id)}
+                                                                        className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                                        title="Eliminar"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SECCIÓN INFERIOR: NOTAS DEL PROYECTO (SINCRONIZADAS CON EL MÓDULO DE NOTAS) */}
+                            {projectNotes.length > 0 && (
+                                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-800">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <BookOpen className="w-4 h-4 text-amber-500" />
+                                            <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
+                                                Notas de este Proyecto (Sincronizadas con módulo de Notas)
+                                            </h3>
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-bold">
+                                                {projectNotes.length}
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleCreateProjectNote}
+                                            className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1.5"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            <span>Nueva Nota de Proyecto</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {projectNotes.map(n => (
+                                            <div
+                                                key={n.id}
+                                                onClick={() => setEditingProjectNote(n)}
+                                                className="group cursor-pointer p-3 bg-white dark:bg-[#141414] border border-amber-200/60 dark:border-amber-900/40 hover:border-amber-400 dark:hover:border-amber-600 rounded-xl hover:shadow-xs transition-all flex flex-col justify-between"
+                                            >
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                                                            Nota de Proyecto
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400">
+                                                            {format(parseISO(n.updated_at || n.created_at), 'dd MMM', { locale: es })}
+                                                        </span>
+                                                    </div>
+                                                    <h4 className="text-xs font-bold text-gray-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
+                                                        {n.title || 'Nota sin título'}
+                                                    </h4>
+                                                    <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                                                        {cleanToPlainText(n.content) || 'Sin contenido adicional... Haz clic para editar con el editor enriquecido.'}
+                                                    </p>
+                                                </div>
+
+                                                <div 
+                                                    className="pt-2.5 mt-2.5 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingProjectNote(n)}
+                                                        className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1 transition-colors"
+                                                    >
+                                                        <Edit2 className="w-3 h-3" /> Editar
+                                                    </button>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenShareNote(n)}
+                                                            className="px-2 py-0.5 rounded-md text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center gap-1 transition-colors"
+                                                            title="Compartir esta nota en un canal (público o privado con contraseña)"
+                                                        >
+                                                            <MessageSquare className="w-3 h-3" /> Compartir en Canal
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteProjectNote(n.id)}
+                                                            className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                            title="Eliminar Nota"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
             </div>
         );
     };
@@ -5392,6 +6072,26 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     );
                 })()}
             </Modal>
+
+            {/* MODAL EDITOR ENRIQUECIDO DE NOTAS DEL PROYECTO */}
+            <ProjectNoteEditorModal
+                isOpen={!!editingProjectNote}
+                note={editingProjectNote}
+                projectName={activeProject?.title}
+                onClose={() => setEditingProjectNote(null)}
+                onSave={(updated) => {
+                    onUpdateNote(updated);
+                    setEditingProjectNote(null);
+                }}
+                onShareToChannel={(noteToShare) => {
+                    setEditingProjectNote(null);
+                    handleOpenShareNote(noteToShare);
+                }}
+                onDelete={(noteId) => {
+                    handleDeleteProjectNote(noteId);
+                    setEditingProjectNote(null);
+                }}
+            />
         </div>
     );
 };

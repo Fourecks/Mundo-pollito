@@ -552,7 +552,14 @@ export const NotesNavigationSidebar: React.FC<NotesNavigationSidebarProps> = ({
                   </p>
 
                   <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-zinc-100 dark:border-zinc-800 text-[10px] text-zinc-400">
-                    <span>{formattedDate}</span>
+                    <div className="flex items-center gap-1.5">
+                      {note.project_id && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 font-medium">
+                          Proyecto
+                        </span>
+                      )}
+                      <span>{formattedDate}</span>
+                    </div>
 
                     {/* Action buttons on card hover */}
                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>

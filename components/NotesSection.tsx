@@ -108,13 +108,13 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   // Filter notes and folders if scoped to project or subject
   const folders = React.useMemo(() => {
     return allFolders.filter(f =>
-      projectId ? f.project_id === projectId : subjectId ? f.subject_id === subjectId : (!f.project_id && !f.subject_id)
+      projectId ? f.project_id === projectId : subjectId ? f.subject_id === subjectId : (!f.subject_id)
     );
   }, [allFolders, projectId, subjectId]);
 
   const notes = React.useMemo(() => {
     return allNotes.filter(n =>
-      projectId ? n.project_id === projectId : subjectId ? n.subject_id === subjectId : (!n.project_id && !n.subject_id)
+      projectId ? n.project_id === projectId : subjectId ? n.subject_id === subjectId : (!n.subject_id)
     );
   }, [allNotes, projectId, subjectId]);
 

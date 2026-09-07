@@ -490,11 +490,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   // --- Windowing and Misc Handlers ---
   const bringToFront = useCallback((windowType: WindowType) => {
     setMinimizedWindows(minimized => minimized.filter(w => w !== windowType));
-    if (focusedWindowRef.current === windowType) return;
     focusedWindowRef.current = windowType;
     setFocusedWindow(windowType);
     setHighestZIndex(prev => {
-      const nextZ = prev + 1;
+      const nextZ = Math.max(prev + 1, 100);
       setWindowZIndices(current => ({ ...current, [windowType]: nextZ }));
       return nextZ;
     });
@@ -934,21 +933,49 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     }
   }, []);
 
+  const [windowShortcutNotice, setWindowShortcutNotice] = useState<string | null>(null);
+  const noticeTimeoutRef = useRef<any>(null);
+
+  const showShortcutNotice = useCallback((msg: string) => {
+    if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
+    setWindowShortcutNotice(msg);
+    noticeTimeoutRef.current = setTimeout(() => {
+      setWindowShortcutNotice(null);
+    }, 1600);
+  }, []);
+
+  const WINDOW_NAMES: Record<string, string> = {
+    todo: 'Lista de Tareas',
+    calendar: 'Calendario',
+    habits: 'Hábitos',
+    progreso: 'Progreso',
+    notes: 'Bloc de Notas',
+    pomodoro: 'Pomodoro',
+    finance: 'Finanzas',
+    student: 'Estudio',
+    music: 'Música',
+    projects: 'Proyectos',
+  };
+
   const cycleNextWindow = useCallback(() => {
     const open = openWindowsRef.current;
     const min = minimizedWindowsRef.current;
     const visible = open.filter(w => !min.includes(w));
     if (visible.length === 0) {
       if (min.length > 0) {
-        bringToFront(min[min.length - 1]);
+        const restored = min[min.length - 1];
+        bringToFront(restored);
+        showShortcutNotice(`Ventana: ${WINDOW_NAMES[restored] || restored}`);
       }
       return;
     }
     const current = focusedWindowRef.current;
     const currentIdx = current ? visible.indexOf(current) : -1;
     const nextIdx = (currentIdx + 1) % visible.length;
-    bringToFront(visible[nextIdx]);
-  }, [bringToFront]);
+    const targetWin = visible[nextIdx];
+    bringToFront(targetWin);
+    showShortcutNotice(`Ventana: ${WINDOW_NAMES[targetWin] || targetWin}`);
+  }, [bringToFront, showShortcutNotice]);
 
   const cyclePrevWindow = useCallback(() => {
     const open = openWindowsRef.current;
@@ -956,28 +983,36 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     const visible = open.filter(w => !min.includes(w));
     if (visible.length === 0) {
       if (min.length > 0) {
-        bringToFront(min[min.length - 1]);
+        const restored = min[min.length - 1];
+        bringToFront(restored);
+        showShortcutNotice(`Ventana: ${WINDOW_NAMES[restored] || restored}`);
       }
       return;
     }
     const current = focusedWindowRef.current;
     const currentIdx = current ? visible.indexOf(current) : -1;
     const prevIdx = currentIdx <= 0 ? visible.length - 1 : currentIdx - 1;
-    bringToFront(visible[prevIdx]);
-  }, [bringToFront]);
+    const targetWin = visible[prevIdx];
+    bringToFront(targetWin);
+    showShortcutNotice(`Ventana: ${WINDOW_NAMES[targetWin] || targetWin}`);
+  }, [bringToFront, showShortcutNotice]);
 
   const restoreLastMinimized = useCallback(() => {
     const min = minimizedWindowsRef.current;
     if (min.length > 0) {
       const last = min[min.length - 1];
       bringToFront(last);
+      showShortcutNotice(`Restaurada: ${WINDOW_NAMES[last] || last}`);
+    } else {
+      showShortcutNotice('No hay ventanas minimizadas');
     }
-  }, [bringToFront]);
+  }, [bringToFront, showShortcutNotice]);
 
   const minimizeActiveWindow = useCallback(() => {
     const active = focusedWindowRef.current;
     if (active) {
       minimizeWindow(active);
+      showShortcutNotice(`Minimizada: ${WINDOW_NAMES[active] || active}`);
       return;
     }
     const open = openWindowsRef.current;
@@ -987,13 +1022,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       const z = windowZIndicesRef.current;
       const sorted = [...visible].sort((a, b) => (z[b] || 0) - (z[a] || 0));
       minimizeWindow(sorted[0]);
+      showShortcutNotice(`Minimizada: ${WINDOW_NAMES[sorted[0]] || sorted[0]}`);
     }
-  }, [minimizeWindow]);
+  }, [minimizeWindow, showShortcutNotice]);
 
   const closeActiveWindow = useCallback(() => {
     const active = focusedWindowRef.current;
     if (active) {
       closeWindow(active);
+      showShortcutNotice(`Cerrada: ${WINDOW_NAMES[active] || active}`);
       return;
     }
     const open = openWindowsRef.current;
@@ -1003,8 +1040,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       const z = windowZIndicesRef.current;
       const sorted = [...visible].sort((a, b) => (z[b] || 0) - (z[a] || 0));
       closeWindow(sorted[0]);
+      showShortcutNotice(`Cerrada: ${WINDOW_NAMES[sorted[0]] || sorted[0]}`);
     }
-  }, [closeWindow]);
+  }, [closeWindow, showShortcutNotice]);
 
   const toggleShowDesktop = useCallback(() => {
     const open = openWindowsRef.current;
@@ -1014,6 +1052,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       setMinimizedWindows([...open]);
       focusedWindowRef.current = null;
       setFocusedWindow(null);
+      showShortcutNotice('Escritorio: Ventanas ocultadas');
     } else if (open.length > 0) {
       setMinimizedWindows([]);
       const z = windowZIndicesRef.current;
@@ -1021,8 +1060,9 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       if (sorted.length > 0) {
         bringToFront(sorted[0]);
       }
+      showShortcutNotice('Escritorio: Ventanas restauradas');
     }
-  }, [bringToFront]);
+  }, [bringToFront, showShortcutNotice]);
 
   const getWindowZIndex = useCallback((windowType: WindowType) => {
     return windowZIndices[windowType] ?? (focusedWindow === windowType ? 100 : 50);
@@ -1124,16 +1164,27 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         }
 
         // 2. Cycle Next Window:
-        // - Alt / Option + ArrowRight
-        // - Alt / Option + ] or } (works with or without Shift, handles Spanish Mac layouts)
-        // - Mac Native: Cmd + ` or Cmd + < or Cmd + ~
-        const isNextWindowKey = 
-          code === 'ArrowRight' || key === 'arrowright' ||
-          code === 'BracketRight' || key === ']' || key === '}' || 
-          key === '»' || key === '›' || key === '”' || key === '’';
+        // Soportar:
+        // - Alt / Option + ArrowRight (100% universal en todos los teclados)
+        // - Alt / Option + tecla } o ] (con o sin Shift, para teclados en español de Mac)
+        // - Tecla física: code === 'BracketRight', o key ']', '}', '»', '›', '”', '’', '´', '¨'
+        // - Mac Native: Cmd + ` o Cmd + < o Cmd + ~ o Cmd + ] o Cmd + }
+        // - Option + Tab
+        const isNextArrow = code === 'ArrowRight' || key === 'arrowright';
+        const isBracketRightKey = 
+          code === 'BracketRight' || 
+          key === ']' || key === '}' || 
+          key === '»' || key === '›' || key === '”' || key === '’' || key === '´' || key === '¨' ||
+          (code === 'Quote' && (key === '}' || key === ']')) ||
+          (code === 'Equal' && (key === '}' || key === ']'));
+        
+        const isNextWindowKey = isNextArrow || isBracketRightKey || (!e.shiftKey && (code === 'Tab' || key === 'tab'));
 
         const isMacNativeCycleNext = 
-          e.metaKey && !e.shiftKey && (code === 'Backquote' || key === '`' || key === '~' || key === '<' || key === 'º' || key === '§');
+          e.metaKey && !e.shiftKey && (
+            code === 'Backquote' || key === '`' || key === '~' || key === '<' || key === 'º' || key === '§' ||
+            code === 'BracketRight' || key === ']' || key === '}'
+          );
 
         if ((e.altKey && isNextWindowKey) || isMacNativeCycleNext) {
           e.preventDefault();
@@ -1142,16 +1193,27 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         }
 
         // 3. Cycle Previous Window:
-        // - Alt / Option + ArrowLeft
-        // - Alt / Option + [ or { (works with or without Shift, handles Spanish Mac layouts)
-        // - Mac Native: Cmd + Shift + ` or Cmd + Shift + < or Cmd + Shift + ~
-        const isPrevWindowKey = 
-          code === 'ArrowLeft' || key === 'arrowleft' ||
-          code === 'BracketLeft' || key === '[' || key === '{' || 
-          key === '«' || key === '‹' || key === '“' || key === '‘';
+        // Soportar:
+        // - Alt / Option + ArrowLeft (100% universal en todos los teclados)
+        // - Alt / Option + tecla { o [ (con o sin Shift, para teclados en español de Mac)
+        // - Tecla física: code === 'BracketLeft', o key '[', '{', '«', '‹', '“', '‘', '^', '`'
+        // - Mac Native: Cmd + Shift + ` o Cmd + Shift + < o Cmd + Shift + ~ o Cmd + [ o Cmd + {
+        // - Option + Shift + Tab
+        const isPrevArrow = code === 'ArrowLeft' || key === 'arrowleft';
+        const isBracketLeftKey = 
+          code === 'BracketLeft' || 
+          key === '[' || key === '{' || 
+          key === '«' || key === '‹' || key === '“' || key === '‘' || key === '^' ||
+          (code === 'Slash' && (key === '{' || key === '[')) ||
+          (code === 'Minus' && (key === '{' || key === '['));
+
+        const isPrevWindowKey = isPrevArrow || isBracketLeftKey || (e.shiftKey && (code === 'Tab' || key === 'tab'));
 
         const isMacNativeCyclePrev = 
-          e.metaKey && e.shiftKey && (code === 'Backquote' || key === '`' || key === '~' || key === '<' || key === 'º' || key === '§');
+          e.metaKey && (
+            (e.shiftKey && (code === 'Backquote' || key === '`' || key === '~' || key === '<' || key === 'º' || key === '§')) ||
+            (!e.shiftKey && (code === 'BracketLeft' || key === '[' || key === '{'))
+          );
 
         if ((e.altKey && isPrevWindowKey) || isMacNativeCyclePrev) {
           e.preventDefault();
@@ -1160,18 +1222,19 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         }
 
         // 4. Restore Last Minimized Window:
-        // Win: Alt+U or Alt+Shift+Z. Mac: Option+U or Cmd+Shift+Z
-        if (
-          (e.altKey && (code === 'KeyU' || key === 'u')) ||
-          ((e.metaKey || e.ctrlKey || e.altKey) && e.shiftKey && (code === 'KeyZ' || key === 'z'))
-        ) {
+        // Win: Alt+U o Alt+Shift+Z. Mac: Option+U (dead key / ¨) o Cmd+Shift+Z o Option+Shift+Z
+        const isRestoreKey = 
+          (e.altKey && (code === 'KeyU' || key === 'u' || key === 'dead' || key === '¨')) ||
+          ((e.metaKey || e.ctrlKey || e.altKey) && e.shiftKey && (code === 'KeyZ' || key === 'z'));
+
+        if (isRestoreKey) {
           e.preventDefault();
           restoreLastMinimized();
           return;
         }
 
         // 5. Minimize Active Window:
-        // Win: Alt+W. Mac: Option+W or Cmd+M
+        // Win: Alt+W. Mac: Option+W (∑) o Cmd+M
         if (
           (e.altKey && (code === 'KeyW' || key === 'w' || key === '∑')) ||
           (e.metaKey && !e.shiftKey && (code === 'KeyM' || key === 'm'))
@@ -1182,7 +1245,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         }
 
         // 6. Close Active Window:
-        // Win: Alt+Q. Mac: Option+Q or Cmd+Shift+W
+        // Win: Alt+Q. Mac: Option+Q (œ) o Cmd+Shift+W
         if (
           (e.altKey && (code === 'KeyQ' || key === 'q' || key === 'œ')) ||
           ((e.metaKey || e.ctrlKey) && e.shiftKey && (code === 'KeyW' || key === 'w'))
@@ -1193,10 +1256,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         }
 
         // 7. Show Desktop / Hide All:
-        // Win: Alt+0 or Alt+Shift+D. Mac: Option+0 or Option+Shift+D
+        // Win: Alt+0 o Alt+Shift+D. Mac: Option+0 (º o ≠) o Option+Shift+D
         if (
-          (e.altKey && (code === 'Digit0' || key === '0' || key === 'º')) ||
-          (e.altKey && e.shiftKey && (code === 'KeyD' || key === 'd'))
+          (e.altKey && (code === 'Digit0' || key === '0' || key === 'º' || key === '≠')) ||
+          (e.altKey && e.shiftKey && (code === 'KeyD' || key === 'd' || key === 'î'))
         ) {
           e.preventDefault();
           toggleShowDesktop();
@@ -1204,10 +1267,10 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         }
 
         // 8. Zen Mode Toggle:
-        // Win: Alt+Z or Alt+Shift+F. Mac: Option+Z or Option+Shift+F
+        // Win: Alt+Z o Alt+Shift+F. Mac: Option+Z (Ω) o Option+Shift+F
         if (
-          (e.altKey && (code === 'KeyZ' || key === 'z' || key === 'Ω')) ||
-          (e.altKey && e.shiftKey && (code === 'KeyF' || key === 'f'))
+          (e.altKey && !e.shiftKey && (code === 'KeyZ' || key === 'z' || key === 'Ω')) ||
+          (e.altKey && e.shiftKey && (code === 'KeyF' || key === 'f' || key === 'Ï'))
         ) {
           e.preventDefault();
           setIsFocusMode(prev => !prev);
@@ -1679,6 +1742,24 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
       <div className={`app-dock-container fixed bottom-0 left-0 right-0 transition-transform duration-500 ease-in-out z-[40000] ${isFocusMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <Dock onButtonClick={toggleWindow} openWindows={openWindows} focusedWindow={focusedWindow} />
       </div>
+
+      {/* HUD Floating Shortcut Notice */}
+      <AnimatePresence>
+        {windowShortcutNotice && (
+          <motion.div
+            initial={{ opacity: 0, y: -16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[999999] pointer-events-none"
+          >
+            <div className="px-4 py-2 rounded-full bg-zinc-900/90 dark:bg-zinc-100/95 text-white dark:text-zinc-950 text-xs font-medium shadow-xl backdrop-blur-md border border-white/10 dark:border-zinc-900/10 flex items-center gap-2 tracking-tight">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+              <span>{windowShortcutNotice}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <audio ref={pomodoroAudioRef} src={pomodoroAudioSrc} />
     </div>
