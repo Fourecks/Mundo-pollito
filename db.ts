@@ -487,7 +487,8 @@ export const syncableCreate = async (tableName: string, payload: any): Promise<a
 };
 
 export const syncableUpdate = async (tableName: string, payload: any): Promise<any> => {
-    if (typeof payload.id === 'number' && payload.id < 0) {
+    const isTempId = (typeof payload.id === 'number' && payload.id < 0) || (typeof payload.id === 'string' && (payload.id.startsWith('item_') || payload.id.startsWith('temp_')));
+    if (isTempId) {
         await queueMutation({ type: 'UPDATE', tableName, payload });
         await set(tableName, payload);
         return payload;

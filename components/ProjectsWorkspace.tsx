@@ -21,6 +21,7 @@ interface ProjectsWorkspaceProps {
     onAddNote: (folderId: number | null, projectId?: number, subjectId?: string) => Promise<Note | null>;
     onUpdateNote: (note: Note) => Promise<void>;
     onDeleteNote: (noteId: number, folderId: number | null) => Promise<void>;
+    onOpenNotesModule?: (noteId?: number | null, folderId?: number | null) => void;
     allTodos: Todo[];
     activeProjectId: number | null;
     invitations?: ProjectInvitation[];
@@ -66,6 +67,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     onAddNote,
     onUpdateNote,
     onDeleteNote,
+    onOpenNotesModule,
     allTodos,
     activeProjectId,
     invitations = [],
@@ -847,12 +849,35 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
     };
 
-    // Helper: Create a Note for this Project (syncs with main Notes module and opens rich note editor)
+    // Helper: Create a Note for this Project (associated with folder in Notes module named "[ProjectName] (Proyecto)" and synced with project folder)
     const handleCreateProjectNote = async () => {
         if (!activeProject) return;
-        const newNote = await onAddNote(null, activeProject.id);
+
+        const folderName = `${activeProject.title} (Proyecto)`;
+        let targetNotesFolder = folders.find(f => f.name.trim().toLowerCase() === folderName.trim().toLowerCase());
+
+        if (!targetNotesFolder) {
+            const created = await onAddFolder(folderName, activeProject.id);
+            if (created) targetNotesFolder = created;
+        }
+
+        const notesFolderId = targetNotesFolder ? targetNotesFolder.id : null;
+
+        const newNote = await onAddNote(notesFolderId, activeProject.id);
         if (newNote) {
-            setEditingProjectNote(newNote);
+            const updatedNote: Note = {
+                ...newNote,
+                folder_id: notesFolderId,
+                project_id: activeProject.id,
+                project_doc_folder_id: selectedFolderId || null
+            };
+            await onUpdateNote(updatedNote);
+
+            if (onOpenNotesModule) {
+                onOpenNotesModule(newNote.id, notesFolderId);
+            } else {
+                setEditingProjectNote(updatedNote);
+            }
         }
     };
 
@@ -1873,13 +1898,21 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
-    // DOCUMENTATION & FILES TAB (ARCHIVOS, IMÁGENES, NOTAS DEL PROYECTO Y COMPARTIR)
+    // DOCUMENTATION & FILES TAB (ARCHIVOS, IMÁGENES Y NOTAS DEL PROYECTO - DISEÑO MINIMALISTA Y ELEGANTE)
     const renderDocs = () => {
         if (!activeProject) return null;
 
         const allProjectDocs = activeProject.docs || [];
         const projectFolders = activeProject.doc_folders || [];
-        const projectNotes = notes.filter(n => n.project_id === activeProject.id && !n.deleted_at);
+        
+        // Filter notes for this project based on current folder or all
+        const projectNotes = notes.filter(n => {
+            if (n.project_id !== activeProject.id || n.deleted_at) return false;
+            if (selectedFolderId !== null) {
+                return n.project_doc_folder_id === selectedFolderId;
+            }
+            return true;
+        });
 
         // Filter docs by search and folder
         let filteredDocs = allProjectDocs;
@@ -1898,7 +1931,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const activeFolderObj = projectFolders.find(f => f.id === selectedFolderId);
 
         return (
-            <div className="w-full h-full flex flex-col bg-gray-50/50 dark:bg-[#0c0c0c] overflow-hidden">
+            <div className="w-full h-full flex flex-col bg-zinc-50/60 dark:bg-[#08080a] overflow-hidden text-zinc-900 dark:text-zinc-100">
                 {/* Hidden File Input for uploading files & images */}
                 <input
                     type="file"
@@ -1908,58 +1941,57 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.zip"
                 />
 
-                {/* HEADER CON BUSCADOR Y ACCIONES DE ARCHIVOS */}
-                <div className="px-6 py-3.5 bg-white dark:bg-[#111] border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                    {/* Título y estado de sección */}
-                    <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                {/* HEADER MINIMALISTA Y ELEGANTE */}
+                <div className="px-6 py-3.5 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200">
                             <FolderOpen className="w-4 h-4" />
                         </div>
                         <div>
-                            <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                <span>Documentos y Archivos</span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 font-bold">
-                                    {allProjectDocs.length} archivos
+                            <h2 className="text-sm font-medium tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                <span>Documentos & Archivos</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
+                                    {allProjectDocs.length}
                                 </span>
                             </h2>
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                                {activeFolderObj ? `Carpeta activa: ${activeFolderObj.name}` : 'Todos los documentos, imágenes y archivos adjuntos'}
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                                {activeFolderObj ? `Carpeta: ${activeFolderObj.name}` : 'Todos los documentos, archivos y notas asociadas'}
                             </p>
                         </div>
                     </div>
 
-                    {/* Acciones principales */}
+                    {/* Acciones principales - Estilo monocromático refinado */}
                     <div className="flex items-center gap-2">
                         {/* Buscador */}
                         <div className="relative">
-                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                                 type="text"
                                 placeholder="Buscar archivos..."
                                 value={docSearchText}
                                 onChange={e => setDocSearchText(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 text-xs bg-gray-100 dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 w-44 sm:w-56"
+                                className="pl-8 pr-3 py-1.5 text-xs bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-52 transition-colors"
                             />
                             {docSearchText && (
                                 <button
                                     type="button"
                                     onClick={() => setDocSearchText('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
                             )}
                         </div>
 
-                        {/* Conmutador de vista Cuadrícula / Tabla */}
-                        <div className="flex items-center p-0.5 bg-gray-100 dark:bg-black/40 rounded-lg border border-gray-200 dark:border-gray-800">
+                        {/* Conmutador de vista Grid / Table */}
+                        <div className="flex items-center p-0.5 bg-zinc-100 dark:bg-zinc-900 rounded-lg border border-zinc-200/80 dark:border-zinc-800/80">
                             <button
                                 type="button"
                                 onClick={() => setDocViewMode('grid')}
                                 className={`p-1.5 rounded-md transition-colors ${
                                     docViewMode === 'grid'
-                                        ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs'
-                                        : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                        ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs'
+                                        : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
                                 }`}
                                 title="Vista en Cuadrícula"
                             >
@@ -1970,8 +2002,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 onClick={() => setDocViewMode('table')}
                                 className={`p-1.5 rounded-md transition-colors ${
                                     docViewMode === 'table'
-                                        ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs'
-                                        : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                        ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs'
+                                        : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
                                 }`}
                                 title="Vista en Tabla"
                             >
@@ -1983,32 +2015,31 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <button
                             type="button"
                             onClick={() => setFolderModal({ isOpen: true, folder: null })}
-                            className="px-2.5 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-black border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-zinc-900 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
-                            title="Nueva Carpeta de Documentos"
+                            className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-lg flex items-center gap-1.5 transition-colors"
+                            title="Nueva Carpeta"
                         >
-                            <FolderPlus className="w-3.5 h-3.5 text-amber-500" />
+                            <FolderPlus className="w-3.5 h-3.5 text-zinc-500" />
                             <span className="hidden sm:inline">Carpeta</span>
                         </button>
 
-                        {/* Subir Archivo / Imagen */}
+                        {/* Subir Archivo */}
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
-                            title="Subir archivos o imágenes desde tu equipo"
+                            className="px-3 py-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-lg flex items-center gap-1.5 transition-colors"
                         >
-                            <Upload className="w-3.5 h-3.5" />
-                            <span>Subir Archivo / Imagen</span>
+                            <Upload className="w-3.5 h-3.5 text-zinc-500" />
+                            <span>Subir Archivo</span>
                         </button>
 
-                        {/* Crear Nota (con modal propio de edición enriquecida y sincronizada con el módulo de notas) */}
+                        {/* Nueva Nota - Sincronizada con Módulo de Notas */}
                         <button
                             type="button"
                             onClick={handleCreateProjectNote}
-                            className="px-3 py-1.5 text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
-                            title="Crear una nota para este proyecto (se abre el editor completo y aparece en el módulo de Notas)"
+                            className="px-3 py-1.5 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+                            title="Crear una nota para este proyecto (asociada al Módulo de Notas)"
                         >
-                            <FilePlus className="w-3.5 h-3.5 text-amber-400 dark:text-amber-600" />
+                            <FilePlus className="w-3.5 h-3.5" />
                             <span className="hidden md:inline">Nueva Nota</span>
                         </button>
                     </div>
@@ -2016,36 +2047,38 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                 {/* CONTENIDO PRINCIPAL: VISTA DE ARCHIVOS E IMÁGENES */}
                 <div className="w-full flex-1 flex overflow-hidden">
-                        {/* BARRA LATERAL DE CARPETAS */}
-                        <div className="w-56 sm:w-64 bg-white dark:bg-[#111] border-r border-gray-200 dark:border-gray-800 flex flex-col shrink-0">
-                            <div className="p-3 border-b border-gray-100 dark:border-gray-800/80 flex items-center justify-between">
-                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Carpetas</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setFolderModal({ isOpen: true, folder: null })}
-                                    className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                    title="Nueva Carpeta"
-                                >
-                                    <FolderPlus className="w-4 h-4 text-amber-500" />
-                                </button>
-                            </div>
+                    {/* BARRA LATERAL MINIMALISTA DE CARPETAS */}
+                    <div className="w-52 sm:w-60 bg-white dark:bg-[#0d0d0f] border-r border-zinc-200/80 dark:border-zinc-800/80 flex flex-col shrink-0">
+                        <div className="p-3 border-b border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                                Carpetas
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setFolderModal({ isOpen: true, folder: null })}
+                                className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                title="Nueva Carpeta"
+                            >
+                                <FolderPlus className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
 
-                            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
                                 {/* Todas las carpetas */}
                                 <button
                                     type="button"
                                     onClick={() => setSelectedFolderId(null)}
-                                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+                                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors ${
                                         selectedFolderId === null
-                                            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
-                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800/60'
+                                            ? 'bg-zinc-100 dark:bg-zinc-800/70 text-zinc-900 dark:text-zinc-100 font-medium'
+                                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
                                     }`}
                                 >
                                     <div className="flex items-center gap-2 min-w-0">
-                                        <FolderOpen className="w-4 h-4 text-blue-500 shrink-0" />
+                                        <FolderOpen className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                                         <span className="truncate">Todos los Archivos</span>
                                     </div>
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 font-bold">
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-medium">
                                         {allProjectDocs.length}
                                     </span>
                                 </button>
@@ -2059,8 +2092,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             key={folder.id}
                                             className={`group w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors ${
                                                 isSelected
-                                                    ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
-                                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800/60'
+                                                    ? 'bg-zinc-100 dark:bg-zinc-800/70 text-zinc-900 dark:text-zinc-100 font-medium'
+                                                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
                                             }`}
                                         >
                                             <button
@@ -2068,11 +2101,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 onClick={() => setSelectedFolderId(folder.id)}
                                                 className="flex items-center gap-2 min-w-0 flex-1 text-left"
                                             >
-                                                <FolderIcon className={`w-4 h-4 shrink-0 ${isSelected ? 'text-blue-500' : 'text-amber-500'}`} />
+                                                <FolderIcon className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                                                 <span className="truncate">{folder.name}</span>
                                             </button>
                                             <div className="flex items-center gap-1">
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 font-bold">
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-medium">
                                                     {count}
                                                 </span>
                                                 <button
@@ -2081,7 +2114,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         e.stopPropagation();
                                                         handleDeleteDocFolder(folder.id);
                                                     }}
-                                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded transition-opacity"
+                                                    className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded transition-opacity"
                                                     title="Eliminar Carpeta"
                                                 >
                                                     <Trash2 className="w-3 h-3" />
@@ -2092,17 +2125,17 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 })}
 
                                 {/* Botón de acceso a las Notas del Proyecto en la barra lateral */}
-                                <div className="pt-3 mt-3 border-t border-gray-100 dark:border-gray-800/80">
+                                <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/60">
                                     <button
                                         type="button"
-                                        onClick={() => setDocsSubTab('notes')}
-                                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                                        onClick={() => onOpenNotesModule?.()}
+                                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                                            <BookOpen className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                                             <span className="truncate">Notas de Proyecto</span>
                                         </div>
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-bold">
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
                                             {projectNotes.length}
                                         </span>
                                     </button>
@@ -2110,10 +2143,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         </div>
 
-                        {/* ÁREA DE ARCHIVOS Y DOCUMENTOS */}
+                        {/* ÁREA DE ARCHIVOS Y DOCUMENTOS - DISEÑO ELEGANTE Y MINIMALISTA */}
                         <div 
                             className={`flex-1 overflow-y-auto p-4 sm:p-6 transition-colors ${
-                                isDraggingFiles ? 'bg-blue-50/50 dark:bg-blue-950/20 border-2 border-dashed border-blue-500' : ''
+                                isDraggingFiles ? 'bg-zinc-100/80 dark:bg-zinc-800/40 border-2 border-dashed border-zinc-400 dark:border-zinc-600' : ''
                             }`}
                             onDragOver={(e) => {
                                 e.preventDefault();
@@ -2134,86 +2167,86 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 }
                             }}
                         >
-                            {/* Banner informativo de carpeta activa si aplica */}
+                            {/* Banner informativo de carpeta activa */}
                             {activeFolderObj && (
-                                <div className="mb-4 flex items-center justify-between p-3 bg-white dark:bg-[#141414] border border-gray-200 dark:border-gray-800 rounded-xl shadow-xs">
+                                <div className="mb-4 flex items-center justify-between p-3 bg-white dark:bg-[#0d0d0f] border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl">
                                     <div className="flex items-center gap-2">
-                                        <FolderIcon className="w-4 h-4 text-amber-500" />
-                                        <span className="text-xs font-bold text-gray-900 dark:text-white">Carpeta: {activeFolderObj.name}</span>
-                                        <span className="text-[11px] text-gray-400">({filteredDocs.length} archivos)</span>
+                                        <FolderIcon className="w-4 h-4 text-zinc-500" />
+                                        <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100">Carpeta: {activeFolderObj.name}</span>
+                                        <span className="text-[11px] text-zinc-400">({filteredDocs.length} archivos)</span>
                                     </div>
                                     <button
                                         type="button"
                                         onClick={() => setSelectedFolderId(null)}
-                                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                        className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium transition-colors"
                                     >
-                                        Ver todos los archivos
+                                        Ver todos
                                     </button>
                                 </div>
                             )}
 
-                            {/* Dropzone hint discreta */}
-                            <div className="mb-5 p-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-700/80 bg-white/60 dark:bg-black/20 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+                            {/* Dropzone hint discreta y minimalista */}
+                            <div className="mb-5 p-3.5 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/30 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
                                 <div className="flex items-center gap-2">
-                                    <Upload className="w-4 h-4 text-blue-500 shrink-0" />
-                                    <span>Arrastra y suelta aquí imágenes, PDFs o documentos, o</span>
+                                    <Upload className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                    <span>Arrastra archivos o imágenes aquí, o</span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                                        className="text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:underline"
                                     >
                                         Examinar archivos
                                     </button>
-                                    <span>•</span>
+                                    <span className="text-zinc-300 dark:text-zinc-700">•</span>
                                     <button
                                         type="button"
                                         onClick={() => setDocModal({ isOpen: true, doc: null, initialFolderId: selectedFolderId || undefined })}
-                                        className="text-xs font-semibold text-gray-700 dark:text-gray-300 hover:underline"
+                                        className="text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
                                     >
-                                        Crear documento de texto
+                                        Crear texto
                                     </button>
                                 </div>
                             </div>
 
                             {/* Listado de Documentos o Estado Vacío */}
                             {filteredDocs.length === 0 ? (
-                                <div className="py-12 text-center bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-xs">
-                                    <div className="w-14 h-14 mx-auto rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 flex items-center justify-center text-blue-500 mb-3">
-                                        <FolderOpen className="w-7 h-7" />
+                                <div className="py-14 text-center bg-white dark:bg-[#0d0d0f] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-8">
+                                    <div className="w-12 h-12 mx-auto rounded-full bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/50 flex items-center justify-center text-zinc-400 mb-3">
+                                        <FolderOpen className="w-5 h-5" />
                                     </div>
-                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">
-                                        {docSearchText ? 'No se encontraron documentos coincidentes' : 'No hay documentos o archivos aún'}
+                                    <h3 className="text-xs font-medium text-zinc-900 dark:text-zinc-100 mb-1">
+                                        {docSearchText ? 'No se encontraron archivos' : 'Sin archivos ni documentos'}
                                     </h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-5">
+                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto mb-5 leading-relaxed">
                                         {docSearchText 
-                                            ? 'Prueba con otro término de búsqueda o revisa en otra carpeta.' 
-                                            : 'Sube imágenes de diseño, especificaciones en PDF, hojas de cálculo o redacta notas para el equipo.'
+                                            ? 'Prueba con otros términos de búsqueda.' 
+                                            : 'Sube especificaciones, imágenes de diseño o crea documentos para este proyecto.'
                                         }
                                     </p>
-                                    <div className="flex flex-wrap items-center justify-center gap-3">
+                                    <div className="flex flex-wrap items-center justify-center gap-2">
                                         <button
                                             type="button"
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="px-3.5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 shadow-xs transition-colors"
+                                            className="px-3 py-1.5 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg flex items-center gap-1.5 transition-colors"
                                         >
                                             <Upload className="w-3.5 h-3.5" />
-                                            <span>Subir Primer Archivo</span>
+                                            <span>Subir Archivo</span>
                                         </button>
                                         <button
                                             type="button"
                                             onClick={handleCreateProjectNote}
-                                            className="px-3.5 py-2 text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 rounded-lg flex items-center gap-2 shadow-xs transition-colors"
+                                            className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 rounded-lg flex items-center gap-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-colors"
                                         >
-                                            <BookOpen className="w-3.5 h-3.5 text-amber-500" />
-                                            <span>Crear Nota de Proyecto</span>
+                                            <BookOpen className="w-3.5 h-3.5 text-zinc-500" />
+                                            <span>Nueva Nota</span>
                                         </button>
                                     </div>
                                 </div>
                             ) : docViewMode === 'grid' ? (
-                                /* VISTA CUADRÍCULA */
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                /* VISTA CUADRÍCULA - MINIMALISTA */
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
                                     {filteredDocs.map(doc => {
                                         const isImage = doc.file_type?.startsWith('image/') || doc.file_url?.startsWith('data:image/') || ['png', 'jpg', 'jpeg', 'svg', 'webp', 'gif'].some(ext => (doc.file_name || doc.title).toLowerCase().endsWith(ext));
                                         const folder = projectFolders.find(f => f.id === doc.folder_id);
@@ -2222,37 +2255,37 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         return (
                                             <div
                                                 key={doc.id}
-                                                className="group bg-white dark:bg-[#141414] border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden hover:shadow-md dark:hover:border-gray-700 transition-all flex flex-col justify-between"
+                                                className="group bg-white dark:bg-[#0d0d0f] border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl overflow-hidden hover:border-zinc-400 dark:hover:border-zinc-600 transition-all flex flex-col justify-between"
                                             >
                                                 {/* Previsualización superior */}
                                                 <div 
                                                     onClick={() => setPreviewDocModal(doc)}
-                                                    className="cursor-pointer bg-gray-50 dark:bg-black/40 border-b border-gray-100 dark:border-gray-800/80 relative overflow-hidden flex items-center justify-center h-36"
+                                                    className="cursor-pointer bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800/60 relative overflow-hidden flex items-center justify-center h-32"
                                                 >
                                                     {isImage && doc.file_url ? (
                                                         <img
                                                             src={doc.file_url}
                                                             alt={doc.title}
-                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
                                                         />
                                                     ) : (
                                                         <div className="flex flex-col items-center justify-center p-4 text-center">
                                                             {getFileIcon(doc.file_type, doc.file_name)}
-                                                            <span className="mt-2 text-[10px] font-mono uppercase font-bold text-gray-400 dark:text-gray-500">
+                                                            <span className="mt-2 text-[9.5px] font-mono tracking-wider uppercase font-medium text-zinc-400 dark:text-zinc-500">
                                                                 {doc.file_name?.split('.').pop() || doc.category || 'DOC'}
                                                             </span>
                                                         </div>
                                                     )}
 
-                                                    {/* Badge de categoría / tipo */}
-                                                    <span className="absolute top-2 left-2 text-[9.5px] font-semibold px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-white">
+                                                    {/* Tag de carpeta */}
+                                                    <span className="absolute top-2 left-2 text-[9px] font-medium px-2 py-0.5 rounded bg-zinc-900/80 dark:bg-black/80 text-zinc-100">
                                                         {folder ? folder.name : (doc.category || 'Archivo')}
                                                     </span>
 
-                                                    {/* Hover Overlay con botón ver */}
-                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                                        <span className="px-2.5 py-1 rounded-md bg-white text-black text-[11px] font-semibold flex items-center gap-1 shadow-sm">
-                                                            <Eye className="w-3 h-3" /> Vista Previa
+                                                    {/* Hover Overlay */}
+                                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                                                        <span className="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-[10.5px] font-medium flex items-center gap-1 shadow-2xs">
+                                                            <Eye className="w-3 h-3 text-zinc-500" /> Vista Previa
                                                         </span>
                                                     </div>
                                                 </div>
@@ -2261,63 +2294,55 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                 <div className="p-3 flex-1 flex flex-col justify-between">
                                                     <div>
                                                         <h4 
-                                                            className="text-xs font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                                                            className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors"
                                                             title={doc.title}
                                                         >
                                                             {doc.title}
                                                         </h4>
-                                                        <div className="mt-1 flex items-center justify-between text-[10.5px] text-gray-400">
+                                                        <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
                                                             <span>{sizeFormatted}</span>
                                                             <span>{format(parseISO(doc.created_at), 'dd MMM yyyy', { locale: es })}</span>
                                                         </div>
-                                                        {doc.created_by && (
-                                                            <p className="mt-1 text-[10px] text-gray-400 truncate">
-                                                                Por: {doc.created_by.split('@')[0]}
-                                                            </p>
-                                                        )}
                                                     </div>
 
-                                                    {/* Botones de acción */}
-                                                    <div className="pt-2.5 mt-2.5 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between gap-1">
-                                                        {/* Compartir a Canal */}
+                                                    {/* Acciones */}
+                                                    <div className="pt-2 mt-2 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between gap-1">
                                                         <button
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleOpenShareDoc(doc);
                                                             }}
-                                                            className="px-2 py-1 rounded-md text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center gap-1 transition-colors"
-                                                            title="Compartir documento en un canal (público o privado con contraseña)"
+                                                            className="px-2 py-0.5 rounded text-[10.5px] font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1"
+                                                            title="Compartir en Canal"
                                                         >
-                                                            <MessageSquare className="w-3.5 h-3.5" />
+                                                            <MessageSquare className="w-3 h-3 text-zinc-400" />
                                                             <span>Compartir</span>
                                                         </button>
 
-                                                        <div className="flex items-center gap-1">
-                                                            {/* Descargar */}
+                                                        <div className="flex items-center gap-0.5">
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handleDownloadFile(doc);
                                                                 }}
-                                                                className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                                                title="Descargar archivo"
+                                                                className="p-1 rounded text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                title="Descargar"
                                                             >
-                                                                <Download className="w-3.5 h-3.5" />
+                                                                <Download className="w-3 h-3" />
                                                             </button>
 
-                                                            {/* Eliminar */}
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handleDeleteDoc(doc.id);
                                                                 }}
-                                                                className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                                                                title="Eliminar archivo"
+                                                                className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                title="Eliminar"
                                                             >
-                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                <Trash2 className="w-3 h-3" />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -2327,21 +2352,21 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     })}
                                 </div>
                             ) : (
-                                /* VISTA TABLA / LISTA */
-                                <div className="bg-white dark:bg-[#141414] border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden shadow-xs">
+                                /* VISTA TABLA / LISTA - MINIMALISTA */
+                                <div className="bg-white dark:bg-[#0d0d0f] border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl overflow-hidden">
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-xs">
-                                            <thead className="bg-gray-50 dark:bg-black/50 text-gray-400 font-semibold border-b border-gray-200 dark:border-gray-800">
+                                            <thead className="bg-zinc-50 dark:bg-zinc-900/60 text-zinc-400 font-medium border-b border-zinc-200/80 dark:border-zinc-800/80">
                                                 <tr>
-                                                    <th className="py-2.5 px-4">Archivo / Documento</th>
-                                                    <th className="py-2.5 px-3">Carpeta</th>
-                                                    <th className="py-2.5 px-3">Tamaño</th>
-                                                    <th className="py-2.5 px-3">Fecha</th>
-                                                    <th className="py-2.5 px-3">Subido por</th>
-                                                    <th className="py-2.5 px-4 text-right">Acciones</th>
+                                                    <th className="py-2.5 px-4 font-medium">Archivo / Documento</th>
+                                                    <th className="py-2.5 px-3 font-medium">Carpeta</th>
+                                                    <th className="py-2.5 px-3 font-medium">Tamaño</th>
+                                                    <th className="py-2.5 px-3 font-medium">Fecha</th>
+                                                    <th className="py-2.5 px-3 font-medium">Subido por</th>
+                                                    <th className="py-2.5 px-4 text-right font-medium">Acciones</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                                            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                                                 {filteredDocs.map(doc => {
                                                     const folder = projectFolders.find(f => f.id === doc.folder_id);
                                                     const sizeFormatted = doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : 'Texto';
@@ -2349,7 +2374,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                     return (
                                                         <tr 
                                                             key={doc.id}
-                                                            className="hover:bg-gray-50/80 dark:hover:bg-zinc-800/40 transition-colors"
+                                                            className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors"
                                                         >
                                                             <td className="py-2.5 px-4">
                                                                 <div 
@@ -2357,21 +2382,21 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                     className="cursor-pointer flex items-center gap-2.5 min-w-0"
                                                                 >
                                                                     {getFileIcon(doc.file_type, doc.file_name)}
-                                                                    <span className="font-semibold text-gray-900 dark:text-white hover:underline truncate">
+                                                                    <span className="font-medium text-zinc-900 dark:text-zinc-100 hover:underline truncate">
                                                                         {doc.title}
                                                                     </span>
                                                                 </div>
                                                             </td>
-                                                            <td className="py-2.5 px-3 text-gray-500 dark:text-gray-400">
+                                                            <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">
                                                                 {folder ? folder.name : '—'}
                                                             </td>
-                                                            <td className="py-2.5 px-3 text-gray-500 dark:text-gray-400 font-mono text-[11px]">
+                                                            <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400 font-mono text-[11px]">
                                                                 {sizeFormatted}
                                                             </td>
-                                                            <td className="py-2.5 px-3 text-gray-500 dark:text-gray-400">
+                                                            <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">
                                                                 {format(parseISO(doc.created_at), 'dd/MM/yyyy', { locale: es })}
                                                             </td>
-                                                            <td className="py-2.5 px-3 text-gray-400 truncate max-w-[120px]">
+                                                            <td className="py-2.5 px-3 text-zinc-400 truncate max-w-[120px]">
                                                                 {doc.created_by?.split('@')[0] || '—'}
                                                             </td>
                                                             <td className="py-2.5 px-4 text-right">
@@ -2379,7 +2404,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setPreviewDocModal(doc)}
-                                                                        className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                        className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                                                         title="Vista Previa"
                                                                     >
                                                                         <Eye className="w-3.5 h-3.5" />
@@ -2387,15 +2412,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleOpenShareDoc(doc)}
-                                                                        className="p-1 text-blue-500 hover:text-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-                                                                        title="Compartir en Canal (con clave si es privado)"
+                                                                        className="p-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                        title="Compartir en Canal"
                                                                     >
                                                                         <MessageSquare className="w-3.5 h-3.5" />
                                                                     </button>
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleDownloadFile(doc)}
-                                                                        className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                        className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                                                         title="Descargar"
                                                                     >
                                                                         <Download className="w-3.5 h-3.5" />
@@ -2403,7 +2428,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleDeleteDoc(doc.id)}
-                                                                        className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                                        className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                                                         title="Eliminar"
                                                                     >
                                                                         <Trash2 className="w-3.5 h-3.5" />
@@ -2419,26 +2444,26 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 </div>
                             )}
 
-                            {/* SECCIÓN INFERIOR: NOTAS DEL PROYECTO (SINCRONIZADAS CON EL MÓDULO DE NOTAS) */}
+                            {/* SECCIÓN INFERIOR: NOTAS DEL PROYECTO (MINIMALISTA Y MONOCROMÁTICA) */}
                             {projectNotes.length > 0 && (
-                                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-800">
-                                    <div className="flex items-center justify-between mb-4">
+                                <div className="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80">
+                                    <div className="flex items-center justify-between mb-3.5">
                                         <div className="flex items-center gap-2">
-                                            <BookOpen className="w-4 h-4 text-amber-500" />
-                                            <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
-                                                Notas de este Proyecto (Sincronizadas con módulo de Notas)
+                                            <BookOpen className="w-3.5 h-3.5 text-zinc-500" />
+                                            <h3 className="text-xs font-medium text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                                                Notas de este Proyecto
                                             </h3>
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-bold">
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
                                                 {projectNotes.length}
                                             </span>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={handleCreateProjectNote}
-                                            className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1.5"
+                                            className="text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1 transition-colors"
                                         >
                                             <Plus className="w-3.5 h-3.5" />
-                                            <span>Nueva Nota de Proyecto</span>
+                                            <span>Nueva Nota</span>
                                         </button>
                                     </div>
 
@@ -2447,33 +2472,33 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             <div
                                                 key={n.id}
                                                 onClick={() => setEditingProjectNote(n)}
-                                                className="group cursor-pointer p-3 bg-white dark:bg-[#141414] border border-amber-200/60 dark:border-amber-900/40 hover:border-amber-400 dark:hover:border-amber-600 rounded-xl hover:shadow-xs transition-all flex flex-col justify-between"
+                                                className="group cursor-pointer p-3.5 bg-white dark:bg-[#0d0d0f] border border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-400 dark:hover:border-zinc-600 rounded-xl transition-all flex flex-col justify-between"
                                             >
                                                 <div>
-                                                    <div className="flex items-center justify-between mb-1.5">
-                                                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">
                                                             Nota de Proyecto
                                                         </span>
-                                                        <span className="text-[10px] text-gray-400">
+                                                        <span className="text-[10px] text-zinc-400">
                                                             {format(parseISO(n.updated_at || n.created_at), 'dd MMM', { locale: es })}
                                                         </span>
                                                     </div>
-                                                    <h4 className="text-xs font-bold text-gray-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
+                                                    <h4 className="text-xs font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors truncate">
                                                         {n.title || 'Nota sin título'}
                                                     </h4>
-                                                    <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
-                                                        {cleanToPlainText(n.content) || 'Sin contenido adicional... Haz clic para editar con el editor enriquecido.'}
+                                                    <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                                                        {cleanToPlainText(n.content) || 'Haz clic para ver o editar esta nota...'}
                                                     </p>
                                                 </div>
 
                                                 <div 
-                                                    className="pt-2.5 mt-2.5 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between"
+                                                    className="pt-2 mt-2.5 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <button
                                                         type="button"
                                                         onClick={() => setEditingProjectNote(n)}
-                                                        className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1 transition-colors"
+                                                        className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1 transition-colors"
                                                     >
                                                         <Edit2 className="w-3 h-3" /> Editar
                                                     </button>
@@ -2481,15 +2506,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => handleOpenShareNote(n)}
-                                                            className="px-2 py-0.5 rounded-md text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center gap-1 transition-colors"
-                                                            title="Compartir esta nota en un canal (público o privado con contraseña)"
+                                                            className="px-2 py-0.5 rounded text-[10.5px] font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-1 transition-colors"
+                                                            title="Compartir nota en Canal"
                                                         >
-                                                            <MessageSquare className="w-3 h-3" /> Compartir en Canal
+                                                            <MessageSquare className="w-3 h-3" /> Compartir
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => handleDeleteProjectNote(n.id)}
-                                                            className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                            className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                                             title="Eliminar Nota"
                                                         >
                                                             <Trash2 className="w-3 h-3" />

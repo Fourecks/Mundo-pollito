@@ -127,20 +127,66 @@ export const NotesToolbar: React.FC<NotesToolbarProps> = ({
     let inCode = false;
     let inBlockquote = false;
     let blockTag = '';
+    let activeElement: HTMLElement | null = null;
 
     if (sel && sel.rangeCount > 0) {
       let node: Node | null = sel.anchorNode;
       while (node && node !== document.body) {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const el = node as HTMLElement;
+          if (!activeElement) activeElement = el;
           const tagName = el.tagName.toLowerCase();
           if (tagName === 'code' || tagName === 'pre') inCode = true;
           if (tagName === 'blockquote') inBlockquote = true;
           if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'].includes(tagName) && !blockTag) {
             blockTag = `<${tagName}>`;
           }
+        } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
+          if (!activeElement) activeElement = node.parentElement;
         }
         node = node.parentNode;
+      }
+    }
+
+    if (activeElement) {
+      try {
+        const comp = window.getComputedStyle(activeElement);
+        if (comp) {
+          // Detect font size in px
+          const fs = comp.fontSize;
+          if (fs) {
+            const parsedPx = Math.round(parseFloat(fs));
+            if (!isNaN(parsedPx) && parsedPx > 0) {
+              setSelectedFontSize(parsedPx);
+            }
+          }
+
+          // Detect font family
+          const family = comp.fontFamily;
+          if (family) {
+            const cleanFamily = family.split(',')[0].replace(/['"]/g, '').trim().toLowerCase();
+            const matchedFont = FONT_FAMILY_OPTIONS.find(f => 
+              f.name.toLowerCase() === cleanFamily ||
+              f.value.toLowerCase().includes(cleanFamily) ||
+              cleanFamily.includes(f.name.toLowerCase())
+            );
+            if (matchedFont) {
+              setSelectedFont(matchedFont.value);
+            }
+          }
+
+          // Detect custom text color
+          if (comp.color) {
+            setCustomTextColor(comp.color);
+          }
+
+          // Detect custom highlight color
+          if (comp.backgroundColor && comp.backgroundColor !== 'rgba(0, 0, 0, 0)' && comp.backgroundColor !== 'transparent') {
+            setCustomHighlightColor(comp.backgroundColor);
+          }
+        }
+      } catch (e) {
+        // Safe computed style fallback
       }
     }
 

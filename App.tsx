@@ -460,6 +460,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
   };
 
   // Local UI State for Desktop
+  const [activeNoteForNotes, setActiveNoteForNotes] = useState<number | null>(null);
+  const [activeFolderForNotes, setActiveFolderForNotes] = useState<number | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionQuote, setCompletionQuote] = useState('');
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -1078,6 +1080,15 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     }
   };
 
+  const handleOpenNotesModule = useCallback((noteId?: number | null, folderId?: number | null) => {
+    if (noteId !== undefined && noteId !== null) setActiveNoteForNotes(noteId);
+    if (folderId !== undefined && folderId !== null) setActiveFolderForNotes(folderId);
+    if (!openWindows.includes('notes')) {
+      setOpenWindows(open => [...open, 'notes']);
+    }
+    bringToFront('notes');
+  }, [bringToFront, openWindows]);
+
   const handleSelectTrack = (track: Playlist, queue: Playlist[]) => {
       if(track.platform === 'youtube') {
           setActiveTrack({ ...track, queue });
@@ -1613,7 +1624,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
           )}
           {openWindows.includes('notes') && (
               <ModalWindow isOpen onClose={() => closeWindow('notes')} title="Notas" isDraggable isResizable zIndex={getWindowZIndex('notes')} onFocus={() => bringToFront('notes')} className="w-full max-w-3xl h-[75vh]" windowState={windowStatesRef.current.notes} onStateChange={s => handleWindowStateChange('notes', s)} allowFullscreen isMinimized={minimizedWindows.includes('notes')} onMinimize={() => minimizeWindow('notes')}>
-                  <NotesSection folders={folders} notes={notes} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
+                  <NotesSection folders={folders} notes={notes} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} initialSelectedNoteId={activeNoteForNotes} initialSelectedFolderId={activeFolderForNotes} />
               </ModalWindow>
           )}
           {openWindows.includes('pomodoro') && (
@@ -1674,6 +1685,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                       onAddNote={handleAddNote}
                       onUpdateNote={handleUpdateNote}
                       onDeleteNote={handleDeleteNote}
+                      onOpenNotesModule={handleOpenNotesModule}
                       allTodos={flatAllTodos}
                       activeProjectId={viewingProjectId}
                       invitations={projectInvitations}
@@ -1790,11 +1802,23 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       notifications, onNotificationClick, onClearNotifications, onMarkNotificationRead, onDeleteNotification,
       isPowerSavingActive, batteryStatus,
       focusSessions, onLogFocusSession,
-      projectInvitations, onSendInvitation, onAcceptInvitation, onDeclineInvitation
+      projectInvitations, onSendInvitation, onAcceptInvitation, onDeclineInvitation,
+      onOpenNotesModule
     } = props;
 
     // Local UI state for Mobile
     const [activeTab, setActiveTab] = useState('home');
+    const [activeNoteForNotes, setActiveNoteForNotes] = useState<number | null>(null);
+    const [activeFolderForNotes, setActiveFolderForNotes] = useState<number | null>(null);
+
+    const handleOpenNotesModule = useCallback((noteId?: number | null, folderId?: number | null) => {
+      if (noteId !== undefined) setActiveNoteForNotes(noteId);
+      if (folderId !== undefined) setActiveFolderForNotes(folderId);
+      setActiveTab('notes');
+      if (onOpenNotesModule) {
+        onOpenNotesModule(noteId, folderId);
+      }
+    }, [onOpenNotesModule]);
     const [showCompletionModal, setShowCompletionModal] = useState(false);
     const [completionQuote, setCompletionQuote] = useState('');
     const [taskToEdit, setTaskToEdit] = useState<Todo | null>(null);
@@ -2119,6 +2143,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onAddNote={handleAddNote}
                             onUpdateNote={handleUpdateNote}
                             onDeleteNote={handleDeleteNote}
+                            onOpenNotesModule={handleOpenNotesModule}
                             allTodos={flatAllTodos}
                             activeProjectId={viewingProjectId}
                             invitations={projectInvitations}
@@ -2192,7 +2217,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
                 <div className={activeTab === 'notes' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full pt-8 landscape:pt-2">
-                      <NotesSection isMobile={true} folders={folders} notes={notes} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} />
+                      <NotesSection isMobile={true} folders={folders} notes={notes} onAddFolder={handleAddFolder} onUpdateFolder={handleUpdateFolder} onDeleteFolder={handleDeleteFolder} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} initialSelectedNoteId={activeNoteForNotes} initialSelectedFolderId={activeFolderForNotes} />
                     </div>
                 </div>
 
@@ -2829,6 +2854,19 @@ const App: React.FC = () => {
         getAll<HabitRecord>('habit_records'),
     ]);
 
+    // Fallback to localStorage backup if IndexedDB cache is empty
+    let effectiveCachedNotes = cachedNotes;
+    if (!effectiveCachedNotes || effectiveCachedNotes.length === 0) {
+      const localNotesBackup = localStorage.getItem(getUserKey('notes_backup'));
+      if (localNotesBackup) {
+        try {
+          effectiveCachedNotes = JSON.parse(localNotesBackup);
+        } catch (e) {
+          console.warn('Failed to parse local notes backup:', e);
+        }
+      }
+    }
+
     const todosByDate: { [key: string]: Todo[] } = {};
     const undatedTodos: Todo[] = [];
     cachedTodos.forEach(todo => {
@@ -2845,7 +2883,7 @@ const App: React.FC = () => {
     }
     setAllTodos(todosByDate);
     setFolders(cachedFolders);
-    setNotes(cachedNotes);
+    setNotes(effectiveCachedNotes || []);
     if (cachedPlaylists && cachedPlaylists.length > 0) {
       setPlaylists(cachedPlaylists);
     } else {
@@ -3001,7 +3039,21 @@ const App: React.FC = () => {
         await clearAndPutAll('todos', recentTodosData);
       }
       if(foldersData) { setFolders(foldersData); await clearAndPutAll('folders', foldersData); }
-      if(notesData) { setNotes(notesData); await clearAndPutAll('notes', notesData); }
+      if(notesData) {
+        const serverNoteMap = new Map((notesData as Note[]).map(n => [n.id, n]));
+        const mergedNotes: Note[] = [...(notesData as Note[])];
+        (effectiveCachedNotes || []).forEach(localNote => {
+          if (!serverNoteMap.has(localNote.id)) {
+            const idStr = String(localNote.id);
+            if ((typeof localNote.id === 'number' && localNote.id < 0) || idStr.startsWith('item_') || idStr.startsWith('temp_')) {
+              mergedNotes.push(localNote);
+            }
+          }
+        });
+        setNotes(mergedNotes);
+        try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(mergedNotes)); } catch(e) {}
+        await clearAndPutAll('notes', mergedNotes);
+      }
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
       if(projectsData) { setProjects(projectsData); await clearAndPutAll('projects', projectsData); }
@@ -4213,12 +4265,20 @@ const App: React.FC = () => {
     const now = new Date().toISOString();
     const newNote: Note = { id: tempId, folder_id: folderId, user_id: user.id, project_id: projectId || null, subject_id: subjectId || null, title: 'Nueva Nota', content: '', created_at: now, updated_at: now };
     
-    setNotes(n => [...n, newNote]);
+    setNotes(n => {
+      const updated = [...n, newNote];
+      try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(updated)); } catch(e) {}
+      return updated;
+    });
     
     const savedNote = await syncableCreate('notes', newNote) as Note;
 
     if (savedNote.id !== tempId) {
-        setNotes(n => n.map(item => item.id === tempId ? savedNote : item));
+        setNotes(n => {
+          const updated = n.map(item => item.id === tempId ? savedNote : item);
+          try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(updated)); } catch(e) {}
+          return updated;
+        });
     }
     return savedNote;
   }, [user]);
@@ -4226,14 +4286,26 @@ const App: React.FC = () => {
 
   const handleUpdateNote = async (note: Note) => {
     const updatedNote = { ...note, updated_at: new Date().toISOString() };
-    setNotes(n => n.map(item => item.id === note.id ? updatedNote : item));
+    setNotes(n => {
+      const updated = n.map(item => item.id === note.id ? updatedNote : item);
+      try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(updated)); } catch(e) {}
+      return updated;
+    });
 
     const savedNote = await syncableUpdate('notes', updatedNote);
-    setNotes(n => n.map(item => item.id === note.id ? savedNote : item));
+    setNotes(n => {
+      const updated = n.map(item => item.id === note.id ? savedNote : item);
+      try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(updated)); } catch(e) {}
+      return updated;
+    });
   };
 
   const handleDeleteNote = async (noteId: number, folderId: number | null) => {
-    setNotes(n => n.filter(item => item.id !== noteId));
+    setNotes(n => {
+      const updated = n.filter(item => item.id !== noteId);
+      try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(updated)); } catch(e) {}
+      return updated;
+    });
     await syncableDelete('notes', noteId);
   };
   

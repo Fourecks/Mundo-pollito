@@ -375,6 +375,7 @@ export interface Note {
   user_id: string;
   folder_id: number | null;
   project_id?: number | null;
+  project_doc_folder_id?: string | null;
   subject_id?: string | null;
   title: string;
   content: string;

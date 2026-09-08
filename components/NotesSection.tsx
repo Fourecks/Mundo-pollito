@@ -43,6 +43,8 @@ interface NotesSectionProps {
   isMobile?: boolean;
   projectId?: number;
   subjectId?: string;
+  initialSelectedNoteId?: number | null;
+  initialSelectedFolderId?: number | null;
 }
 
 const NotesSection: React.FC<NotesSectionProps> = ({
@@ -57,12 +59,33 @@ const NotesSection: React.FC<NotesSectionProps> = ({
   isMobile = false,
   projectId,
   subjectId,
+  initialSelectedNoteId,
+  initialSelectedFolderId,
 }) => {
   // Navigation State
   const [currentView, setCurrentView] = useState<NoteView>('all');
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
+
+  // Sync initial selection from props if passed
+  useEffect(() => {
+    if (initialSelectedNoteId) {
+      setSelectedNoteId(initialSelectedNoteId);
+      const target = allNotes.find(n => n.id === initialSelectedNoteId);
+      if (target) {
+        if (target.folder_id) {
+          setSelectedFolderId(target.folder_id);
+          setCurrentView('folder');
+        } else {
+          setCurrentView('all');
+        }
+      }
+    } else if (initialSelectedFolderId) {
+      setSelectedFolderId(initialSelectedFolderId);
+      setCurrentView('folder');
+    }
+  }, [initialSelectedNoteId, initialSelectedFolderId, allNotes]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('updated');
 
