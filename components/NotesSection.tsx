@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import { normalizeNoteContentForEditor, sanitizeAndCleanHtml, cleanToPlainText } from '../utils/textCleaner';
-import { getAll, syncableCreate, ensureDB } from '../db';
+import { getAll, set, syncableCreate, ensureDB } from '../db';
 import { NoteView, SortOrder } from './notes/NotesTypes';
 import { NotesNavigationSidebar } from './notes/NotesNavigationSidebar';
 import { NotesToolbar } from './notes/NotesToolbar';
@@ -250,6 +250,13 @@ const NotesSection: React.FC<NotesSectionProps> = ({
           updated_at: new Date().toISOString(),
         };
 
+        // Write directly to IndexedDB first for absolute instant persistence
+        try {
+          await set('notes', updated);
+        } catch (dbErr) {
+          console.warn('Direct IndexedDB set failed in executeSave:', dbErr);
+        }
+
         await onUpdateNote(updated);
         lastSavedContentMapRef.current.set(targetNoteId, { title: titleToSave, content: sanitizedContent });
         setNoteSaveStatus(prev => ({ ...prev, [targetNoteId]: 'saved' }));
@@ -263,6 +270,44 @@ const NotesSection: React.FC<NotesSectionProps> = ({
     },
     [onUpdateNote, selectedNote]
   );
+
+  // Flush pending auto-save when page is unloading, hidden, or tab closed
+  useEffect(() => {
+    const flushUnsaved = () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+        autoSaveTimeoutRef.current = null;
+      }
+      if (pendingSaveRef.current) {
+        const { noteId, title, content } = pendingSaveRef.current;
+        pendingSaveRef.current = null;
+        executeSave(noteId, title, content);
+      } else if (activeNoteIdRef.current) {
+        const activeId = activeNoteIdRef.current;
+        const currentTitle = titleRef.current ? titleRef.current.innerHTML : activeNoteTitle;
+        const currentContent = editorRef.current ? editorRef.current.innerHTML : activeNoteContent;
+        if (currentTitle || currentContent) {
+          executeSave(activeId, currentTitle, currentContent);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushUnsaved();
+      }
+    };
+
+    window.addEventListener('beforeunload', flushUnsaved);
+    window.addEventListener('pagehide', flushUnsaved);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', flushUnsaved);
+      window.removeEventListener('pagehide', flushUnsaved);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [executeSave, activeNoteTitle, activeNoteContent]);
 
   const scheduleAutoSave = (newTitle: string, newContent: string) => {
     const activeId = activeNoteIdRef.current;

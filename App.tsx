@@ -3038,18 +3038,49 @@ const App: React.FC = () => {
         setAllTodos(networkTodosByDate);
         await clearAndPutAll('todos', recentTodosData);
       }
-      if(foldersData) { setFolders(foldersData); await clearAndPutAll('folders', foldersData); }
-      if(notesData) {
-        const serverNoteMap = new Map((notesData as Note[]).map(n => [n.id, n]));
-        const mergedNotes: Note[] = [...(notesData as Note[])];
-        (effectiveCachedNotes || []).forEach(localNote => {
-          if (!serverNoteMap.has(localNote.id)) {
-            const idStr = String(localNote.id);
-            if ((typeof localNote.id === 'number' && localNote.id < 0) || idStr.startsWith('item_') || idStr.startsWith('temp_')) {
-              mergedNotes.push(localNote);
-            }
+      if (foldersData) {
+        const serverFolderMap = new Map((foldersData as Folder[]).map(f => [f.id, f]));
+        const mergedFolders: Folder[] = [...(foldersData as Folder[])];
+        (cachedFolders || []).forEach(localFolder => {
+          if (!serverFolderMap.has(localFolder.id)) {
+            mergedFolders.push(localFolder);
+            syncableCreate('folders', localFolder).catch(e => console.warn('Syncing local folder failed:', e));
           }
         });
+        setFolders(mergedFolders);
+        await clearAndPutAll('folders', mergedFolders);
+      }
+      if (notesData) {
+        const serverNoteMap = new Map((notesData as Note[]).map(n => [n.id, n]));
+        const localNoteMap = new Map((effectiveCachedNotes || []).map(n => [n.id, n]));
+        const mergedNotes: Note[] = [];
+
+        // 1. Process server notes & merge with newer local edits
+        (notesData as Note[]).forEach(serverNote => {
+          const localNote = localNoteMap.get(serverNote.id);
+          if (localNote) {
+            const serverTime = new Date(serverNote.updated_at || serverNote.created_at || 0).getTime();
+            const localTime = new Date(localNote.updated_at || localNote.created_at || 0).getTime();
+            if (localTime > serverTime) {
+              // Local version has unsynced newer edits; preserve local and trigger re-sync
+              mergedNotes.push(localNote);
+              syncableUpdate('notes', localNote).catch(err => console.warn('Resyncing local note failed:', err));
+            } else {
+              mergedNotes.push(serverNote);
+            }
+          } else {
+            mergedNotes.push(serverNote);
+          }
+        });
+
+        // 2. Preserve local notes not yet existing on server (created offline or before sync)
+        (effectiveCachedNotes || []).forEach(localNote => {
+          if (!serverNoteMap.has(localNote.id)) {
+            mergedNotes.push(localNote);
+            syncableCreate('notes', localNote).catch(err => console.warn('Syncing missing local note failed:', err));
+          }
+        });
+
         setNotes(mergedNotes);
         try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(mergedNotes)); } catch(e) {}
         await clearAndPutAll('notes', mergedNotes);
@@ -3433,11 +3464,91 @@ const App: React.FC = () => {
       )
       .subscribe();
 
+    // 4. Subscribe to Notes changes
+    const notesChannel = supabase
+      .channel('notes-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes' },
+        async (payload) => {
+          console.log('Realtime note payload received:', payload);
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+          if (eventType === 'INSERT' || eventType === 'UPDATE') {
+            const note = newRecord as Note;
+            if (note.user_id === user.id) {
+              setNotes(prev => {
+                const existing = prev.find(n => n.id === note.id);
+                if (existing) {
+                  const existingTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
+                  const newTime = new Date(note.updated_at || note.created_at || 0).getTime();
+                  if (existingTime > newTime) {
+                    return prev; // keep newer local version
+                  }
+                }
+                const filtered = prev.filter(n => n.id !== note.id);
+                const updated = [note, ...filtered];
+                try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(updated)); } catch(e){}
+                return updated;
+              });
+              const currentCached = await getAll<Note>('notes');
+              const updatedCached = currentCached.filter(n => n.id !== note.id);
+              updatedCached.push(note);
+              await clearAndPutAll('notes', updatedCached);
+            }
+          } else if (eventType === 'DELETE') {
+            const deletedId = oldRecord.id;
+            setNotes(prev => {
+              const updated = prev.filter(n => n.id !== deletedId);
+              try { localStorage.setItem(getUserKey('notes_backup'), JSON.stringify(updated)); } catch(e){}
+              return updated;
+            });
+            const currentCached = await getAll<Note>('notes');
+            const updatedCached = currentCached.filter(n => n.id !== deletedId);
+            await clearAndPutAll('notes', updatedCached);
+          }
+        }
+      )
+      .subscribe();
+
+    // 5. Subscribe to Folders changes
+    const foldersChannel = supabase
+      .channel('folders-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'folders' },
+        async (payload) => {
+          console.log('Realtime folder payload received:', payload);
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+          if (eventType === 'INSERT' || eventType === 'UPDATE') {
+            const folder = newRecord as Folder;
+            if (folder.user_id === user.id) {
+              setFolders(prev => {
+                const filtered = prev.filter(f => f.id !== folder.id);
+                return [...filtered, folder];
+              });
+              const currentCached = await getAll<Folder>('folders');
+              const updatedCached = currentCached.filter(f => f.id !== folder.id);
+              updatedCached.push(folder);
+              await clearAndPutAll('folders', updatedCached);
+            }
+          } else if (eventType === 'DELETE') {
+            const deletedId = oldRecord.id;
+            setFolders(prev => prev.filter(f => f.id !== deletedId));
+            const currentCached = await getAll<Folder>('folders');
+            const updatedCached = currentCached.filter(f => f.id !== deletedId);
+            await clearAndPutAll('folders', updatedCached);
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       console.log("Cleaning up Supabase Realtime Channels...");
       supabase.removeChannel(projectsChannel);
       supabase.removeChannel(todosChannel);
       supabase.removeChannel(invitationsChannel);
+      supabase.removeChannel(notesChannel);
+      supabase.removeChannel(foldersChannel);
     };
   }, [user, dataLoaded, isOnline]);
 
