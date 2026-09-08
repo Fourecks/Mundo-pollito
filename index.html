@@ -253,7 +253,40 @@
         color: #262626 !important;
       }
 
-      /* Note rich text editor styling */
+      /* Note rich text editor styling & Anti-flicker focus rules */
+      .note-editor-content,
+      .note-editor-content *,
+      [contenteditable="true"],
+      [contenteditable="true"] *,
+      [contenteditable="false"],
+      [contenteditable="false"] * {
+        outline: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      .note-editor-content *:focus,
+      .note-editor-content *:focus-visible,
+      [contenteditable]:focus,
+      [contenteditable]:focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+        border-color: transparent;
+      }
+      .note-editor-content div,
+      .note-editor-content p,
+      .note-editor-content h1,
+      .note-editor-content h2,
+      .note-editor-content h3,
+      .note-editor-content blockquote,
+      .note-editor-content pre,
+      .note-editor-content table,
+      .note-editor-content tr,
+      .note-editor-content td,
+      .note-editor-content th,
+      .note-editor-content .note-callout,
+      .note-editor-content .note-task-item {
+        outline: none !important;
+      }
+
       .note-editor-content b, .note-editor-content strong { font-weight: 700; }
       .note-editor-content i, .note-editor-content em { font-style: italic; }
       .note-editor-content u { text-decoration: underline; }

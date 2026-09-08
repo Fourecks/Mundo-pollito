@@ -1431,7 +1431,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({
                     onSelect={saveActiveSelection}
                     onKeyDown={handleEditorKeyDown}
                     data-placeholder="Escribe tus notas aquí..."
-                    className={`flex-1 focus:outline-none note-editor-content min-h-[400px] transition-all ${
+                    className={`flex-1 focus:outline-none note-editor-content min-h-[400px] transition-colors ${
                       isReadingMode
                         ? 'text-lg md:text-xl leading-relaxed md:leading-loose text-zinc-800 dark:text-zinc-200 selection:bg-amber-200 dark:selection:bg-amber-900/60 font-serif'
                         : 'leading-relaxed text-zinc-800 dark:text-zinc-200'

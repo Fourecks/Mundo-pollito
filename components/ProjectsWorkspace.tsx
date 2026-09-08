@@ -849,12 +849,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
     };
 
-    // Helper: Create a Note for this Project (associated with folder in Notes module named "[ProjectName] (Proyecto)" and synced with project folder)
+    // Helper: Create a Note for this Project (associated with folder in Notes module named with project name and synced with project folder)
     const handleCreateProjectNote = async () => {
         if (!activeProject) return;
 
-        const folderName = `${activeProject.title} (Proyecto)`;
-        let targetNotesFolder = folders.find(f => f.name.trim().toLowerCase() === folderName.trim().toLowerCase());
+        const folderName = activeProject.name || 'Proyecto';
+        let targetNotesFolder = folders.find(f => (f.project_id && f.project_id === activeProject.id) || f.name.trim().toLowerCase() === folderName.trim().toLowerCase());
 
         if (!targetNotesFolder) {
             const created = await onAddFolder(folderName, activeProject.id);

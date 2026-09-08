@@ -4348,11 +4348,13 @@ const App: React.FC = () => {
       setFolders(f => [...f, newFolder]);
       
       const savedFolder = await syncableCreate('folders', newFolder) as Folder;
+      const finalFolder = savedFolder || newFolder;
       
-      if (savedFolder.id !== tempId) {
-          setFolders(f => f.map(folder => folder.id === tempId ? savedFolder : folder));
+      if (finalFolder && finalFolder.id !== tempId) {
+          setFolders(f => f.map(folder => folder.id === tempId ? finalFolder : folder));
+          setNotes(n => n.map(note => note.folder_id === tempId ? { ...note, folder_id: finalFolder.id } : note));
       }
-      return savedFolder;
+      return finalFolder;
   }, [user]);
 
   const handleUpdateFolder = async (folderId: number, name: string) => {
