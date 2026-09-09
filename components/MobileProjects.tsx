@@ -235,9 +235,15 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
             <div className="grid grid-cols-2 gap-3">
                 {activeProjects.map(project => {
                     const projectTasks = allTodos.filter(t => t.project_id === project.id);
+                    const pendingTasks = projectTasks.filter(t => !t.completed).length;
                     const completedTasks = projectTasks.filter(t => t.completed).length;
                     const totalTasks = projectTasks.length;
                     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+                    // Calculate ASCII progress blocks
+                    const filledBlocks = Math.round(progress / 10);
+                    const emptyBlocks = 10 - filledBlocks;
+                    const blockString = '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
 
                     return (
                         <motion.button
@@ -245,30 +251,22 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
                             animate={{ opacity: 1, scale: 1 }}
                             key={project.id}
                             onClick={() => handleSelectProject(project.id)}
-                            className="flex flex-col text-left p-4 rounded-3xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 active:scale-95 transition-all relative overflow-hidden h-full"
+                            className="flex flex-col text-left p-4 rounded-3xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 active:scale-95 transition-all relative overflow-hidden h-full min-h-[145px]"
                         >
-                            <div className="w-10 h-10 rounded-full bg-white dark:bg-black border border-zinc-100 dark:border-zinc-800 flex items-center justify-center text-xl shadow-sm mb-3 shrink-0">
-                                {project.emoji || '📁'}
+                            <div className="flex items-center gap-1.5 mb-2">
+                                <span className="text-base shrink-0">{project.emoji || '📁'}</span>
+                                <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 leading-tight line-clamp-1 flex-1">
+                                    {project.name}
+                                </h3>
                             </div>
                             
-                            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-1 leading-tight line-clamp-2">
-                                {project.name}
-                            </h3>
-                            
                             <p className="text-[11px] text-zinc-500 font-semibold mb-3">
-                                {totalTasks} {totalTasks === 1 ? 'tarea' : 'tareas'}
+                                {pendingTasks} {pendingTasks === 1 ? 'tarea pendiente' : 'tareas pendientes'}
                             </p>
 
-                            <div className="mt-auto w-full pt-2">
-                                <div className="flex justify-between items-center mb-1.5">
-                                    <span className="text-[10px] font-bold text-zinc-400">Progreso</span>
-                                    <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300">{progress}%</span>
-                                </div>
-                                <div className="w-full h-1 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-black dark:bg-white rounded-full"
-                                        style={{ width: `${progress}%` }}
-                                    />
+                            <div className="mt-auto w-full pt-1">
+                                <div className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-300 tracking-wider">
+                                    {blockString} <span className="ml-1">{progress}%</span>
                                 </div>
                             </div>
                         </motion.button>

@@ -4,7 +4,7 @@ import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, Project
 import { sendPushNotification } from '../services/pushNotificationService';
 import ProjectNoteEditorModal from './ProjectNoteEditorModal';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal, DollarSign
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
@@ -270,6 +270,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     // Mobile specific drawers & popup data capture states
     const [isMobileChannelDrawerOpen, setIsMobileChannelDrawerOpen] = useState(false);
     const [isMobileFolderDrawerOpen, setIsMobileFolderDrawerOpen] = useState(false);
+    const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
+    const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [isAddListItemModalOpen, setIsAddListItemModalOpen] = useState(false);
     const [kanbanAddModalCol, setKanbanAddModalCol] = useState<string | null>(null);
 
@@ -1037,49 +1039,80 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
 
     const renderMasMenu = () => {
-        const masTabs = [
-            { id: 'sprints', label: 'Sprints', icon: Target, badge: 0 },
-            { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon, badge: 0 },
-            { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs },
-            { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
-            { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time },
-            { id: 'team', label: 'Equipo', icon: Users, badge: 0 },
-            { id: 'settings', label: 'Configuración', icon: Settings, badge: 0 }
+        const sections = [
+            {
+                title: 'PLANIFICACIÓN',
+                items: [
+                    { id: 'sprints', label: 'Sprints', icon: Target, badge: 0 },
+                    { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon, badge: 0 }
+                ]
+            },
+            {
+                title: 'RECURSOS',
+                items: [
+                    { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs }
+                ]
+            },
+            {
+                title: 'GESTIÓN',
+                items: [
+                    { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
+                    { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time }
+                ]
+            },
+            {
+                title: 'PROYECTO',
+                items: [
+                    { id: 'team', label: 'Equipo', icon: Users, badge: 0 },
+                    { id: 'settings', label: 'Configuración', icon: Settings, badge: 0 }
+                ]
+            }
         ];
 
         return (
-            <div className="p-4 space-y-2 h-full overflow-y-auto">
-                {masTabs.map(tab => {
-                    const Icon = tab.icon;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => {
-                                if (tab.id === 'settings') {
-                                    if (onOpenProjectEditor && activeProject) onOpenProjectEditor(activeProject);
-                                } else {
-                                    setActiveTab(tab.id as any);
-                                }
-                            }}
-                            className="w-full flex items-center justify-between p-4 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 active:scale-95 transition-all shadow-sm"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-zinc-50 dark:bg-zinc-800/80 rounded-xl">
-                                    <Icon className="w-5 h-5 text-zinc-600 dark:text-zinc-300" />
-                                </div>
-                                <span className="font-semibold text-zinc-900 dark:text-white text-sm">{tab.label}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {tab.badge && tab.badge > 0 ? (
-                                    <span className="px-2 py-0.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px] font-bold rounded-full">
-                                        {tab.badge}
-                                    </span>
-                                ) : null}
-                                <ChevronRight className="w-4 h-4 text-zinc-400" />
-                            </div>
-                        </button>
-                    );
-                })}
+            <div className="p-4 space-y-6 h-full overflow-y-auto pb-28 font-sans">
+                {sections.map(sec => (
+                    <div key={sec.title} className="space-y-2">
+                        <h4 className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 tracking-wider uppercase px-1">
+                            {sec.title}
+                        </h4>
+                        <div className="space-y-1.5">
+                            {sec.items.map(tab => {
+                                const Icon = tab.icon;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => {
+                                            if (tab.id === 'settings') {
+                                                if (onOpenProjectEditor && activeProject) onOpenProjectEditor(activeProject);
+                                            } else {
+                                                setActiveTab(tab.id as any);
+                                            }
+                                        }}
+                                        className="w-full flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100/80 dark:border-zinc-800/80 active:scale-[0.99] hover:bg-zinc-50 dark:hover:bg-zinc-900/80 transition-all shadow-2xs"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-zinc-50 dark:bg-zinc-800/80 rounded-xl">
+                                                <Icon className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />
+                                            </div>
+                                            <span className="font-semibold text-zinc-800 dark:text-zinc-200 text-xs">
+                                                {tab.label}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {tab.badge && tab.badge > 0 ? (
+                                                <span className="px-2 py-0.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px] font-bold rounded-full">
+                                                    {tab.badge}
+                                                </span>
+                                            ) : null}
+                                            <ChevronRight className="w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
             </div>
         );
     };
@@ -1181,7 +1214,16 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     {/* Compact Mobile Top Bar: Project name, sleek controls */}
                     <div className="px-3 py-3 flex items-center justify-between border-b border-gray-100 dark:border-gray-800/80">
                         <div className="flex items-center gap-2">
-                            {onBack && (
+                            {['sprints', 'roadmap', 'docs', 'expenses', 'time', 'team'].includes(activeTab) ? (
+                                <button
+                                    onClick={() => setActiveTab('mas_menu')}
+                                    className="p-1.5 -ml-1 rounded-xl text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 active:scale-95 transition-all flex items-center gap-1"
+                                    aria-label="Volver a Más"
+                                >
+                                    <ChevronLeft className="w-5 h-5" />
+                                    <span className="text-xs font-bold text-zinc-900 dark:text-white">Volver</span>
+                                </button>
+                            ) : onBack ? (
                                 <button
                                     onClick={onBack}
                                     className="p-1.5 -ml-1 rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all"
@@ -1189,13 +1231,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 >
                                     <ChevronLeft className="w-5 h-5" />
                                 </button>
-                            )}
+                            ) : null}
                             <div className="flex items-center gap-2 max-w-[200px]">
-                                <span className="font-bold text-sm text-gray-900 dark:text-white tracking-tight truncate">{activeProject.name}</span>
+                                <span className="font-bold text-sm text-gray-900 dark:text-white tracking-tight truncate">
+                                    {activeTab === 'sprints' ? 'Sprints' :
+                                     activeTab === 'roadmap' ? 'Hoja de Ruta' :
+                                     activeTab === 'docs' ? 'Documentos' :
+                                     activeTab === 'expenses' ? 'Gastos' :
+                                     activeTab === 'time' ? 'Tiempo' :
+                                     activeTab === 'team' ? 'Equipo' :
+                                     activeProject.name}
+                                </span>
                             </div>
                         </div>
                         
                         <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => setIsQuickAddOpen(true)}
+                                className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                aria-label="Agregar al proyecto"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </button>
                             <button
                                 onClick={() => setInboxModalOpen(true)}
                                 className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 relative transition-colors"
@@ -1205,13 +1262,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 {activeProject.inbox && activeProject.inbox.length > 0 && (
                                     <span className="absolute top-1.5 right-1 w-2 h-2 bg-amber-500 rounded-full" />
                                 )}
-                            </button>
-                            <button
-                                onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)}
-                                className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                aria-label="Ajustes del Proyecto"
-                            >
-                                <MoreHorizontal className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
@@ -2803,122 +2853,215 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 />
 
                 {/* HEADER MINIMALISTA Y ELEGANTE */}
-                <div className="px-4 sm:px-6 py-3 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
-                    <div className="flex items-center gap-2">
-                        {/* Mobile Folder Drawer Toggle */}
+                {isMobile ? (
+                    <div className="px-4 py-3 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between gap-3 shrink-0">
+                        {/* Folder Toggle */}
                         <button
                             type="button"
                             onClick={() => setIsMobileFolderDrawerOpen(true)}
-                            className="md:hidden px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 text-xs font-semibold"
+                            className="px-2.5 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 flex items-center gap-1 text-[11px] font-bold shrink-0"
                             title="Ver carpetas"
                         >
-                            <FolderOpen className="w-4 h-4 text-amber-500 shrink-0" />
-                            <span className="truncate max-w-[110px]">{activeFolderObj ? activeFolderObj.name : 'Carpetas'}</span>
+                            <FolderOpen className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span className="truncate max-w-[70px]">{activeFolderObj ? activeFolderObj.name : 'Carpetas'}</span>
                             <ChevronDown className="w-3 h-3 text-zinc-400 shrink-0" />
                         </button>
 
-                        <div className="hidden md:flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200">
-                                <FolderOpen className="w-4 h-4" />
-                            </div>
-                            <div>
-                                <h2 className="text-sm font-medium tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                                    <span>Documentos & Archivos</span>
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
-                                        {allProjectDocs.length}
-                                    </span>
-                                </h2>
-                                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                                    {activeFolderObj ? `Carpeta: ${activeFolderObj.name}` : 'Todos los documentos, archivos y notas asociadas'}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Acciones principales - Estilo monocromático refinado */}
-                    <div className="flex items-center gap-2">
-                        {/* Buscador */}
-                        <div className="relative">
+                        {/* Search Input */}
+                        <div className="relative flex-1">
                             <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                                 type="text"
                                 placeholder="Buscar archivos..."
                                 value={docSearchText}
                                 onChange={e => setDocSearchText(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 text-xs bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-52 transition-colors"
+                                className="w-full pl-8 pr-7 py-1.5 text-xs bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none transition-colors"
                             />
                             {docSearchText && (
                                 <button
                                     type="button"
                                     onClick={() => setDocSearchText('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
                             )}
                         </div>
 
-                        {/* Conmutador de vista Grid / Table */}
-                        <div className="flex items-center p-0.5 bg-zinc-100 dark:bg-zinc-900 rounded-lg border border-zinc-200/80 dark:border-zinc-800/80">
+                        {/* Plus (+) Action Button with Popover */}
+                        <div className="relative shrink-0">
                             <button
                                 type="button"
-                                onClick={() => setDocViewMode('grid')}
-                                className={`p-1.5 rounded-md transition-colors ${
-                                    docViewMode === 'grid'
-                                        ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                                        : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                                }`}
-                                title="Vista en Cuadrícula"
+                                onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+                                className="p-2 bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-white rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-sm"
+                                title="Acciones"
                             >
-                                <Grid className="w-3.5 h-3.5" />
+                                <Plus className="w-4 h-4" />
                             </button>
+
+                            {isPlusMenuOpen && (
+                                <>
+                                    <div 
+                                        className="fixed inset-0 z-40 bg-transparent" 
+                                        onClick={() => setIsPlusMenuOpen(false)}
+                                    />
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#111] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-xl z-50 py-1 animate-in fade-in slide-in-from-top-2 duration-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsPlusMenuOpen(false);
+                                                fileInputRef.current?.click();
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-left font-semibold"
+                                        >
+                                            <Upload className="w-4 h-4 text-zinc-500" />
+                                            <span>Subir archivo</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsPlusMenuOpen(false);
+                                                setFolderModal({ isOpen: true, folder: null });
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-left font-semibold border-t border-zinc-100 dark:border-zinc-900"
+                                        >
+                                            <FolderPlus className="w-4 h-4 text-zinc-500" />
+                                            <span>Crear carpeta</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsPlusMenuOpen(false);
+                                                handleCreateProjectNote();
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-left font-semibold border-t border-zinc-100 dark:border-zinc-900"
+                                        >
+                                            <FilePlus className="w-4 h-4 text-zinc-500" />
+                                            <span>Crear texto/nota</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="px-4 sm:px-6 py-3 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+                        <div className="flex items-center gap-2">
+                            {/* Mobile Folder Drawer Toggle */}
                             <button
                                 type="button"
-                                onClick={() => setDocViewMode('table')}
-                                className={`p-1.5 rounded-md transition-colors ${
-                                    docViewMode === 'table'
-                                        ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                                        : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                                }`}
-                                title="Vista en Tabla"
+                                onClick={() => setIsMobileFolderDrawerOpen(true)}
+                                className="md:hidden px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 text-xs font-semibold"
+                                title="Ver carpetas"
                             >
-                                <List className="w-3.5 h-3.5" />
+                                <FolderOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                                <span className="truncate max-w-[110px]">{activeFolderObj ? activeFolderObj.name : 'Carpetas'}</span>
+                                <ChevronDown className="w-3 h-3 text-zinc-400 shrink-0" />
                             </button>
+
+                            <div className="hidden md:flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200">
+                                    <FolderOpen className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h2 className="text-sm font-medium tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                        <span>Documentos & Archivos</span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
+                                            {allProjectDocs.length}
+                                        </span>
+                                    </h2>
+                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                                        {activeFolderObj ? `Carpeta: ${activeFolderObj.name}` : 'Todos los documentos, archivos y notas asociadas'}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Nueva Carpeta */}
-                        <button
-                            type="button"
-                            onClick={() => setFolderModal({ isOpen: true, folder: null })}
-                            className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-lg flex items-center gap-1.5 transition-colors"
-                            title="Nueva Carpeta"
-                        >
-                            <FolderPlus className="w-3.5 h-3.5 text-zinc-500" />
-                            <span className="hidden sm:inline">Carpeta</span>
-                        </button>
+                        {/* Acciones principales - Estilo monocromático refinado */}
+                        <div className="flex items-center gap-2">
+                            {/* Buscador */}
+                            <div className="relative">
+                                <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar archivos..."
+                                    value={docSearchText}
+                                    onChange={e => setDocSearchText(e.target.value)}
+                                    className="pl-8 pr-3 py-1.5 text-xs bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-52 transition-colors"
+                                />
+                                {docSearchText && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setDocSearchText('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
 
-                        {/* Subir Archivo */}
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-3 py-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-lg flex items-center gap-1.5 transition-colors"
-                        >
-                            <Upload className="w-3.5 h-3.5 text-zinc-500" />
-                            <span>Subir Archivo</span>
-                        </button>
+                            {/* Conmutador de vista Grid / Table */}
+                            <div className="flex items-center p-0.5 bg-zinc-100 dark:bg-zinc-900 rounded-lg border border-zinc-200/80 dark:border-zinc-800/80">
+                                <button
+                                    type="button"
+                                    onClick={() => setDocViewMode('grid')}
+                                    className={`p-1.5 rounded-md transition-colors ${
+                                        docViewMode === 'grid'
+                                            ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs'
+                                            : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                                    }`}
+                                    title="Vista en Cuadrícula"
+                                >
+                                    <Grid className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setDocViewMode('table')}
+                                    className={`p-1.5 rounded-md transition-colors ${
+                                        docViewMode === 'table'
+                                            ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs'
+                                            : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                                    }`}
+                                    title="Vista en Tabla"
+                                >
+                                    <List className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
 
-                        {/* Nueva Nota - Sincronizada con Módulo de Notas */}
-                        <button
-                            type="button"
-                            onClick={handleCreateProjectNote}
-                            className="px-3 py-1.5 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
-                            title="Crear una nota para este proyecto (asociada al Módulo de Notas)"
-                        >
-                            <FilePlus className="w-3.5 h-3.5" />
-                            <span className="hidden md:inline">Nueva Nota</span>
-                        </button>
+                            {/* Nueva Carpeta */}
+                            <button
+                                type="button"
+                                onClick={() => setFolderModal({ isOpen: true, folder: null })}
+                                className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-lg flex items-center gap-1.5 transition-colors"
+                                title="Nueva Carpeta"
+                            >
+                                <FolderPlus className="w-3.5 h-3.5 text-zinc-500" />
+                                <span className="hidden sm:inline">Carpeta</span>
+                            </button>
+
+                            {/* Subir Archivo */}
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="px-3 py-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-lg flex items-center gap-1.5 transition-colors"
+                            >
+                                <Upload className="w-3.5 h-3.5 text-zinc-500" />
+                                <span>Subir Archivo</span>
+                            </button>
+
+                            {/* Nueva Nota - Sincronizada con Módulo de Notas */}
+                            <button
+                                type="button"
+                                onClick={handleCreateProjectNote}
+                                className="px-3 py-1.5 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+                                title="Crear una nota para este proyecto (asociada al Módulo de Notas)"
+                            >
+                                <FilePlus className="w-3.5 h-3.5" />
+                                <span className="hidden md:inline">Nueva Nota</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* CONTENIDO PRINCIPAL: VISTA DE ARCHIVOS E IMÁGENES */}
                 <div className="w-full flex-1 flex overflow-hidden">
@@ -8100,6 +8243,106 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 className="flex-1 py-3 text-sm font-bold text-white bg-gray-900 dark:bg-white dark:text-black rounded-xl"
                             >
                                 Aplicar
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
+            {/* QUICK ADD BOTTOM SHEET */}
+            {isQuickAddOpen && (
+                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setIsQuickAddOpen(false)} />
+                    <motion.div 
+                        initial={{ y: '100%' }}
+                        animate={{ y: 0 }}
+                        exit={{ y: '100%' }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        className="relative w-full bg-white dark:bg-[#111] rounded-t-3xl shadow-xl max-h-[85vh] flex flex-col z-10"
+                    >
+                        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Agregar al proyecto</h3>
+                            <button onClick={() => setIsQuickAddOpen(false)} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-1 pb-10">
+                            <button 
+                                onClick={() => {
+                                    setIsQuickAddOpen(false);
+                                    setIsAddListItemModalOpen(true);
+                                }}
+                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                                    <CheckSquare className="w-5 h-5" />
+                                </div>
+                                <span>Nueva tarea</span>
+                            </button>
+
+                            <button 
+                                onClick={() => {
+                                    setIsQuickAddOpen(false);
+                                    setActiveTab('chat');
+                                }}
+                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center justify-center">
+                                    <MessageSquare className="w-5 h-5" />
+                                </div>
+                                <span>Mensaje</span>
+                            </button>
+
+                            <button 
+                                onClick={() => {
+                                    setIsQuickAddOpen(false);
+                                    handleCreateProjectNote();
+                                }}
+                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                                    <FileText className="w-5 h-5" />
+                                </div>
+                                <span>Nota</span>
+                            </button>
+
+                            <button 
+                                onClick={() => {
+                                    setIsQuickAddOpen(false);
+                                    fileInputRef.current?.click();
+                                }}
+                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                                    <Paperclip className="w-5 h-5" />
+                                </div>
+                                <span>Archivo</span>
+                            </button>
+
+                            <button 
+                                onClick={() => {
+                                    setIsQuickAddOpen(false);
+                                    setIsExpenseModalOpen(true);
+                                }}
+                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                                    <DollarSign className="w-5 h-5" />
+                                </div>
+                                <span>Gasto</span>
+                            </button>
+
+                            <button 
+                                onClick={() => {
+                                    setIsQuickAddOpen(false);
+                                    setIsTimeModalOpen(true);
+                                }}
+                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                                    <Clock className="w-5 h-5" />
+                                </div>
+                                <span>Registrar tiempo</span>
                             </button>
                         </div>
                     </motion.div>
