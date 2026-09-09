@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectMember, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences, AppNotification } from './types';
+import { Todo, Folder, Background, Playlist, WindowType, WindowState, Subtask, QuickNote, ParticleType, AmbientSoundType, Note, ThemeColors, BrowserSession, SupabaseUser, Priority, Project, ProjectMember, ProjectInvitation, GCalSettings, GoogleCalendar, GoogleCalendarEvent, Habit, HabitRecord, HabitFrequency, CalendarProvider, CalendarIntegrationAccount, FocusSession, PushNotificationPreferences, AppNotification, RecurrenceRule } from './types';
 import { DEFAULT_PUSH_PREFERENCES, syncPreferencesToOneSignal, sendPushNotification, sendSampleNotificationForEvent, NotificationEventType } from './services/pushNotificationService';
 import CompletionModal from './components/CompletionModal';
 import { triggerConfetti } from './utils/confetti';
@@ -729,11 +729,11 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
         const endDate = new Date(endParts[0], endParts[1] - 1, endParts[2]);
 
         if (todayNormalized > endDate) {
-          targetKey = '';
+          targetKey = task.end_date;
         } else if (todayNormalized >= startDate) {
           targetKey = todayKey;
         } else {
-          targetKey = '';
+          targetKey = task.due_date;
         }
       }
 
@@ -3684,10 +3684,15 @@ const App: React.FC = () => {
     project_id?: number | null;
     isUndated?: boolean;
     dueDate?: string | null;
+    endDate?: string;
     startTime?: string;
     endTime?: string;
     priority?: Priority;
     notes?: string;
+    subtasks?: Subtask[];
+    recurrence?: RecurrenceRule;
+    reminder_offset?: Todo['reminder_offset'];
+    reminder_at?: string;
     syncToGoogle?: boolean;
     syncToOutlook?: boolean;
     sprint_id?: string | null;
@@ -3720,12 +3725,17 @@ const App: React.FC = () => {
         completed: false, 
         priority: options?.priority || 'medium', 
         due_date: targetDueDate || null, 
+        end_date: options?.endDate || undefined,
         start_time: options?.startTime || null,
         end_time: options?.endTime || null,
         notes: options?.notes || null,
         user_id: user.id, 
         created_at: new Date().toISOString(), 
-        subtasks: [],
+        subtasks: options?.subtasks || [],
+        recurrence: options?.recurrence || { frequency: 'none' },
+        reminder_offset: options?.reminder_offset,
+        reminder_at: options?.reminder_at,
+        notification_sent: false,
         project_id: projectId,
         sprint_id: options?.sprint_id || null,
         milestone_id: options?.milestone_id || null,

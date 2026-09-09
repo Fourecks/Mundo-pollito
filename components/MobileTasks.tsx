@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Todo, Project, Priority, Subtask, RecurrenceRule, CalendarProvider } from '../types';
+import { NotionService } from '../services/notionService';
 import { 
     CheckCircle2, 
     Circle, 
@@ -21,7 +22,9 @@ import {
     ListTodo, 
     FileText, 
     RefreshCw,
-    X
+    Bell,
+    X,
+    ExternalLink
 } from 'lucide-react';
 import { format, addDays, subDays, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -37,13 +40,16 @@ interface MobileTasksProps {
     onAddTodo?: (text: string, options?: { 
         projectId?: number | null; 
         isUndated?: boolean; 
-        dueDate?: string;
+        dueDate?: string | null;
         endDate?: string;
         priority?: Priority;
         startTime?: string;
         endTime?: string;
         notes?: string;
         subtasks?: Subtask[];
+        recurrence?: RecurrenceRule;
+        reminder_offset?: Todo['reminder_offset'];
+        reminder_at?: string;
     }) => Promise<void> | void;
     onUpdateTodo?: (todo: Todo) => void;
     onDeleteTodo?: (id: number) => void;
@@ -81,13 +87,10 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     selectedDate,
     setSelectedDate,
     toggleTodo,
-    onEditTodo,
     projects = [],
     onAddTodo,
     onUpdateTodo,
     onDeleteTodo,
-    onRemoveFromCalendar,
-    onSyncToCalendar,
     taskToEdit: externalTaskToEdit,
     setTaskToEdit: externalSetTaskToEdit
 }) => {
@@ -99,8 +102,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     // Sync external task to edit if triggered from outside
     useEffect(() => {
         if (externalTaskToEdit) {
-            setActiveEditingTask(externalTaskToEdit);
-            setSubPage('edit');
+            handleOpenEditPage(externalTaskToEdit);
         }
     }, [externalTaskToEdit]);
 
@@ -137,7 +139,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
         return allTodos[selectedDateKey] || [];
     }, [allTodos, tabView, selectedDateKey]);
 
-    // Sorted Tasks: incomplete first, high priority first, then completed
+    // Sorted Tasks
     const sortedTasks = useMemo(() => {
         return [...currentTasks].sort((a, b) => {
             if (a.completed !== b.completed) return a.completed ? 1 : -1;
@@ -155,7 +157,8 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     const undatedCount = (allTodos['undated'] || []).length;
     const datedCount = (allTodos[selectedDateKey] || []).length;
 
-    // --- SUBPAGE: CREATE TASK FORM STATE ---
+    // --- FORM STATES (Unified options for Create & Edit) ---
+    // Create Form State
     const [newTitle, setNewTitle] = useState('');
     const [newPriority, setNewPriority] = useState<Priority>('medium');
     const [newProjectId, setNewProjectId] = useState<number | null>(null);
@@ -163,13 +166,51 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     const [newDueDate, setNewDueDate] = useState(selectedDateKey);
     const [newHasEndDate, setNewHasEndDate] = useState(false);
     const [newEndDate, setNewEndDate] = useState(selectedDateKey);
+    
     const [newHasTime, setNewHasTime] = useState(false);
     const [newStartTime, setNewStartTime] = useState('09:00');
     const [newEndTime, setNewEndTime] = useState('10:00');
+
+    const [newHasReminder, setNewHasReminder] = useState(false);
+    const [newReminderType, setNewReminderType] = useState('0');
+    const [newCustomReminderDate, setNewCustomReminderDate] = useState('');
+    const [newCustomReminderTime, setNewCustomReminderTime] = useState('');
+
+    const [newHasRecurrence, setNewHasRecurrence] = useState(false);
+    const [newRecurrence, setNewRecurrence] = useState<RecurrenceRule>({ frequency: 'none' });
+
     const [newNotes, setNewNotes] = useState('');
     const [newSubtasks, setNewSubtasks] = useState<Subtask[]>([]);
     const [newSubtaskInput, setNewSubtaskInput] = useState('');
     const [isListeningCreate, setIsListeningCreate] = useState(false);
+
+    // Edit Form State
+    const [editTitle, setEditTitle] = useState('');
+    const [editCompleted, setEditCompleted] = useState(false);
+    const [editPriority, setEditPriority] = useState<Priority>('medium');
+    const [editProjectId, setEditProjectId] = useState<number | null>(null);
+    const [editIsUndated, setEditIsUndated] = useState(false);
+    const [editDueDate, setEditDueDate] = useState('');
+    const [editHasEndDate, setEditHasEndDate] = useState(false);
+    const [editEndDate, setEditEndDate] = useState('');
+    
+    const [editHasTime, setEditHasTime] = useState(false);
+    const [editStartTime, setEditStartTime] = useState('');
+    const [editEndTime, setEditEndTime] = useState('');
+
+    const [editHasReminder, setEditHasReminder] = useState(false);
+    const [editReminderType, setEditReminderType] = useState('0');
+    const [editCustomReminderDate, setEditCustomReminderDate] = useState('');
+    const [editCustomReminderTime, setEditCustomReminderTime] = useState('');
+
+    const [editHasRecurrence, setEditHasRecurrence] = useState(false);
+    const [editRecurrence, setEditRecurrence] = useState<RecurrenceRule>({ frequency: 'none' });
+
+    const [editNotes, setEditNotes] = useState('');
+    const [editSubtasks, setEditSubtasks] = useState<Subtask[]>([]);
+    const [editSubtaskInput, setEditSubtaskInput] = useState('');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isLoadingNotionNotes, setIsLoadingNotionNotes] = useState(false);
 
     const handleOpenCreatePage = () => {
         setNewTitle('');
@@ -182,6 +223,12 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
         setNewHasTime(false);
         setNewStartTime('09:00');
         setNewEndTime('10:00');
+        setNewHasReminder(false);
+        setNewReminderType('0');
+        setNewCustomReminderDate('');
+        setNewCustomReminderTime('');
+        setNewHasRecurrence(false);
+        setNewRecurrence({ frequency: 'none' });
         setNewNotes('');
         setNewSubtasks([]);
         setNewSubtaskInput('');
@@ -198,6 +245,16 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
         setNewSubtasks(prev => prev.filter(st => st.id !== id));
     };
 
+    const handleCustomDayToggleCreate = (dayIndex: number) => {
+        setNewRecurrence(prev => {
+            const currentDays = prev.customDays || [];
+            const newDays = currentDays.includes(dayIndex)
+                ? currentDays.filter(d => d !== dayIndex)
+                : [...currentDays, dayIndex];
+            return { ...prev, customDays: newDays.sort((a, b) => a - b) };
+        });
+    };
+
     const handleSaveNewTask = async () => {
         if (!newTitle.trim()) return;
         
@@ -206,38 +263,45 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
             subtasksToSave.push({ id: Date.now(), text: newSubtaskInput.trim(), completed: false });
         }
 
+        let reminder_offset: Todo['reminder_offset'] = undefined;
+        let reminder_at: string | undefined = undefined;
+
+        if (newHasReminder && !newIsUndated) {
+            if (newReminderType === 'custom' && newCustomReminderTime) {
+                const reminderDateStr = newCustomReminderDate || newDueDate;
+                if (reminderDateStr) {
+                    const [year, month, day] = reminderDateStr.split('-').map(Number);
+                    const [hour, minute] = newCustomReminderTime.split(':').map(Number);
+                    const localReminderDate = new Date(year, month - 1, day, hour, minute);
+                    reminder_at = localReminderDate.toISOString();
+                }
+            } else if (newReminderType !== 'custom') {
+                reminder_offset = Number(newReminderType) as Todo['reminder_offset'];
+            }
+        }
+
+        const recurrenceToSave: RecurrenceRule = (newHasRecurrence && !newIsUndated) 
+            ? { ...newRecurrence, id: crypto.randomUUID() } 
+            : { frequency: 'none' };
+
         if (onAddTodo) {
             await onAddTodo(newTitle.trim(), {
                 projectId: newProjectId,
                 isUndated: newIsUndated,
-                dueDate: newIsUndated ? undefined : newDueDate,
+                dueDate: newIsUndated ? null : newDueDate,
                 endDate: newIsUndated || !newHasEndDate ? undefined : newEndDate,
                 priority: newPriority,
                 startTime: newHasTime && !newIsUndated ? newStartTime : undefined,
                 endTime: newHasTime && !newIsUndated ? newEndTime : undefined,
                 notes: newNotes.trim() ? newNotes.trim() : undefined,
-                subtasks: subtasksToSave.length > 0 ? subtasksToSave : undefined
+                subtasks: subtasksToSave.length > 0 ? subtasksToSave : undefined,
+                recurrence: recurrenceToSave,
+                reminder_offset,
+                reminder_at
             });
         }
         handleBackToList();
     };
-
-    // --- SUBPAGE: EDIT TASK FORM STATE ---
-    const [editTitle, setEditTitle] = useState('');
-    const [editCompleted, setEditCompleted] = useState(false);
-    const [editPriority, setEditPriority] = useState<Priority>('medium');
-    const [editProjectId, setEditProjectId] = useState<number | null>(null);
-    const [editIsUndated, setEditIsUndated] = useState(false);
-    const [editDueDate, setEditDueDate] = useState('');
-    const [editHasEndDate, setEditHasEndDate] = useState(false);
-    const [editEndDate, setEditEndDate] = useState('');
-    const [editHasTime, setEditHasTime] = useState(false);
-    const [editStartTime, setEditStartTime] = useState('');
-    const [editEndTime, setEditEndTime] = useState('');
-    const [editNotes, setEditNotes] = useState('');
-    const [editSubtasks, setEditSubtasks] = useState<Subtask[]>([]);
-    const [editSubtaskInput, setEditSubtaskInput] = useState('');
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const handleOpenEditPage = (task: Todo) => {
         setActiveEditingTask(task);
@@ -252,6 +316,32 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
         setEditHasTime(!!task.start_time);
         setEditStartTime(task.start_time || '09:00');
         setEditEndTime(task.end_time || '10:00');
+
+        setEditHasReminder(!!task.reminder_at || !!(task.reminder_offset !== undefined && task.reminder_offset > 0));
+        if (task.reminder_at) {
+            setEditReminderType('custom');
+            try {
+                const d = new Date(task.reminder_at);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const hour = String(d.getHours()).padStart(2, '0');
+                const minute = String(d.getMinutes()).padStart(2, '0');
+                setEditCustomReminderDate(`${year}-${month}-${day}`);
+                setEditCustomReminderTime(`${hour}:${minute}`);
+            } catch (e) {
+                setEditCustomReminderDate('');
+                setEditCustomReminderTime('');
+            }
+        } else {
+            setEditReminderType(String(task.reminder_offset || '0'));
+            setEditCustomReminderDate('');
+            setEditCustomReminderTime('');
+        }
+
+        setEditHasRecurrence(task.recurrence?.frequency !== 'none' && !!task.recurrence);
+        setEditRecurrence(task.recurrence || { frequency: 'none' });
+
         setEditNotes(task.notes || '');
         setEditSubtasks(task.subtasks || []);
         setEditSubtaskInput('');
@@ -273,6 +363,31 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
         setEditSubtasks(prev => prev.filter(st => st.id !== id));
     };
 
+    const handleCustomDayToggleEdit = (dayIndex: number) => {
+        setEditRecurrence(prev => {
+            const currentDays = prev.customDays || [];
+            const newDays = currentDays.includes(dayIndex)
+                ? currentDays.filter(d => d !== dayIndex)
+                : [...currentDays, dayIndex];
+            return { ...prev, customDays: newDays.sort((a, b) => a - b) };
+        });
+    };
+
+    const handleFetchNotionNotes = async () => {
+        if (!activeEditingTask?.notion_page_id) return;
+        setIsLoadingNotionNotes(true);
+        try {
+            const pageNotes = await NotionService.getPageNotes(activeEditingTask.notion_page_id);
+            if (pageNotes) {
+                setEditNotes(prev => prev ? `${prev}\n\n[Notas de Notion]\n${pageNotes}` : pageNotes);
+            }
+        } catch (error) {
+            console.error("Error fetching Notion notes:", error);
+        } finally {
+            setIsLoadingNotionNotes(false);
+        }
+    };
+
     const handleSaveEditTask = () => {
         if (!activeEditingTask || !editTitle.trim()) return;
 
@@ -280,6 +395,27 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
         if (editSubtaskInput.trim()) {
             subtasksToSave.push({ id: Date.now(), text: editSubtaskInput.trim(), completed: false });
         }
+
+        let reminder_offset: Todo['reminder_offset'] = undefined;
+        let reminder_at: string | undefined = undefined;
+
+        if (editHasReminder && !editIsUndated) {
+            if (editReminderType === 'custom' && editCustomReminderTime) {
+                const reminderDateStr = editCustomReminderDate || editDueDate;
+                if (reminderDateStr) {
+                    const [year, month, day] = reminderDateStr.split('-').map(Number);
+                    const [hour, minute] = editCustomReminderTime.split(':').map(Number);
+                    const localReminderDate = new Date(year, month - 1, day, hour, minute);
+                    reminder_at = localReminderDate.toISOString();
+                }
+            } else if (editReminderType !== 'custom') {
+                reminder_offset = Number(editReminderType) as Todo['reminder_offset'];
+            }
+        }
+
+        const recurrenceToSave: RecurrenceRule = (editHasRecurrence && !editIsUndated) 
+            ? { ...editRecurrence, id: editRecurrence.id || crypto.randomUUID() } 
+            : { frequency: 'none' };
 
         const updatedTask: Todo = {
             ...activeEditingTask,
@@ -292,7 +428,13 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
             start_time: editHasTime && !editIsUndated ? editStartTime : undefined,
             end_time: editHasTime && !editIsUndated ? editEndTime : undefined,
             notes: editNotes.trim() ? editNotes.trim() : undefined,
-            subtasks: subtasksToSave
+            subtasks: subtasksToSave,
+            recurrence: recurrenceToSave,
+            reminder_offset,
+            reminder_at,
+            notification_sent: (activeEditingTask.reminder_at !== reminder_at || activeEditingTask.reminder_offset !== reminder_offset) 
+                ? false 
+                : activeEditingTask.notification_sent
         };
 
         if (onUpdateTodo) {
@@ -332,14 +474,17 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
         }
     };
 
+    // Day labels
+    const dayLabels = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
+
     // ==========================================
     // PAGE 2: CREATE TASK (PÁGINA NUEVA TAREA)
     // ==========================================
     if (subPage === 'create') {
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-32">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
                 {/* Sticky Top Header */}
-                <div className="sticky top-0 z-40 bg-white/90 dark:bg-black/90 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
                         type="button"
                         onClick={handleBackToList}
@@ -353,14 +498,14 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         type="button"
                         onClick={handleSaveNewTask}
                         disabled={!newTitle.trim()}
-                        className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-all shadow-xs"
+                        className="text-xs font-bold px-4 py-1.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-all shadow-xs"
                     >
                         Guardar
                     </button>
                 </div>
 
                 {/* Form Content */}
-                <div className="flex-1 px-5 pt-5 space-y-6 max-w-lg mx-auto w-full">
+                <div className="flex-1 px-4 sm:px-6 pt-5 space-y-4 max-w-lg mx-auto w-full box-border">
                     {/* Title and Voice Recognition */}
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Título de la Tarea</label>
@@ -371,50 +516,50 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                 placeholder="¿Qué necesitas hacer?"
                                 rows={2}
                                 autoFocus
-                                className="w-full px-4 py-3 text-base rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 focus:outline-hidden focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition-all resize-none text-zinc-900 dark:text-zinc-50 placeholder-zinc-400"
+                                className="w-full box-border px-3.5 py-2.5 pr-12 text-sm font-medium rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 focus:outline-hidden focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition-all resize-none text-zinc-900 dark:text-zinc-50 placeholder-zinc-400"
                             />
                             <button
                                 type="button"
                                 onClick={() => toggleSpeechRecognition('create')}
-                                className={`absolute right-3 bottom-3 p-2 rounded-xl transition-colors ${
+                                className={`absolute right-3 bottom-3 p-1.5 rounded-xl transition-colors ${
                                     isListeningCreate 
                                         ? 'bg-red-500 text-white animate-pulse' 
                                         : 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
                                 }`}
                                 title="Dictar por voz"
                             >
-                                {isListeningCreate ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                                {isListeningCreate ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                             </button>
                         </div>
                     </div>
 
-                    {/* Fecha y Rango de Días */}
-                    <div className="p-4 rounded-2xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 space-y-3">
+                    {/* Fecha y Rango de Días (Grounded & Box-fitted) */}
+                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2.5 box-border w-full overflow-hidden">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                                <CalendarIcon className="w-4 h-4 text-zinc-500" />
-                                <span>Asignación de Fecha</span>
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                <CalendarIcon className="w-3.5 h-3.5 text-zinc-500" />
+                                <span>Fecha</span>
                             </div>
-                            <label className="flex items-center gap-2 text-xs cursor-pointer text-zinc-500">
+                            <label className="flex items-center gap-1.5 text-xs cursor-pointer text-zinc-500">
                                 <input 
                                     type="checkbox" 
                                     checked={newIsUndated} 
                                     onChange={e => setNewIsUndated(e.target.checked)}
-                                    className="rounded-md border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-0"
+                                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-0 w-3.5 h-3.5"
                                 />
                                 <span>Sin fecha</span>
                             </label>
                         </div>
 
                         {!newIsUndated && (
-                            <div className="space-y-3 pt-1">
+                            <div className="space-y-2.5 pt-1">
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-500">Tipo de asignación</span>
+                                    <span className="text-zinc-500 text-[11px]">Tipo de asignación</span>
                                     <div className="flex bg-zinc-200/60 dark:bg-zinc-800 p-0.5 rounded-xl">
                                         <button
                                             type="button"
                                             onClick={() => setNewHasEndDate(false)}
-                                            className={`px-2.5 py-1 rounded-lg font-medium transition-all ${!newHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
+                                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${!newHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
                                         >
                                             Día único
                                         </button>
@@ -424,59 +569,212 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                                 setNewHasEndDate(true);
                                                 if (!newEndDate) setNewEndDate(newDueDate);
                                             }}
-                                            className={`px-2.5 py-1 rounded-lg font-medium transition-all ${newHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
+                                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${newHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
                                         >
                                             Rango de días
                                         </button>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                    <div>
-                                        <span className="text-[11px] font-semibold text-zinc-500 block mb-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] font-semibold text-zinc-500 block mb-1">
                                             {newHasEndDate ? 'Fecha de inicio' : 'Fecha'}
                                         </span>
                                         <input 
                                             type="date"
                                             value={newDueDate}
                                             onChange={e => setNewDueDate(e.target.value)}
-                                            className="w-full px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
+                                            className="w-full box-border px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
                                         />
                                     </div>
 
                                     {newHasEndDate && (
-                                        <div>
-                                            <span className="text-[11px] font-semibold text-zinc-500 block mb-1">Fecha de término</span>
+                                        <div className="min-w-0">
+                                            <span className="text-[10px] font-semibold text-zinc-500 block mb-1">Fecha de término</span>
                                             <input 
                                                 type="date"
                                                 value={newEndDate}
                                                 min={newDueDate}
                                                 onChange={e => setNewEndDate(e.target.value)}
-                                                className="w-full px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
+                                                className="w-full box-border px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
                                             />
                                         </div>
                                     )}
                                 </div>
 
                                 {newHasEndDate && (
-                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/60 p-2 rounded-xl">
-                                        ✨ Si la tarea no se completa, pasará automáticamente al día siguiente hasta completarse o alcanzar la fecha final.
+                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/60 p-2 rounded-xl">
+                                        ✨ Si la tarea no se completa, avanzará automáticamente día a día hasta completarse o alcanzar la fecha final.
                                     </p>
                                 )}
                             </div>
                         )}
                     </div>
 
+                    {/* Horario (Añadir Hora) */}
+                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                                <span>Añadir Hora</span>
+                            </span>
+                            <input 
+                                type="checkbox" 
+                                checked={newHasTime} 
+                                onChange={e => setNewHasTime(e.target.checked)} 
+                                disabled={newIsUndated}
+                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                            />
+                        </div>
+
+                        {newHasTime && !newIsUndated && (
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                <div className="min-w-0">
+                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Inicio</label>
+                                    <input 
+                                        type="time" 
+                                        value={newStartTime} 
+                                        onChange={e => setNewStartTime(e.target.value)} 
+                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
+                                    />
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Fin (opcional)</label>
+                                    <input 
+                                        type="time" 
+                                        value={newEndTime} 
+                                        onChange={e => setNewEndTime(e.target.value)} 
+                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Recordatorio */}
+                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                <Bell className="w-3.5 h-3.5 text-zinc-400" />
+                                <span>Recordatorio</span>
+                            </span>
+                            <input 
+                                type="checkbox" 
+                                checked={newHasReminder} 
+                                onChange={e => setNewHasReminder(e.target.checked)} 
+                                disabled={newIsUndated}
+                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                            />
+                        </div>
+
+                        {newHasReminder && !newIsUndated && (
+                            <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                <select 
+                                    value={newReminderType} 
+                                    onChange={e => setNewReminderType(e.target.value)} 
+                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                >
+                                    <option value="0">En el momento de la tarea</option>
+                                    <option value="10">10 minutos antes</option>
+                                    <option value="30">30 minutos antes</option>
+                                    <option value="60">1 hora antes</option>
+                                    <option value="1440">1 día antes</option>
+                                    <option value="custom">Personalizado...</option>
+                                </select>
+
+                                {newReminderType === 'custom' && (
+                                    <div className="grid grid-cols-2 gap-2 w-full">
+                                        <input 
+                                            type="date" 
+                                            value={newCustomReminderDate} 
+                                            onChange={e => setNewCustomReminderDate(e.target.value)} 
+                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                        />
+                                        <input 
+                                            type="time" 
+                                            value={newCustomReminderTime} 
+                                            onChange={e => setNewCustomReminderTime(e.target.value)} 
+                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Repetir tarea (Recurrencia) */}
+                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                                <span>Repetir tarea</span>
+                            </span>
+                            <input 
+                                type="checkbox" 
+                                checked={newHasRecurrence} 
+                                onChange={e => setNewHasRecurrence(e.target.checked)} 
+                                disabled={newIsUndated}
+                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                            />
+                        </div>
+
+                        {newHasRecurrence && !newIsUndated && (
+                            <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                <select 
+                                    value={newRecurrence?.frequency || 'none'} 
+                                    onChange={e => setNewRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
+                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                >
+                                    <option value="none">Nunca</option>
+                                    <option value="daily">Diariamente</option>
+                                    <option value="weekly">Semanalmente</option>
+                                    <option value="custom">Días específicos</option>
+                                </select>
+
+                                {newRecurrence.frequency === 'custom' && (
+                                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full box-border">
+                                        {dayLabels.map((dayLabel, index) => {
+                                            const isSelected = newRecurrence.customDays?.includes(index);
+                                            return (
+                                                <button 
+                                                    key={index} 
+                                                    type="button" 
+                                                    onClick={() => handleCustomDayToggleCreate(index)} 
+                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                        isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                                    }`}
+                                                >
+                                                    {dayLabel}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                <div className="w-full">
+                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
+                                    <input 
+                                        type="date" 
+                                        value={newRecurrence?.ends_on || ''} 
+                                        onChange={e => setNewRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
+                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Prioridad */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Prioridad</label>
                         <div className="grid grid-cols-3 gap-2">
                             {(['low', 'medium', 'high'] as Priority[]).map(p => {
                                 const labels: Record<Priority, string> = { low: 'Baja', medium: 'Media', high: 'Alta' };
                                 const colors: Record<Priority, string> = {
-                                    low: 'text-zinc-500 border-zinc-200 dark:border-zinc-800',
-                                    medium: 'text-amber-500 border-amber-300 dark:border-amber-800/80',
-                                    high: 'text-rose-500 border-rose-300 dark:border-rose-800/80'
+                                    low: 'text-zinc-500',
+                                    medium: 'text-amber-500',
+                                    high: 'text-rose-500'
                                 };
                                 const activeStyles: Record<Priority, string> = {
                                     low: 'bg-zinc-100 dark:bg-zinc-900 border-zinc-400 dark:border-zinc-600 font-bold',
@@ -491,11 +789,11 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                         key={p}
                                         type="button"
                                         onClick={() => setNewPriority(p)}
-                                        className={`py-2.5 px-3 rounded-2xl border text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
+                                        className={`py-2 px-2.5 rounded-2xl border text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
                                             isSelected ? activeStyles[p] : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-500'
                                         }`}
                                     >
-                                        <Flag className={`w-3.5 h-3.5 ${colors[p]}`} />
+                                        <Flag className={`w-3 h-3 ${colors[p]}`} />
                                         <span>{labels[p]}</span>
                                     </button>
                                 );
@@ -505,12 +803,12 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
 
                     {/* Proyecto */}
                     {projects.length > 0 && (
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Proyecto</label>
                             <select
                                 value={newProjectId || ''}
                                 onChange={e => setNewProjectId(e.target.value ? Number(e.target.value) : null)}
-                                className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
+                                className="w-full box-border px-3.5 py-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
                             >
                                 <option value="">Sin proyecto asociado</option>
                                 {projects.map(pr => (
@@ -532,12 +830,12 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                 onChange={e => setNewSubtaskInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtaskCreate(); } }}
                                 placeholder="Añadir paso o subtarea..."
-                                className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                className="flex-1 box-border px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
                             />
                             <button
                                 type="button"
                                 onClick={handleAddSubtaskCreate}
-                                className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95"
+                                className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95 shrink-0"
                             >
                                 Añadir
                             </button>
@@ -567,9 +865,9 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         <textarea 
                             value={newNotes}
                             onChange={e => setNewNotes(e.target.value)}
-                            placeholder="Detalles, enlaces o recordatorios..."
+                            placeholder="Detalles, enlaces o notas..."
                             rows={3}
-                            className="w-full px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
+                            className="w-full box-border px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
                         />
                     </div>
                 </div>
@@ -582,9 +880,9 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     // ==========================================
     if (subPage === 'edit' && activeEditingTask) {
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-32">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
                 {/* Sticky Top Header */}
-                <div className="sticky top-0 z-40 bg-white/90 dark:bg-black/90 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
                         type="button"
                         onClick={handleBackToList}
@@ -598,20 +896,21 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         type="button"
                         onClick={handleSaveEditTask}
                         disabled={!editTitle.trim()}
-                        className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-all shadow-xs"
+                        className="text-xs font-bold px-4 py-1.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-all shadow-xs"
                     >
                         Guardar
                     </button>
                 </div>
 
                 {/* Form Content */}
-                <div className="flex-1 px-5 pt-5 space-y-6 max-w-lg mx-auto w-full">
+                <div className="flex-1 px-4 sm:px-6 pt-5 space-y-4 max-w-lg mx-auto w-full box-border">
                     {/* Status Toggle & Title */}
                     <div className="flex items-start gap-3">
                         <button
                             type="button"
                             onClick={() => setEditCompleted(!editCompleted)}
                             className="mt-1 shrink-0"
+                            aria-label="Alternar estado completado"
                         >
                             {editCompleted ? (
                                 <CheckCircle2 className="w-7 h-7 text-emerald-500 fill-emerald-500/20" />
@@ -619,12 +918,12 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                 <Circle className="w-7 h-7 text-zinc-300 dark:text-zinc-700" />
                             )}
                         </button>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                             <textarea 
                                 value={editTitle}
                                 onChange={e => setEditTitle(e.target.value)}
                                 rows={2}
-                                className={`w-full px-3.5 py-2.5 text-base font-semibold rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden ${
+                                className={`w-full box-border px-3.5 py-2.5 text-sm font-semibold rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden ${
                                     editCompleted ? 'line-through text-zinc-400' : ''
                                 }`}
                             />
@@ -632,32 +931,32 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                     </div>
 
                     {/* Fecha y Rango de Días */}
-                    <div className="p-4 rounded-2xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 space-y-3">
+                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2.5 box-border w-full overflow-hidden">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                                <CalendarIcon className="w-4 h-4 text-zinc-500" />
-                                <span>Asignación de Fecha</span>
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                <CalendarIcon className="w-3.5 h-3.5 text-zinc-500" />
+                                <span>Fecha</span>
                             </div>
-                            <label className="flex items-center gap-2 text-xs cursor-pointer text-zinc-500">
+                            <label className="flex items-center gap-1.5 text-xs cursor-pointer text-zinc-500">
                                 <input 
                                     type="checkbox" 
                                     checked={editIsUndated} 
                                     onChange={e => setEditIsUndated(e.target.checked)}
-                                    className="rounded-md border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-0"
+                                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-0 w-3.5 h-3.5"
                                 />
                                 <span>Sin fecha</span>
                             </label>
                         </div>
 
                         {!editIsUndated && (
-                            <div className="space-y-3 pt-1">
+                            <div className="space-y-2.5 pt-1">
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-500">Tipo de asignación</span>
+                                    <span className="text-zinc-500 text-[11px]">Tipo de asignación</span>
                                     <div className="flex bg-zinc-200/60 dark:bg-zinc-800 p-0.5 rounded-xl">
                                         <button
                                             type="button"
                                             onClick={() => setEditHasEndDate(false)}
-                                            className={`px-2.5 py-1 rounded-lg font-medium transition-all ${!editHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
+                                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${!editHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
                                         >
                                             Día único
                                         </button>
@@ -667,59 +966,212 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                                 setEditHasEndDate(true);
                                                 if (!editEndDate) setEditEndDate(editDueDate || selectedDateKey);
                                             }}
-                                            className={`px-2.5 py-1 rounded-lg font-medium transition-all ${editHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
+                                            className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${editHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
                                         >
                                             Rango de días
                                         </button>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                    <div>
-                                        <span className="text-[11px] font-semibold text-zinc-500 block mb-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] font-semibold text-zinc-500 block mb-1">
                                             {editHasEndDate ? 'Fecha de inicio' : 'Fecha'}
                                         </span>
                                         <input 
                                             type="date"
                                             value={editDueDate || ''}
                                             onChange={e => setEditDueDate(e.target.value)}
-                                            className="w-full px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
+                                            className="w-full box-border px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
                                         />
                                     </div>
 
                                     {editHasEndDate && (
-                                        <div>
-                                            <span className="text-[11px] font-semibold text-zinc-500 block mb-1">Fecha de término</span>
+                                        <div className="min-w-0">
+                                            <span className="text-[10px] font-semibold text-zinc-500 block mb-1">Fecha de término</span>
                                             <input 
                                                 type="date"
                                                 value={editEndDate || ''}
                                                 min={editDueDate || undefined}
                                                 onChange={e => setEditEndDate(e.target.value)}
-                                                className="w-full px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
+                                                className="w-full box-border px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
                                             />
                                         </div>
                                     )}
                                 </div>
 
                                 {editHasEndDate && (
-                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/60 p-2 rounded-xl">
-                                        ✨ Si la tarea no se completa, pasará automáticamente al día siguiente hasta completarse o alcanzar la fecha final.
+                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/60 p-2 rounded-xl">
+                                        ✨ Si la tarea no se completa, avanzará automáticamente día a día hasta completarse o alcanzar la fecha final.
                                     </p>
                                 )}
                             </div>
                         )}
                     </div>
 
+                    {/* Horario (Añadir Hora) */}
+                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                                <span>Añadir Hora</span>
+                            </span>
+                            <input 
+                                type="checkbox" 
+                                checked={editHasTime} 
+                                onChange={e => setEditHasTime(e.target.checked)} 
+                                disabled={editIsUndated}
+                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                            />
+                        </div>
+
+                        {editHasTime && !editIsUndated && (
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                <div className="min-w-0">
+                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Inicio</label>
+                                    <input 
+                                        type="time" 
+                                        value={editStartTime} 
+                                        onChange={e => setEditStartTime(e.target.value)} 
+                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
+                                    />
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Fin (opcional)</label>
+                                    <input 
+                                        type="time" 
+                                        value={editEndTime} 
+                                        onChange={e => setEditEndTime(e.target.value)} 
+                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Recordatorio */}
+                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                <Bell className="w-3.5 h-3.5 text-zinc-400" />
+                                <span>Recordatorio</span>
+                            </span>
+                            <input 
+                                type="checkbox" 
+                                checked={editHasReminder} 
+                                onChange={e => setEditHasReminder(e.target.checked)} 
+                                disabled={editIsUndated}
+                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                            />
+                        </div>
+
+                        {editHasReminder && !editIsUndated && (
+                            <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                <select 
+                                    value={editReminderType} 
+                                    onChange={e => setEditReminderType(e.target.value)} 
+                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                >
+                                    <option value="0">En el momento de la tarea</option>
+                                    <option value="10">10 minutos antes</option>
+                                    <option value="30">30 minutos antes</option>
+                                    <option value="60">1 hora antes</option>
+                                    <option value="1440">1 día antes</option>
+                                    <option value="custom">Personalizado...</option>
+                                </select>
+
+                                {editReminderType === 'custom' && (
+                                    <div className="grid grid-cols-2 gap-2 w-full">
+                                        <input 
+                                            type="date" 
+                                            value={editCustomReminderDate} 
+                                            onChange={e => setEditCustomReminderDate(e.target.value)} 
+                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                        />
+                                        <input 
+                                            type="time" 
+                                            value={editCustomReminderTime} 
+                                            onChange={e => setEditCustomReminderTime(e.target.value)} 
+                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Repetir tarea (Recurrencia) */}
+                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                                <span>Repetir tarea</span>
+                            </span>
+                            <input 
+                                type="checkbox" 
+                                checked={editHasRecurrence} 
+                                onChange={e => setEditHasRecurrence(e.target.checked)} 
+                                disabled={editIsUndated}
+                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                            />
+                        </div>
+
+                        {editHasRecurrence && !editIsUndated && (
+                            <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                <select 
+                                    value={editRecurrence?.frequency || 'none'} 
+                                    onChange={e => setEditRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
+                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                >
+                                    <option value="none">Nunca</option>
+                                    <option value="daily">Diariamente</option>
+                                    <option value="weekly">Semanalmente</option>
+                                    <option value="custom">Días específicos</option>
+                                </select>
+
+                                {editRecurrence.frequency === 'custom' && (
+                                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full box-border">
+                                        {dayLabels.map((dayLabel, index) => {
+                                            const isSelected = editRecurrence.customDays?.includes(index);
+                                            return (
+                                                <button 
+                                                    key={index} 
+                                                    type="button" 
+                                                    onClick={() => handleCustomDayToggleEdit(index)} 
+                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                        isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                                    }`}
+                                                >
+                                                    {dayLabel}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                <div className="w-full">
+                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
+                                    <input 
+                                        type="date" 
+                                        value={editRecurrence?.ends_on || ''} 
+                                        onChange={e => setEditRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
+                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Prioridad */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Prioridad</label>
                         <div className="grid grid-cols-3 gap-2">
                             {(['low', 'medium', 'high'] as Priority[]).map(p => {
                                 const labels: Record<Priority, string> = { low: 'Baja', medium: 'Media', high: 'Alta' };
                                 const colors: Record<Priority, string> = {
-                                    low: 'text-zinc-500 border-zinc-200 dark:border-zinc-800',
-                                    medium: 'text-amber-500 border-amber-300 dark:border-amber-800/80',
-                                    high: 'text-rose-500 border-rose-300 dark:border-rose-800/80'
+                                    low: 'text-zinc-500',
+                                    medium: 'text-amber-500',
+                                    high: 'text-rose-500'
                                 };
                                 const activeStyles: Record<Priority, string> = {
                                     low: 'bg-zinc-100 dark:bg-zinc-900 border-zinc-400 dark:border-zinc-600 font-bold',
@@ -734,11 +1186,11 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                         key={p}
                                         type="button"
                                         onClick={() => setEditPriority(p)}
-                                        className={`py-2.5 px-3 rounded-2xl border text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
+                                        className={`py-2 px-2.5 rounded-2xl border text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
                                             isSelected ? activeStyles[p] : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-500'
                                         }`}
                                     >
-                                        <Flag className={`w-3.5 h-3.5 ${colors[p]}`} />
+                                        <Flag className={`w-3 h-3 ${colors[p]}`} />
                                         <span>{labels[p]}</span>
                                     </button>
                                 );
@@ -748,12 +1200,12 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
 
                     {/* Proyecto */}
                     {projects.length > 0 && (
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Proyecto</label>
                             <select
                                 value={editProjectId || ''}
                                 onChange={e => setEditProjectId(e.target.value ? Number(e.target.value) : null)}
-                                className="w-full px-3.5 py-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
+                                className="w-full box-border px-3.5 py-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
                             >
                                 <option value="">Sin proyecto asociado</option>
                                 {projects.map(pr => (
@@ -775,12 +1227,12 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                 onChange={e => setEditSubtaskInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtaskEdit(); } }}
                                 placeholder="Añadir paso o subtarea..."
-                                className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                className="flex-1 box-border px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
                             />
                             <button
                                 type="button"
                                 onClick={handleAddSubtaskEdit}
-                                className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95"
+                                className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95 shrink-0"
                             >
                                 Añadir
                             </button>
@@ -819,13 +1271,26 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
 
                     {/* Notas */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas</label>
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas</label>
+                            {activeEditingTask?.notion_page_id && (
+                                <button
+                                    type="button"
+                                    onClick={handleFetchNotionNotes}
+                                    disabled={isLoadingNotionNotes}
+                                    className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1 disabled:opacity-50"
+                                >
+                                    <ExternalLink className="w-3 h-3" />
+                                    <span>{isLoadingNotionNotes ? 'Cargando...' : 'Ver notas de Notion'}</span>
+                                </button>
+                            )}
+                        </div>
                         <textarea 
                             value={editNotes}
                             onChange={e => setEditNotes(e.target.value)}
                             placeholder="Detalles de la tarea..."
                             rows={3}
-                            className="w-full px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
+                            className="w-full box-border px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
                         />
                     </div>
 

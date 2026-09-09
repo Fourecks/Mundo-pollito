@@ -187,48 +187,48 @@ const calculateLongestStreak = (habit: Habit, records: HabitRecord[]): number =>
     return maxStreak;
 };
 
-// Curated categorized emoji collections
+// Curated categorized emoji collections with 200+ emojis
 export const EMOJI_CATEGORIES = [
     {
         id: 'all',
         label: 'Todos',
         emojis: [
-            // Agua y Fitness
-            '💧', '🏃', '🚴', '🏋️', '🧘', '🏊', '🤸', '🧗', '🚶', '🥊', '⚽', '🏀', '🎾', '⛹️', '🥋', '💪', '🩺', '💊',
-            // Nutrición
-            '🥗', '🥑', '🍎', '🍌', '🥦', '🥕', '🧃', '🍵', '☕', '🫖', '🍳', '🥜', '🍇', '🍉', '🍊', '🍓', '🫐', '🥒', '🥩', '🥚',
+            // Fitness & Deporte
+            '💧', '🏃', '🚴', '🏋️', '🧘', '🏊', '🤸', '🧗', '🚶', '🥊', '⚽', '🏀', '🎾', '⛹️', '🥋', '💪', '🩺', '💊', '🫀', '🎽', '🛹', '🏓', '🏸', '🏊‍♂️', '🤽', '🚣',
+            // Nutrición & Dieta
+            '🥗', '🥑', '🍎', '🍌', '🥦', '🥕', '🧃', '🍵', '☕', '🫖', '🍳', '🥜', '🍇', '🍉', '🍊', '🍓', '🫐', '🥒', '🥩', '🥚', '🥝', '🥣', '🍍', '🥥', '🥛', '🍯',
             // Mente & Estudio
-            '📚', '✍️', '🧠', '🎯', '💡', '📖', '🎓', '💻', '🎨', '♟️', '🧩', '📝', '🔍', '🎧', '🎻', '🎹', '🧘‍♂️', '🕯️', '🗣️', '🌍',
+            '📚', '✍️', '🧠', '🎯', '💡', '📖', '🎓', '💻', '🎨', '♟️', '🧩', '📝', '🔍', '🎧', '🎻', '🎹', '🧘‍♂️', '🕯️', '🗣️', '🌍', '📐', '🔬', '🔭', '📜', '🖊️', '💡',
             // Rutinas & Hogar
-            '⏰', '📅', '⏱️', '📋', '☀️', '🌙', '🌅', '🧹', '🚿', '🪥', '🪴', '🐶', '🐱', '💰', '💳', '🚫', '🚭', '✨', '🌱', '🏆',
+            '⏰', '📅', '⏱️', '📋', '☀️', '🌙', '🌅', '🧹', '🚿', '🪥', '🪴', '🐶', '🐱', '💰', '💳', '🚫', '🚭', '✨', '🌱', '🏆', '🎒', '🚪', '🧺', '🪟', '🔑', '🪴',
             // Bienestar & Sueño
-            '💤', '🛌', '🛀', '🧖', '💆', '❤️', '🔥', '⭐', '🚀', '🌺', '🍀', '🌈', '🕊️', '🧘‍♀️', '🪞', '🧴'
+            '💤', '🛌', '🛀', '🧖', '💆', '❤️', '🔥', '⭐', '🚀', '🌺', '🍀', '🌈', '🕊️', '🧘‍♀️', '🪞', '🧴', '🛋️', '🌻', '🌸', '🌿', '🍃', '☀️', '🕯️', '🫁'
         ]
     },
     {
         id: 'fitness',
-        label: 'Salud & Fitness',
-        emojis: ['💧', '🏃', '🚴', '🏋️', '🧘', '🏊', '🤸', '🧗', '🚶', '🥊', '⚽', '🏀', '🎾', '⛹️', '🥋', '💪', '🩺', '💊', '🫀', '🩹', '🎽']
+        label: 'Salud & Deporte',
+        emojis: ['💧', '🏃', '🚴', '🏋️', '🧘', '🏊', '🤸', '🧗', '🚶', '🥊', '⚽', '🏀', '🎾', '⛹️', '🥋', '💪', '🩺', '💊', '🫀', '🎽', '🛹', '🏓', '🏸', '🏊‍♂️', '🤽', '🚣', '🫁', '🩻', '🩹']
     },
     {
         id: 'nutrition',
         label: 'Nutrición',
-        emojis: ['🥗', '🥑', '🍎', '🍌', '🥦', '🥕', '🧃', '🍵', '☕', '🫖', '🍳', '🥜', '🍇', '🍉', '🍊', '🍓', '🫐', '🥒', '🥩', '🥚', '🥝', '🥣']
+        emojis: ['🥗', '🥑', '🍎', '🍌', '🥦', '🥕', '🧃', '🍵', '☕', '🫖', '🍳', '🥜', '🍇', '🍉', '🍊', '🍓', '🫐', '🥒', '🥩', '🥚', '🥝', '🥣', '🍍', '🥥', '🥛', '🍯', '🍞', '🍋', '🧄']
     },
     {
         id: 'mind',
         label: 'Mente & Foco',
-        emojis: ['📚', '✍️', '🧠', '🎯', '💡', '📖', '🎓', '💻', '🎨', '♟️', '🧩', '📝', '🔍', '🎧', '🎻', '🎹', '🧘‍♂️', '🕯️', '🗣️', '🌍', '📐', '🔬']
+        emojis: ['📚', '✍️', '🧠', '🎯', '💡', '📖', '🎓', '💻', '🎨', '♟️', '🧩', '📝', '🔍', '🎧', '🎻', '🎹', '🧘‍♂️', '🕯️', '🗣️', '🌍', '📐', '🔬', '🔭', '📜', '🖊️', '🎸', '🥁']
     },
     {
         id: 'routines',
-        label: 'Rutinas & Hogar',
-        emojis: ['⏰', '📅', '⏱️', '📋', '☀️', '🌙', '🌅', '🧹', '🚿', '🪥', '🪴', '🐶', '🐱', '💰', '💳', '🚫', '🚭', '✨', '🌱', '🏆', '🎒', '🚪']
+        label: 'Rutinas & Casa',
+        emojis: ['⏰', '📅', '⏱️', '📋', '☀️', '🌙', '🌅', '🧹', '🚿', '🪥', '🪴', '🐶', '🐱', '💰', '💳', '🚫', '🚭', '✨', '🌱', '🏆', '🎒', '🚪', '🧺', '🪟', '🔑', '🏷️', '📦']
     },
     {
         id: 'wellness',
         label: 'Bienestar & Sueño',
-        emojis: ['💤', '🛌', '🛀', '🧖', '💆', '❤️', '🔥', '⭐', '🚀', '🌺', '🍀', '🌈', '🕊️', '🧘‍♀️', '🪞', '🧴', '🛋️', '🕯️', '🌻']
+        emojis: ['💤', '🛌', '🛀', '🧖', '💆', '❤️', '🔥', '⭐', '🚀', '🌺', '🍀', '🌈', '🕊️', '🧘‍♀️', '🪞', '🧴', '🛋️', '🌻', '🌸', '🌿', '🍃', '☀️', '🕯️', '🫁', '⛅', '🌊']
     }
 ];
 
@@ -399,13 +399,13 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
         const weekRangeLabel = `${format(weeklyWeekStart, 'd MMM', { locale: es })} - ${format(weekEnd, 'd MMM', { locale: es })}`;
 
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-32">
-                {/* Header */}
-                <div className="sticky top-0 z-40 bg-white/90 dark:bg-black/90 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
+                {/* Header - Starts high up */}
+                <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
                         type="button"
                         onClick={() => setSubPage('main')}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors"
+                        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2 py-1 rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />
                         <span>Atrás</span>
@@ -420,9 +420,9 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                     </button>
                 </div>
 
-                <div className="flex-1 px-4 pt-4 space-y-4 max-w-lg mx-auto w-full">
+                <div className="flex-1 px-4 pt-2.5 space-y-3.5 max-w-lg mx-auto w-full">
                     {/* Week Navigator */}
-                    <div className="flex items-center justify-between bg-zinc-100/80 dark:bg-zinc-900/80 p-2 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60">
+                    <div className="flex items-center justify-between bg-zinc-100/80 dark:bg-zinc-900/80 p-1.5 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60">
                         <button 
                             type="button"
                             onClick={handlePrevWeek}
@@ -448,11 +448,12 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                     <div className="space-y-3">
                         {habits.map(habit => {
                             const streak = calculateStreak(habit, records);
+                            const isCompletedToday = isHabitCompletedOnDate(habit.id, todayDateKey);
 
                             return (
                                 <div 
                                     key={habit.id}
-                                    className="p-4 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3"
+                                    className="p-3.5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-2.5"
                                 >
                                     {/* Habit Top Info */}
                                     <div className="flex items-center justify-between">
@@ -462,7 +463,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                                 <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{habit.name}</h3>
                                                 <span className="text-[10px] text-zinc-400 font-medium">
                                                     {habit.frequency.type === 'daily' && 'Diario'}
-                                                    {habit.frequency.type === 'specific_days' && 'Días seleccionados'}
+                                                    {habit.frequency.type === 'specific_days' && 'Días específicos'}
                                                     {habit.frequency.type === 'times_per_week' && `${habit.frequency.count}x por semana`}
                                                     {habit.frequency.type === 'interval' && `Cada ${habit.frequency.days} días`}
                                                 </span>
@@ -471,8 +472,12 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
 
                                         {/* Streak Badge only if streak > 0 */}
                                         {streak > 0 && (
-                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                                                <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                isCompletedToday
+                                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                                            }`}>
+                                                <Flame className={`w-3 h-3 fill-current ${isCompletedToday ? 'text-emerald-500' : 'text-rose-500'}`} />
                                                 <span>{streak}d</span>
                                             </div>
                                         )}
@@ -497,7 +502,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                                 buttonContent = <span className="text-[10px] font-medium">{dayNumber}</span>;
                                             } else if (!isApplicable && habit.frequency.type !== 'times_per_week') {
                                                 buttonStyle = 'bg-zinc-50 dark:bg-zinc-900/40 text-zinc-300 dark:text-zinc-700 cursor-not-allowed';
-                                                buttonContent = <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />;
+                                                buttonContent = <span className="text-zinc-300 dark:text-zinc-700 text-[10px]">•</span>;
                                             } else if (isCompleted) {
                                                 buttonStyle = 'bg-emerald-500 text-white font-bold shadow-xs active:scale-90';
                                                 buttonContent = <Check className="w-3.5 h-3.5 stroke-[3]" />;
@@ -518,7 +523,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                                         className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${buttonStyle} ${
                                                             isDayToday && !isCompleted ? 'ring-2 ring-zinc-900 dark:ring-zinc-100' : ''
                                                         }`}
-                                                        title={isFutureDay ? 'Día futuro (no disponible)' : `${habit.name} - ${dayDateKey}`}
+                                                        title={isFutureDay ? 'Día futuro (no editable)' : `${habit.name} - ${dayDateKey}`}
                                                     >
                                                         {buttonContent}
                                                     </button>
@@ -546,25 +551,25 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
     // ==========================================
     if (subPage === 'stats') {
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-32">
-                {/* Header */}
-                <div className="sticky top-0 z-40 bg-white/90 dark:bg-black/90 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
+                {/* Header - Starts high up */}
+                <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
                         type="button"
                         onClick={() => setSubPage('main')}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors"
+                        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2 py-1 rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />
                         <span>Atrás</span>
                     </button>
-                    <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Estadísticas de Hábitos</h2>
+                    <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Estadísticas</h2>
                     <div className="w-12" />
                 </div>
 
-                <div className="flex-1 px-4 pt-4 space-y-5 max-w-lg mx-auto w-full">
+                <div className="flex-1 px-4 pt-2.5 space-y-4 max-w-lg mx-auto w-full">
                     {/* KPI Cards Grid - Minimalist Monochrome */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
+                    <div className="grid grid-cols-2 gap-2.5">
+                        <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
                             <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
                                 <TrendingUp className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                                 Cumplimiento (7d)
@@ -574,7 +579,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                             </div>
                         </div>
 
-                        <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
+                        <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
                             <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
                                 <Flame className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                                 Mejor Racha
@@ -584,17 +589,17 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                             </div>
                         </div>
 
-                        <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
+                        <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
                             <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
                                 <CheckSquare className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
-                                Total Registros
+                                Registros Totales
                             </span>
                             <div className="text-2xl font-black text-zinc-900 dark:text-white">
                                 {statsData.totalRecordsCount}
                             </div>
                         </div>
 
-                        <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
+                        <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
                             <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
                                 <Target className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                                 Hábitos Activos
@@ -605,34 +610,28 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                         </div>
                     </div>
 
-                    {/* Minimalist Line/Area Chart: Tendencia de Hábitos (14 días) */}
+                    {/* Minimalist Monochrome Line Chart: Tendencia 14 Días */}
                     <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-3">
                         <div className="flex items-center justify-between">
                             <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                                <Activity className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />
-                                Tendencia de Hábitos (Últimos 14 días)
+                                <Activity className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
+                                Tendencia de Hábitos (14 días)
                             </h3>
-                            <span className="text-[10px] font-semibold text-zinc-400">
-                                Hábitos cumplidos
+                            <span className="text-[10px] font-medium text-zinc-400">
+                                Cumplidos / día
                             </span>
                         </div>
 
                         <div className="h-44 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={statsData.chartDays} margin={{ top: 12, right: 8, left: -22, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="monochromeHabitArea" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#71717a" stopOpacity={0.25} />
-                                            <stop offset="95%" stopColor="#71717a" stopOpacity={0.0} />
-                                        </linearGradient>
-                                    </defs>
+                                <LineChart data={statsData.chartDays} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(113, 113, 122, 0.15)" />
                                     <XAxis 
                                         dataKey="dayLabel" 
                                         axisLine={false} 
                                         tickLine={false} 
                                         tick={{ fontSize: 9, fill: '#71717a' }}
-                                        interval={1}
+                                        interval={2}
                                     />
                                     <YAxis 
                                         axisLine={false} 
@@ -646,7 +645,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                             if (active && payload && payload.length) {
                                                 const data = payload[0].payload;
                                                 return (
-                                                    <div className="bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 px-3 py-2 rounded-xl text-[11px] shadow-lg font-medium border border-zinc-800 dark:border-zinc-200">
+                                                    <div className="bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 px-3 py-1.5 rounded-xl text-[11px] shadow-lg font-medium border border-zinc-800 dark:border-zinc-300">
                                                         <p className="font-bold text-xs">{data.dayLabel}</p>
                                                         <p className="text-zinc-300 dark:text-zinc-700">
                                                             {data.completados} de {data.programados} completados ({data.porcentaje}%)
@@ -657,26 +656,26 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                             return null;
                                         }}
                                     />
-                                    <Area 
+                                    <Line 
                                         type="monotone" 
                                         dataKey="completados" 
                                         stroke="#18181b" 
-                                        strokeWidth={2}
-                                        fill="url(#monochromeHabitArea)" 
+                                        strokeWidth={2.5}
                                         dot={{ r: 3, fill: '#18181b', stroke: '#ffffff', strokeWidth: 1.5 }}
                                         activeDot={{ r: 5, fill: '#18181b', stroke: '#ffffff', strokeWidth: 2 }}
                                     />
-                                </AreaChart>
+                                </LineChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
-                    {/* Desglose por Hábito (Sin "tot", con gráficos de barra de progreso y métricas reales) */}
-                    <div className="space-y-3">
+                    {/* Desglose por Hábito - Gráficos de barra de consistencia y métricas reales */}
+                    <div className="space-y-2.5">
                         <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Desglose por Hábito</h3>
-                        <div className="space-y-2.5">
+                        <div className="space-y-2">
                             {habits.map(habit => {
                                 const streak = calculateStreak(habit, records);
+                                const isCompletedToday = isHabitCompletedOnDate(habit.id, todayDateKey);
                                 
                                 // Count total completions for this habit
                                 const habitRecords = records.filter(r => Number(r.habit_id) === Number(habit.id));
@@ -695,25 +694,29 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2.5 min-w-0">
-                                                <span className="text-xl">{habit.emoji}</span>
+                                                <span className="text-xl shrink-0">{habit.emoji}</span>
                                                 <div className="min-w-0">
                                                     <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{habit.name}</h4>
                                                     <span className="text-[10px] text-zinc-400">
-                                                        {totalCompletions} {totalCompletions === 1 ? 'completado' : 'completados'} en total
+                                                        {totalCompletions} {totalCompletions === 1 ? 'completado' : 'completados'}
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            {/* Streak Badge only if streak > 0 */}
+                                            {/* Streak Badge: ONLY if streak > 0 */}
                                             {streak > 0 && (
-                                                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300/60 dark:border-zinc-700/60">
-                                                    <Flame className="w-3 h-3 text-zinc-900 dark:text-zinc-100 fill-zinc-900 dark:fill-zinc-100" />
+                                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                                    isCompletedToday
+                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                                                }`}>
+                                                    <Flame className={`w-3 h-3 fill-current ${isCompletedToday ? 'text-emerald-500' : 'text-rose-500'}`} />
                                                     <span>{streak}d</span>
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Progress Bar for consistency */}
+                                        {/* Real Bar Progress for Consistency */}
                                         <div className="space-y-1">
                                             <div className="flex justify-between text-[10px] font-semibold text-zinc-500">
                                                 <span>Consistencia (30 días)</span>
@@ -744,13 +747,13 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
         const activeCategoryData = EMOJI_CATEGORIES.find(c => c.id === selectedEmojiCategory) || EMOJI_CATEGORIES[0];
 
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-32">
-                {/* Header */}
-                <div className="sticky top-0 z-40 bg-white/90 dark:bg-black/90 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
+                {/* Header - Starts high up */}
+                <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
                         type="button"
                         onClick={() => setSubPage('main')}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors"
+                        className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2 py-1 rounded-xl active:bg-zinc-100 dark:active:bg-zinc-800 transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />
                         <span>Atrás</span>
@@ -768,9 +771,9 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                     </button>
                 </div>
 
-                <div className="flex-1 px-5 pt-5 space-y-6 max-w-lg mx-auto w-full">
+                <div className="flex-1 px-4 pt-3 space-y-5 max-w-lg mx-auto w-full">
                     {/* Emoji + Name */}
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Nombre del Hábito</label>
                         <div className="flex gap-2.5 items-center">
                             <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-2xl shrink-0">
@@ -782,15 +785,15 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                 onChange={e => setFormName(e.target.value)}
                                 placeholder="Ej: Beber 2L de agua"
                                 autoFocus
-                                className="flex-1 px-4 py-3 text-base rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
+                                className="flex-1 px-4 py-3 text-sm rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:outline-hidden font-medium"
                             />
                         </div>
 
                         {/* Categorized & Horizontally Scrollable Emoji Picker */}
-                        <div className="space-y-2 pt-2">
+                        <div className="space-y-2 pt-1">
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Seleccionar icono</span>
-                                <span className="text-[10px] text-zinc-400">Desliza horizontalmente</span>
+                                <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Seleccionar icono ({activeCategoryData.emojis.length})</span>
+                                <span className="text-[10px] text-zinc-400">Desliza horizontalmente →</span>
                             </div>
 
                             {/* Category chips */}
@@ -984,11 +987,11 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
     // PAGE: MAIN HABITS (PÁGINA PRINCIPAL)
     // ==========================================
     return (
-        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-28 pt-8 px-4 sm:px-6">
+        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36 pt-3 px-4 sm:px-6">
             {/* Header */}
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-3">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Hábitos</h1>
+                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">Hábitos</h1>
                     <p className="text-xs font-medium text-zinc-500 mt-0.5">
                         {completedTodayCount} de {habitsForSelectedDay.length} completados
                     </p>
@@ -996,7 +999,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                 <button 
                     type="button"
                     onClick={handleOpenCreate}
-                    className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-md"
+                    className="w-10 h-10 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-sm"
                     title="Nuevo Hábito"
                     aria-label="Nuevo Hábito"
                 >
@@ -1005,7 +1008,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
             </div>
 
             {/* Quick Navigation Action Pills: Vista Semanal & Estadísticas */}
-            <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="grid grid-cols-2 gap-2 mb-3">
                 <button 
                     type="button"
                     onClick={() => setSubPage('weekly')}
@@ -1025,7 +1028,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
             </div>
 
             {/* Selector de Día (Día Anterior, Día Actual / Hoy, Día Siguiente) */}
-            <div className="flex items-center justify-between mb-4 bg-zinc-100/70 dark:bg-zinc-900/90 p-1.5 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/80">
+            <div className="flex items-center justify-between mb-3.5 bg-zinc-100/70 dark:bg-zinc-900/90 p-1.5 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/80">
                 <button 
                     type="button"
                     onClick={handlePrevDay} 
@@ -1056,15 +1059,15 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
 
             {/* Notice if future date */}
             {isSelectedDateFuture && (
-                <div className="mb-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 font-medium">
-                    <Lock className="w-4 h-4 shrink-0 text-amber-500" />
-                    <span>Estás viendo un día futuro. Los hábitos solo pueden marcarse el día actual o días pasados.</span>
+                <div className="mb-3.5 p-3 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 font-medium">
+                    <Lock className="w-4 h-4 shrink-0 text-zinc-500" />
+                    <span>Estás viendo un día futuro. Los hábitos solo pueden completarse en el día actual o días anteriores.</span>
                 </div>
             )}
 
             {/* Daily Progress Bar */}
             {habitsForSelectedDay.length > 0 && !isSelectedDateFuture && (
-                <div className="mb-5 flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="mb-4 flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60">
                     <div className="flex-1 h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                         <div 
                             className="h-full bg-emerald-500 transition-all duration-500 ease-out rounded-full"
@@ -1093,7 +1096,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
                                 key={habit.id}
-                                className={`flex items-center gap-3.5 p-4 rounded-2xl border transition-all active:scale-[0.99] ${
+                                className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all active:scale-[0.99] ${
                                     isCompleted 
                                         ? 'bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-500/30 dark:border-emerald-500/20' 
                                         : !isApplicable && habit.frequency.type !== 'times_per_week'
@@ -1129,36 +1132,36 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                     onClick={() => handleOpenEdit(habit)}
                                 >
                                     <div className="flex items-center gap-2">
-                                        <h3 className={`text-sm font-semibold truncate ${
-                                            isCompleted ? 'text-emerald-900 dark:text-emerald-200 font-bold' : 'text-zinc-900 dark:text-zinc-100'
+                                        <h3 className={`text-xs font-bold truncate ${
+                                            isCompleted ? 'text-emerald-900 dark:text-emerald-200' : 'text-zinc-900 dark:text-zinc-100'
                                         }`}>
                                             {habit.name}
                                         </h3>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400 font-medium">
+                                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-zinc-400 font-medium">
                                         <span>
                                             {habit.frequency.type === 'daily' && 'Todos los días'}
-                                            {habit.frequency.type === 'specific_days' && 'Días programados'}
+                                            {habit.frequency.type === 'specific_days' && 'Días específicos'}
                                             {habit.frequency.type === 'times_per_week' && `${habit.frequency.count} veces / sem`}
                                             {habit.frequency.type === 'interval' && `Cada ${habit.frequency.days} días`}
                                         </span>
                                         {!isApplicable && habit.frequency.type !== 'times_per_week' && (
-                                            <span className="text-amber-500 font-semibold">• No programado hoy</span>
+                                            <span className="text-zinc-400 font-semibold">• No hoy</span>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Streak Badge: CRITICAL: Only shown if streak > 0 */}
+                                {/* Streak Badge: CRITICAL: Only shown if streak > 0; Green if completed today, Red if at risk */}
                                 {streak > 0 && (
                                     <div 
-                                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors shrink-0 ${
+                                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors shrink-0 ${
                                             isCompletedToday
                                                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                                         }`}
-                                        title={isCompletedToday ? `Racha de ${streak} días completada hoy` : `Racha de ${streak} días pendiente hoy`}
+                                        title={isCompletedToday ? `Racha de ${streak} días completada hoy` : `Racha de ${streak} días pendiente hoy (en riesgo)`}
                                     >
-                                        <Flame className={`w-3.5 h-3.5 fill-current ${isCompletedToday ? 'text-emerald-500' : 'text-amber-500'}`} />
+                                        <Flame className={`w-3.5 h-3.5 fill-current ${isCompletedToday ? 'text-emerald-500' : 'text-rose-500'}`} />
                                         <span>{streak}d</span>
                                     </div>
                                 )}

@@ -71,11 +71,11 @@ const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
       const endDate = new Date(endParts[0], endParts[1] - 1, endParts[2]);
 
       if (todayNormalized > endDate) {
-        targetKey = '';
+        targetKey = task.end_date;
       } else if (todayNormalized >= startDate) {
         targetKey = todayKey;
       } else {
-        targetKey = '';
+        targetKey = task.due_date;
       }
     }
 
