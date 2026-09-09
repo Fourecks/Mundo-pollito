@@ -865,18 +865,18 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         const newNote = await onAddNote(notesFolderId, activeProject.id);
         if (newNote) {
-            const updatedNote: Note = {
-                ...newNote,
-                folder_id: notesFolderId,
-                project_id: activeProject.id,
-                project_doc_folder_id: selectedFolderId || null
-            };
-            await onUpdateNote(updatedNote);
+            if (selectedFolderId) {
+                const updatedNote: Note = {
+                    ...newNote,
+                    project_doc_folder_id: selectedFolderId
+                };
+                await onUpdateNote(updatedNote);
+            }
 
             if (onOpenNotesModule) {
                 onOpenNotesModule(newNote.id, notesFolderId);
             } else {
-                setEditingProjectNote(updatedNote);
+                setEditingProjectNote(newNote);
             }
         }
     };

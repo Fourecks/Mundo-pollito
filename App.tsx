@@ -28,6 +28,8 @@ import FinanceSummaryWidget from './components/FinanceSummaryWidget';
 import { rainSoundSrc, forestSoundSrc, coffeeShopSrc, oceanSoundSrc } from './assets/sounds';
 import MobileNav from './components/MobileNav';
 import MobileDashboard from './components/MobileDashboard';
+import MobileTasks from './components/MobileTasks';
+import MobileProjects from './components/MobileProjects';
 import MobileHeader from './components/MobileHeader';
 import MobileMusicPlayer from './components/MobileMusicPlayer';
 import MobilePomodoroWidget from './components/MobilePomodoroWidget';
@@ -2062,81 +2064,25 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
                 <div className={activeTab === 'tasks' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="flex flex-col h-full">
-                        <TodoListModule progressEmoji={uiSettings?.progressEmoji} 
-                            currentUser={currentUser}
-                            onLogout={onLogout}
-                            isMobile={true} 
-                            allTodos={allTodos} 
-                            addTodo={handleAddTodo} 
-                            toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)} 
-                            toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} 
-                            deleteTodo={handleDeleteTodo} 
-                            updateTodo={handleUpdateTodo} 
-                            onEditTodo={setTaskToEdit} 
-                            selectedDate={selectedDate} 
-                            setSelectedDate={setSelectedDate} 
-                            datesWithTasks={datesWithTasks} 
-                            datesWithAllTasksCompleted={datesWithAllTasksCompleted} 
-                            onClearPastTodos={onClearPastTodos}
+                        <MobileTasks
+                            allTodos={allTodos}
+                            selectedDate={selectedDate}
+                            setSelectedDate={setSelectedDate}
+                            toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
+                            onEditTodo={setTaskToEdit}
                             projects={projects}
-                            onAddProject={handleAddProject}
-                            onUpdateProject={(id, name, emoji, color) => handleUpdateProject(id, { name, emoji, color })}
-                            onDeleteProject={handleDeleteProject}
-                            onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
-                            handleArchiveProject={handleArchiveProject}
-                            onViewProjectChange={setViewingProjectId}
-                            calendarEvents={calendarEvents}
-                            onOpenProjectCreator={handleOpenProjectCreator}
-                            onOpenProjectEditor={handleOpenProjectEditor}
-                            activeFocusTaskId={pomodoroState.activeFocusTaskId}
-                            onSelectFocusTask={handleSelectFocusTask}
-                            focusSessions={focusSessions}
-                            isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
+                            onAddTask={() => setIsAddTaskModalOpen(true)}
                         />
-                         <button onClick={() => setIsAddTaskModalOpen(true)} className="fixed bottom-24 landscape:bottom-16 right-4 bg-primary text-white rounded-full p-4 landscape:p-3 shadow-lg z-40 transform hover:scale-110 active:scale-95 transition-transform" aria-label="Añadir tarea">
-                            <PlusIcon />
-                        </button>
                     </div>
                 </div>
 
                 <div className={activeTab === 'projects' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full">
-                        <ProjectsWorkspace
-                            currentUser={currentUser}
+                        <MobileProjects
                             projects={projects}
-                            notes={notes}
-                            folders={folders}
-                            onAddFolder={handleAddFolder}
-                            onUpdateFolder={handleUpdateFolder}
-                            onDeleteFolder={handleDeleteFolder}
-                            onAddNote={handleAddNote}
-                            onUpdateNote={handleUpdateNote}
-                            onDeleteNote={handleDeleteNote}
-                            onOpenNotesModule={handleOpenNotesModule}
+                            onAddProject={handleOpenProjectCreator}
+                            onSelectProject={setViewingProjectId}
                             allTodos={flatAllTodos}
-                            activeProjectId={viewingProjectId}
-                            invitations={projectInvitations}
-                            onSendInvitation={onSendInvitation}
-                            pushPreferences={pushPreferences}
-                            onSelectProject={(id) => setViewingProjectId(id)}
-                            onAddProject={async (name, emoji, color) => {
-                                const p = await handleAddProject(name, emoji, color);
-                                return p || null;
-                            }}
-                            onUpdateProject={async (id, updates) => {
-                                await handleUpdateProject(id, updates);
-                            }}
-                            onDeleteProject={handleDeleteProject}
-                            onArchiveProject={async (id, isArchived) => {
-                                await handleArchiveProject(id, isArchived);
-                            }}
-                            addTodo={async (text, options) => {
-                                await handleAddTodo(text, options);
-                            }}
-                            updateTodo={handleUpdateTodo}
-                            deleteTodo={handleDeleteTodo}
-                            onEditTodo={setTaskToEdit}
-                            onOpenProjectEditor={handleOpenProjectEditor}
                         />
                     </div>
                 </div>

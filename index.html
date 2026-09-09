@@ -256,11 +256,16 @@
       /* Note rich text editor styling & Anti-flicker focus rules */
       .note-editor-content,
       .note-editor-content *,
+      .note-editor-content *:focus,
+      .note-editor-content *:active,
       [contenteditable="true"],
+      [contenteditable="true"]:focus,
       [contenteditable="true"] *,
       [contenteditable="false"],
       [contenteditable="false"] * {
         outline: none !important;
+        box-shadow: none !important;
+        border-color: transparent !important;
         -webkit-tap-highlight-color: transparent !important;
       }
       .note-editor-content *:focus,

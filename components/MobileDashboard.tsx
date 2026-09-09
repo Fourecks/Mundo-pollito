@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, ArrowRight, LayoutGrid, Calendar, CheckSquare, Wallet, GraduationCap, FileText, Settings, UserCircle, PieChart, Focus } from 'lucide-react';
-import { Todo, CalendarEvent } from '../types';
+import { Todo, GoogleCalendarEvent as CalendarEvent } from '../types';
 
 interface MobileDashboardProps {
   userName: string;
