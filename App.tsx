@@ -30,6 +30,7 @@ import MobileNav from './components/MobileNav';
 import MobileDashboard from './components/MobileDashboard';
 import MobileTasks from './components/MobileTasks';
 import MobileProjects from './components/MobileProjects';
+import MobileHabits from './components/MobileHabits';
 import MobileHeader from './components/MobileHeader';
 import MobileMusicPlayer from './components/MobileMusicPlayer';
 import MobilePomodoroWidget from './components/MobilePomodoroWidget';
@@ -2076,14 +2077,64 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     </div>
                 </div>
 
-                <div className={activeTab === 'projects' ? 'h-full flex flex-col' : 'hidden'}>
+                                <div className={activeTab === 'projects' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="h-full">
-                        <MobileProjects
-                            projects={projects}
-                            onAddProject={handleOpenProjectCreator}
-                            onSelectProject={setViewingProjectId}
-                            allTodos={flatAllTodos}
-                        />
+                        {viewingProjectId ? (
+                            <div className="h-full flex flex-col relative mobile-projects-workspace">
+                                <button 
+                                    onClick={() => setViewingProjectId(null)} 
+                                    className="absolute top-4 right-4 z-50 p-2 bg-black dark:bg-white text-white dark:text-black rounded-full shadow-xl active:scale-95 transition-transform"
+                                >
+                                    <ArrowLeft className="w-5 h-5" />
+                                </button>
+                                <div className="h-full flex-1 overflow-hidden pt-12">
+                                    <ProjectsWorkspace 
+                                      currentUser={currentUser}
+                                      projects={projects}
+                                      notes={notes}
+                                      folders={folders}
+                                      onAddFolder={handleAddFolder}
+                                      onUpdateFolder={handleUpdateFolder}
+                                      onDeleteFolder={handleDeleteFolder}
+                                      onAddNote={handleAddNote}
+                                      onUpdateNote={handleUpdateNote}
+                                      onDeleteNote={handleDeleteNote}
+                                      onOpenNotesModule={handleOpenNotesModule}
+                                      allTodos={flatAllTodos}
+                                      activeProjectId={viewingProjectId}
+                                      invitations={projectInvitations}
+                                      onSendInvitation={onSendInvitation}
+                                      pushPreferences={pushPreferences}
+                                      onSelectProject={(id) => setViewingProjectId(id)}
+                                      onAddProject={async (name, emoji, color) => {
+                                          const p = await handleAddProject(name, emoji, color);
+                                          return p || null;
+                                      }}
+                                      onUpdateProject={async (id, updates) => {
+                                          await handleUpdateProject(id, updates);
+                                      }}
+                                      onDeleteProject={handleDeleteProject}
+                                      onArchiveProject={async (id, isArchived) => {
+                                          await handleArchiveProject(id, isArchived);
+                                      }}
+                                      addTodo={async (text, options) => {
+                                          await handleAddTodo(text, options);
+                                      }}
+                                      updateTodo={handleUpdateTodo}
+                                      deleteTodo={handleDeleteTodo}
+                                      onEditTodo={setTaskToEdit}
+                                      onOpenProjectEditor={handleOpenProjectEditor}
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <MobileProjects
+                                projects={projects}
+                                onAddProject={handleOpenProjectCreator}
+                                onSelectProject={setViewingProjectId}
+                                allTodos={flatAllTodos}
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -2117,16 +2168,14 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
                 {activeTab === 'habits' && (
                     <div className="h-full flex flex-col">
-                         <div className="h-full pt-8">
-                            <HabitTracker 
-                                habits={habits} 
-                                records={habitRecords} 
-                                onOpenHabitCreator={onOpenHabitCreator}
-                                onOpenHabitEditor={onOpenHabitEditor}
-                                onDeleteHabit={handleDeleteHabit} 
-                                onToggleRecord={handleToggleHabitRecord}
-                            />
-                        </div>
+                        <MobileHabits
+                            habits={habits}
+                            records={habitRecords}
+                            onOpenHabitCreator={onOpenHabitCreator}
+                            onOpenHabitEditor={onOpenHabitEditor}
+                            onDeleteHabit={handleDeleteHabit}
+                            onToggleRecord={handleToggleHabitRecord}
+                        />
                     </div>
                 )}
 
@@ -2240,7 +2289,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 )}
             </div>
 
-            <main className="flex-grow overflow-y-auto pb-28 landscape:pb-16 custom-scrollbar">
+            <main className="flex-grow overflow-y-auto pb-28 landscape:pb-16 custom-scrollbar mobile-minimalist-override">
                 {renderContent()}
             </main>
 

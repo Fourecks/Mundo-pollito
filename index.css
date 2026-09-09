@@ -1,0 +1,67 @@
+
+/* Minimalist Mobile Override */
+@media (max-width: 768px) {
+  .mobile-minimalist-override {
+    /* Strip backgrounds and borders to grayscale */
+    --color-zinc-50: #fafafa;
+    --color-zinc-100: #f4f4f5;
+    --color-zinc-200: #e4e4e7;
+    --color-zinc-800: #27272a;
+    --color-zinc-900: #18181b;
+    --color-zinc-950: #09090b;
+  }
+  
+  .mobile-minimalist-override [class*="bg-indigo"],
+  .mobile-minimalist-override [class*="bg-blue"],
+  .mobile-minimalist-override [class*="bg-purple"],
+  .mobile-minimalist-override [class*="bg-amber"],
+  .mobile-minimalist-override [class*="bg-emerald"] {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  .dark .mobile-minimalist-override [class*="bg-indigo"],
+  .dark .mobile-minimalist-override [class*="bg-blue"],
+  .dark .mobile-minimalist-override [class*="bg-purple"],
+  .dark .mobile-minimalist-override [class*="bg-amber"],
+  .dark .mobile-minimalist-override [class*="bg-emerald"] {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .mobile-minimalist-override [class*="text-indigo"],
+  .mobile-minimalist-override [class*="text-blue"],
+  .mobile-minimalist-override [class*="text-purple"],
+  .mobile-minimalist-override [class*="text-amber"] {
+    color: #ffffff !important;
+  }
+  
+  .dark .mobile-minimalist-override [class*="text-indigo"],
+  .dark .mobile-minimalist-override [class*="text-blue"],
+  .dark .mobile-minimalist-override [class*="text-purple"],
+  .dark .mobile-minimalist-override [class*="text-amber"] {
+    color: #000000 !important;
+  }
+
+  /* Keep green and red for stats */
+  .mobile-minimalist-override [class*="text-emerald"],
+  .mobile-minimalist-override [class*="text-green"] {
+    color: #22c55e !important; /* green-500 */
+  }
+  
+  .mobile-minimalist-override [class*="text-rose"],
+  .mobile-minimalist-override [class*="text-red"] {
+    color: #ef4444 !important; /* red-500 */
+  }
+
+  .mobile-minimalist-override .rounded-lg,
+  .mobile-minimalist-override .rounded-xl,
+  .mobile-minimalist-override .rounded-2xl {
+    border-radius: 1.5rem !important; /* rounded-3xl to match mobile feel */
+  }
+
+  /* Make tab bar cleaner */
+  .mobile-minimalist-override .border-b {
+    border-color: transparent !important;
+  }
+}
