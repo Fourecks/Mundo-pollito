@@ -1791,7 +1791,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       handleAddTodo, handleUpdateTodo, handleToggleTodo, handleToggleSubtask, handleDeleteTodo, onClearPastTodos, handleArchiveProject,
       handleAddFolder, handleUpdateFolder, handleDeleteFolder, handleAddNote, handleUpdateNote, handleDeleteNote,
       handleAddProject, handleUpdateProject, handleDeleteProject, handleDeleteProjectAndTasks,
-      handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator, onOpenHabitEditor,
+      handleAddHabit, handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator, onOpenHabitEditor,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
       setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
@@ -2066,13 +2066,19 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 <div className={activeTab === 'tasks' ? 'h-full flex flex-col' : 'hidden'}>
                     <div className="flex flex-col h-full">
                         <MobileTasks
-                            allTodos={allTodos}
+                            allTodos={expandedAllTodos}
                             selectedDate={selectedDate}
                             setSelectedDate={setSelectedDate}
                             toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
                             onEditTodo={setTaskToEdit}
                             projects={projects}
-                            onAddTask={() => setIsAddTaskModalOpen(true)}
+                            onAddTodo={handleAddTodo}
+                            onUpdateTodo={handleUpdateTodo}
+                            onDeleteTodo={handleDeleteTodo}
+                            onRemoveFromCalendar={onRemoveFromCalendar}
+                            onSyncToCalendar={onSyncToCalendar}
+                            taskToEdit={taskToEdit}
+                            setTaskToEdit={setTaskToEdit}
                         />
                     </div>
                 </div>
@@ -2171,6 +2177,8 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             onOpenHabitEditor={onOpenHabitEditor}
                             onDeleteHabit={handleDeleteHabit}
                             onToggleRecord={handleToggleHabitRecord}
+                            onAddHabit={handleAddHabit}
+                            onUpdateHabit={handleUpdateHabit}
                         />
                     </div>
                 )}
