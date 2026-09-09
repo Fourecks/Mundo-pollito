@@ -232,7 +232,7 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
                 </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3">
                 {activeProjects.map(project => {
                     const projectTasks = allTodos.filter(t => t.project_id === project.id);
                     const pendingTasks = projectTasks.filter(t => !t.completed).length;
@@ -247,34 +247,38 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
 
                     return (
                         <motion.button
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
                             key={project.id}
                             onClick={() => handleSelectProject(project.id)}
-                            className="flex flex-col text-left p-4 rounded-3xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 active:scale-95 transition-all relative overflow-hidden h-full min-h-[145px]"
+                            className="w-full flex items-center justify-between p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800/80 active:scale-[0.98] transition-all"
                         >
-                            <div className="flex items-center gap-1.5 mb-2">
-                                <span className="text-base shrink-0">{project.emoji || '📁'}</span>
-                                <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 leading-tight line-clamp-1 flex-1">
-                                    {project.name}
-                                </h3>
-                            </div>
-                            
-                            <p className="text-[11px] text-zinc-500 font-semibold mb-3">
-                                {pendingTasks} {pendingTasks === 1 ? 'tarea pendiente' : 'tareas pendientes'}
-                            </p>
+                            <div className="flex-1 min-w-0 pr-4 text-left">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-lg shrink-0">{project.emoji || '📁'}</span>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 tracking-tight truncate">
+                                        {project.name}
+                                    </h3>
+                                </div>
+                                
+                                <p className="text-[11px] text-zinc-500 font-semibold pl-7 mt-0.5">
+                                    {pendingTasks} {pendingTasks === 1 ? 'tarea pendiente' : 'tareas pendientes'}
+                                </p>
 
-                            <div className="mt-auto w-full pt-1">
-                                <div className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-300 tracking-wider">
-                                    {blockString} <span className="ml-1">{progress}%</span>
+                                <div className="pl-7 pt-1.5">
+                                    <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-300 tracking-wider">
+                                        {blockString} <span className="ml-1 text-zinc-900 dark:text-white">{progress}%</span>
+                                    </span>
                                 </div>
                             </div>
+
+                            <ChevronRight className="w-5 h-5 text-zinc-400 shrink-0" />
                         </motion.button>
                     );
                 })}
 
                 {activeProjects.length === 0 && (
-                    <div className="text-center py-20 col-span-2">
+                    <div className="text-center py-20">
                         <div className="w-16 h-16 rounded-full bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center mx-auto mb-4">
                             <Folder className="w-8 h-8 text-zinc-300 dark:text-zinc-700" />
                         </div>

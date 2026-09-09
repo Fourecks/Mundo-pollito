@@ -300,6 +300,7 @@ export interface Project {
   name: string;
   description?: string | null;
   created_at: string;
+  project_mode?: 'personal' | 'advanced';
   todos?: Todo[]; // Populated on the client
   emoji?: string | null;
   is_archived?: boolean;

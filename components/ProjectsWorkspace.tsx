@@ -7,7 +7,7 @@ import {
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal, DollarSign
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
+import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear, isTomorrow, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cleanToPlainText } from '../utils/textCleaner';
 
@@ -172,6 +172,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     
     const [isTimeModalOpen, setIsTimeModalOpen] = useState(false);
     const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month' | 'year'>('all');
+    const [isQuickMessageModalOpen, setIsQuickMessageModalOpen] = useState(false);
+    const [quickMessageText, setQuickMessageText] = useState('');
     
     // Chat States
     const [chatText, setChatText] = useState('');
@@ -259,10 +261,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     }>({});
     const [mobileKanbanColumn, setMobileKanbanColumn] = useState<string>('');
     const [touchStartX, setTouchStartX] = useState<number | null>(null);
+    const [personalFilter, setPersonalFilter] = useState<'all' | 'todo' | 'in_progress' | 'completed'>('all');
 
     const [newItemTitle, setNewItemTitle] = useState<string>('');
     const [newItemAssignee, setNewItemAssignee] = useState<string>('');
     const [newItemDueDate, setNewItemDueDate] = useState<string>('');
+    const [newItemStartTime, setNewItemStartTime] = useState<string>('');
+    const [newItemNotes, setNewItemNotes] = useState<string>('');
+    const [newItemKanbanColumn, setNewItemKanbanColumn] = useState<string>('Por hacer');
     const [newItemPriority, setNewItemPriority] = useState<Priority>('medium');
     const [isAddBoardTaskModalOpen, setIsAddBoardTaskModalOpen] = useState<boolean>(false);
     const [assignListTodoId, setAssignListTodoId] = useState<string | null>(null);
@@ -458,6 +464,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         localStorage.setItem(key, JSON.stringify(saved));
         setTabsLastVisitedTimes(saved);
     }, [activeProject?.id, activeTab, currentUserEmail]);
+
+    useEffect(() => {
+        if (!activeProject) return;
+        if (activeProject.project_mode === 'personal') {
+            if (!['overview', 'listas', 'kanban'].includes(activeTab)) {
+                setActiveTab('overview');
+            }
+        }
+    }, [activeProject?.id]);
 
     // Calculate unread counts for all other tabs based on when they were last visited and if they were created by another user
     const unreadTabCounts = useMemo(() => {
@@ -1268,13 +1283,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                     {/* New Mobile 4-Tab Navigation */}
                     <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-800/80">
-                        {[
-                            { id: 'inicio', label: 'Inicio', target: 'overview' },
-                            { id: 'tareas', label: 'Tareas', target: 'mis_tareas' },
-                            { id: 'chat', label: 'Chat', target: 'chat' },
-                            { id: 'mas', label: 'Más', target: 'mas_menu' }
-                        ].map(tab => {
-                            const isActive = mobileMainTab === tab.id;
+                        {(activeProject.project_mode === 'personal'
+                            ? [
+                                { id: 'inicio', label: 'Resumen', target: 'overview' },
+                                { id: 'tareas', label: 'Tareas', target: 'listas' },
+                                { id: 'tablero', label: 'Tablero', target: 'kanban' }
+                              ]
+                            : [
+                                { id: 'inicio', label: 'Inicio', target: 'overview' },
+                                { id: 'tareas', label: 'Tareas', target: 'mis_tareas' },
+                                { id: 'chat', label: 'Chat', target: 'chat' },
+                                { id: 'mas', label: 'Más', target: 'mas_menu' }
+                              ]
+                        ).map(tab => {
+                            const isActive = activeProject.project_mode === 'personal'
+                                ? activeTab === tab.target
+                                : mobileMainTab === tab.id;
                             return (
                                 <button
                                     key={tab.id}
@@ -1290,6 +1314,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         <motion.div 
                                             layoutId="mobileProjectNavIndicator"
                                             className="absolute bottom-[-8px] left-0 right-0 h-0.5 bg-gray-900 dark:bg-white rounded-full"
+                                            transition={{ type: "spring", stiffness: 380, damping: 30 }}
                                         />
                                     )}
                                 </button>
@@ -1298,7 +1323,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     {/* Sub-navigation for Tareas */}
-                    {mobileMainTab === 'tareas' && (
+                    {activeProject.project_mode !== 'personal' && mobileMainTab === 'tareas' && (
                         <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar scrollbar-none border-b border-gray-100 dark:border-gray-800/80">
                             {[
                                 { id: 'mis_tareas', label: 'Mis tareas' },
@@ -1416,18 +1441,25 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1 overflow-x-auto pb-0.5 -mx-1 px-1 scrollbar-hide">
-                        {[
-                            { id: 'overview', label: 'Resumen', icon: Activity },
-                            { id: 'kanban', label: 'Tablero', icon: AlignLeft },
-                            { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: unreadTabCounts.listas },
-                            { id: 'sprints', label: 'Sprints', icon: Target },
-                            { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
-                            { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs },
-                            { id: 'chat', label: 'Canales', icon: MessageSquare, badge: unreadChatMessagesCount },
-                            { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
-                            { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time },
-                            { id: 'team', label: 'Equipo', icon: Users },
-                        ].map(tab => (
+                        {(activeProject.project_mode === 'personal'
+                            ? [
+                                { id: 'overview', label: 'Resumen', icon: Activity },
+                                { id: 'listas', label: 'Tareas', icon: CheckSquareIcon },
+                                { id: 'kanban', label: 'Tablero', icon: AlignLeft },
+                              ]
+                            : [
+                                { id: 'overview', label: 'Resumen', icon: Activity },
+                                { id: 'kanban', label: 'Tablero', icon: AlignLeft },
+                                { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: unreadTabCounts.listas },
+                                { id: 'sprints', label: 'Sprints', icon: Target },
+                                { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
+                                { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs },
+                                { id: 'chat', label: 'Canales', icon: MessageSquare, badge: unreadChatMessagesCount },
+                                { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
+                                { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time },
+                                { id: 'team', label: 'Equipo', icon: Users },
+                              ]
+                        ).map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
@@ -1456,8 +1488,203 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     };
 
     // OVERVIEW TAB
+    const renderPersonalOverview = () => {
+        if (!activeProject) return null;
+
+        const totalTasks = projectTodos.length;
+        const completedTasksCount = projectTodos.filter(t => t.completed || t.kanban_column === 'Completado').length;
+        const inProgressTasksCount = projectTodos.filter(t => !t.completed && t.kanban_column === 'En progreso').length;
+        const pendingTasksCount = projectTodos.filter(t => !t.completed && t.kanban_column !== 'En progreso' && t.kanban_column !== 'Completado').length;
+        
+        const progress = totalTasks === 0 ? 0 : Math.round((completedTasksCount / totalTasks) * 100);
+
+        // PRÓXIMAS: incomplete, due_date is in future or today
+        const upcomingTasks = projectTodos
+            .filter(t => !t.completed && t.due_date && (!isPast(parseISO(t.due_date)) || isToday(parseISO(t.due_date))))
+            .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
+
+        // ATRASADAS: incomplete, due_date in the past and NOT today
+        const overdueTasks = projectTodos
+            .filter(t => !t.completed && t.due_date && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)))
+            .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
+
+        const getFriendlyDate = (dateStr?: string) => {
+            if (!dateStr) return '';
+            try {
+                const date = parseISO(dateStr);
+                if (isToday(date)) return 'Hoy';
+                if (isTomorrow(date)) return 'Mañana';
+                if (isYesterday(date)) return 'Ayer';
+                return format(date, 'd MMM', { locale: es });
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
+        return (
+            <div className="p-6 max-w-2xl mx-auto space-y-8 w-full pb-24 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
+                {/* Header */}
+                <div className="space-y-2">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <span>{activeProject.emoji || '📁'}</span>
+                        <span>{activeProject.name}</span>
+                    </h1>
+                    {activeProject.description && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                            {activeProject.description}
+                        </p>
+                    )}
+                    {activeProject.target_date && (
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400 pt-1">
+                            <CalendarIcon className="w-4 h-4 shrink-0 text-zinc-400" />
+                            <span>Objetivo: {getFriendlyDate(activeProject.target_date)}</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Progress Card */}
+                <div className="bg-zinc-50/50 dark:bg-zinc-900/30 p-5 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-2xs space-y-4">
+                    <div className="flex justify-between items-end">
+                        <div className="space-y-1">
+                            <span className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+                                {progress}%
+                            </span>
+                            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                                Progreso General
+                            </p>
+                        </div>
+                        <span className="text-xs font-bold text-zinc-400">
+                            {completedTasksCount} de {totalTasks} tareas completadas
+                        </span>
+                    </div>
+
+                    <div className="w-full bg-gray-200/60 dark:bg-zinc-800 h-2.5 rounded-full overflow-hidden">
+                        <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progress}%` }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                            className="bg-zinc-900 dark:bg-white h-full rounded-full"
+                        />
+                    </div>
+                </div>
+
+                {/* Task Count grid */}
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white dark:bg-zinc-900/20 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 text-center shadow-3xs">
+                        <span className="block text-xl font-extrabold text-zinc-700 dark:text-zinc-300">
+                            {pendingTasksCount}
+                        </span>
+                        <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mt-1">
+                            Pendientes
+                        </span>
+                    </div>
+                    <div className="bg-white dark:bg-zinc-900/20 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 text-center shadow-3xs">
+                        <span className="block text-xl font-extrabold text-amber-600 dark:text-amber-400">
+                            {inProgressTasksCount}
+                        </span>
+                        <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mt-1">
+                            En proceso
+                        </span>
+                    </div>
+                    <div className="bg-white dark:bg-zinc-900/20 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 text-center shadow-3xs">
+                        <span className="block text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                            {completedTasksCount}
+                        </span>
+                        <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mt-1">
+                            Completadas
+                        </span>
+                    </div>
+                </div>
+
+                {/* PRÓXIMAS Tasks Section */}
+                <div className="space-y-4">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-zinc-400">
+                        Próximas Tareas
+                    </h3>
+                    <div className="space-y-2">
+                        {upcomingTasks.length === 0 ? (
+                            <p className="text-xs text-zinc-400 py-3 italic">No hay tareas próximas programadas.</p>
+                        ) : (
+                            upcomingTasks.map(task => (
+                                <div
+                                    key={task.id}
+                                    onClick={() => onEditTodo && onEditTodo(task)}
+                                    className="group flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900/40 hover:bg-gray-50/50 dark:hover:bg-zinc-900/80 border border-gray-100 dark:border-zinc-800 rounded-xl transition-all cursor-pointer shadow-3xs"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                updateTodo(task.id, { completed: true });
+                                            }}
+                                            className="shrink-0 focus:outline-none"
+                                        >
+                                            <Circle className="w-5 h-5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-400 transition-colors" />
+                                        </button>
+                                        <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 truncate">
+                                            {task.text}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-850 text-zinc-500 dark:text-zinc-400">
+                                            {getFriendlyDate(task.due_date)}
+                                        </span>
+                                        <ChevronRight className="w-3.5 h-3.5 text-zinc-300 opacity-0 group-hover:opacity-100 transition-all" />
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* ATRASADAS Tasks Section */}
+                {overdueTasks.length > 0 && (
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-red-500 dark:text-red-400">
+                            Tareas Atrasadas
+                        </h3>
+                        <div className="space-y-2">
+                            {overdueTasks.map(task => (
+                                <div
+                                    key={task.id}
+                                    onClick={() => onEditTodo && onEditTodo(task)}
+                                    className="group flex items-center justify-between p-3.5 bg-red-50/20 dark:bg-red-950/5 hover:bg-red-50/40 dark:hover:bg-red-950/10 border border-red-100/50 dark:border-red-950/30 rounded-xl transition-all cursor-pointer shadow-3xs"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                updateTodo(task.id, { completed: true });
+                                            }}
+                                            className="shrink-0 focus:outline-none"
+                                        >
+                                            <Circle className="w-5 h-5 text-red-300 dark:text-red-900/60 hover:text-red-400 transition-colors" />
+                                        </button>
+                                        <span className="text-sm font-semibold text-red-900 dark:text-red-200 truncate">
+                                            {task.text}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100/60 dark:bg-red-950 text-red-700 dark:text-red-400">
+                                            {getFriendlyDate(task.due_date)}
+                                        </span>
+                                        <ChevronRight className="w-3.5 h-3.5 text-red-350 opacity-0 group-hover:opacity-100 transition-all" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const renderOverview = () => {
         if (!activeProject) return null;
+
+        if (activeProject.project_mode === 'personal') {
+            return renderPersonalOverview();
+        }
         
         const completedTasks = projectTodos.filter(t => t.completed).length;
         const totalTasks = projectTodos.length;
@@ -1864,11 +2091,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const renderKanban = () => {
         if (!activeProject) return null;
-        const columns = activeProject.kanban_columns || ['Por hacer', 'En progreso', 'Completado'];
+        const columns = activeProject.project_mode === 'personal'
+            ? ['Por hacer', 'En proceso', 'Completado']
+            : (activeProject.kanban_columns || ['Por hacer', 'En progreso', 'Completado']);
+
+        const getColumnTasks = (colName: string) => {
+            return projectTodos.filter(t => {
+                if (colName === 'Completado' || colName === 'Completados' || colName === 'Completada' || colName === 'Completadas') {
+                    return t.completed || t.kanban_column === 'Completado' || t.kanban_column === 'Completados' || t.kanban_column === 'Completada' || t.kanban_column === 'Completadas';
+                }
+                if (colName === 'Por hacer') {
+                    return !t.completed && (t.kanban_column === 'Por hacer' || !t.kanban_column || t.kanban_column === '');
+                }
+                if (colName === 'En proceso' || colName === 'En progreso') {
+                    return !t.completed && (t.kanban_column === 'En proceso' || t.kanban_column === 'En progreso');
+                }
+                return !t.completed && (t.kanban_column || columns[0]) === colName;
+            });
+        };
         
         if (isMobile) {
             const activeMobileCol = mobileKanbanColumn && columns.includes(mobileKanbanColumn) ? mobileKanbanColumn : columns[0];
-            const activeColTasks = projectTodos.filter(t => (t.kanban_column || columns[0]) === activeMobileCol);
+            const activeColTasks = getColumnTasks(activeMobileCol);
 
             return (
                 <div className="h-full flex flex-col font-sans">
@@ -1885,7 +2129,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 }`}
                             >
                                 {col} <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${activeMobileCol === col ? 'bg-white/20 dark:bg-black/20' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
-                                    {projectTodos.filter(t => (t.kanban_column || columns[0]) === col).length}
+                                    {getColumnTasks(col).length}
                                 </span>
                             </button>
                         ))}
@@ -1969,7 +2213,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
             <div className="h-full flex overflow-x-auto p-6 gap-6 bg-gray-50/50 dark:bg-[#050505]">
                 {columns.map((col) => {
-                    const colTasks = projectTodos.filter(t => (t.kanban_column || 'Por hacer') === col);
+                    const colTasks = getColumnTasks(col);
                     const isDragOver = dragOverColumn === col && draggedTaskId !== null;
                     
                     return (
@@ -5839,9 +6083,380 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         );
     };
 
+    const renderPersonalTareas = () => {
+        if (!activeProject) return null;
+
+        // Filter todos based on personalFilter (Todas | Por hacer | En progreso | Completadas) and search
+        let filteredTodos = projectTodos;
+
+        if (personalFilter === 'completed') {
+            filteredTodos = filteredTodos.filter(t => t.completed || t.kanban_column === 'Completado');
+        } else if (personalFilter === 'todo') {
+            filteredTodos = filteredTodos.filter(t => !t.completed && (t.kanban_column === 'Por hacer' || !t.kanban_column || t.kanban_column === ''));
+        } else if (personalFilter === 'in_progress') {
+            filteredTodos = filteredTodos.filter(t => !t.completed && t.kanban_column === 'En progreso');
+        }
+
+        if (listasSearch.trim()) {
+            filteredTodos = filteredTodos.filter(t => t.text.toLowerCase().includes(listasSearch.toLowerCase()));
+        }
+
+        // Sort: incomplete first, then sort by due date ascending, then complete tasks at the end
+        const sortedTodos = [...filteredTodos].sort((a, b) => {
+            const aDone = a.completed || a.kanban_column === 'Completado';
+            const bDone = b.completed || b.kanban_column === 'Completado';
+            if (aDone && !bDone) return 1;
+            if (!aDone && bDone) return -1;
+            if (a.due_date && b.due_date) {
+                return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+            }
+            if (a.due_date) return -1;
+            if (b.due_date) return 1;
+            return 0;
+        });
+
+        const getFriendlyDate = (dateStr?: string) => {
+            if (!dateStr) return '';
+            try {
+                const date = parseISO(dateStr);
+                if (isToday(date)) return 'Hoy';
+                if (isTomorrow(date)) return 'Mañana';
+                if (isYesterday(date)) return 'Ayer';
+                return format(date, 'd MMM', { locale: es });
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
+        const handleQuickAdd = async (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!newItemTitle.trim()) return;
+            
+            const isDoneCol = newItemKanbanColumn === 'Completado';
+
+            await addTodo(newItemTitle.trim(), {
+                projectId: activeProject.id,
+                priority: newItemPriority || 'medium',
+                dueDate: newItemDueDate || undefined,
+                startTime: newItemStartTime || undefined,
+                notes: newItemNotes.trim() || undefined,
+                kanban_column: newItemKanbanColumn,
+                completed: isDoneCol
+            });
+
+            // Reset states
+            setNewItemTitle('');
+            setNewItemDueDate('');
+            setNewItemStartTime('');
+            setNewItemNotes('');
+            setNewItemKanbanColumn('Por hacer');
+            setNewItemPriority('medium');
+        };
+
+        return (
+            <div className="p-6 max-w-2xl mx-auto space-y-6 w-full pb-24 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
+                <div className="flex items-center justify-between mb-2">
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tareas</h2>
+                        <p className="text-xs font-medium text-gray-500 mt-0.5">
+                            {projectTodos.filter(t => !t.completed && t.kanban_column !== 'Completado').length} pendientes, {projectTodos.filter(t => t.completed || t.kanban_column === 'Completado').length} completadas
+                        </p>
+                    </div>
+                </div>
+
+                {/* Quick Add Form */}
+                <form onSubmit={handleQuickAdd} className="bg-white dark:bg-zinc-900/50 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 shadow-2xs space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-zinc-400 shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="Añadir una nueva tarea..."
+                            value={newItemTitle}
+                            onChange={(e) => setNewItemTitle(e.target.value)}
+                            className="flex-1 bg-transparent border-none text-sm focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder-zinc-400"
+                        />
+                        {newItemTitle.trim() && (
+                            <button
+                                type="submit"
+                                className="px-3 py-1 bg-black dark:bg-white text-white dark:text-black text-xs font-bold rounded-lg transition-all shrink-0 shadow-xs hover:scale-105"
+                            >
+                                Añadir
+                            </button>
+                        )}
+                    </div>
+                    
+                    {/* Expand details on focus/type */}
+                    {newItemTitle.trim() && (
+                        <div className="space-y-3 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                            {/* Form Input Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {/* Due Date and Time Picker */}
+                                <div className="flex items-center gap-2.5">
+                                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors relative bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg w-full cursor-pointer">
+                                        <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                                        <input
+                                            type="date"
+                                            value={newItemDueDate}
+                                            onChange={(e) => setNewItemDueDate(e.target.value)}
+                                            className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                                            title="Fecha de vencimiento"
+                                        />
+                                        <span className="font-semibold text-[11px] truncate">
+                                            {newItemDueDate ? getFriendlyDate(newItemDueDate) : 'Asignar fecha'}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors relative bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg w-full cursor-pointer">
+                                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                                        <input
+                                            type="time"
+                                            value={newItemStartTime}
+                                            onChange={(e) => setNewItemStartTime(e.target.value)}
+                                            className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                                            title="Hora de inicio"
+                                        />
+                                        <span className="font-semibold text-[11px] truncate">
+                                            {newItemStartTime ? newItemStartTime : 'Asignar hora'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Column State Selector */}
+                                <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">Estado:</span>
+                                    <select
+                                        value={newItemKanbanColumn}
+                                        onChange={(e) => setNewItemKanbanColumn(e.target.value)}
+                                        className="bg-transparent border-none text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-0 w-full p-0 py-0.5 cursor-pointer"
+                                    >
+                                        <option value="Por hacer" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">Por hacer</option>
+                                        <option value="En progreso" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">En progreso</option>
+                                        <option value="Completado" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">Completado</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Notes description input */}
+                            <div className="bg-zinc-100 dark:bg-zinc-800/40 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                                <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                <input
+                                    type="text"
+                                    placeholder="Añadir una nota o descripción..."
+                                    value={newItemNotes}
+                                    onChange={(e) => setNewItemNotes(e.target.value)}
+                                    className="bg-transparent border-none text-xs focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder-zinc-400 w-full p-0"
+                                />
+                            </div>
+
+                            {/* Priority Selector */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-zinc-100/60 dark:border-zinc-800/40">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Prioridad:</span>
+                                    {(['low', 'medium', 'high'] as Priority[]).map((prio) => (
+                                        <button
+                                            key={prio}
+                                            type="button"
+                                            onClick={() => setNewItemPriority(prio)}
+                                            className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                                                newItemPriority === prio
+                                                    ? prio === 'high'
+                                                        ? 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300'
+                                                        : prio === 'medium'
+                                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                                                        : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300'
+                                                    : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                                            }`}
+                                        >
+                                            {prio === 'high' ? 'Alta' : prio === 'medium' ? 'Media' : 'Baja'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <span className="text-[10px] text-zinc-400 italic">💡 Haz clic en la tarea para editar subtareas o subir archivos</span>
+                            </div>
+                        </div>
+                    )}
+                </form>
+
+                {/* Filters and Search Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                    <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-hide">
+                        {(['all', 'todo', 'in_progress', 'completed'] as const).map((filter) => (
+                            <button
+                                key={filter}
+                                onClick={() => setPersonalFilter(filter)}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                                    personalFilter === filter
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs'
+                                        : 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800'
+                                }`}
+                            >
+                                {filter === 'all' ? 'Todas' : filter === 'todo' ? 'Por hacer' : filter === 'in_progress' ? 'En proceso' : 'Completadas'}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900/60 border border-transparent dark:border-zinc-800 rounded-lg px-2.5 py-1.5 flex-1 max-w-xs">
+                        <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="Buscar tarea..."
+                            value={listasSearch}
+                            onChange={(e) => setListasSearch(e.target.value)}
+                            className="bg-transparent border-none text-xs focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder-zinc-400 w-full"
+                        />
+                        {listasSearch.trim() && (
+                            <button onClick={() => setListasSearch('')} className="text-zinc-400 hover:text-zinc-600">
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Tasks List */}
+                <div className="space-y-2 pt-2">
+                    {sortedTodos.length === 0 ? (
+                        <div className="text-center py-12 text-zinc-400 dark:text-zinc-500 text-xs bg-white dark:bg-zinc-900/10 border border-dashed border-gray-200 dark:border-zinc-800 rounded-xl">
+                            No se encontraron tareas.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {sortedTodos.map(task => {
+                                const isOverdue = task.due_date && !(task.completed || task.kanban_column === 'Completado') && isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date));
+                                const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+                                const completedSub = hasSubtasks ? task.subtasks!.filter(s => s.completed).length : 0;
+                                const totalSub = hasSubtasks ? task.subtasks!.length : 0;
+                                const isDone = task.completed || task.kanban_column === 'Completado';
+
+                                return (
+                                    <div 
+                                        key={task.id} 
+                                        className="group flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900/40 hover:bg-gray-50/50 dark:hover:bg-zinc-900/80 border border-gray-100 dark:border-zinc-800 rounded-xl transition-all cursor-pointer shadow-2xs"
+                                        onClick={() => onEditTodo && onEditTodo(task)}
+                                    >
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateTodo(task.id, { 
+                                                        completed: !isDone,
+                                                        kanban_column: !isDone ? 'Completado' : 'Por hacer'
+                                                    });
+                                                }}
+                                                className="shrink-0 focus:outline-none"
+                                            >
+                                                {isDone ? (
+                                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                                ) : (
+                                                    <Circle className={`w-5 h-5 text-zinc-300 dark:text-zinc-700 hover:text-zinc-400 transition-colors ${
+                                                        task.priority === 'high' ? 'border-red-400 hover:border-red-500' : ''
+                                                    }`} />
+                                                )}
+                                            </button>
+                                            <div className="flex-1 min-w-0">
+                                                <span className={`text-sm font-semibold truncate block ${
+                                                    isDone 
+                                                        ? 'text-zinc-400 dark:text-zinc-600 line-through' 
+                                                        : 'text-zinc-800 dark:text-zinc-100'
+                                                }`}>
+                                                    {task.text}
+                                                </span>
+                                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                    {task.due_date && (
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                                                            isDone
+                                                                ? 'bg-zinc-100 dark:bg-zinc-800/40 text-zinc-400 dark:text-zinc-600'
+                                                                : isOverdue
+                                                                ? 'bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400'
+                                                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                                                        }`}>
+                                                            <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                                                            {getFriendlyDate(task.due_date)}
+                                                        </span>
+                                                    )}
+                                                    {task.start_time && (
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                                                            isDone
+                                                                ? 'bg-zinc-100 dark:bg-zinc-800/40 text-zinc-400 dark:text-zinc-600'
+                                                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                                                        }`}>
+                                                            <Clock className="w-3.5 h-3.5 shrink-0" />
+                                                            {task.start_time}
+                                                        </span>
+                                                    )}
+                                                    {task.priority && !isDone && (
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                                            task.priority === 'high'
+                                                                ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400'
+                                                                : task.priority === 'medium'
+                                                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400'
+                                                                : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400'
+                                                        }`}>
+                                                            {task.priority === 'high' ? 'Alta' : task.priority === 'medium' ? 'Media' : 'Baja'}
+                                                        </span>
+                                                    )}
+                                                    {task.kanban_column && (
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                                            isDone
+                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400'
+                                                                : task.kanban_column === 'En progreso'
+                                                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400'
+                                                                : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400'
+                                                        }`}>
+                                                            {task.kanban_column}
+                                                        </span>
+                                                    )}
+                                                    {hasSubtasks && (
+                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-400 flex items-center gap-1">
+                                                            <CheckSquareIcon className="w-3.5 h-3.5 shrink-0" />
+                                                            {completedSub}/{totalSub}
+                                                        </span>
+                                                    )}
+                                                    {task.attachments && task.attachments.length > 0 && (
+                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 flex items-center gap-1">
+                                                            <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                                                            {task.attachments.length}
+                                                        </span>
+                                                    )}
+                                                    {task.notes && (
+                                                        <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 flex items-center gap-1" title={task.notes}>
+                                                            <FileText className="w-3.5 h-3.5 shrink-0" />
+                                                            <span className="max-w-[120px] truncate">{task.notes}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteTodo(task.id);
+                                                }}
+                                                className="p-1 text-zinc-400 hover:text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Eliminar tarea"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                            <ChevronRight className="w-4 h-4 text-zinc-300 dark:text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     // LISTAS TAB (Multiple Lists, Bi-directional Kanban Sync & Inline Task Editing)
     const renderListas = () => {
         if (!activeProject) return null;
+
+        if (activeProject.project_mode === 'personal') {
+            return renderPersonalTareas();
+        }
 
         const projectLists = activeProject.lists || [];
 
@@ -5986,7 +6601,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             e.preventDefault();
             if (!newItemTitle.trim()) return;
             const assigneeValue = newItemAssignee.trim() || undefined;
-            const availableCols = activeProject.kanban_columns && activeProject.kanban_columns.length > 0 ? activeProject.kanban_columns : ['Por hacer', 'En progreso', 'Completado'];
+            const availableCols = activeProject.project_mode === 'personal'
+                ? ['Por hacer', 'En proceso', 'Completado']
+                : (activeProject.kanban_columns && activeProject.kanban_columns.length > 0 ? activeProject.kanban_columns : ['Por hacer', 'En progreso', 'Completado']);
             const defaultCol = availableCols[0] || 'Por hacer';
             await addTodo(newItemTitle.trim(), {
                 projectId: activeProject.id,
@@ -5995,10 +6612,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 assigned_to: assigneeValue,
                 dueDate: newItemDueDate || undefined,
                 kanban_column: defaultCol,
-                list_id: effectiveListId
+                list_id: activeProject.project_mode === 'personal' ? undefined : effectiveListId
             });
             setNewItemTitle('');
             setNewItemDueDate('');
+            setNewItemAssignee('');
+            setNewItemPriority('medium');
         };
 
         const handleShareListSummary = () => {
@@ -6481,7 +7100,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
                                 <div>
                                     <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Nueva Tarea</h3>
-                                    <p className="text-xs text-zinc-400">En {activeCustomList?.name || 'Lista'}</p>
+                                    <p className="text-xs text-zinc-400">En {activeProject.project_mode === 'personal' ? activeProject.name : (activeCustomList?.name || 'Lista')}</p>
                                 </div>
                                 <button
                                     type="button"
@@ -8283,7 +8902,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <button 
                                 onClick={() => {
                                     setIsQuickAddOpen(false);
-                                    setActiveTab('chat');
+                                    if (activeProject.project_mode === 'personal') {
+                                        setIsQuickMessageModalOpen(true);
+                                    } else {
+                                        setActiveTab('chat');
+                                    }
                                 }}
                                 className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
                             >
@@ -8347,6 +8970,74 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
                     </motion.div>
                 </div>
+            )}
+
+            {/* QUICK MESSAGE MODAL FOR PERSONAL PROJECTS */}
+            {isQuickMessageModalOpen && (
+                <Modal 
+                    isOpen={isQuickMessageModalOpen} 
+                    onClose={() => {
+                        setIsQuickMessageModalOpen(false);
+                        setQuickMessageText('');
+                    }} 
+                    title="Enviar Mensaje al Proyecto"
+                >
+                    <form onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!activeProject || !quickMessageText.trim()) return;
+
+                        const newMessage: ProjectChatMessage = {
+                            id: crypto.randomUUID(),
+                            project_id: activeProject.id,
+                            channel_id: 'general',
+                            sender_id: currentUser?.id,
+                            sender_name: currentUserName,
+                            sender_email: currentUserEmail,
+                            text: quickMessageText.trim(),
+                            created_at: new Date().toISOString()
+                        };
+
+                        const currentMessages = activeProject.chat_messages || [];
+                        onUpdateProject(activeProject.id, { 
+                            chat_messages: [...currentMessages, newMessage] 
+                        });
+
+                        setIsQuickMessageModalOpen(false);
+                        setQuickMessageText('');
+                    }} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                                Mensaje o actualización de estado
+                            </label>
+                            <textarea 
+                                value={quickMessageText}
+                                onChange={e => setQuickMessageText(e.target.value)}
+                                required 
+                                rows={4}
+                                placeholder="Escribe algo para publicar en el canal general del proyecto..." 
+                                className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-zinc-500"
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    setIsQuickMessageModalOpen(false);
+                                    setQuickMessageText('');
+                                }} 
+                                className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                type="submit" 
+                                className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg text-xs hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                            >
+                                Enviar Mensaje
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
             )}
 
             {/* MODAL EDITOR ENRIQUECIDO DE NOTAS DEL PROYECTO */}
