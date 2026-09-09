@@ -345,39 +345,44 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
   if (!isOpen || !todo) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100010] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
-
+    <div 
+      className="fixed inset-0 z-[100010] flex items-start sm:items-center justify-center pt-2 sm:pt-6 px-3 sm:px-4 pb-20 overflow-y-auto bg-black/60 backdrop-blur-xs animate-fade-in"
+      onClick={onClose}
+    >
       <div 
-        className="relative w-full max-w-lg bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl flex flex-col z-[100011] overflow-hidden max-h-[90vh]"
+        className="relative w-full max-w-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl flex flex-col z-[100011] overflow-hidden max-h-[92vh] my-1 sm:my-4"
         onClick={e => e.stopPropagation()}
       >
+        {/* Native Drag Handle */}
+        <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mt-3 mb-1 shrink-0 sm:hidden" />
+
         {/* Modal Header */}
-        <header className="flex-shrink-0 px-5 py-3.5 border-b border-secondary-light/50 dark:border-gray-700 flex items-center justify-between bg-white/50 dark:bg-gray-800/50 rounded-t-2xl">
+        <header className="flex-shrink-0 px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-base text-gray-800 dark:text-gray-100">
-              Editar Tarea
+            <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
+              Detalles de la Tarea
             </h3>
-            <p className="text-xs text-gray-400 dark:text-gray-400">
-              Modifica los detalles de tu tarea
+            <p className="text-xs text-zinc-500">
+              Personaliza prioridad, fecha, recordatorios y notas
             </p>
           </div>
           <button 
             type="button" 
             onClick={onClose} 
-            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-secondary-light/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            aria-label="Cerrar modal"
           >
             <CloseIcon />
           </button>
         </header>
 
         {/* Form Body */}
-        <form onSubmit={handleSave} className="flex flex-col flex-grow overflow-hidden rounded-b-2xl">
-          <main className="flex-grow p-5 overflow-y-auto custom-scrollbar space-y-4 text-left">
+        <form onSubmit={handleSave} className="flex flex-col flex-grow overflow-hidden">
+          <main className="flex-grow p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 text-left">
             
             {/* Task Name */}
-            <div className="space-y-1">
-              <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Nombre de la Tarea
               </label>
               <input 
@@ -386,32 +391,33 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 value={text || ''} 
                 onChange={(e) => setText(e.target.value)} 
                 placeholder="Ej. Comprar víveres, Enviar informe..." 
-                className="w-full bg-white/50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-slate-300 dark:border-gray-600 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100 placeholder:text-gray-400 transition-all"
+                className="w-full bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-2.5 px-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-600 placeholder:text-zinc-400 transition-all"
               />
             </div>
 
             {/* Subtasks */}
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Sub-tareas
               </label>
               {subtasks.length > 0 && (
                 <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
                   {subtasks.map(subtask => (
-                    <div key={subtask.id} className="flex items-center gap-2 bg-white/50 dark:bg-gray-700/60 p-2 rounded-lg border border-secondary-light/50 dark:border-gray-700 group">
+                    <div key={subtask.id} className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 group">
                       <input 
                         type="checkbox" 
                         checked={subtask.completed} 
                         onChange={() => handleToggleSubtask(subtask.id)}
-                        className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0 cursor-pointer"
+                        className="w-4 h-4 rounded text-zinc-900 dark:text-white border-zinc-300 dark:border-zinc-600 focus:ring-0 cursor-pointer"
                       />
-                      <span className={`flex-1 text-xs ${subtask.completed ? 'line-through text-gray-400 dark:text-gray-400' : 'text-gray-700 dark:text-secondary-light/50'}`}>
+                      <span className={`flex-1 text-xs ${subtask.completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
                         {subtask.text}
                       </span>
                       <button 
                         type="button" 
                         onClick={() => handleDeleteSubtask(subtask.id)} 
-                        className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors"
+                        className="text-zinc-400 hover:text-rose-500 p-1 rounded-lg transition-colors"
+                        aria-label="Eliminar sub-tarea"
                       >
                         <TrashIcon className="h-3.5 w-3.5" />
                       </button>
@@ -426,12 +432,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   onChange={e => setNewSubtaskText(e.target.value)} 
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(); } }}
                   placeholder="Añadir nueva sub-tarea..." 
-                  className="flex-1 bg-white/50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-slate-300 dark:border-gray-600 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100 placeholder:text-gray-400"
+                  className="flex-1 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-600 placeholder:text-zinc-400"
                 />
                 <button 
                   type="button" 
                   onClick={handleAddSubtask} 
-                  className="px-3 py-1.5 bg-secondary-light/50 dark:bg-gray-600 hover:bg-slate-300 dark:hover:bg-gray-500 text-gray-700 dark:text-secondary-light/50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                  className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold rounded-xl transition-all flex items-center gap-1 shrink-0"
                 >
                   <PlusIcon className="w-3.5 h-3.5" />
                   Añadir
@@ -439,18 +445,18 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
               </div>
             </div>
 
-            <hr className="border-gray-100 dark:border-gray-700" />
+            <hr className="border-zinc-100 dark:border-zinc-800/80" />
 
             {/* Project & Priority */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Proyecto
                 </label>
                 <select 
                   value={projectId === null ? '' : projectId} 
                   onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)} 
-                  className="w-full bg-white/50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-slate-300 dark:border-gray-600 rounded-lg py-2 px-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-zinc-400"
                 >
                   <option value="">Sin proyecto</option>
                   {projects.map(p => (
@@ -460,10 +466,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                   Prioridad
                 </label>
-                <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg border border-secondary-light/50 dark:border-gray-600">
+                <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
                   {(['low', 'medium', 'high'] as Priority[]).map(p => {
                     const labels: Record<Priority, string> = { low: 'Baja', medium: 'Media', high: 'Alta' };
                     const isSelected = priority === p;
@@ -472,10 +478,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         key={p}
                         type="button"
                         onClick={() => setPriority(p)}
-                        className={`flex-1 py-1 text-xs font-semibold rounded-md transition-colors ${
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
                           isSelected
-                            ? p === 'high' ? 'bg-red-600 text-white' : p === 'medium' ? 'bg-amber-500 text-white' : 'bg-blue-600 text-white'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100'
+                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs'
+                            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
                         }`}
                       >
                         {labels[p]}
@@ -487,32 +493,32 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Date Section */}
-            <div className="p-3 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2.5">
+            <div className="p-3.5 bg-zinc-50/80 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
-                  <CalendarIcon className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-zinc-400" />
                   Fecha
                 </span>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-xs text-gray-400 dark:text-gray-400">Sin fecha</span>
+                  <span className="text-xs text-zinc-500">Sin fecha</span>
                   <input 
                     type="checkbox" 
                     checked={isUndated} 
                     onChange={e => handleToggleUndated(e.target.checked)} 
-                    className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0"
+                    className="w-4 h-4 rounded text-zinc-900 dark:text-white border-zinc-300 dark:border-zinc-700 focus:ring-0"
                   />
                 </label>
               </div>
 
               {!isUndated && (
-                <div className="space-y-2 pt-2 border-t border-secondary-light/50/60 dark:border-gray-600/60 animate-fade-in">
+                <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-gray-400 dark:text-gray-400">Rango de fechas (Fin)</span>
+                    <span className="text-[11px] text-zinc-500">Rango de fechas (Fin)</span>
                     <input 
                       type="checkbox" 
                       checked={hasEndDate} 
                       onChange={e => setHasEndDate(e.target.checked)} 
-                      className="w-3.5 h-3.5 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0"
+                      className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -520,15 +526,15 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                       type="date" 
                       value={due_date || ''} 
                       onChange={e => setDueDate(e.target.value)} 
-                      className="flex-1 bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
+                      className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                     />
-                    {hasEndDate && <span className="text-xs text-gray-400 font-medium">a</span>}
+                    {hasEndDate && <span className="text-xs text-zinc-400 font-medium">a</span>}
                     {hasEndDate && (
                       <input 
                         type="date" 
                         value={end_date || ''} 
                         onChange={e => setEndDate(e.target.value)} 
-                        className="flex-1 bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
+                        className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                       />
                     )}
                   </div>
@@ -537,10 +543,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Time Section */}
-            <div className="p-3 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2">
+            <div className="p-3.5 bg-zinc-50/80 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
-                  <ClockIcon className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <ClockIcon className="w-3.5 h-3.5 text-zinc-400" />
                   Añadir Hora
                 </span>
                 <input 
@@ -548,28 +554,28 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   checked={hasTime} 
                   onChange={e => handleToggleTime(e.target.checked)} 
                   disabled={isUndated}
-                  className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0 disabled:opacity-40"
+                  className="w-4 h-4 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
                 />
               </div>
 
               {hasTime && !isUndated && (
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-secondary-light/50/60 dark:border-gray-600/60 animate-fade-in">
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in">
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-400 dark:text-gray-400 mb-1">Inicio</label>
+                    <label className="block text-[11px] font-medium text-zinc-500 mb-1">Inicio</label>
                     <input 
                       type="time" 
                       value={start_time || ''} 
                       onChange={e => setStartTime(e.target.value)} 
-                      className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
+                      className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-400 dark:text-gray-400 mb-1">Fin (opcional)</label>
+                    <label className="block text-[11px] font-medium text-zinc-500 mb-1">Fin (opcional)</label>
                     <input 
                       type="time" 
                       value={end_time || ''} 
                       onChange={e => setEndTime(e.target.value)} 
-                      className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
+                      className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                     />
                   </div>
                 </div>
@@ -577,10 +583,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Reminder Section */}
-            <div className="p-3 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2">
+            <div className="p-3.5 bg-zinc-50/80 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
-                  <BellIcon className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <BellIcon className="w-3.5 h-3.5 text-zinc-400" />
                   Recordatorio
                 </span>
                 <input 
@@ -588,16 +594,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   checked={hasReminder} 
                   onChange={e => handleToggleReminder(e.target.checked)} 
                   disabled={isUndated}
-                  className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0 disabled:opacity-40"
+                  className="w-4 h-4 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
                 />
               </div>
 
               {hasReminder && !isUndated && (
-                <div className="space-y-2 pt-2 border-t border-secondary-light/50/60 dark:border-gray-600/60 animate-fade-in">
+                <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in">
                   <select 
                     value={reminderType || '0'} 
                     onChange={e => setReminderType(e.target.value)} 
-                    className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
+                    className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                   >
                     <option value="0">En el momento de la tarea</option>
                     <option value="10">10 minutos antes</option>
@@ -613,13 +619,13 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         type="date" 
                         value={customReminderDate || ''} 
                         onChange={e => setCustomReminderDate(e.target.value)} 
-                        className="bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800"
+                        className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                       />
                       <input 
                         type="time" 
                         value={customReminderTime || ''} 
                         onChange={e => setCustomReminderTime(e.target.value)} 
-                        className="bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800"
+                        className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                       />
                     </div>
                   )}
@@ -628,10 +634,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Recurrence Section */}
-            <div className="p-3 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2">
+            <div className="p-3.5 bg-zinc-50/80 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
-                  <RefreshIcon className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <RefreshIcon className="w-3.5 h-3.5 text-zinc-400" />
                   Repetir tarea
                 </span>
                 <input 
@@ -639,16 +645,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   checked={hasRecurrence} 
                   onChange={e => handleToggleRecurrence(e.target.checked)} 
                   disabled={isUndated}
-                  className="w-4 h-4 rounded text-gray-800 border-slate-300 dark:border-gray-500 focus:ring-0 disabled:opacity-40"
+                  className="w-4 h-4 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
                 />
               </div>
 
               {hasRecurrence && !isUndated && (
-                <div className="space-y-2.5 pt-2 border-t border-secondary-light/50/60 dark:border-gray-600/60 animate-fade-in">
+                <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in">
                   <select 
                     value={recurrence?.frequency || 'none'} 
                     onChange={e => setRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
-                    className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100"
+                    className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                   >
                     <option value="none">Nunca</option>
                     <option value="daily">Diariamente</option>
@@ -657,7 +663,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   </select>
 
                   {recurrence.frequency === 'custom' && (
-                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-gray-600 rounded-lg border border-secondary-light/50 dark:border-gray-500">
+                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700">
                       {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map((dayLabel, index) => {
                         const isSelected = recurrence.customDays?.includes(index);
                         return (
@@ -665,8 +671,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                             key={index} 
                             type="button" 
                             onClick={() => handleCustomDayToggle(index)} 
-                            className={`flex-1 py-1 text-xs font-semibold rounded-md transition-colors ${
-                              isSelected ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800' : 'text-gray-500 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-500'
+                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                              isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700'
                             }`}
                           >
                             {dayLabel}
@@ -677,12 +683,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   )}
 
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-400 dark:text-gray-400 mb-1">Finaliza repetición (opcional)</label>
+                    <label className="block text-[11px] font-medium text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
                     <input 
                       type="date" 
                       value={recurrence?.ends_on || ''} 
                       onChange={e => setRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
-                      className="w-full bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg p-1.5 text-xs text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-800"
+                      className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                     />
                   </div>
                 </div>
@@ -690,9 +696,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
             </div>
 
             {/* Notes */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-gray-600 dark:text-secondary-light/50">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                   Notas
                 </label>
                 {todo?.notion_page_id && (
@@ -701,16 +707,16 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                       type="button"
                       onClick={handleFetchNotionNotes}
                       disabled={isLoadingNotionNotes}
-                      className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                      className="text-[10px] text-zinc-600 dark:text-zinc-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
                     >
-                      {isLoadingNotionNotes ? 'Cargando...' : 'Importar de Notion ⚡'}
+                      {isLoadingNotionNotes ? 'Cargando...' : 'Importar de Notion'}
                     </button>
                     {todo.notion_url && (
                       <a
                         href={todo.notion_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[10px] text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-secondary-light/50 hover:underline flex items-center gap-0.5"
+                        className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 underline flex items-center gap-0.5"
                       >
                         Abrir Notion ↗
                       </a>
@@ -723,32 +729,32 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 onChange={e => setNotes(e.target.value)} 
                 placeholder="Añade notas o detalles adicionales..." 
                 rows={3} 
-                className="w-full bg-white/50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border border-slate-300 dark:border-gray-600 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-100 placeholder:text-gray-400 transition-all resize-none"
+                className="w-full bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-2.5 px-3.5 text-xs focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-600 placeholder:text-zinc-400 transition-all resize-none"
               />
             </div>
 
             {/* Calendar Integration Section */}
-            <div className="p-3.5 bg-white/50 dark:bg-gray-700/60 rounded-xl border border-secondary-light/50 dark:border-gray-700 space-y-2.5">
+            <div className="p-3.5 bg-zinc-50/80 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-600 dark:text-secondary-light/50 flex items-center gap-1.5">
-                  <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-zinc-500" />
                   Sincronización de Calendario
                 </span>
                 {(todo.gcal_event_id || todo.calendar_provider) && calendarSyncStatus !== 'removed' ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     Sincronizado
                   </span>
                 ) : (
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-zinc-400">
                     {calendarSyncStatus === 'removed' ? 'Desvinculado' : 'No sincronizado'}
                   </span>
                 )}
               </div>
 
               {(todo.gcal_event_id || todo.calendar_provider) && calendarSyncStatus !== 'removed' ? (
-                <div className="bg-white dark:bg-gray-800/80 p-3 rounded-lg border border-secondary-light/50/80 dark:border-gray-600/80 space-y-2.5">
-                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-slate-300">
+                <div className="bg-white dark:bg-zinc-800/80 p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-300">
                     <div className="flex items-center gap-2">
                       {todo.calendar_provider === 'outlook' ? (
                         <OutlookIcon className="w-4 h-4" />
@@ -764,22 +770,22 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         href={todo.calendar_event_link}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-blue-500 hover:text-blue-600 underline text-[11px]"
+                        className="text-zinc-700 dark:text-zinc-300 hover:underline text-[11px] font-medium"
                       >
-                        Abrir
+                        Abrir ↗
                       </a>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
-                    <p className="text-[11px] text-gray-400 dark:text-gray-400">
-                      Puedes eliminar el evento del calendario sin borrar la tarea de la app.
+                  <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-700">
+                    <p className="text-[11px] text-zinc-400">
+                      Desvincular del calendario sin borrar de la app.
                     </p>
                     <button
                       type="button"
                       onClick={() => setIsConfirmRemoveCalOpen(true)}
                       disabled={isRemovingCalendar}
-                      className="px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800/60 rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5"
+                      className="px-2.5 py-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 border border-zinc-200 dark:border-zinc-600 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5"
                     >
                       {isRemovingCalendar ? (
                         <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
@@ -787,18 +793,18 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
                       ) : (
-                        <CalendarIcon className="w-3 h-3 text-amber-600" />
+                        <CalendarIcon className="w-3 h-3 text-zinc-400" />
                       )}
-                      Eliminar del Calendario
+                      Desvincular
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2.5 bg-white dark:bg-gray-800/80 rounded-lg border border-secondary-light/50/80 dark:border-gray-600/80">
-                    <span className="text-[11px] text-gray-400 dark:text-gray-400">
+                  <div className="flex items-center justify-between p-2.5 bg-white dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80">
+                    <span className="text-[11px] text-zinc-400">
                       {calendarSyncStatus === 'removed' 
-                        ? '✓ Evento eliminado del calendario. La tarea permanece guardada.'
+                        ? '✓ Evento eliminado del calendario. La tarea sigue aquí.'
                         : 'Esta tarea no está vinculada a un evento de calendario.'}
                     </span>
                     {onSyncToCalendar && !isUndated && (
@@ -806,7 +812,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         type="button"
                         onClick={handleInitiateSync}
                         disabled={isSyncingCalendar}
-                        className="px-2.5 py-1 text-[11px] font-medium text-gray-600 dark:text-secondary-light/50 bg-gray-100 dark:bg-gray-700 hover:bg-secondary-light/50 dark:hover:bg-gray-600 rounded-md transition-colors flex items-center gap-1.5"
+                        className="px-3 py-1.5 text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 rounded-lg transition-all flex items-center gap-1.5 active:scale-95"
                       >
                         {isSyncingCalendar ? (
                           <>
@@ -818,15 +824,15 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                           </>
                         ) : (
                           <>
-                            <CalendarIcon className="w-3.5 h-3.5 text-primary" />
-                            <span>Sincronizar ahora</span>
+                            <CalendarIcon className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                            <span>Sincronizar</span>
                           </>
                         )}
                       </button>
                     )}
                   </div>
                   {syncNotice && (
-                    <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200">
+                    <div className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] text-zinc-700 dark:text-zinc-300">
                       {syncNotice}
                     </div>
                   )}
@@ -837,12 +843,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
           </main>
 
           {/* Modal Footer */}
-          <footer className="flex-shrink-0 px-5 py-3 border-t border-secondary-light/50 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 flex items-center justify-between gap-2 rounded-b-2xl">
+          <footer className="flex-shrink-0 px-5 py-3.5 border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between gap-2">
             {todo && onDelete ? (
               <button
                 type="button"
                 onClick={() => setIsConfirmDeleteOpen(true)}
-                className="px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors flex items-center gap-1.5"
+                className="px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors flex items-center gap-1.5 active:scale-95"
               >
                 <TrashIcon className="w-3.5 h-3.5" />
                 Eliminar
@@ -853,14 +859,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
               <button 
                 type="button" 
                 onClick={onClose} 
-                className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-slate-300 hover:bg-secondary-light/50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="px-4 py-2.5 text-xs font-semibold text-zinc-500 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 rounded-xl transition-colors active:scale-95"
               >
                 Cancelar
               </button>
               <button 
                 type="submit" 
                 disabled={!text.trim()} 
-                className="px-5 py-2 text-xs font-semibold bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-800 hover:bg-gray-700 dark:hover:bg-white rounded-lg transition-colors disabled:opacity-40"
+                className="px-5 py-2.5 text-xs font-bold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl transition-all shadow-xs disabled:opacity-40 active:scale-95"
               >
                 Guardar Cambios
               </button>
@@ -871,23 +877,23 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
 
       {/* Account Selection Modal */}
       {isAccountPickerOpen && (
-        <div className="fixed inset-0 z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-700">
-              <h4 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
-                <CalendarIcon className="w-4 h-4 text-primary" />
+        <div className="fixed inset-0 z-[100020] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-950 rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-zinc-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
+              <h4 className="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                <CalendarIcon className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />
                 <span>¿A cuál cuenta sincronizar?</span>
               </h4>
               <button
                 onClick={() => setIsAccountPickerOpen(false)}
-                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
+                className="p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400"
               >
                 <CloseIcon />
               </button>
             </div>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Detectamos múltiples cuentas de calendario conectadas. Elige dónde crear este evento:
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Detectamos múltiples cuentas conectadas. Selecciona dónde crear este evento:
             </p>
 
             <div className="space-y-2">
@@ -895,18 +901,18 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 <button
                   type="button"
                   onClick={() => handleSyncToCalendarAction('google')}
-                  className="w-full p-3 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-all text-left flex items-center justify-between group"
+                  className="w-full p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-all text-left flex items-center justify-between group active:scale-[0.98]"
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="w-5 h-5 flex-shrink-0"><GoogleIcon /></div>
                     <div>
-                      <div className="font-bold text-xs text-sky-900 dark:text-sky-200">Google Calendar</div>
-                      <div className="text-[10px] text-sky-600 dark:text-sky-400">
+                      <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100">Google Calendar</div>
+                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
                         {getConnectedCalendarAccounts().googleEmail}
                       </div>
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-sky-600 dark:text-sky-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                  <span className="text-xs font-bold text-zinc-400 group-hover:translate-x-0.5 transition-transform">→</span>
                 </button>
               )}
 
@@ -914,18 +920,18 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                 <button
                   type="button"
                   onClick={() => handleSyncToCalendarAction('outlook')}
-                  className="w-full p-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all text-left flex items-center justify-between group"
+                  className="w-full p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-all text-left flex items-center justify-between group active:scale-[0.98]"
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="w-5 h-5 flex-shrink-0"><OutlookIcon /></div>
                     <div>
-                      <div className="font-bold text-xs text-blue-900 dark:text-blue-200">Outlook Calendar</div>
-                      <div className="text-[10px] text-blue-600 dark:text-blue-400">
+                      <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100">Outlook Calendar</div>
+                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
                         {getConnectedCalendarAccounts().outlookEmail}
                       </div>
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                  <span className="text-xs font-bold text-zinc-400 group-hover:translate-x-0.5 transition-transform">→</span>
                 </button>
               )}
             </div>
@@ -934,7 +940,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
               <button
                 type="button"
                 onClick={() => setIsAccountPickerOpen(false)}
-                className="px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="px-3.5 py-2 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
               >
                 Cancelar
               </button>

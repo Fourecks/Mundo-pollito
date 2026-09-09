@@ -53,6 +53,52 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
         onToggleRecord(habitId.toString(), specificDateStr, !currentCompleted);
     };
 
+    // Helper: calculate streak and status for a habit
+    const getHabitStreakInfo = (habitId: number | string) => {
+        const idNum = Number(habitId);
+        const todayDStr = format(new Date(), 'yyyy-MM-dd');
+        const isCompletedToday = records.some(r => Number(r.habit_id) === idNum && r.completed_at === todayDStr);
+        
+        let streak = 0;
+        let checkDate = new Date();
+        
+        if (isCompletedToday) {
+            streak = 1;
+            checkDate = subDays(checkDate, 1);
+            while (streak < 365) {
+                const d = format(checkDate, 'yyyy-MM-dd');
+                if (records.some(r => Number(r.habit_id) === idNum && r.completed_at === d)) {
+                    streak++;
+                    checkDate = subDays(checkDate, 1);
+                } else {
+                    break;
+                }
+            }
+            return {
+                streak,
+                isCompletedToday: true,
+                status: 'continued' as const
+            };
+        } else {
+            // Not completed today: count streak through yesterday
+            checkDate = subDays(checkDate, 1);
+            while (streak < 365) {
+                const d = format(checkDate, 'yyyy-MM-dd');
+                if (records.some(r => Number(r.habit_id) === idNum && r.completed_at === d)) {
+                    streak++;
+                    checkDate = subDays(checkDate, 1);
+                } else {
+                    break;
+                }
+            }
+            return {
+                streak,
+                isCompletedToday: false,
+                status: 'at_risk' as const
+            };
+        }
+    };
+
     const completedCount = habits.filter(h => isHabitCompletedOnDate(h.id, dateStr)).length;
     const progress = habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0;
 
@@ -210,6 +256,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
             <div className="space-y-2.5">
                 {habits.map(habit => {
                     const isCompleted = isHabitCompletedOnDate(habit.id, dateStr);
+                    const streakInfo = getHabitStreakInfo(habit.id);
 
                     return (
                         <motion.div 
@@ -240,7 +287,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
 
                             {/* Detalles del Hábito */}
                             <div 
-                                className="flex-1 min-w-0 cursor-pointer"
+                                className="flex-1 min-w-0 cursor-pointer pr-2"
                                 onClick={() => onOpenHabitEditor(habit)}
                             >
                                 <div className="flex items-center gap-2">
@@ -254,6 +301,27 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                         {habit.description}
                                     </p>
                                 )}
+                            </div>
+
+                            {/* Insignia de Racha en la Esquina: Verde si se continuó hoy, Rojo si se está perdiendo la racha hoy */}
+                            <div className="shrink-0 flex items-center pl-1">
+                                <div 
+                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-all ${
+                                        streakInfo.isCompletedToday
+                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 shadow-xs'
+                                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 animate-pulse'
+                                    }`}
+                                    title={
+                                        streakInfo.isCompletedToday
+                                            ? `Racha de ${streakInfo.streak} días mantenida hoy`
+                                            : streakInfo.streak > 0
+                                                ? `Racha de ${streakInfo.streak} días en riesgo hoy (no completado aún)`
+                                                : 'Sin racha activa hoy'
+                                    }
+                                >
+                                    <Flame className={`w-3.5 h-3.5 ${streakInfo.isCompletedToday ? 'fill-emerald-500 text-emerald-500' : 'fill-rose-500 text-rose-500'}`} />
+                                    <span>{streakInfo.streak}d</span>
+                                </div>
                             </div>
                         </motion.div>
                     );
@@ -270,10 +338,10 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                 )}
             </div>
 
-            {/* EMERGENTE 1: VISTA SEMANAL */}
+            {/* EMERGENTE 1: VISTA SEMANAL - Empieza más arriba y z-[75] para no ser tapado */}
             <AnimatePresence>
                 {isWeeklyModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+                    <div className="fixed inset-0 z-[75] flex items-start justify-center pt-2 sm:pt-6 px-3 sm:px-6 pb-20 overflow-y-auto">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -282,26 +350,30 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                             className="fixed inset-0 bg-black/60 backdrop-blur-xs"
                         />
                         <motion.div
-                            initial={{ y: '100%' }}
-                            animate={{ y: 0 }}
-                            exit={{ y: '100%' }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 280 }}
-                            className="relative w-full max-w-lg bg-white dark:bg-zinc-950 rounded-t-3xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl max-h-[85vh] flex flex-col z-10"
+                            initial={{ opacity: 0, y: -20, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -20, scale: 0.98 }}
+                            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+                            className="relative w-full max-w-lg bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 shadow-2xl max-h-[92vh] flex flex-col z-10 my-1 sm:my-4"
                         >
-                            <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
+                            {/* Drag Indicator for Native Feel */}
+                            <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mb-2.5 shrink-0 sm:hidden" />
+
+                            <div className="flex items-center justify-between pb-3.5 border-b border-zinc-100 dark:border-zinc-800/80 shrink-0">
                                 <div>
                                     <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Vista Semanal</h3>
                                     <p className="text-xs text-zinc-500">Semana del {format(weekDays[0], "d 'de' MMM", { locale: es })} al {format(weekDays[6], "d 'de' MMM", { locale: es })}</p>
                                 </div>
                                 <button
                                     onClick={() => setIsWeeklyModalOpen(false)}
-                                    className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500"
+                                    className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 active:scale-95 transition-all"
+                                    aria-label="Cerrar vista semanal"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-4.5 h-4.5" />
                                 </button>
                             </div>
 
-                            <div className="overflow-y-auto py-4 space-y-4 flex-1">
+                            <div className="overflow-y-auto py-3 space-y-3 flex-1 pb-16 custom-scrollbar">
                                 {habits.map(habit => (
                                     <div key={habit.id} className="p-3 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60">
                                         <div className="flex items-center gap-2 mb-3">
@@ -348,10 +420,10 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                 )}
             </AnimatePresence>
 
-            {/* EMERGENTE 2: ESTADÍSTICAS */}
+            {/* EMERGENTE 2: ESTADÍSTICAS - Empieza más arriba y z-[75] para no ser tapado */}
             <AnimatePresence>
                 {isStatsModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+                    <div className="fixed inset-0 z-[75] flex items-start justify-center pt-2 sm:pt-6 px-3 sm:px-6 pb-20 overflow-y-auto">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -360,26 +432,30 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                             className="fixed inset-0 bg-black/60 backdrop-blur-xs"
                         />
                         <motion.div
-                            initial={{ y: '100%' }}
-                            animate={{ y: 0 }}
-                            exit={{ y: '100%' }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 280 }}
-                            className="relative w-full max-w-lg bg-white dark:bg-zinc-950 rounded-t-3xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl max-h-[85vh] flex flex-col z-10"
+                            initial={{ opacity: 0, y: -20, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -20, scale: 0.98 }}
+                            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+                            className="relative w-full max-w-lg bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 shadow-2xl max-h-[92vh] flex flex-col z-10 my-1 sm:my-4"
                         >
-                            <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
+                            {/* Drag Indicator for Native Feel */}
+                            <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mb-2.5 shrink-0 sm:hidden" />
+
+                            <div className="flex items-center justify-between pb-3.5 border-b border-zinc-100 dark:border-zinc-800/80 shrink-0">
                                 <div>
                                     <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Estadísticas de Hábitos</h3>
                                     <p className="text-xs text-zinc-500">Resumen y consistencia de tus hábitos</p>
                                 </div>
                                 <button
                                     onClick={() => setIsStatsModalOpen(false)}
-                                    className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500"
+                                    className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 active:scale-95 transition-all"
+                                    aria-label="Cerrar estadísticas"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-4.5 h-4.5" />
                                 </button>
                             </div>
 
-                            <div className="overflow-y-auto py-4 space-y-4 flex-1">
+                            <div className="overflow-y-auto py-3 space-y-4 flex-1 pb-16 custom-scrollbar">
                                 {/* Metric Cards Grid */}
                                 <div className="grid grid-cols-2 gap-2.5">
                                     <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/60">

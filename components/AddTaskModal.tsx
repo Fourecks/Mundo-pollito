@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import MicrophoneIcon from './icons/MicrophoneIcon';
+import CloseIcon from './icons/CloseIcon';
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -133,59 +134,79 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onAddTask 
 
   const modalContent = (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[100010] overflow-y-auto animate-fade-in"
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start sm:items-center justify-center pt-3 sm:pt-6 px-3 sm:px-4 pb-20 z-[100010] overflow-y-auto animate-fade-in"
       aria-modal="true"
       role="dialog"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-3xl shadow-2xl p-6 w-full max-w-sm mx-auto transform transition-all duration-300 animate-pop-in max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl p-5 w-full max-w-md mx-auto transform transition-all duration-200 max-h-[92vh] flex flex-col my-1 sm:my-4"
         onClick={e => e.stopPropagation()}
       >
-        <h2 className="text-xl font-bold text-primary-dark dark:text-primary text-center mb-4">
-          Nueva Tarea
-        </h2>
+        {/* Native Drag Handle */}
+        <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mb-3 shrink-0 sm:hidden" />
+
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-100 dark:border-zinc-800/80">
+          <div>
+            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+              Nueva Tarea
+            </h2>
+            <p className="text-xs text-zinc-500">
+              Añade una tarea rápida a tu lista
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            aria-label="Cerrar modal"
+          >
+            <CloseIcon />
+          </button>
+        </div>
         
-        <div className="relative w-full">
+        <div className="relative w-full mb-4">
           <textarea
             ref={textareaRef}
             value={text || ''}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="¿Tienes algo en mente, pollito?"
-            className="w-full bg-white/80 dark:bg-gray-700/80 text-gray-800 dark:text-gray-100 border-2 border-secondary-light dark:border-gray-600 rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 resize-none pr-12"
-            rows={1}
+            placeholder="¿Qué tienes pendiente hoy?..."
+            className="w-full bg-zinc-50 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3 px-3.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-600 transition-all resize-none pr-12 text-sm placeholder:text-zinc-400 min-h-[80px]"
+            rows={2}
           />
           {isSpeechSupported && (
             <button
               type="button"
               onClick={handleMicClick}
-              className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all duration-200 ${
+              className={`absolute right-3 bottom-3 p-2 rounded-xl transition-all ${
                 isListening
-                  ? 'bg-red-500 text-white animate-pulse'
-                  : 'text-gray-500 dark:text-gray-400 hover:bg-secondary-lighter dark:hover:bg-gray-700'
+                  ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 animate-pulse'
+                  : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800'
               }`}
               aria-label={isListening ? 'Detener dictado' : 'Dictar tarea'}
             >
-              <MicrophoneIcon className="h-5 w-5" />
+              <MicrophoneIcon className="h-4 w-4" />
             </button>
           )}
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-            <button
-                onClick={onClose}
-                className="w-full bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-full px-5 py-2.5 hover:bg-gray-300 dark:hover:bg-gray-500 transition-all duration-200"
-            >
-                Cancelar
-            </button>
-            <button
-                onClick={handleSubmit}
-                className="w-full bg-primary text-white font-bold rounded-full px-5 py-2.5 shadow-md hover:bg-primary-dark transform hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
-                disabled={!text.trim()}
-            >
-                Guardar Tarea
-            </button>
+        <div className="flex items-center justify-end gap-2.5 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all active:scale-95"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="px-5 py-2.5 text-xs font-bold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+            disabled={!text.trim()}
+          >
+            Guardar Tarea
+          </button>
         </div>
       </div>
     </div>
