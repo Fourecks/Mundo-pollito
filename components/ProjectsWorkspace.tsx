@@ -4,8 +4,9 @@ import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, Project
 import { sendPushNotification } from '../services/pushNotificationService';
 import ProjectNoteEditorModal from './ProjectNoteEditorModal';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cleanToPlainText } from '../utils/textCleaner';
@@ -88,7 +89,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     isMobile = false,
     onBack
 }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team' | 'listas'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team' | 'listas' | 'mas_menu' | 'mis_tareas'>('overview');
     
     // Sprint Detail & Task Management
     const [sprintDetailModal, setSprintDetailModal] = useState<Sprint | null>(null);
@@ -1018,6 +1019,100 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
 
+    const renderMasMenu = () => {
+        const masTabs = [
+            { id: 'sprints', label: 'Sprints', icon: Target, badge: 0 },
+            { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon, badge: 0 },
+            { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs },
+            { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
+            { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time },
+            { id: 'team', label: 'Equipo', icon: Users, badge: 0 },
+            { id: 'settings', label: 'Configuración', icon: Settings, badge: 0 }
+        ];
+
+        return (
+            <div className="p-4 space-y-2 h-full overflow-y-auto">
+                {masTabs.map(tab => {
+                    const Icon = tab.icon;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => {
+                                if (tab.id === 'settings') {
+                                    if (onOpenProjectEditor && activeProject) onOpenProjectEditor(activeProject);
+                                } else {
+                                    setActiveTab(tab.id as any);
+                                }
+                            }}
+                            className="w-full flex items-center justify-between p-4 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 active:scale-95 transition-all shadow-sm"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-zinc-50 dark:bg-zinc-800/80 rounded-xl">
+                                    <Icon className="w-5 h-5 text-zinc-600 dark:text-zinc-300" />
+                                </div>
+                                <span className="font-semibold text-zinc-900 dark:text-white text-sm">{tab.label}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {tab.badge && tab.badge > 0 ? (
+                                    <span className="px-2 py-0.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px] font-bold rounded-full">
+                                        {tab.badge}
+                                    </span>
+                                ) : null}
+                                <ChevronRight className="w-4 h-4 text-zinc-400" />
+                            </div>
+                        </button>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    const renderMisTareas = () => {
+        if (!activeProject) return null;
+        const myTodos = projectTodos.filter(t => (t.assigned_to === currentUserEmail || t.created_by === currentUserEmail));
+        
+        return (
+            <div className="p-4 h-full overflow-y-auto pb-24 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Mis Tareas</h2>
+                        <p className="text-xs font-medium text-gray-500 mt-0.5">{myTodos.length} tareas asignadas o creadas por ti</p>
+                    </div>
+                </div>
+                
+                {myTodos.length === 0 ? (
+                    <div className="text-center py-10 opacity-60 text-sm">
+                        No tienes tareas pendientes en este proyecto.
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {myTodos.map(task => (
+                            <div key={task.id} className="p-3.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-2xl flex items-start gap-3 shadow-xs active:scale-[0.98] transition-transform" onClick={() => onEditTodo && onEditTodo(task)}>
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateTodo(task.id, { completed: !task.completed });
+                                    }}
+                                    className="mt-0.5 shrink-0"
+                                >
+                                    {task.completed ? <CheckCircle2 className="w-6 h-6 text-zinc-900 dark:text-white" /> : <Circle className="w-6 h-6 text-zinc-300 dark:text-zinc-700" />}
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className={`text-sm font-semibold truncate ${task.completed ? 'line-through text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{task.text}</h3>
+                                    {task.list_id && (
+                                        <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase tracking-wide">
+                                            Lista: {activeProject.lists?.find(l => l.id === task.list_id)?.name || 'General'}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const renderProjectHeader = () => {
         if (!activeProject) {
             return (
@@ -1031,90 +1126,107 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
 
         if (isMobile) {
-            const currentTabConfig = [
-                { id: 'overview', label: 'Resumen', icon: Activity },
-                { id: 'kanban', label: 'Tablero', icon: AlignLeft },
-                { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: unreadTabCounts.listas },
-                { id: 'sprints', label: 'Sprints', icon: Target },
-                { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
-                { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs },
-                { id: 'chat', label: 'Canales', icon: MessageSquare, badge: unreadChatMessagesCount },
-                { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
-                { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time },
-                { id: 'team', label: 'Equipo', icon: Users },
-            ];
-            const activeTabInfo = currentTabConfig.find(t => t.id === activeTab) || currentTabConfig[0];
-            const ActiveTabIcon = activeTabInfo.icon;
+            let mobileMainTab = 'inicio';
+            if (['mis_tareas', 'listas', 'kanban'].includes(activeTab)) mobileMainTab = 'tareas';
+            if (activeTab === 'chat') mobileMainTab = 'chat';
+            if (['mas_menu', 'sprints', 'roadmap', 'docs', 'expenses', 'time', 'team'].includes(activeTab)) mobileMainTab = 'mas';
 
             return (
                 <div className="bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 shadow-xs shrink-0 select-none">
-                    {/* Compact Mobile Top Bar: No redundant project name, sleek controls */}
-                    <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-gray-100 dark:border-gray-800/80">
+                    {/* Compact Mobile Top Bar: Project name, sleek controls */}
+                    <div className="px-3 py-3 flex items-center justify-between border-b border-gray-100 dark:border-gray-800/80">
                         <div className="flex items-center gap-2">
                             {onBack && (
                                 <button
                                     onClick={onBack}
-                                    className="p-2 -ml-1 rounded-xl bg-gray-100 dark:bg-zinc-800/80 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-95 transition-all"
+                                    className="p-1.5 -ml-1 rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all"
                                     aria-label="Volver a lista de proyectos"
                                 >
-                                    <ChevronLeft className="w-4 h-4" />
+                                    <ChevronLeft className="w-5 h-5" />
                                 </button>
                             )}
-                            <div className="flex items-center gap-2">
-                                <ActiveTabIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
-                                <span className="font-bold text-sm text-gray-900 dark:text-white tracking-tight">{activeTabInfo.label}</span>
+                            <div className="flex items-center gap-2 max-w-[200px]">
+                                <span className="font-bold text-sm text-gray-900 dark:text-white tracking-tight truncate">{activeProject.name}</span>
                             </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
+                        
+                        <div className="flex items-center gap-1">
                             <button
                                 onClick={() => setInboxModalOpen(true)}
-                                className="p-2 rounded-xl border border-gray-200/80 dark:border-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 relative transition-colors"
+                                className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 relative transition-colors"
                                 aria-label="Bandeja de entrada"
                             >
-                                <Inbox className="w-4 h-4 text-amber-500" />
+                                <Inbox className="w-5 h-5" />
                                 {activeProject.inbox && activeProject.inbox.length > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full" />
+                                    <span className="absolute top-1.5 right-1 w-2 h-2 bg-amber-500 rounded-full" />
                                 )}
                             </button>
                             <button
                                 onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)}
-                                className="p-2 rounded-xl border border-gray-200/80 dark:border-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
                                 aria-label="Ajustes del Proyecto"
                             >
-                                <Settings className="w-4 h-4" />
+                                <MoreHorizontal className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
 
-                    {/* Scrollable Horizontal Tabs Navigation */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto py-2 px-3 no-scrollbar scrollbar-none">
-                        {currentTabConfig.map(tab => {
-                            const TabIcon = tab.icon;
-                            const isActive = activeTab === tab.id;
+                    {/* New Mobile 4-Tab Navigation */}
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-800/80">
+                        {[
+                            { id: 'inicio', label: 'Inicio', target: 'overview' },
+                            { id: 'tareas', label: 'Tareas', target: 'mis_tareas' },
+                            { id: 'chat', label: 'Chat', target: 'chat' },
+                            { id: 'mas', label: 'Más', target: 'mas_menu' }
+                        ].map(tab => {
+                            const isActive = mobileMainTab === tab.id;
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id as any)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap shrink-0 ${
-                                        isActive
-                                            ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs'
-                                            : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 bg-zinc-100/70 dark:bg-zinc-900'
+                                    onClick={() => setActiveTab(tab.target as any)}
+                                    className={`relative px-2 py-1.5 text-sm font-bold transition-all ${
+                                        isActive 
+                                            ? 'text-gray-900 dark:text-white' 
+                                            : 'text-gray-500 dark:text-gray-400'
                                     }`}
                                 >
-                                    <TabIcon className="w-3.5 h-3.5" />
-                                    <span>{tab.label}</span>
-                                    {tab.badge ? (
-                                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                                            isActive ? 'bg-white/20 dark:bg-black/20 text-white dark:text-zinc-900' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-                                        }`}>
-                                            {tab.badge}
-                                        </span>
-                                    ) : null}
+                                    {tab.label}
+                                    {isActive && (
+                                        <motion.div 
+                                            layoutId="mobileProjectNavIndicator"
+                                            className="absolute bottom-[-8px] left-0 right-0 h-0.5 bg-gray-900 dark:bg-white rounded-full"
+                                        />
+                                    )}
                                 </button>
                             );
                         })}
                     </div>
+
+                    {/* Sub-navigation for Tareas */}
+                    {mobileMainTab === 'tareas' && (
+                        <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar scrollbar-none border-b border-gray-100 dark:border-gray-800/80">
+                            {[
+                                { id: 'mis_tareas', label: 'Mis tareas' },
+                                { id: 'listas', label: 'Todas' },
+                                { id: 'kanban', label: 'Tablero' }
+                            ].map(sub => {
+                                const isActive = activeTab === sub.id;
+                                return (
+                                    <button
+                                        key={sub.id}
+                                        onClick={() => setActiveTab(sub.id as any)}
+                                        className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-xl transition-colors whitespace-nowrap ${
+                                            isActive
+                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                                                : 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400'
+                                        }`}
+                                    >
+                                        {sub.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -5847,6 +5959,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {activeTab === 'overview' && renderOverview()}
                         {activeTab === 'kanban' && renderKanban()}
                         {activeTab === 'listas' && renderListas()}
+                        {activeTab === 'mis_tareas' && renderMisTareas()}
                         {activeTab === 'sprints' && renderSprints()}
                         {activeTab === 'roadmap' && renderRoadmap()}
                         {activeTab === 'docs' && renderDocs()}
@@ -5854,6 +5967,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {activeTab === 'expenses' && renderExpenses()}
                         {activeTab === 'time' && renderTime()}
                         {activeTab === 'team' && renderTeam()}
+                        {activeTab === 'mas_menu' && renderMasMenu()}
                     </>
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-500 text-sm">
