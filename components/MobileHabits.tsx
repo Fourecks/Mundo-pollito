@@ -399,7 +399,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
         const weekRangeLabel = `${format(weeklyWeekStart, 'd MMM', { locale: es })} - ${format(weekEnd, 'd MMM', { locale: es })}`;
 
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40">
                 {/* Header - Starts high up */}
                 <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
@@ -551,7 +551,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
     // ==========================================
     if (subPage === 'stats') {
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40">
                 {/* Header - Starts high up */}
                 <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
@@ -747,7 +747,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
         const activeCategoryData = EMOJI_CATEGORIES.find(c => c.id === selectedEmojiCategory) || EMOJI_CATEGORIES[0];
 
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40">
                 {/* Header - Starts high up */}
                 <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
@@ -987,7 +987,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
     // PAGE: MAIN HABITS (PÁGINA PRINCIPAL)
     // ==========================================
     return (
-        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36 pt-3 px-4 sm:px-6">
+        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40 pt-3 px-4 sm:px-6">
             {/* Header */}
             <div className="flex justify-between items-center mb-3">
                 <div>

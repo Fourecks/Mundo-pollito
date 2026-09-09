@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project, Todo } from '../types';
-import { Plus, ChevronRight, Folder, ArrowLeft, CheckCircle2, Circle, FileText, CheckSquare, PlusCircle } from 'lucide-react';
+import { Plus, ChevronRight, Folder, ArrowLeft, CheckCircle2, Circle, FileText, CheckSquare, MessageSquare, MoreHorizontal } from 'lucide-react';
 
 interface MobileProjectsProps {
     projects: Project[];
@@ -17,12 +17,14 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
     allTodos
 }) => {
     const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+    const [projectTab, setProjectTab] = useState<'inicio' | 'tareas' | 'chat' | 'mas'>('inicio');
     
     // Sort active projects first
     const activeProjects = projects.filter(p => !p.is_archived);
 
     const handleSelectProject = (id: number | null) => {
         setSelectedProjectId(id);
+        setProjectTab('inicio');
         onSelectProject(id);
     };
 
@@ -43,9 +45,9 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-28 pt-12 px-6"
+                className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40 pt-12 px-6"
             >
-                <div className="flex items-center gap-4 mb-8">
+                <div className="flex items-center gap-4 mb-6">
                     <button 
                         onClick={() => handleSelectProject(null)}
                         className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center active:scale-95 transition-transform"
@@ -60,58 +62,163 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
                     </div>
                 </div>
 
-                <div className="mb-8">
-                    <div className="flex justify-between items-end mb-2">
-                        <h2 className="text-sm font-medium text-zinc-500">Progreso del Proyecto</h2>
-                        <span className="text-sm font-bold">{progress}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
-                        <div 
-                            className="h-full bg-black dark:bg-white transition-all duration-500 ease-out rounded-full"
-                            style={{ width: `${progress}%` }}
-                        />
-                    </div>
+                {/* Internal Navigation */}
+                <div className="flex space-x-1 bg-zinc-100 dark:bg-zinc-900/80 p-1 rounded-2xl mb-8 overflow-x-auto hide-scrollbar">
+                    {(['inicio', 'tareas', 'chat', 'mas'] as const).map(tab => {
+                        const labels = { inicio: 'Inicio', tareas: 'Tareas', chat: 'Chat', mas: 'Más' };
+                        const icons = {
+                            inicio: <Folder className="w-4 h-4" />,
+                            tareas: <CheckSquare className="w-4 h-4" />,
+                            chat: <MessageSquare className="w-4 h-4" />,
+                            mas: <MoreHorizontal className="w-4 h-4" />
+                        };
+                        const isActive = projectTab === tab;
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => setProjectTab(tab)}
+                                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                                    isActive 
+                                        ? 'bg-white dark:bg-black text-zinc-900 dark:text-white shadow-sm' 
+                                        : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                                }`}
+                            >
+                                {icons[tab]}
+                                <span>{labels[tab]}</span>
+                            </button>
+                        );
+                    })}
                 </div>
 
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold">Tareas ({projectTasks.length})</h2>
-                    </div>
-                    {projectTasks.length === 0 ? (
-                        <div className="text-center py-10 bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800">
-                            <p className="text-zinc-500 text-sm">No hay tareas en este proyecto.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {projectTasks.map(task => (
-                                <div key={task.id} className={`flex items-start gap-4 p-4 rounded-3xl border transition-all ${
-                                    task.completed 
-                                        ? 'bg-zinc-50 dark:bg-zinc-900/50 border-transparent opacity-60' 
-                                        : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-sm'
-                                }`}>
-                                    <div className="mt-0.5 shrink-0">
-                                        {task.completed ? (
-                                            <CheckCircle2 className="w-6 h-6 text-green-500 fill-green-500/20" />
-                                        ) : (
-                                            <Circle className="w-6 h-6 text-zinc-300 dark:text-zinc-700" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className={`text-base font-medium truncate ${task.completed ? 'line-through text-zinc-500' : 'text-zinc-900 dark:text-zinc-100'}`}>
-                                            {task.text}
-                                        </h3>
-                                    </div>
+                <AnimatePresence mode="wait">
+                    {projectTab === 'inicio' && (
+                        <motion.div
+                            key="inicio"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-6"
+                        >
+                            <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 p-5 rounded-3xl">
+                                <div className="flex justify-between items-end mb-3">
+                                    <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">Progreso del Proyecto</h2>
+                                    <span className="text-lg font-bold">{progress}%</span>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="w-full h-2.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden mb-3">
+                                    <div 
+                                        className="h-full bg-black dark:bg-white transition-all duration-500 ease-out rounded-full"
+                                        style={{ width: `${progress}%` }}
+                                    />
+                                </div>
+                                <p className="text-xs font-medium text-zinc-500">
+                                    {completedTasks} de {totalTasks} tareas completadas
+                                </p>
+                            </div>
+                            
+                            {project.description && (
+                                <div>
+                                    <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Descripción</h2>
+                                    <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-3xl border border-zinc-100 dark:border-zinc-800">
+                                        {project.description}
+                                    </p>
+                                </div>
+                            )}
+                        </motion.div>
                     )}
-                </div>
+
+                    {projectTab === 'tareas' && (
+                        <motion.div
+                            key="tareas"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-4"
+                        >
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold">Tareas ({projectTasks.length})</h2>
+                            </div>
+
+                            {projectTasks.length === 0 ? (
+                                <div className="text-center py-12 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                                    <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-3">
+                                        <CheckSquare className="w-6 h-6 text-zinc-400" />
+                                    </div>
+                                    <p className="text-zinc-500 text-sm font-medium">No hay tareas en este proyecto.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {projectTasks.map(task => (
+                                        <div key={task.id} className={`flex items-start gap-4 p-4 rounded-3xl border transition-all ${
+                                            task.completed 
+                                                ? 'bg-zinc-50 dark:bg-zinc-900/50 border-transparent opacity-60' 
+                                                : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-sm'
+                                        }`}>
+                                            <div className="mt-0.5 shrink-0">
+                                                {task.completed ? (
+                                                    <CheckCircle2 className="w-6 h-6 text-zinc-900 dark:text-white" />
+                                                ) : (
+                                                    <Circle className="w-6 h-6 text-zinc-300 dark:text-zinc-700" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className={`text-base font-medium truncate ${task.completed ? 'line-through text-zinc-500' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                                                    {task.text}
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {projectTab === 'chat' && (
+                        <motion.div
+                            key="chat"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="flex flex-col items-center justify-center py-16 text-center"
+                        >
+                            <div className="w-16 h-16 bg-zinc-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 border border-zinc-100 dark:border-zinc-800">
+                                <MessageSquare className="w-8 h-8 text-zinc-300 dark:text-zinc-700" />
+                            </div>
+                            <h3 className="text-lg font-semibold mb-2">Chat del Proyecto</h3>
+                            <p className="text-sm text-zinc-500 max-w-[200px]">
+                                Funcionalidad de chat y colaboración próxima a llegar.
+                            </p>
+                        </motion.div>
+                    )}
+
+                    {projectTab === 'mas' && (
+                        <motion.div
+                            key="mas"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-2"
+                        >
+                            <button className="w-full flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 active:scale-[0.98] transition-transform">
+                                <span className="font-medium text-sm">Editar Proyecto</span>
+                                <ChevronRight className="w-4 h-4 text-zinc-400" />
+                            </button>
+                            <button className="w-full flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 active:scale-[0.98] transition-transform">
+                                <span className="font-medium text-sm">Archivar Proyecto</span>
+                                <ChevronRight className="w-4 h-4 text-zinc-400" />
+                            </button>
+                            <button className="w-full flex items-center justify-between p-4 bg-rose-50 dark:bg-rose-950/20 rounded-2xl border border-rose-100 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 active:scale-[0.98] transition-transform">
+                                <span className="font-medium text-sm">Eliminar Proyecto</span>
+                                <ChevronRight className="w-4 h-4 text-rose-400" />
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.div>
         );
     }
 
     return (
-        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-28 pt-12 px-6">
+        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40 pt-12 px-6">
             <div className="flex justify-between items-end mb-8">
                 <div>
                     <h1 className="text-3xl font-semibold tracking-tight">Proyectos</h1>

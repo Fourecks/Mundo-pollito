@@ -7,8 +7,8 @@ interface MobileHeaderProps {
 
 const MobileHeader: React.FC<MobileHeaderProps> = ({ title, children }) => {
   return (
-    <header className="sticky top-0 bg-yellow-50/80 dark:bg-gray-800/80 backdrop-blur-md p-4 z-30 border-b border-yellow-300/50 dark:border-gray-700/50 flex items-center justify-between">
-      <h1 className="text-xl font-bold text-pink-500 dark:text-pink-400">{title}</h1>
+    <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md px-4 pt-10 pb-4 z-30 border-b border-zinc-100 dark:border-zinc-900 flex items-center justify-between">
+      <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">{title}</h1>
       <div className="flex items-center gap-2">
         {children}
       </div>

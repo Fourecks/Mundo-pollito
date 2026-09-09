@@ -94,6 +94,9 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     taskToEdit: externalTaskToEdit,
     setTaskToEdit: externalSetTaskToEdit
 }) => {
+    const [showAdvancedCreate, setShowAdvancedCreate] = useState(false);
+    const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
+
     // Subpage navigation: 'list' | 'create' | 'edit'
     const [subPage, setSubPage] = useState<'list' | 'create' | 'edit'>('list');
     const [tabView, setTabView] = useState<'dated' | 'undated'>('dated');
@@ -482,7 +485,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     // ==========================================
     if (subPage === 'create') {
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40">
                 {/* Sticky Top Header */}
                 <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
@@ -612,159 +615,6 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         )}
                     </div>
 
-                    {/* Horario (Añadir Hora) */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                                <span>Añadir Hora</span>
-                            </span>
-                            <input 
-                                type="checkbox" 
-                                checked={newHasTime} 
-                                onChange={e => setNewHasTime(e.target.checked)} 
-                                disabled={newIsUndated}
-                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                            />
-                        </div>
-
-                        {newHasTime && !newIsUndated && (
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                <div className="min-w-0">
-                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Inicio</label>
-                                    <input 
-                                        type="time" 
-                                        value={newStartTime} 
-                                        onChange={e => setNewStartTime(e.target.value)} 
-                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
-                                    />
-                                </div>
-                                <div className="min-w-0">
-                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Fin (opcional)</label>
-                                    <input 
-                                        type="time" 
-                                        value={newEndTime} 
-                                        onChange={e => setNewEndTime(e.target.value)} 
-                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Recordatorio */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                <Bell className="w-3.5 h-3.5 text-zinc-400" />
-                                <span>Recordatorio</span>
-                            </span>
-                            <input 
-                                type="checkbox" 
-                                checked={newHasReminder} 
-                                onChange={e => setNewHasReminder(e.target.checked)} 
-                                disabled={newIsUndated}
-                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                            />
-                        </div>
-
-                        {newHasReminder && !newIsUndated && (
-                            <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                <select 
-                                    value={newReminderType} 
-                                    onChange={e => setNewReminderType(e.target.value)} 
-                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                >
-                                    <option value="0">En el momento de la tarea</option>
-                                    <option value="10">10 minutos antes</option>
-                                    <option value="30">30 minutos antes</option>
-                                    <option value="60">1 hora antes</option>
-                                    <option value="1440">1 día antes</option>
-                                    <option value="custom">Personalizado...</option>
-                                </select>
-
-                                {newReminderType === 'custom' && (
-                                    <div className="grid grid-cols-2 gap-2 w-full">
-                                        <input 
-                                            type="date" 
-                                            value={newCustomReminderDate} 
-                                            onChange={e => setNewCustomReminderDate(e.target.value)} 
-                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                        />
-                                        <input 
-                                            type="time" 
-                                            value={newCustomReminderTime} 
-                                            onChange={e => setNewCustomReminderTime(e.target.value)} 
-                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Repetir tarea (Recurrencia) */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
-                                <span>Repetir tarea</span>
-                            </span>
-                            <input 
-                                type="checkbox" 
-                                checked={newHasRecurrence} 
-                                onChange={e => setNewHasRecurrence(e.target.checked)} 
-                                disabled={newIsUndated}
-                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                            />
-                        </div>
-
-                        {newHasRecurrence && !newIsUndated && (
-                            <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                <select 
-                                    value={newRecurrence?.frequency || 'none'} 
-                                    onChange={e => setNewRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
-                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                >
-                                    <option value="none">Nunca</option>
-                                    <option value="daily">Diariamente</option>
-                                    <option value="weekly">Semanalmente</option>
-                                    <option value="custom">Días específicos</option>
-                                </select>
-
-                                {newRecurrence.frequency === 'custom' && (
-                                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full box-border">
-                                        {dayLabels.map((dayLabel, index) => {
-                                            const isSelected = newRecurrence.customDays?.includes(index);
-                                            return (
-                                                <button 
-                                                    key={index} 
-                                                    type="button" 
-                                                    onClick={() => handleCustomDayToggleCreate(index)} 
-                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                                                        isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                                                    }`}
-                                                >
-                                                    {dayLabel}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                <div className="w-full">
-                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
-                                    <input 
-                                        type="date" 
-                                        value={newRecurrence?.ends_on || ''} 
-                                        onChange={e => setNewRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
-                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
                     {/* Prioridad */}
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Prioridad</label>
@@ -818,6 +668,178 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                 ))}
                             </select>
                         </div>
+                    )}
+
+                    {/* Más opciones Toggle */}
+                    {!showAdvancedCreate && (
+                        <button 
+                            type="button"
+                            onClick={() => setShowAdvancedCreate(true)}
+                            className="w-full py-3 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
+                        >
+                            + Más opciones
+                        </button>
+                    )}
+
+                    {showAdvancedCreate && (
+                        <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="space-y-4"
+                        >
+                            {/* Horario (Añadir Hora) */}
+                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                                        <span>Añadir Hora</span>
+                                    </span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={newHasTime} 
+                                        onChange={e => setNewHasTime(e.target.checked)} 
+                                        disabled={newIsUndated}
+                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                                    />
+                                </div>
+
+                                {newHasTime && !newIsUndated && (
+                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                        <div className="min-w-0">
+                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Inicio</label>
+                                            <input 
+                                                type="time" 
+                                                value={newStartTime} 
+                                                onChange={e => setNewStartTime(e.target.value)} 
+                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
+                                            />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Fin (opcional)</label>
+                                            <input 
+                                                type="time" 
+                                                value={newEndTime} 
+                                                onChange={e => setNewEndTime(e.target.value)} 
+                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Recordatorio */}
+                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                        <Bell className="w-3.5 h-3.5 text-zinc-400" />
+                                        <span>Recordatorio</span>
+                                    </span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={newHasReminder} 
+                                        onChange={e => setNewHasReminder(e.target.checked)} 
+                                        disabled={newIsUndated}
+                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                                    />
+                                </div>
+
+                                {newHasReminder && !newIsUndated && (
+                                    <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                        <select 
+                                            value={newReminderType} 
+                                            onChange={e => setNewReminderType(e.target.value)} 
+                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                        >
+                                            <option value="0">En el momento de la tarea</option>
+                                            <option value="10">10 minutos antes</option>
+                                            <option value="30">30 minutos antes</option>
+                                            <option value="60">1 hora antes</option>
+                                            <option value="1440">1 día antes</option>
+                                            <option value="custom">Personalizado...</option>
+                                        </select>
+
+                                        {newReminderType === 'custom' && (
+                                            <div className="grid grid-cols-2 gap-2 w-full">
+                                                <input 
+                                                    type="date" 
+                                                    value={newCustomReminderDate} 
+                                                    onChange={e => setNewCustomReminderDate(e.target.value)} 
+                                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                                />
+                                                <input 
+                                                    type="time" 
+                                                    value={newCustomReminderTime} 
+                                                    onChange={e => setNewCustomReminderTime(e.target.value)} 
+                                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Repetir tarea (Recurrencia) */}
+                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                        <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                                        <span>Repetir tarea</span>
+                                    </span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={newHasRecurrence} 
+                                        onChange={e => setNewHasRecurrence(e.target.checked)} 
+                                        disabled={newIsUndated}
+                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                                    />
+                                </div>
+
+                                {newHasRecurrence && !newIsUndated && (
+                                    <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                        <select 
+                                            value={newRecurrence?.frequency || 'none'} 
+                                            onChange={e => setNewRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
+                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                        >
+                                            <option value="none">Nunca</option>
+                                            <option value="daily">Diariamente</option>
+                                            <option value="weekly">Semanalmente</option>
+                                            <option value="custom">Días específicos</option>
+                                        </select>
+
+                                        {newRecurrence.frequency === 'custom' && (
+                                            <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full box-border">
+                                                {dayLabels.map((dayLabel, index) => {
+                                                    const isSelected = newRecurrence.customDays?.includes(index);
+                                                    return (
+                                                        <button 
+                                                            key={index} 
+                                                            type="button" 
+                                                            onClick={() => handleCustomDayToggleCreate(index)} 
+                                                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                                isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                                            }`}
+                                                        >
+                                                            {dayLabel}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        <div className="w-full">
+                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
+                                            <input 
+                                                type="date" 
+                                                value={newRecurrence?.ends_on || ''} 
+                                                onChange={e => setNewRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
+                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
                     )}
 
                     {/* Subtareas */}
@@ -880,7 +902,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     // ==========================================
     if (subPage === 'edit' && activeEditingTask) {
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-36">
+            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40">
                 {/* Sticky Top Header */}
                 <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
@@ -1009,159 +1031,6 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         )}
                     </div>
 
-                    {/* Horario (Añadir Hora) */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                                <span>Añadir Hora</span>
-                            </span>
-                            <input 
-                                type="checkbox" 
-                                checked={editHasTime} 
-                                onChange={e => setEditHasTime(e.target.checked)} 
-                                disabled={editIsUndated}
-                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                            />
-                        </div>
-
-                        {editHasTime && !editIsUndated && (
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                <div className="min-w-0">
-                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Inicio</label>
-                                    <input 
-                                        type="time" 
-                                        value={editStartTime} 
-                                        onChange={e => setEditStartTime(e.target.value)} 
-                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
-                                    />
-                                </div>
-                                <div className="min-w-0">
-                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Fin (opcional)</label>
-                                    <input 
-                                        type="time" 
-                                        value={editEndTime} 
-                                        onChange={e => setEditEndTime(e.target.value)} 
-                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Recordatorio */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                <Bell className="w-3.5 h-3.5 text-zinc-400" />
-                                <span>Recordatorio</span>
-                            </span>
-                            <input 
-                                type="checkbox" 
-                                checked={editHasReminder} 
-                                onChange={e => setEditHasReminder(e.target.checked)} 
-                                disabled={editIsUndated}
-                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                            />
-                        </div>
-
-                        {editHasReminder && !editIsUndated && (
-                            <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                <select 
-                                    value={editReminderType} 
-                                    onChange={e => setEditReminderType(e.target.value)} 
-                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                >
-                                    <option value="0">En el momento de la tarea</option>
-                                    <option value="10">10 minutos antes</option>
-                                    <option value="30">30 minutos antes</option>
-                                    <option value="60">1 hora antes</option>
-                                    <option value="1440">1 día antes</option>
-                                    <option value="custom">Personalizado...</option>
-                                </select>
-
-                                {editReminderType === 'custom' && (
-                                    <div className="grid grid-cols-2 gap-2 w-full">
-                                        <input 
-                                            type="date" 
-                                            value={editCustomReminderDate} 
-                                            onChange={e => setEditCustomReminderDate(e.target.value)} 
-                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                        />
-                                        <input 
-                                            type="time" 
-                                            value={editCustomReminderTime} 
-                                            onChange={e => setEditCustomReminderTime(e.target.value)} 
-                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Repetir tarea (Recurrencia) */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
-                                <span>Repetir tarea</span>
-                            </span>
-                            <input 
-                                type="checkbox" 
-                                checked={editHasRecurrence} 
-                                onChange={e => setEditHasRecurrence(e.target.checked)} 
-                                disabled={editIsUndated}
-                                className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
-                            />
-                        </div>
-
-                        {editHasRecurrence && !editIsUndated && (
-                            <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
-                                <select 
-                                    value={editRecurrence?.frequency || 'none'} 
-                                    onChange={e => setEditRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
-                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                >
-                                    <option value="none">Nunca</option>
-                                    <option value="daily">Diariamente</option>
-                                    <option value="weekly">Semanalmente</option>
-                                    <option value="custom">Días específicos</option>
-                                </select>
-
-                                {editRecurrence.frequency === 'custom' && (
-                                    <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full box-border">
-                                        {dayLabels.map((dayLabel, index) => {
-                                            const isSelected = editRecurrence.customDays?.includes(index);
-                                            return (
-                                                <button 
-                                                    key={index} 
-                                                    type="button" 
-                                                    onClick={() => handleCustomDayToggleEdit(index)} 
-                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                                                        isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                                                    }`}
-                                                >
-                                                    {dayLabel}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                <div className="w-full">
-                                    <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
-                                    <input 
-                                        type="date" 
-                                        value={editRecurrence?.ends_on || ''} 
-                                        onChange={e => setEditRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
-                                        className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
                     {/* Prioridad */}
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Prioridad</label>
@@ -1217,82 +1086,254 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         </div>
                     )}
 
-                    {/* Subtareas */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Subtareas</label>
-                        <div className="flex gap-2">
-                            <input 
-                                type="text"
-                                value={editSubtaskInput}
-                                onChange={e => setEditSubtaskInput(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtaskEdit(); } }}
-                                placeholder="Añadir paso o subtarea..."
-                                className="flex-1 box-border px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
-                            />
-                            <button
-                                type="button"
-                                onClick={handleAddSubtaskEdit}
-                                className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95 shrink-0"
-                            >
-                                Añadir
-                            </button>
-                        </div>
+                    {/* Más opciones Toggle */}
+                    {!showAdvancedEdit && (
+                        <button 
+                            type="button"
+                            onClick={() => setShowAdvancedEdit(true)}
+                            className="w-full py-3 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
+                        >
+                            + Más opciones
+                        </button>
+                    )}
 
-                        {editSubtasks.length > 0 && (
-                            <div className="space-y-1.5 pt-1">
-                                {editSubtasks.map(st => (
-                                    <div key={st.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 text-xs">
+                    {showAdvancedEdit && (
+                        <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="space-y-4"
+                        >
+                            {/* Horario (Añadir Hora) */}
+                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                                        <span>Añadir Hora</span>
+                                    </span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={editHasTime} 
+                                        onChange={e => setEditHasTime(e.target.checked)} 
+                                        disabled={editIsUndated}
+                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                                    />
+                                </div>
+
+                                {editHasTime && !editIsUndated && (
+                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                        <div className="min-w-0">
+                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Inicio</label>
+                                            <input 
+                                                type="time" 
+                                                value={editStartTime || ''} 
+                                                onChange={e => setEditStartTime(e.target.value)} 
+                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
+                                            />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Fin (opcional)</label>
+                                            <input 
+                                                type="time" 
+                                                value={editEndTime || ''} 
+                                                onChange={e => setEditEndTime(e.target.value)} 
+                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none font-medium"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Recordatorio */}
+                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                        <Bell className="w-3.5 h-3.5 text-zinc-400" />
+                                        <span>Recordatorio</span>
+                                    </span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={editHasReminder} 
+                                        onChange={e => setEditHasReminder(e.target.checked)} 
+                                        disabled={editIsUndated}
+                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                                    />
+                                </div>
+
+                                {editHasReminder && !editIsUndated && (
+                                    <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                        <select 
+                                            value={editReminderType} 
+                                            onChange={e => setEditReminderType(e.target.value)} 
+                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                        >
+                                            <option value="0">En el momento de la tarea</option>
+                                            <option value="10">10 minutos antes</option>
+                                            <option value="30">30 minutos antes</option>
+                                            <option value="60">1 hora antes</option>
+                                            <option value="1440">1 día antes</option>
+                                            <option value="custom">Personalizado...</option>
+                                        </select>
+
+                                        {editReminderType === 'custom' && (
+                                            <div className="grid grid-cols-2 gap-2 w-full">
+                                                <input 
+                                                    type="date" 
+                                                    value={editCustomReminderDate} 
+                                                    onChange={e => setEditCustomReminderDate(e.target.value)} 
+                                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                                />
+                                                <input 
+                                                    type="time" 
+                                                    value={editCustomReminderTime} 
+                                                    onChange={e => setEditCustomReminderTime(e.target.value)} 
+                                                    className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Repetir tarea (Recurrencia) */}
+                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2 box-border w-full overflow-hidden">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                        <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                                        <span>Repetir tarea</span>
+                                    </span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={editHasRecurrence} 
+                                        onChange={e => setEditHasRecurrence(e.target.checked)} 
+                                        disabled={editIsUndated}
+                                        className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0 disabled:opacity-40"
+                                    />
+                                </div>
+
+                                {editHasRecurrence && !editIsUndated && (
+                                    <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 animate-fade-in w-full">
+                                        <select 
+                                            value={editRecurrence?.frequency || 'none'} 
+                                            onChange={e => setEditRecurrence(r => ({ ...r, frequency: e.target.value as any }))} 
+                                            className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                        >
+                                            <option value="none">Nunca</option>
+                                            <option value="daily">Diariamente</option>
+                                            <option value="weekly">Semanalmente</option>
+                                            <option value="custom">Días específicos</option>
+                                        </select>
+
+                                        {editRecurrence?.frequency === 'custom' && (
+                                            <div className="flex justify-between gap-1 p-1 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full box-border">
+                                                {dayLabels.map((dayLabel, index) => {
+                                                    const isSelected = editRecurrence.customDays?.includes(index);
+                                                    return (
+                                                        <button 
+                                                            key={index} 
+                                                            type="button" 
+                                                            onClick={() => handleCustomDayToggleEdit(index)} 
+                                                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                                isSelected ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                                            }`}
+                                                        >
+                                                            {dayLabel}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        <div className="w-full">
+                                            <label className="block text-[10px] font-semibold text-zinc-500 mb-1">Finaliza repetición (opcional)</label>
+                                            <input 
+                                                type="date" 
+                                                value={editRecurrence?.ends_on || ''} 
+                                                onChange={e => setEditRecurrence(r => ({ ...r, ends_on: e.target.value }))} 
+                                                className="w-full box-border bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Subtareas */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Subtareas</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text"
+                                        value={editSubtaskInput}
+                                        onChange={e => setEditSubtaskInput(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtaskEdit(); } }}
+                                        placeholder="Añadir paso o subtarea..."
+                                        className="flex-1 box-border px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAddSubtaskEdit}
+                                        className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95 shrink-0"
+                                    >
+                                        Añadir
+                                    </button>
+                                </div>
+
+                                {editSubtasks.length > 0 && (
+                                    <div className="space-y-1.5 pt-1">
+                                        {editSubtasks.map(st => (
+                                            <div key={st.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 text-xs">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleSubtaskEdit(st.id)}
+                                                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                                >
+                                                    {st.completed ? (
+                                                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                                    ) : (
+                                                        <Circle className="w-4 h-4 text-zinc-400" />
+                                                    )}
+                                                </button>
+                                                <span className={`flex-1 truncate ${st.completed ? 'line-through text-zinc-400' : 'text-zinc-700 dark:text-zinc-300 font-medium'}`}>
+                                                    {st.text}
+                                                </span>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleRemoveSubtaskEdit(st.id)}
+                                                    className="text-zinc-400 hover:text-rose-500 p-1"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Notas */}
+                            <div className="space-y-1.5 pb-6">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas</label>
+                                    {activeEditingTask?.notion_page_id && (
                                         <button
                                             type="button"
-                                            onClick={() => handleToggleSubtaskEdit(st.id)}
-                                            className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                            onClick={handleFetchNotionNotes}
+                                            disabled={isLoadingNotionNotes}
+                                            className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1 disabled:opacity-50"
                                         >
-                                            {st.completed ? (
-                                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                            ) : (
-                                                <Circle className="w-4 h-4 text-zinc-400" />
-                                            )}
+                                            <ExternalLink className="w-3 h-3" />
+                                            <span>{isLoadingNotionNotes ? 'Cargando...' : 'Ver notas de Notion'}</span>
                                         </button>
-                                        <span className={`flex-1 truncate ${st.completed ? 'line-through text-zinc-400' : 'text-zinc-700 dark:text-zinc-300 font-medium'}`}>
-                                            {st.text}
-                                        </span>
-                                        <button 
-                                            type="button"
-                                            onClick={() => handleRemoveSubtaskEdit(st.id)}
-                                            className="text-zinc-400 hover:text-rose-500 p-1"
-                                        >
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                ))}
+                                    )}
+                                </div>
+                                <textarea 
+                                    value={editNotes}
+                                    onChange={e => setEditNotes(e.target.value)}
+                                    placeholder="Detalles de la tarea..."
+                                    rows={3}
+                                    className="w-full box-border px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
+                                />
                             </div>
-                        )}
-                    </div>
-
-                    {/* Notas */}
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas</label>
-                            {activeEditingTask?.notion_page_id && (
-                                <button
-                                    type="button"
-                                    onClick={handleFetchNotionNotes}
-                                    disabled={isLoadingNotionNotes}
-                                    className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1 disabled:opacity-50"
-                                >
-                                    <ExternalLink className="w-3 h-3" />
-                                    <span>{isLoadingNotionNotes ? 'Cargando...' : 'Ver notas de Notion'}</span>
-                                </button>
-                            )}
-                        </div>
-                        <textarea 
-                            value={editNotes}
-                            onChange={e => setEditNotes(e.target.value)}
-                            placeholder="Detalles de la tarea..."
-                            rows={3}
-                            className="w-full box-border px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
-                        />
-                    </div>
+                        </motion.div>
+                    )}
 
                     {/* Eliminar Tarea */}
                     <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
@@ -1338,7 +1379,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     // PAGE 1: TASK LIST (PÁGINA PRINCIPAL TAREAS)
     // ==========================================
     return (
-        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-28 pt-8 px-4 sm:px-6">
+        <div className="flex flex-col min-h-full bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40 pt-8 px-4 sm:px-6">
             {/* Header: Title and Add Task Button */}
             <div className="flex justify-between items-center mb-5">
                 <div>
