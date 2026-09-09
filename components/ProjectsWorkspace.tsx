@@ -1384,9 +1384,17 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         }
 
         if (isMobile) {
+            const myPendingTodos = projectTodos.filter(t => !t.completed && (t.assigned_to === currentUserEmail || t.created_by === currentUserEmail));
+            const myOverdue = myPendingTodos.filter(t => t.due_date && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)));
+            const myToday = myPendingTodos.filter(t => t.due_date && isToday(parseISO(t.due_date)));
+            const myUpcoming = myPendingTodos.filter(t => t.due_date && !isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)));
+            const myNoDate = myPendingTodos.filter(t => !t.due_date);
+            
+            const myTopTasks = [...myOverdue, ...myToday, ...myUpcoming, ...myNoDate].slice(0, 3);
+
             return (
-                <div className="p-3.5 w-full h-full overflow-y-auto pb-28 space-y-3.5 font-sans">
-                    {/* Main Health & Progress Card */}
+                <div className="p-4 w-full h-full overflow-y-auto pb-28 space-y-4 font-sans">
+                    {/* 1. Progreso del Proyecto */}
                     <div className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-3">
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Progreso del Proyecto</span>
@@ -1403,74 +1411,135 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
                     </div>
 
+                    {/* 2. Para Mí */}
+                    {myTopTasks.length > 0 && (
+                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs p-3.5 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                    <CheckSquare className="w-3.5 h-3.5 text-blue-500" /> Para mí
+                                </h3>
+                                <button
+                                    onClick={() => setActiveTab('mis_tareas')}
+                                    className="text-[11px] text-blue-500 font-semibold"
+                                >
+                                    Ver mis tareas →
+                                </button>
+                            </div>
+                            <div className="space-y-2">
+                                {myTopTasks.map(task => (
+                                    <div key={task.id} className="p-2.5 bg-gray-50 dark:bg-zinc-900/60 rounded-xl flex items-start gap-2.5 shadow-xs active:scale-[0.98] transition-transform cursor-pointer" onClick={() => onEditTodo && onEditTodo(task)}>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                updateTodo(task.id, { completed: !task.completed });
+                                            }}
+                                            className="mt-0.5 shrink-0"
+                                        >
+                                            <Circle className="w-4 h-4 text-zinc-400" />
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-xs font-semibold truncate text-zinc-900 dark:text-zinc-100">{task.text}</h3>
+                                            {task.due_date && (
+                                                <p className={`text-[10px] font-bold mt-0.5 ${isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date)) ? 'text-red-500' : isToday(parseISO(task.due_date)) ? 'text-amber-500' : 'text-zinc-500'}`}>
+                                                    Vence: {format(parseISO(task.due_date), 'd MMM', { locale: es })}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Quick Metric Tiles (2x2) */}
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-2 gap-3">
+                        {/* 3. Sprint activo */}
                         <button
                             onClick={() => setActiveTab('sprints')}
-                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all"
+                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all flex flex-col h-full"
                         >
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Sprint Activo</span>
-                            <span className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1 mt-1 block">
-                                {activeSprint ? activeSprint.name : 'Sin sprint activo'}
-                            </span>
-                            <span className="text-[10px] text-blue-500 font-semibold mt-1 inline-block">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Sprint Activo</span>
+                            {activeSprint ? (
+                                <>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 mb-1">{activeSprint.name}</span>
+                                    <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden mb-1">
+                                        <div className="bg-blue-500 h-full rounded-full" style={{ width: `${Math.round((activeSprint.todos.filter(t => t.completed).length / (activeSprint.todos.length || 1)) * 100)}%` }} />
+                                    </div>
+                                    <span className="text-[10px] text-gray-500 font-medium mb-auto">
+                                        {activeSprint.todos.filter(t => t.completed).length}/{activeSprint.todos.length} tareas
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="text-xs font-medium text-gray-500 mb-auto">Sin sprint activo</span>
+                            )}
+                            <span className="text-[10px] text-blue-500 font-bold mt-2 inline-block">
                                 {activeSprint ? 'Ver sprint →' : 'Planificar →'}
                             </span>
                         </button>
 
+                        {/* 4. Próximo hito */}
                         <button
                             onClick={() => setActiveTab('roadmap')}
-                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all"
+                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all flex flex-col h-full"
                         >
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Próximo Hito</span>
-                            <span className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1 mt-1 block">
-                                {pendingMilestones.length > 0 ? pendingMilestones[0].name : 'Sin hitos'}
-                            </span>
-                            <span className="text-[10px] text-blue-500 font-semibold mt-1 inline-block">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Próximo Hito</span>
+                            {pendingMilestones.length > 0 ? (
+                                <>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 mb-1">{pendingMilestones[0].name}</span>
+                                    {pendingMilestones[0].date && (
+                                        <span className={`text-[10px] font-medium mb-auto ${isPast(parseISO(pendingMilestones[0].date)) && !isToday(parseISO(pendingMilestones[0].date)) ? 'text-red-500' : 'text-amber-500'}`}>
+                                            {format(parseISO(pendingMilestones[0].date), 'd MMM yyyy', { locale: es })}
+                                        </span>
+                                    )}
+                                </>
+                            ) : (
+                                <span className="text-xs font-medium text-gray-500 mb-auto">Sin hitos pendientes</span>
+                            )}
+                            <span className="text-[10px] text-blue-500 font-bold mt-2 inline-block">
                                 {pendingMilestones.length > 0 ? 'Ver hoja de ruta →' : 'Crear hito →'}
                             </span>
                         </button>
 
-                        <div className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Atrasadas</span>
-                            <span className={`text-base font-black mt-0.5 block ${overdueTasks.length > 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
-                                {overdueTasks.length}
-                            </span>
-                            <span className="text-[10px] text-gray-400">
-                                {overdueTasks.length === 0 ? 'Todo al día' : 'Requieren atención'}
-                            </span>
-                        </div>
-
-                        <button
-                            onClick={() => setActiveTab('kanban')}
-                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all"
-                        >
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Tablero Kanban</span>
-                            <span className="text-xs font-bold text-gray-900 dark:text-white mt-1 block">
-                                Ver Columnas
-                            </span>
-                            <span className="text-[10px] text-blue-500 font-semibold mt-1 inline-block">
-                                Abrir tablero →
-                            </span>
-                        </button>
+                        {/* 5. Tareas Atrasadas */}
+                        {overdueTasks.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    setListCustomView('due_date');
+                                    setActiveTab('listas');
+                                }}
+                                className="bg-red-50 dark:bg-red-950/20 p-3.5 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-xs text-left active:scale-[0.98] transition-all col-span-2 flex items-center justify-between"
+                            >
+                                <div>
+                                    <span className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider block">Atrasadas</span>
+                                    <span className="text-sm font-black text-red-700 dark:text-red-300 block mt-0.5">
+                                        {overdueTasks.length} tareas requieren atención
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-red-600 dark:text-red-400 font-bold bg-white dark:bg-red-900/40 px-2 py-1 rounded-lg">
+                                    Ver tareas →
+                                </span>
+                            </button>
+                        )}
                     </div>
 
-                    {/* Recent Tasks */}
+                    {/* 6. Tareas Recientes */}
                     <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs p-3.5 space-y-2.5">
                         <div className="flex items-center justify-between">
                             <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                                 <AlignLeft className="w-3.5 h-3.5 text-blue-500" /> Tareas Recientes
                             </h3>
                             <button
-                                onClick={() => setActiveTab('kanban')}
+                                onClick={() => {
+                                    setListCustomView('all');
+                                    setActiveTab('listas');
+                                }}
                                 className="text-[11px] text-blue-500 font-semibold"
                             >
                                 Ver todas ({projectTodos.length}) →
                             </button>
                         </div>
-
                         <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
-                            {projectTodos.slice(0, 5).map(todo => (
+                            {projectTodos.slice(0, 4).map(todo => (
                                 <div
                                     key={todo.id}
                                     className="flex items-center gap-2.5 py-2.5 active:bg-gray-50 dark:active:bg-gray-800/20 cursor-pointer"
@@ -1492,11 +1561,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <span className={`text-xs flex-1 truncate ${todo.completed ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white font-medium'}`}>
                                         {todo.text}
                                     </span>
-                                    {todo.kanban_column && (
-                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-500 shrink-0">
-                                            {todo.kanban_column}
-                                        </span>
-                                    )}
                                 </div>
                             ))}
                             {projectTodos.length === 0 && (
@@ -1505,7 +1569,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
                     </div>
 
-                    {/* Team Announcements */}
+                    {/* 7. Anuncios */}
                     <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs p-3.5 space-y-2.5">
                         <div className="flex items-center justify-between">
                             <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
@@ -1518,7 +1582,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 + Publicar
                             </button>
                         </div>
-
                         <div className="space-y-2">
                             {(activeProject.inbox || []).slice(0, 3).map(item => (
                                 <div key={item.id} className="p-3 bg-gray-50 dark:bg-zinc-900/60 rounded-xl space-y-1 text-xs">
