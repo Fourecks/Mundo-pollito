@@ -175,6 +175,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     
     // Chat States
     const [chatText, setChatText] = useState('');
+    const [isChatInputFocused, setIsChatInputFocused] = useState(false);
     const [chatSearch, setChatSearch] = useState('');
     const [replyingToMessage, setReplyingToMessage] = useState<ProjectChatMessage | null>(null);
     const [showDocPickerInChat, setShowDocPickerInChat] = useState(false);
@@ -3612,7 +3613,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     project_id: activeProject.id,
                     title: file.name,
                     content: dataUrl,
-                    category: file.type.startsWith('image/') ? 'Diseño' : 'Especificaciones',
+                    category: file.type.startsWith('image/') ? 'Ideas' : 'Specifications',
                     file_name: file.name,
                     file_size: file.size,
                     file_type: file.type || 'application/octet-stream',
@@ -3916,7 +3917,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
 
         return (
-            <div className="flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden">
+            <div className={`flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden ${isMobile && !isChatInputFocused ? 'pb-24' : ''}`}>
                 {/* SELECTOR MÓVIL DE CANALES (BOTTOM SHEET) */}
                 {isMobileChannelDrawerOpen && (
                     <div className="fixed inset-0 z-[10000] flex flex-col justify-end md:hidden animate-in fade-in duration-200">
@@ -4205,15 +4206,21 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setIsMobileChannelDrawerOpen(true)}
-                                    className="flex items-center gap-1.5 text-left rounded-xl p-1 -ml-1 hover:bg-gray-100 dark:hover:bg-zinc-800/80 transition-colors md:pointer-events-none"
+                                    className={`flex items-center gap-1.5 text-left rounded-xl transition-all ${
+                                        isMobile 
+                                            ? 'px-2.5 py-1.5 bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/50 dark:border-zinc-800/50 hover:bg-zinc-200 dark:hover:bg-zinc-800 active:scale-95' 
+                                            : 'p-1 -ml-1 hover:bg-gray-100 dark:hover:bg-zinc-800/80 md:pointer-events-none'
+                                    }`}
                                 >
-                                    <span className="text-gray-400 dark:text-gray-500 shrink-0">
-                                        {currentChannel.is_private ? <Lock className="w-4 h-4" /> : <Hash className="w-4 h-4 text-blue-500" />}
+                                    <span className={`${isMobile ? 'text-zinc-500 dark:text-zinc-400' : 'text-gray-400 dark:text-gray-500'} shrink-0`}>
+                                        {currentChannel.is_private ? <Lock className="w-4 h-4 text-amber-500" /> : <Hash className="w-4 h-4 text-blue-500" />}
                                     </span>
-                                    <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">{currentChannel.name}</h2>
-                                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 md:hidden shrink-0" />
+                                    <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                        {currentChannel.name}
+                                    </h2>
+                                    <ChevronDown className={`w-4 h-4 text-gray-500 shrink-0 ${isMobile ? '' : 'md:hidden'}`} />
                                 </button>
-                                {currentChannel.description && (
+                                {currentChannel.description && !isMobile && (
                                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{currentChannel.description}</p>
                                 )}
                             </div>
@@ -4635,6 +4642,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             placeholder={`Enviar un mensaje a #${currentChannel.name}...`} 
                                             value={chatText} 
                                             onChange={e => setChatText(e.target.value)} 
+                                            onFocus={() => setIsChatInputFocused(true)}
+                                            onBlur={() => setIsChatInputFocused(false)}
                                             className="flex-1 bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-[#111] transition-all"
                                         />
 
@@ -4722,6 +4731,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         placeholder="Responder en este hilo..." 
                                         value={threadInputText} 
                                         onChange={e => setThreadInputText(e.target.value)} 
+                                        onFocus={() => setIsChatInputFocused(true)}
+                                        onBlur={() => setIsChatInputFocused(false)}
                                         className="flex-1 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-1.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-[#111] transition-all"
                                     />
                                     <button 
