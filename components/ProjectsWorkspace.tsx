@@ -4,13 +4,15 @@ import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, Project
 import { sendPushNotification } from '../services/pushNotificationService';
 import ProjectNoteEditorModal from './ProjectNoteEditorModal';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, LayoutGrid, Upload, BookOpen, FilePlus
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus
 } from 'lucide-react';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cleanToPlainText } from '../utils/textCleaner';
 
 interface ProjectsWorkspaceProps {
+    isMobile?: boolean;
+    onBack?: () => void;
     currentUser?: any;
     projects: Project[];
     notes: Note[];
@@ -82,7 +84,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     deleteTodo,
     onEditTodo,
     onOpenProjectEditor,
-    pushPreferences
+    pushPreferences,
+    isMobile = false,
+    onBack
 }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'sprints' | 'roadmap' | 'docs' | 'chat' | 'expenses' | 'time' | 'team' | 'listas'>('overview');
     
@@ -244,6 +248,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [newItemPriority, setNewItemPriority] = useState<Priority>('medium');
     const [isAddBoardTaskModalOpen, setIsAddBoardTaskModalOpen] = useState<boolean>(false);
     const [assignListTodoId, setAssignListTodoId] = useState<string | null>(null);
+
+    // Mobile specific drawers & popup data capture states
+    const [isMobileChannelDrawerOpen, setIsMobileChannelDrawerOpen] = useState(false);
+    const [isMobileFolderDrawerOpen, setIsMobileFolderDrawerOpen] = useState(false);
+    const [isAddListItemModalOpen, setIsAddListItemModalOpen] = useState(false);
+    const [kanbanAddModalCol, setKanbanAddModalCol] = useState<string | null>(null);
 
     // Bandeja de Novedades y Anuncios States
     const [inboxModalOpen, setInboxModalOpen] = useState(false);
@@ -1020,6 +1030,95 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             );
         }
 
+        if (isMobile) {
+            const currentTabConfig = [
+                { id: 'overview', label: 'Resumen', icon: Activity },
+                { id: 'kanban', label: 'Tablero', icon: AlignLeft },
+                { id: 'listas', label: 'Listas', icon: CheckSquareIcon, badge: unreadTabCounts.listas },
+                { id: 'sprints', label: 'Sprints', icon: Target },
+                { id: 'roadmap', label: 'Hoja de Ruta', icon: CalendarIcon },
+                { id: 'docs', label: 'Documentos', icon: FileText, badge: unreadTabCounts.docs },
+                { id: 'chat', label: 'Canales', icon: MessageSquare, badge: unreadChatMessagesCount },
+                { id: 'expenses', label: 'Gastos', icon: FileSpreadsheet, badge: unreadTabCounts.expenses },
+                { id: 'time', label: 'Tiempo', icon: Clock, badge: unreadTabCounts.time },
+                { id: 'team', label: 'Equipo', icon: Users },
+            ];
+            const activeTabInfo = currentTabConfig.find(t => t.id === activeTab) || currentTabConfig[0];
+            const ActiveTabIcon = activeTabInfo.icon;
+
+            return (
+                <div className="bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 shadow-xs shrink-0 select-none">
+                    {/* Compact Mobile Top Bar: No redundant project name, sleek controls */}
+                    <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-gray-100 dark:border-gray-800/80">
+                        <div className="flex items-center gap-2">
+                            {onBack && (
+                                <button
+                                    onClick={onBack}
+                                    className="p-2 -ml-1 rounded-xl bg-gray-100 dark:bg-zinc-800/80 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-95 transition-all"
+                                    aria-label="Volver a lista de proyectos"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                            )}
+                            <div className="flex items-center gap-2">
+                                <ActiveTabIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                                <span className="font-bold text-sm text-gray-900 dark:text-white tracking-tight">{activeTabInfo.label}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setInboxModalOpen(true)}
+                                className="p-2 rounded-xl border border-gray-200/80 dark:border-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 relative transition-colors"
+                                aria-label="Bandeja de entrada"
+                            >
+                                <Inbox className="w-4 h-4 text-amber-500" />
+                                {activeProject.inbox && activeProject.inbox.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)}
+                                className="p-2 rounded-xl border border-gray-200/80 dark:border-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                aria-label="Ajustes del Proyecto"
+                            >
+                                <Settings className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Scrollable Horizontal Tabs Navigation */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto py-2 px-3 no-scrollbar scrollbar-none">
+                        {currentTabConfig.map(tab => {
+                            const TabIcon = tab.icon;
+                            const isActive = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all whitespace-nowrap shrink-0 ${
+                                        isActive
+                                            ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs'
+                                            : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 bg-zinc-100/70 dark:bg-zinc-900'
+                                    }`}
+                                >
+                                    <TabIcon className="w-3.5 h-3.5" />
+                                    <span>{tab.label}</span>
+                                    {tab.badge ? (
+                                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                            isActive ? 'bg-white/20 dark:bg-black/20 text-white dark:text-zinc-900' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                                        }`}>
+                                            {tab.badge}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 shadow-sm">
                 {/* 1. TOP BROWSER-STYLE TABS */}
@@ -1170,6 +1269,165 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         } else if (overdueTasks.length > 0) {
             healthLabel = 'En Riesgo Moderado';
             healthBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400';
+        }
+
+        if (isMobile) {
+            return (
+                <div className="p-3.5 w-full h-full overflow-y-auto pb-28 space-y-3.5 font-sans">
+                    {/* Main Health & Progress Card */}
+                    <div className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Progreso del Proyecto</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${healthBadgeClass}`}>
+                                {healthLabel}
+                            </span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                            <span className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{progress}%</span>
+                            <span className="text-xs font-semibold text-gray-500">{completedTasks} de {totalTasks} tareas</span>
+                        </div>
+                        <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                            <div className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+                        </div>
+                    </div>
+
+                    {/* Quick Metric Tiles (2x2) */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                            onClick={() => setActiveTab('sprints')}
+                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all"
+                        >
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Sprint Activo</span>
+                            <span className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1 mt-1 block">
+                                {activeSprint ? activeSprint.name : 'Sin sprint activo'}
+                            </span>
+                            <span className="text-[10px] text-blue-500 font-semibold mt-1 inline-block">
+                                {activeSprint ? 'Ver sprint →' : 'Planificar →'}
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab('roadmap')}
+                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all"
+                        >
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Próximo Hito</span>
+                            <span className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1 mt-1 block">
+                                {pendingMilestones.length > 0 ? pendingMilestones[0].name : 'Sin hitos'}
+                            </span>
+                            <span className="text-[10px] text-blue-500 font-semibold mt-1 inline-block">
+                                {pendingMilestones.length > 0 ? 'Ver hoja de ruta →' : 'Crear hito →'}
+                            </span>
+                        </button>
+
+                        <div className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Atrasadas</span>
+                            <span className={`text-base font-black mt-0.5 block ${overdueTasks.length > 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
+                                {overdueTasks.length}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                                {overdueTasks.length === 0 ? 'Todo al día' : 'Requieren atención'}
+                            </span>
+                        </div>
+
+                        <button
+                            onClick={() => setActiveTab('kanban')}
+                            className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs text-left active:scale-[0.98] transition-all"
+                        >
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Tablero Kanban</span>
+                            <span className="text-xs font-bold text-gray-900 dark:text-white mt-1 block">
+                                Ver Columnas
+                            </span>
+                            <span className="text-[10px] text-blue-500 font-semibold mt-1 inline-block">
+                                Abrir tablero →
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* Recent Tasks */}
+                    <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                <AlignLeft className="w-3.5 h-3.5 text-blue-500" /> Tareas Recientes
+                            </h3>
+                            <button
+                                onClick={() => setActiveTab('kanban')}
+                                className="text-[11px] text-blue-500 font-semibold"
+                            >
+                                Ver todas ({projectTodos.length}) →
+                            </button>
+                        </div>
+
+                        <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                            {projectTodos.slice(0, 5).map(todo => (
+                                <div
+                                    key={todo.id}
+                                    className="flex items-center gap-2.5 py-2.5 active:bg-gray-50 dark:active:bg-gray-800/20 cursor-pointer"
+                                    onClick={() => onEditTodo && onEditTodo(todo)}
+                                >
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            updateTodo(todo.id, { completed: !todo.completed });
+                                        }}
+                                        className="shrink-0 p-0.5"
+                                    >
+                                        {todo.completed ? (
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                        ) : (
+                                            <Circle className="w-4 h-4 text-gray-400" />
+                                        )}
+                                    </button>
+                                    <span className={`text-xs flex-1 truncate ${todo.completed ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white font-medium'}`}>
+                                        {todo.text}
+                                    </span>
+                                    {todo.kanban_column && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-500 shrink-0">
+                                            {todo.kanban_column}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                            {projectTodos.length === 0 && (
+                                <p className="text-xs text-gray-400 py-4 text-center">No hay tareas creadas aún.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Team Announcements */}
+                    <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                <Inbox className="w-3.5 h-3.5 text-amber-500" /> Anuncios
+                            </h3>
+                            <button
+                                onClick={() => setInboxModalOpen(true)}
+                                className="text-[11px] text-blue-500 font-semibold"
+                            >
+                                + Publicar
+                            </button>
+                        </div>
+
+                        <div className="space-y-2">
+                            {(activeProject.inbox || []).slice(0, 3).map(item => (
+                                <div key={item.id} className="p-3 bg-gray-50 dark:bg-zinc-900/60 rounded-xl space-y-1 text-xs">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="font-bold text-gray-900 dark:text-white truncate">
+                                            {item.title || 'Comunicado'}
+                                        </span>
+                                        <span className="text-[9px] text-gray-400 shrink-0">
+                                            {item.created_at ? format(parseISO(item.created_at), 'd MMM', { locale: es }) : ''}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-2 leading-relaxed">{item.text}</p>
+                                </div>
+                            ))}
+                            {(!activeProject.inbox || activeProject.inbox.length === 0) && (
+                                <p className="text-xs text-gray-400 py-3 text-center">Sin anuncios recientes.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
         }
 
         return (
@@ -1415,40 +1673,68 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     </div>
                                 ))}
 
-                                {addingToColumn === col ? (
-                                    <form onSubmit={(e) => {
-                                        e.preventDefault();
-                                        if (newTaskText.trim()) {
-                                            addTodo(newTaskText.trim(), { projectId: activeProject.id, kanban_column: col });
-                                        }
-                                        setAddingToColumn(null);
+                                <button 
+                                    onClick={() => {
+                                        setKanbanAddModalCol(col);
                                         setNewTaskText('');
-                                    }} className="bg-white dark:bg-[#1c1c1c] p-2.5 rounded-lg border border-blue-500 shadow-md">
-                                        <input 
-                                            autoFocus 
-                                            type="text" 
-                                            value={newTaskText} 
-                                            onChange={e => setNewTaskText(e.target.value)} 
-                                            placeholder="Nombre de la tarea..."
-                                            className="w-full text-sm bg-transparent border-none focus:ring-0 p-1 text-gray-900 dark:text-white"
-                                        />
-                                        <div className="flex justify-end gap-2 mt-2">
-                                            <button type="button" onClick={() => setAddingToColumn(null)} className="px-2 py-1 text-xs text-gray-500">Cancelar</button>
-                                            <button type="submit" className="px-3 py-1 text-xs bg-gray-900 dark:bg-white text-white dark:text-black rounded font-medium">Añadir</button>
-                                        </div>
-                                    </form>
-                                ) : (
-                                    <button 
-                                        onClick={() => setAddingToColumn(col)} 
-                                        className="w-full py-2 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 flex items-center justify-center gap-1.5 hover:bg-gray-200/60 dark:hover:bg-gray-800/80 rounded-lg transition-colors border border-dashed border-gray-300 dark:border-gray-700"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" /> Añadir Tarea
-                                    </button>
-                                )}
+                                    }} 
+                                    className="w-full py-2.5 text-xs font-medium text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 flex items-center justify-center gap-1.5 hover:bg-gray-200/60 dark:hover:bg-zinc-800/80 rounded-xl transition-colors border border-dashed border-gray-300 dark:border-zinc-800"
+                                >
+                                    <Plus className="w-3.5 h-3.5" /> Añadir Tarea
+                                </button>
                             </div>
                         </div>
                     );
                 })}
+
+                {/* MODAL EMERGENTE PARA AÑADIR TAREA AL KANBAN */}
+                <Modal
+                    isOpen={kanbanAddModalCol !== null}
+                    onClose={() => { setKanbanAddModalCol(null); setNewTaskText(''); }}
+                    title={`Nueva Tarea en "${kanbanAddModalCol || ''}"`}
+                >
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            if (newTaskText.trim() && kanbanAddModalCol) {
+                                addTodo(newTaskText.trim(), { projectId: activeProject.id, kanban_column: kanbanAddModalCol });
+                            }
+                            setKanbanAddModalCol(null);
+                            setNewTaskText('');
+                        }}
+                        className="space-y-4 font-sans"
+                    >
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                                Descripción de la tarea
+                            </label>
+                            <input
+                                autoFocus
+                                type="text"
+                                value={newTaskText}
+                                onChange={e => setNewTaskText(e.target.value)}
+                                placeholder="¿Qué tarea deseas agregar?"
+                                className="w-full px-3.5 py-2.5 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-500/20 text-gray-900 dark:text-white"
+                                required
+                            />
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => { setKanbanAddModalCol(null); setNewTaskText(''); }}
+                                className="px-4 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors shadow-2xs"
+                            >
+                                Añadir Tarea
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
             </div>
         );
     };
@@ -1650,6 +1936,132 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             );
         }
 
+        if (isMobile) {
+            return (
+                <div className="p-3.5 w-full h-full overflow-y-auto pb-28 space-y-3.5 font-sans">
+                    {/* Top Action Bar */}
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            Sprints ({sprints.length})
+                        </span>
+                        <button
+                            onClick={() => setSprintModal({ isOpen: true, sprint: null })}
+                            className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs active:scale-95 transition-all"
+                        >
+                            <Plus className="w-3.5 h-3.5" /> Crear Sprint
+                        </button>
+                    </div>
+
+                    {sprints.length === 0 ? renderEmptyState('No hay Sprints configurados', 'Organiza el trabajo del equipo en iteraciones de 1 o 2 semanas.') : (
+                        <div className="space-y-3">
+                            {sprints.map(sprint => {
+                                const sprintTasks = projectTodos.filter(t => t.sprint_id === sprint.id);
+                                const completedTasks = sprintTasks.filter(t => t.completed).length;
+                                const totalTasks = sprintTasks.length;
+                                const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+                                const handleShareSprintProgress = () => {
+                                    const text = `📌 **Actualización de Sprint: ${sprint.name}**\n• Estado: ${sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'En Planificación'}\n• Progreso: ${completedTasks}/${totalTasks} tareas (${progress}%)\n• Tareas Completadas: ${completedTasks} de ${totalTasks}`;
+                                    setShareTargetChannelId(selectedChannelId || 'general');
+                                    setShareChannelPassword('');
+                                    setShareComment('');
+                                    setShareError(null);
+                                    setShareUpdateModal({
+                                        isOpen: true,
+                                        title: `Compartir Sprint: ${sprint.name}`,
+                                        updateText: text
+                                    });
+                                };
+
+                                return (
+                                    <div key={sprint.id} className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-4 shadow-xs space-y-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <h3 className="text-xs font-bold text-gray-900 dark:text-white truncate">{sprint.name}</h3>
+                                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${
+                                                sprint.status === 'active' ? 'bg-zinc-100 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100' :
+                                                sprint.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
+                                                'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
+                                            }`}>
+                                                {sprint.status === 'active' ? '● En Curso' : sprint.status === 'completed' ? '✓ Completado' : 'Planificación'}
+                                            </span>
+                                        </div>
+
+                                        {sprint.goal && <p className="text-[11px] text-gray-500 line-clamp-2">{sprint.goal}</p>}
+
+                                        {/* Progress */}
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-[10px] font-medium text-gray-400">
+                                                <span>{completedTasks}/{totalTasks} tareas completadas</span>
+                                                <span>{progress}%</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                                <div className="h-full bg-blue-600 dark:bg-blue-400 rounded-full" style={{ width: `${progress}%` }} />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800/80 text-[11px]">
+                                            <button
+                                                onClick={() => setSelectedSprintId(sprint.id)}
+                                                className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs active:scale-95 transition-all"
+                                            >
+                                                <Layers className="w-3.5 h-3.5" /> Entrar ({sprintTasks.length})
+                                            </button>
+
+                                            <div className="flex items-center gap-1.5">
+                                                {sprint.status === 'planning' && (
+                                                    <button 
+                                                        onClick={() => {
+                                                            const updated = sprints.map(s => s.id === sprint.id ? { ...s, status: 'active' as const } : s);
+                                                            onUpdateProject(activeProject.id, { sprints: updated });
+                                                        }}
+                                                        className="px-2 py-1 text-[11px] bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white rounded-lg font-semibold"
+                                                    >
+                                                        Iniciar
+                                                    </button>
+                                                )}
+                                                {sprint.status === 'active' && (
+                                                    <button 
+                                                        onClick={() => setCloseSprintModal({ isOpen: true, sprint })}
+                                                        className="px-2 py-1 text-[11px] bg-emerald-600 text-white rounded-lg font-semibold"
+                                                    >
+                                                        Cerrar
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={handleShareSprintProgress}
+                                                    className="p-1.5 text-gray-400 hover:text-blue-500 rounded-lg"
+                                                    title="Compartir"
+                                                >
+                                                    <Share2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button onClick={() => setSprintModal({ isOpen: true, sprint })} className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg">
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                {isProjectCreator && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`¿Estás seguro de eliminar el sprint "${sprint.name}"?`)) {
+                                                                const updated = sprints.filter(s => s.id !== sprint.id);
+                                                                onUpdateProject(activeProject.id, { sprints: updated });
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg"
+                                                        title="Eliminar Sprint"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         return (
             <div className="p-8 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6 font-sans">
                 <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
@@ -1782,6 +2194,135 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const renderRoadmap = () => {
         if (!activeProject) return null;
         const milestones = activeProject.milestones || [];
+
+        if (isMobile) {
+            return (
+                <div className="p-3.5 w-full h-full overflow-y-auto pb-28 space-y-3.5 font-sans">
+                    {/* Top Action Bar */}
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            Hitos ({milestones.length})
+                        </span>
+                        <button
+                            onClick={() => setMilestoneModal({ isOpen: true, milestone: null })}
+                            className="px-3.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs active:scale-95 transition-all"
+                        >
+                            <Plus className="w-3.5 h-3.5" /> Nuevo Hito
+                        </button>
+                    </div>
+
+                    {milestones.length === 0 ? renderEmptyState('Hoja de ruta sin hitos', 'Establece los objetivos clave y entregables del proyecto.') : (
+                        <div className="space-y-3">
+                            {milestones.map(ms => {
+                                const handleShareMilestone = () => {
+                                    const text = `🚩 **Hito del Proyecto: ${ms.name}**\n• Categoría: ${ms.category || 'General'}\n• Estado: ${ms.status === 'completed' ? '✓ Completado' : ms.status === 'in_progress' ? '● En Progreso' : 'Planificado'}\n• Fecha Límite: ${ms.target_date || 'Por definir'}${ms.description ? `\n• Detalle: ${ms.description}` : ''}`;
+                                    setShareTargetChannelId(selectedChannelId || 'general');
+                                    setShareChannelPassword('');
+                                    setShareComment('');
+                                    setShareError(null);
+                                    setShareUpdateModal({
+                                        isOpen: true,
+                                        title: `Compartir Hito: ${ms.name}`,
+                                        updateText: text
+                                    });
+                                };
+
+                                const handleStatusChange = (newStatus: 'pending' | 'in_progress' | 'completed') => {
+                                    const updated = milestones.map(m => m.id === ms.id ? { ...m, status: newStatus } : m);
+                                    onUpdateProject(activeProject.id, { milestones: updated });
+                                };
+
+                                return (
+                                    <div key={ms.id} className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                                        ms.status === 'completed' ? 'bg-emerald-500' : ms.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400'
+                                                    }`} />
+                                                    <h3 className="text-xs font-bold text-gray-900 dark:text-white truncate">{ms.name}</h3>
+                                                </div>
+                                            </div>
+                                            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 shrink-0">
+                                                {ms.category || 'General'}
+                                            </span>
+                                        </div>
+
+                                        {ms.description && (
+                                            <p className="text-[11px] text-gray-500 line-clamp-2">{ms.description}</p>
+                                        )}
+
+                                        {/* Status Switcher Pills */}
+                                        <div className="grid grid-cols-3 gap-1 bg-gray-100 dark:bg-zinc-900/60 p-1 rounded-xl">
+                                            <button
+                                                onClick={() => handleStatusChange('pending')}
+                                                className={`py-1 text-[10px] font-bold rounded-lg transition-all ${
+                                                    ms.status === 'pending'
+                                                        ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs'
+                                                        : 'text-gray-400 hover:text-gray-700'
+                                                }`}
+                                            >
+                                                Pendiente
+                                            </button>
+                                            <button
+                                                onClick={() => handleStatusChange('in_progress')}
+                                                className={`py-1 text-[10px] font-bold rounded-lg transition-all ${
+                                                    ms.status === 'in_progress'
+                                                        ? 'bg-blue-600 text-white shadow-xs'
+                                                        : 'text-gray-400 hover:text-gray-700'
+                                                }`}
+                                            >
+                                                En Curso
+                                            </button>
+                                            <button
+                                                onClick={() => handleStatusChange('completed')}
+                                                className={`py-1 text-[10px] font-bold rounded-lg transition-all ${
+                                                    ms.status === 'completed'
+                                                        ? 'bg-emerald-600 text-white shadow-xs'
+                                                        : 'text-gray-400 hover:text-gray-700'
+                                                }`}
+                                            >
+                                                Completado
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800/80 text-[11px] text-gray-500">
+                                            <span>📅 {ms.target_date || 'Sin fecha límite'}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    onClick={handleShareMilestone}
+                                                    className="p-1.5 text-gray-400 hover:text-blue-500 rounded-lg"
+                                                    title="Compartir"
+                                                >
+                                                    <Share2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button onClick={() => setMilestoneModal({ isOpen: true, milestone: ms })} className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg">
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                {isProjectCreator && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`¿Estás seguro de eliminar el hito "${ms.name}"?`)) {
+                                                                const updated = milestones.filter(m => m.id !== ms.id);
+                                                                onUpdateProject(activeProject.id, { milestones: updated });
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg"
+                                                        title="Eliminar Hito"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
 
         return (
             <div className="p-6 max-w-5xl mx-auto w-full h-full overflow-y-auto pb-20">
@@ -1942,21 +2483,35 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 />
 
                 {/* HEADER MINIMALISTA Y ELEGANTE */}
-                <div className="px-6 py-3.5 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200">
-                            <FolderOpen className="w-4 h-4" />
-                        </div>
-                        <div>
-                            <h2 className="text-sm font-medium tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                                <span>Documentos & Archivos</span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
-                                    {allProjectDocs.length}
-                                </span>
-                            </h2>
-                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                                {activeFolderObj ? `Carpeta: ${activeFolderObj.name}` : 'Todos los documentos, archivos y notas asociadas'}
-                            </p>
+                <div className="px-4 sm:px-6 py-3 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+                    <div className="flex items-center gap-2">
+                        {/* Mobile Folder Drawer Toggle */}
+                        <button
+                            type="button"
+                            onClick={() => setIsMobileFolderDrawerOpen(true)}
+                            className="md:hidden px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 text-xs font-semibold"
+                            title="Ver carpetas"
+                        >
+                            <FolderOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                            <span className="truncate max-w-[110px]">{activeFolderObj ? activeFolderObj.name : 'Carpetas'}</span>
+                            <ChevronDown className="w-3 h-3 text-zinc-400 shrink-0" />
+                        </button>
+
+                        <div className="hidden md:flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800/60 text-zinc-800 dark:text-zinc-200">
+                                <FolderOpen className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-medium tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                    <span>Documentos & Archivos</span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
+                                        {allProjectDocs.length}
+                                    </span>
+                                </h2>
+                                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                                    {activeFolderObj ? `Carpeta: ${activeFolderObj.name}` : 'Todos los documentos, archivos y notas asociadas'}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -2047,8 +2602,110 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                 {/* CONTENIDO PRINCIPAL: VISTA DE ARCHIVOS E IMÁGENES */}
                 <div className="w-full flex-1 flex overflow-hidden">
-                    {/* BARRA LATERAL MINIMALISTA DE CARPETAS */}
-                    <div className="w-52 sm:w-60 bg-white dark:bg-[#0d0d0f] border-r border-zinc-200/80 dark:border-zinc-800/80 flex flex-col shrink-0">
+                    {/* DESPLEGABLE LATERAL MÓVIL PARA CARPETAS */}
+                    {isMobileFolderDrawerOpen && (
+                        <div className="fixed inset-0 z-[10000] flex md:hidden animate-in fade-in duration-200">
+                            <div 
+                                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+                                onClick={() => setIsMobileFolderDrawerOpen(false)} 
+                            />
+                            <div className="relative w-4/5 max-w-xs h-full bg-white dark:bg-[#0c0c0e] border-r border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
+                                <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <FolderOpen className="w-4 h-4 text-amber-500" />
+                                        <span className="text-sm font-bold text-zinc-900 dark:text-white">Carpetas</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsMobileFolderDrawerOpen(false);
+                                                setFolderModal({ isOpen: true, folder: null });
+                                            }}
+                                            className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                            title="Nueva Carpeta"
+                                        >
+                                            <FolderPlus className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsMobileFolderDrawerOpen(false)}
+                                            className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedFolderId(null);
+                                            setIsMobileFolderDrawerOpen(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors ${
+                                            selectedFolderId === null
+                                                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold shadow-xs'
+                                                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <FolderOpen className="w-4 h-4 shrink-0" />
+                                            <span className="truncate">Todos los Archivos</span>
+                                        </div>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 font-medium">
+                                            {allProjectDocs.length}
+                                        </span>
+                                    </button>
+
+                                    {projectFolders.map(folder => {
+                                        const count = allProjectDocs.filter(d => d.folder_id === folder.id).length;
+                                        const isSelected = selectedFolderId === folder.id;
+                                        return (
+                                            <div
+                                                key={folder.id}
+                                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                                                    isSelected
+                                                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold shadow-xs'
+                                                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                                                }`}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedFolderId(folder.id);
+                                                        setIsMobileFolderDrawerOpen(false);
+                                                    }}
+                                                    className="flex items-center gap-2 min-w-0 flex-1 text-left py-1"
+                                                >
+                                                    <FolderIcon className="w-4 h-4 shrink-0 text-amber-500" />
+                                                    <span className="truncate">{folder.name}</span>
+                                                </button>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 font-medium">
+                                                        {count}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsMobileFolderDrawerOpen(false);
+                                                            handleDeleteDocFolder(folder.id);
+                                                        }}
+                                                        className="p-1 text-zinc-400 hover:text-red-500 rounded"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* BARRA LATERAL MINIMALISTA DE CARPETAS (ESCRITORIO) */}
+                    <div className="hidden md:flex w-52 sm:w-60 bg-white dark:bg-[#0d0d0f] border-r border-zinc-200/80 dark:border-zinc-800/80 flex-col shrink-0">
                         <div className="p-3 border-b border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between">
                             <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                                 Carpetas
@@ -2838,9 +3495,87 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         return (
             <div className="flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden">
+                {/* DESPLEGABLE LATERAL MÓVIL PARA CANALES */}
+                {isMobileChannelDrawerOpen && (
+                    <div className="fixed inset-0 z-[10000] flex md:hidden animate-in fade-in duration-200">
+                        <div 
+                            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+                            onClick={() => setIsMobileChannelDrawerOpen(false)} 
+                        />
+                        <div className="relative w-4/5 max-w-xs h-full bg-white dark:bg-[#0c0c0e] border-r border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
+                            {/* Drawer Header */}
+                            <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                                    <span className="text-sm font-bold text-zinc-900 dark:text-white">Canales</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    {isProjectCreator && (
+                                        <button 
+                                            onClick={() => {
+                                                setIsMobileChannelDrawerOpen(false);
+                                                setIsCreateChannelOpen(true);
+                                            }}
+                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg text-blue-600 dark:text-blue-400"
+                                            title="Crear nuevo canal"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileChannelDrawerOpen(false)}
+                                        className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            {/* Channels List in Drawer */}
+                            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                                {activeChannels.map(chan => {
+                                    const isSelected = chan.id === currentChannel.id;
+                                    const hasUnread = !isSelected && (activeProject.chat_messages || []).some(m => {
+                                        if ((m.channel_id || 'general') !== chan.id) return false;
+                                        if (checkIsUser(m.sender_email, m.sender_id)) return false;
+                                        const lastRead = lastReadTimes[chan.id];
+                                        if (!lastRead) return true;
+                                        return m.created_at > lastRead;
+                                    });
+
+                                    return (
+                                        <button
+                                            key={chan.id}
+                                            onClick={() => {
+                                                if (chan.is_private) {
+                                                    setUnlockedChannels(prev => ({ ...prev, [chan.id]: false }));
+                                                }
+                                                setSelectedChannelId(chan.id);
+                                                setIsMobileChannelDrawerOpen(false);
+                                            }}
+                                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors text-left ${
+                                                isSelected
+                                                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold shadow-xs'
+                                                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {chan.is_private ? <Lock className="w-3.5 h-3.5 shrink-0" /> : <Hash className="w-3.5 h-3.5 shrink-0" />}
+                                                <span className="truncate">{chan.name}</span>
+                                            </div>
+                                            {hasUnread && (
+                                                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
                 
-                {/* 1. CHANNELS SIDEBAR */}
-                <div className="w-64 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0c0c0c] flex flex-col justify-between shrink-0 h-full">
+                {/* 1. CHANNELS SIDEBAR (ESCRITORIO) */}
+                <div className="hidden md:flex w-64 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0c0c0c] flex-col justify-between shrink-0 h-full">
                     
                     <div className="flex-1 overflow-y-auto">
                         
@@ -2956,14 +3691,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <div className="flex-1 flex flex-col h-full bg-white dark:bg-[#050505] overflow-hidden relative">
                         
                         {/* Channel Main Header */}
-                        <div className="px-6 py-3.5 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-4 shrink-0">
+                        <div className="px-4 sm:px-6 py-3 bg-white dark:bg-[#0c0c0c] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3 shrink-0">
                             <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMobileChannelDrawerOpen(true)}
+                                    className="flex items-center gap-1.5 text-left rounded-xl p-1 -ml-1 hover:bg-gray-100 dark:hover:bg-zinc-800/80 transition-colors md:pointer-events-none"
+                                >
                                     <span className="text-gray-400 dark:text-gray-500 shrink-0">
-                                        {currentChannel.is_private ? <Lock className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
+                                        {currentChannel.is_private ? <Lock className="w-4 h-4" /> : <Hash className="w-4 h-4 text-blue-500" />}
                                     </span>
                                     <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">{currentChannel.name}</h2>
-                                </div>
+                                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 md:hidden shrink-0" />
+                                </button>
                                 {currentChannel.description && (
                                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{currentChannel.description}</p>
                                 )}
@@ -3834,6 +4574,130 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             exportCSV(`gastos-${activeProject.name}-${expenseFilter}`, headers, rows);
         };
 
+        if (isMobile) {
+            return (
+                <div className="p-3.5 w-full h-full overflow-y-auto pb-28 space-y-3.5 font-sans">
+                    {/* Top Action & Filter Bar */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide py-0.5">
+                            {[
+                                { id: 'all', label: 'Todo' },
+                                { id: 'month', label: 'Este mes' },
+                                { id: 'week', label: 'Esta semana' },
+                                { id: 'year', label: 'Año' },
+                            ].map(f => (
+                                <button
+                                    key={f.id}
+                                    onClick={() => setExpenseFilter(f.id as any)}
+                                    className={`px-2.5 py-1 text-xs font-semibold rounded-full transition-all shrink-0 ${
+                                        expenseFilter === f.id
+                                            ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs'
+                                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400'
+                                    }`}
+                                >
+                                    {f.label}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setIsExpenseModalOpen(true)}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm shrink-0 active:scale-95 transition-all"
+                        >
+                            <Plus className="w-3.5 h-3.5" /> Gasto
+                        </button>
+                    </div>
+
+                    {/* Mobile Summary Cards */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                        <div className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium block">Total Gastado</span>
+                            <span className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight mt-0.5 block">
+                                ${totalSpent.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                        </div>
+                        <div className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium block">Registros</span>
+                            <span className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight mt-0.5 block">
+                                {expenses.length}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Expense List */}
+                    {expenses.length === 0 ? (
+                        <div className="py-12 text-center space-y-3 bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-6">
+                            <div className="w-12 h-12 mx-auto rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-400">
+                                <FileSpreadsheet className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white">Sin gastos registrados</h4>
+                                <p className="text-xs text-gray-500 mt-1">No hay gastos para el filtro seleccionado.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsExpenseModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> Registrar Primer Gasto
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {expenses.map(exp => (
+                                <div
+                                    key={exp.id}
+                                    className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center justify-between gap-3 active:bg-gray-50/50 dark:active:bg-zinc-900/50 transition-colors"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                                                {exp.description}
+                                            </h4>
+                                            <span className="text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 shrink-0">
+                                                {exp.category}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400">
+                                            <span>{exp.date}</span>
+                                            <span>•</span>
+                                            <span className="truncate">
+                                                {(() => {
+                                                    const creatorEmail = exp.created_by;
+                                                    const isMe = (currentUserEmail && creatorEmail && creatorEmail.toLowerCase() === currentUserEmail.toLowerCase()) || creatorEmail === 'Tú' || exp.created_by_name === 'Tú';
+                                                    if (isMe) return "Tú";
+                                                    if (exp.created_by_name && exp.created_by_name !== 'Tú') return exp.created_by_name;
+                                                    return creatorEmail ? creatorEmail.split('@')[0] : "Colaborador";
+                                                })()}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-sm font-extrabold text-gray-900 dark:text-white">
+                                            ${exp.amount.toFixed(2)}
+                                        </span>
+                                        {isProjectCreator && (
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm(`¿Estás seguro de eliminar el gasto "${exp.description}"?`)) {
+                                                        const updated = allExpenses.filter(e => e.id !== exp.id);
+                                                        onUpdateProject(activeProject.id, { expenses: updated });
+                                                    }
+                                                }}
+                                                className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg"
+                                                title="Eliminar gasto"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
                 <div className="flex items-center justify-between">
@@ -3952,6 +4816,117 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             exportCSV(`tiempo-${activeProject.name}-${timeFilter}`, headers, rows);
         };
 
+        if (isMobile) {
+            return (
+                <div className="p-3.5 w-full h-full overflow-y-auto pb-28 space-y-3.5 font-sans">
+                    {/* Top Action & Filter Bar */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide py-0.5">
+                            {[
+                                { id: 'all', label: 'Todo' },
+                                { id: 'month', label: 'Este mes' },
+                                { id: 'week', label: 'Esta semana' },
+                                { id: 'year', label: 'Año' },
+                            ].map(f => (
+                                <button
+                                    key={f.id}
+                                    onClick={() => setTimeFilter(f.id as any)}
+                                    className={`px-2.5 py-1 text-xs font-semibold rounded-full transition-all shrink-0 ${
+                                        timeFilter === f.id
+                                            ? 'bg-gray-900 dark:bg-white text-white dark:text-black shadow-xs'
+                                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400'
+                                    }`}
+                                >
+                                    {f.label}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setIsTimeModalOpen(true)}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm shrink-0 active:scale-95 transition-all"
+                        >
+                            <Plus className="w-3.5 h-3.5" /> Tiempo
+                        </button>
+                    </div>
+
+                    {/* Mobile Summary Cards */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                        <div className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium block">Horas Totales</span>
+                            <span className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight mt-0.5 block">
+                                {Math.floor(totalMinutes / 60)}h {totalMinutes % 60}m
+                            </span>
+                        </div>
+                        <div className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium block">Sesiones</span>
+                            <span className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight mt-0.5 block">
+                                {timeEntries.length}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Time Entries List */}
+                    {timeEntries.length === 0 ? (
+                        <div className="py-12 text-center space-y-3 bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-6">
+                            <div className="w-12 h-12 mx-auto rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-400">
+                                <Clock className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white">Sin horas registradas</h4>
+                                <p className="text-xs text-gray-500 mt-1">No hay tiempos guardados para este periodo.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsTimeModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> Registrar Horas
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {timeEntries.map(t => (
+                                <div
+                                    key={t.id}
+                                    className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center justify-between gap-3 active:bg-gray-50/50 dark:active:bg-zinc-900/50 transition-colors"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                                            {t.description || 'Sesión de trabajo'}
+                                        </h4>
+                                        <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400">
+                                            <span>{t.date}</span>
+                                            <span>•</span>
+                                            <span className="truncate">Por: {t.user_name}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-xs font-bold px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/40 font-mono">
+                                            {Math.floor(t.duration_minutes / 60)}h {t.duration_minutes % 60}m
+                                        </span>
+                                        {isProjectCreator && (
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm(`¿Estás seguro de eliminar este registro de tiempo?`)) {
+                                                        const updated = allTimeEntries.filter(entry => entry.id !== t.id);
+                                                        onUpdateProject(activeProject.id, { time_entries: updated });
+                                                    }
+                                                }}
+                                                className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg"
+                                                title="Eliminar tiempo"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
                 <div className="flex items-center justify-between">
@@ -4037,6 +5012,92 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 (m.email && m.email.toLowerCase().includes(memberSearchText.toLowerCase()))
               )
             : realMembers;
+
+        if (isMobile) {
+            return (
+                <div className="p-3.5 w-full h-full overflow-y-auto pb-28 space-y-3.5 font-sans">
+                    {/* Mobile Top Bar */}
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+                            <input 
+                                type="text"
+                                placeholder="Buscar miembro..."
+                                value={memberSearchText}
+                                onChange={e => setMemberSearchText(e.target.value)}
+                                className="w-full pl-8 pr-3 py-2 text-xs bg-white dark:bg-[#111] border border-gray-200/80 dark:border-gray-800/80 rounded-xl focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white placeholder-gray-400"
+                            />
+                        </div>
+                        {isProjectCreator && (
+                            <button
+                                onClick={() => setIsInviteModalOpen(true)}
+                                className="px-3.5 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs shrink-0 active:scale-95 transition-all"
+                            >
+                                <Users className="w-3.5 h-3.5" /> Invitar
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Member Count Badge */}
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 px-1">
+                        <span>Colaboradores ({membersList.length})</span>
+                    </div>
+
+                    {/* Member Cards */}
+                    <div className="space-y-2">
+                        {membersList.map((m, idx) => {
+                            const isOwner = m.role === 'owner';
+                            return (
+                                <div
+                                    key={m.id || idx}
+                                    className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center justify-between gap-3"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className={`w-9 h-9 rounded-xl ${isOwner ? 'bg-gray-900 dark:bg-white text-white dark:text-black font-bold' : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-semibold'} text-xs flex items-center justify-center shrink-0 border border-gray-200/50 dark:border-gray-800`}>
+                                            {(m.name || m.email || 'M').charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                                                {m.name || 'Miembro del Equipo'}
+                                            </h4>
+                                            <span className="text-[10px] text-gray-400 font-mono block truncate">{m.email}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold tracking-wide ${
+                                            isOwner 
+                                                ? 'bg-gray-900/10 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-900/20 dark:border-white/20' 
+                                                : m.role === 'pending'
+                                                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
+                                                : m.role === 'lead'
+                                                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                                : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
+                                        }`}>
+                                            {isOwner ? 'Dueño' : m.role === 'pending' ? 'Pendiente' : m.role === 'lead' ? 'Líder' : 'Miembro'}
+                                        </span>
+                                        {isProjectCreator && !isOwner && (
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm(`¿Estás seguro de eliminar a ${m.name || m.email} de los colaboradores? Perderá acceso a este proyecto.`)) {
+                                                        const updatedMembers = (activeProject.members || []).filter((mem: any) => mem.email !== m.email);
+                                                        onUpdateProject(activeProject.id, { members: updatedMembers });
+                                                    }
+                                                }}
+                                                className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
+                                                title="Eliminar Colaborador"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
 
         return (
             <div className="p-6 max-w-4xl mx-auto w-full h-full overflow-y-auto pb-20 space-y-6">
@@ -4298,24 +5359,33 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </div>
 
                 {/* List Header & Quick Add */}
-                <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/60 dark:border-gray-800/80 shadow-2xs space-y-5">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800/80 pb-4">
-                        <div className="space-y-1">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <List className="w-4 h-4 text-blue-500" />
-                                {activeCustomList?.name}
+                <div className="bg-white dark:bg-[#111] p-4 sm:p-6 rounded-2xl border border-gray-200/60 dark:border-gray-800/80 shadow-2xs space-y-4">
+                    <div className="flex items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800/80 pb-3">
+                        <div className="space-y-0.5 min-w-0">
+                            <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2 truncate">
+                                <List className="w-4 h-4 text-blue-500 shrink-0" />
+                                <span className="truncate">{activeCustomList?.name}</span>
                             </h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {activeCustomList?.description || 'Tareas asignadas a esta lista. Todas las tareas creadas aquí se reflejan en el tablero Kanban.'}
+                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
+                                {activeCustomList?.description || 'Tareas asignadas a esta lista sincronizadas con Kanban.'}
                             </p>
                         </div>
-                        <div className="text-xs text-gray-400 font-medium">
-                            {displayedTodos.length} {displayedTodos.length === 1 ? 'tarea' : 'tareas'}
+                        <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-gray-400 font-medium hidden sm:inline">
+                                {displayedTodos.length} {displayedTodos.length === 1 ? 'tarea' : 'tareas'}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setIsAddListItemModalOpen(true)}
+                                className="px-3 py-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-xs"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Nueva</span> Tarea
+                            </button>
                         </div>
                     </div>
 
-                    {/* Quick Add Form */}
-                    <form onSubmit={handleAddListTodo} className="flex flex-wrap items-center gap-3">
+                    {/* Quick Add Form (Desktop Only, on mobile data capture is done via popup) */}
+                    <form onSubmit={handleAddListTodo} className="hidden md:flex flex-wrap items-center gap-3">
                         <input
                             type="text"
                             placeholder={`Añadir tarea a "${activeCustomList?.name}"...`}
@@ -4396,9 +5466,102 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
                 </div>
 
-                {/* Minimalist Clean Table with Inline Editing */}
+                {/* Minimalist Clean Table / Mobile Cards */}
                 <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200/60 dark:border-gray-800/80 overflow-hidden shadow-2xs">
-                    <div className="overflow-x-auto">
+                    {/* VISTA MÓVIL DE TAREAS */}
+                    <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-800/50">
+                        {displayedTodos.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400 italic text-xs">
+                                No hay tareas en esta lista. Toca "+ Nueva Tarea" para crear una.
+                            </div>
+                        ) : (
+                            displayedTodos.map(todo => {
+                                const currentAssignee = todo.assigned_to || todo.assignee || '';
+                                const availableCols = activeProject.kanban_columns && activeProject.kanban_columns.length > 0 ? activeProject.kanban_columns : ['Por hacer', 'En progreso', 'Completado'];
+                                const doneCol = availableCols.find(c => /done|complet|finaliz|termin/i.test(c)) || availableCols[availableCols.length - 1] || 'Completado';
+                                const firstCol = availableCols[0] || 'Por hacer';
+
+                                return (
+                                    <div key={todo.id} className="p-3.5 space-y-2 hover:bg-gray-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                                        <div className="flex items-start gap-2.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const nextCompleted = !todo.completed;
+                                                    const nextCol = nextCompleted ? doneCol : firstCol;
+                                                    updateTodo(todo.id, {
+                                                        completed: nextCompleted,
+                                                        kanban_column: nextCol
+                                                    });
+                                                }}
+                                                className="mt-0.5 shrink-0"
+                                            >
+                                                {todo.completed ? (
+                                                    <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-500/20" />
+                                                ) : (
+                                                    <Circle className="w-5 h-5 text-gray-300 dark:text-zinc-600" />
+                                                )}
+                                            </button>
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-xs font-semibold leading-snug ${todo.completed ? 'line-through text-gray-400 dark:text-zinc-500' : 'text-gray-900 dark:text-zinc-100'}`}>
+                                                    {todo.text}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShareTask(todo)}
+                                                    className="p-1 text-gray-400 hover:text-blue-500 rounded"
+                                                    title="Compartir"
+                                                >
+                                                    <Share2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => deleteTodo(todo.id)}
+                                                    className="p-1 text-gray-400 hover:text-red-500 rounded"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-1.5 pl-7 text-[10px]">
+                                            <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
+                                                {todo.kanban_column || 'Por hacer'}
+                                            </span>
+                                            {todo.priority && (
+                                                <span className={`px-2 py-0.5 rounded-full font-medium ${
+                                                    todo.priority === 'high'
+                                                        ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'
+                                                        : todo.priority === 'medium'
+                                                        ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400'
+                                                        : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                                                }`}>
+                                                    {todo.priority === 'high' ? 'Alta' : todo.priority === 'medium' ? 'Media' : 'Baja'}
+                                                </span>
+                                            )}
+                                            {todo.dueDate && (
+                                                <span className="flex items-center gap-1 text-zinc-400">
+                                                    <CalendarIcon className="w-3 h-3" />
+                                                    {todo.dueDate}
+                                                </span>
+                                            )}
+                                            {currentAssignee && (
+                                                <span className="text-zinc-400">
+                                                    @{currentAssignee.split('@')[0]}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {/* VISTA ESCRITORIO CON TABLA COMPLETA */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/50 dark:bg-zinc-900/50 border-b border-gray-200/60 dark:border-gray-800 text-gray-400 font-semibold text-[10px] uppercase tracking-wider">
@@ -4553,6 +5716,123 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </table>
                     </div>
                 </div>
+
+                {/* MODAL / BOTTOM SHEET PARA AGREGAR TAREA A LA LISTA */}
+                {isAddListItemModalOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-[9999] animate-in fade-in duration-200">
+                        <div 
+                            className="fixed inset-0" 
+                            onClick={() => setIsAddListItemModalOpen(false)}
+                        />
+                        <div className="relative w-full max-w-lg bg-white dark:bg-[#111] rounded-t-3xl sm:rounded-2xl border-t sm:border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl z-10 animate-in slide-in-from-bottom duration-200">
+                            <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                                <div>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Nueva Tarea</h3>
+                                    <p className="text-xs text-zinc-400">En {activeCustomList?.name || 'Lista'}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddListItemModalOpen(false)}
+                                    className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={async (e) => {
+                                await handleAddListTodo(e);
+                                setIsAddListItemModalOpen(false);
+                            }} className="mt-4 space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                                        Título de la tarea
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="¿Qué se necesita hacer?"
+                                        value={newItemTitle}
+                                        onChange={e => setNewItemTitle(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-zinc-500"
+                                        autoFocus
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                                            Responsable
+                                        </label>
+                                        <select
+                                            value={newItemAssignee}
+                                            onChange={e => setNewItemAssignee(e.target.value)}
+                                            className="w-full px-3 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 focus:outline-none"
+                                        >
+                                            <option value="">(Sin asignar)</option>
+                                            {realMembers.map(m => (
+                                                <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                                            Fecha límite
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={newItemDueDate}
+                                            onChange={e => setNewItemDueDate(e.target.value)}
+                                            className="w-full px-3 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                                        Prioridad
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                            { id: 'low', label: 'Baja' },
+                                            { id: 'medium', label: 'Media' },
+                                            { id: 'high', label: 'Alta' }
+                                        ].map(p => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => setNewItemPriority(p.id as any)}
+                                                className={`py-2 rounded-xl text-xs font-medium border transition-colors ${
+                                                    newItemPriority === p.id
+                                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white font-semibold'
+                                                        : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
+                                                }`}
+                                            >
+                                                {p.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 flex justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAddListItemModalOpen(false)}
+                                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 shadow-sm"
+                                    >
+                                        Guardar Tarea
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };

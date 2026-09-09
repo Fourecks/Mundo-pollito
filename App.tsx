@@ -2081,14 +2081,10 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                     <div className="h-full">
                         {viewingProjectId ? (
                             <div className="h-full flex flex-col relative mobile-projects-workspace">
-                                <button 
-                                    onClick={() => setViewingProjectId(null)} 
-                                    className="absolute top-4 right-4 z-50 p-2 bg-black dark:bg-white text-white dark:text-black rounded-full shadow-xl active:scale-95 transition-transform"
-                                >
-                                    <ArrowLeft className="w-5 h-5" />
-                                </button>
-                                <div className="h-full flex-1 overflow-hidden pt-12">
+                                <div className="h-full flex-1 overflow-hidden">
                                     <ProjectsWorkspace 
+                                      isMobile={true}
+                                      onBack={() => setViewingProjectId(null)}
                                       currentUser={currentUser}
                                       projects={projects}
                                       notes={notes}
@@ -4786,23 +4782,20 @@ const App: React.FC = () => {
     await syncableDelete('habits', habitId);
   };
 
-  const handleToggleHabitRecord = async (habitId: number, date: string) => {
-    if(!user) return;
-    const todayStr = new Date().toISOString().split('T')[0];
-    if (date > todayStr) {
-      return; // Do not allow marking future dates
-    }
-    const recordKey = `${habitId}-${date}`;
+  const handleToggleHabitRecord = async (habitId: number | string, date: string) => {
+    const effectiveUserId = user?.id || 'default_user';
+    const idNum = typeof habitId === 'number' ? habitId : Number(habitId);
+    const recordKey = `${idNum}-${date}`;
     if (processingHabitRecord === recordKey) {
         return; // Prevent rapid-fire clicks
     }
     setProcessingHabitRecord(recordKey);
 
     try {
-        const existingRecords = habitRecords.filter(r => r.habit_id === habitId && r.completed_at === date);
+        const existingRecords = habitRecords.filter(r => Number(r.habit_id) === idNum && r.completed_at === date);
         if(existingRecords.length > 0) {
             // Delete all matching records to avoid duplicates
-            setHabitRecords(r => r.filter(item => !(item.habit_id === habitId && item.completed_at === date)));
+            setHabitRecords(r => r.filter(item => !(Number(item.habit_id) === idNum && item.completed_at === date)));
             for (const rec of existingRecords) {
                 await syncableDelete('habit_records', rec.id);
             }
@@ -4811,16 +4804,18 @@ const App: React.FC = () => {
             const tempId = -Date.now();
             const newRecord: HabitRecord = {
                 id: tempId,
-                habit_id: habitId,
+                habit_id: idNum,
                 completed_at: date,
-                user_id: user.id
+                user_id: effectiveUserId
             };
             setHabitRecords(r => [...r, newRecord]);
             const savedRecord = await syncableCreate('habit_records', newRecord) as HabitRecord;
-            if (savedRecord.id !== tempId) {
+            if (savedRecord && savedRecord.id !== tempId) {
                 setHabitRecords(r => r.map(item => item.id === tempId ? savedRecord : item));
             }
         }
+    } catch (err) {
+        console.error("Error toggling habit record:", err);
     } finally {
         setProcessingHabitRecord(null);
     }
