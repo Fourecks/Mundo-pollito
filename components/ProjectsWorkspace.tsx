@@ -243,6 +243,18 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [activeTaskThreadItem, setActiveTaskThreadItem] = useState<{ listId: string; item: ProjectListItem } | null>(null);
     const [listThreadCommentText, setListThreadCommentText] = useState<string>('');
     const [listCustomView, setListCustomView] = useState<'all' | 'priority' | 'assigned_to_me' | 'due_date' | 'status'>('all');
+    const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+    const [mobileTaskFilters, setMobileTaskFilters] = useState<{
+        status?: 'completed' | 'pending';
+        sprint?: string;
+        list?: string;
+        assignee?: string;
+        priority?: 'low' | 'medium' | 'high';
+        dueDate?: 'overdue' | 'today' | 'upcoming' | 'nodate';
+    }>({});
+    const [mobileKanbanColumn, setMobileKanbanColumn] = useState<string>('');
+    const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
     const [newItemTitle, setNewItemTitle] = useState<string>('');
     const [newItemAssignee, setNewItemAssignee] = useState<string>('');
     const [newItemDueDate, setNewItemDueDate] = useState<string>('');
@@ -1071,8 +1083,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject) return null;
         const myTodos = projectTodos.filter(t => (t.assigned_to === currentUserEmail || t.created_by === currentUserEmail));
         
+        const atrasadas = myTodos.filter(t => !t.completed && t.due_date && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)));
+        const hoy = myTodos.filter(t => !t.completed && t.due_date && isToday(parseISO(t.due_date)));
+        const proximas = myTodos.filter(t => !t.completed && t.due_date && !isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)));
+        const sinFecha = myTodos.filter(t => !t.completed && !t.due_date);
+        const completadas = myTodos.filter(t => t.completed);
+
+        const groups = [
+            { label: 'Atrasadas', tasks: atrasadas, color: 'text-red-500' },
+            { label: 'Hoy', tasks: hoy, color: 'text-amber-500' },
+            { label: 'Próximas', tasks: proximas, color: 'text-blue-500' },
+            { label: 'Sin Fecha', tasks: sinFecha, color: 'text-zinc-500 dark:text-zinc-400' },
+            { label: 'Completadas', tasks: completadas, color: 'text-emerald-500' }
+        ];
+
         return (
-            <div className="p-4 h-full overflow-y-auto pb-24 space-y-4">
+            <div className="p-4 h-full overflow-y-auto pb-24 space-y-6 font-sans">
                 <div className="flex items-center justify-between mb-2">
                     <div>
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">Mis Tareas</h2>
@@ -1085,25 +1111,39 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         No tienes tareas pendientes en este proyecto.
                     </div>
                 ) : (
-                    <div className="space-y-2">
-                        {myTodos.map(task => (
-                            <div key={task.id} className="p-3.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-2xl flex items-start gap-3 shadow-xs active:scale-[0.98] transition-transform" onClick={() => onEditTodo && onEditTodo(task)}>
-                                <button 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        updateTodo(task.id, { completed: !task.completed });
-                                    }}
-                                    className="mt-0.5 shrink-0"
-                                >
-                                    {task.completed ? <CheckCircle2 className="w-6 h-6 text-zinc-900 dark:text-white" /> : <Circle className="w-6 h-6 text-zinc-300 dark:text-zinc-700" />}
-                                </button>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className={`text-sm font-semibold truncate ${task.completed ? 'line-through text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{task.text}</h3>
-                                    {task.list_id && (
-                                        <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase tracking-wide">
-                                            Lista: {activeProject.lists?.find(l => l.id === task.list_id)?.name || 'General'}
-                                        </p>
-                                    )}
+                    <div className="space-y-6">
+                        {groups.map(group => group.tasks.length > 0 && (
+                            <div key={group.label} className="space-y-2">
+                                <h3 className={`text-xs font-bold uppercase tracking-wider ${group.color}`}>
+                                    {group.label} ({group.tasks.length})
+                                </h3>
+                                <div className="space-y-2">
+                                    {group.tasks.map(task => (
+                                        <div key={task.id} className="p-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl flex items-start gap-3 shadow-xs active:scale-[0.98] transition-transform" onClick={() => onEditTodo && onEditTodo(task)}>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateTodo(task.id, { completed: !task.completed });
+                                                }}
+                                                className="mt-0.5 shrink-0"
+                                            >
+                                                {task.completed ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Circle className="w-5 h-5 text-zinc-300 dark:text-zinc-700" />}
+                                            </button>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className={`text-xs font-semibold truncate ${task.completed ? 'line-through text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{task.text}</h3>
+                                                {task.list_id && (
+                                                    <p className="text-[10px] font-bold text-zinc-500 mt-0.5 uppercase tracking-wide">
+                                                        Lista: {activeProject.lists?.find(l => l.id === task.list_id)?.name || 'General'}
+                                                    </p>
+                                                )}
+                                                {task.due_date && !task.completed && (
+                                                    <p className={`text-[10px] font-bold mt-0.5 ${group.color}`}>
+                                                        Vence: {format(parseISO(task.due_date), 'd MMM', { locale: es })}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         ))}
@@ -1770,8 +1810,108 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const renderKanban = () => {
         if (!activeProject) return null;
         const columns = activeProject.kanban_columns || ['Por hacer', 'En progreso', 'Completado'];
+        
+        if (isMobile) {
+            const activeMobileCol = mobileKanbanColumn && columns.includes(mobileKanbanColumn) ? mobileKanbanColumn : columns[0];
+            const activeColTasks = projectTodos.filter(t => (t.kanban_column || columns[0]) === activeMobileCol);
+
+            return (
+                <div className="h-full flex flex-col font-sans">
+                    {/* Horizontal Column Tabs */}
+                    <div className="flex items-center p-2 gap-2 overflow-x-auto no-scrollbar scrollbar-none border-b border-gray-200 dark:border-gray-800 shrink-0">
+                        {columns.map(col => (
+                            <button
+                                key={col}
+                                onClick={() => setMobileKanbanColumn(col)}
+                                className={`px-4 py-2 text-sm font-bold rounded-xl whitespace-nowrap transition-colors ${
+                                    activeMobileCol === col 
+                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' 
+                                        : 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400'
+                                }`}
+                            >
+                                {col} <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${activeMobileCol === col ? 'bg-white/20 dark:bg-black/20' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
+                                    {projectTodos.filter(t => (t.kanban_column || columns[0]) === col).length}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    <div 
+                    className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-[#080808] space-y-3 pb-24"
+                    onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+                    onTouchEnd={(e) => {
+                        if (touchStartX === null) return;
+                        const diff = touchStartX - e.changedTouches[0].clientX;
+                        const currentIndex = columns.indexOf(activeMobileCol);
+                        if (diff > 50 && currentIndex < columns.length - 1) {
+                            setMobileKanbanColumn(columns[currentIndex + 1]);
+                        } else if (diff < -50 && currentIndex > 0) {
+                            setMobileKanbanColumn(columns[currentIndex - 1]);
+                        }
+                        setTouchStartX(null);
+                    }}
+                >
+                        {activeColTasks.length === 0 ? (
+                            <div className="text-center py-10 opacity-60 text-sm font-medium">
+                                No hay tareas en {activeMobileCol}.
+                            </div>
+                        ) : (
+                            activeColTasks.map(todo => (
+                                <div 
+                                    key={todo.id} 
+                                    onClick={() => onEditTodo && onEditTodo(todo)}
+                                    className="bg-white dark:bg-[#111] p-3.5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-3 active:scale-[0.98] transition-all"
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); updateTodo(todo.id, { completed: !todo.completed }); }}
+                                            className="mt-0.5 shrink-0"
+                                        >
+                                            {todo.completed ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Circle className="w-5 h-5 text-zinc-300 dark:text-zinc-700" />}
+                                        </button>
+                                        <p className={`text-sm flex-1 font-semibold leading-snug ${todo.completed ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                                            {todo.text}
+                                        </p>
+                                    </div>
+                                    <div className="pl-8 flex flex-wrap items-center gap-2">
+                                        {todo.assigned_to && (
+                                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
+                                                {todo.assigned_to.split('@')[0]}
+                                            </span>
+                                        )}
+                                        {todo.priority && (
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${todo.priority === 'high' ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/30' : todo.priority === 'low' ? 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/30' : 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/30'}`}>
+                                                {todo.priority === 'high' ? 'Alta' : todo.priority === 'low' ? 'Baja' : 'Media'}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="pl-8 pt-2 mt-2 border-t border-gray-100 dark:border-gray-800/60">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Mover a</label>
+                                        <div className="flex gap-2 overflow-x-auto no-scrollbar scrollbar-none pb-1">
+                                            {columns.filter(c => c !== activeMobileCol).map(c => (
+                                                <button
+                                                    key={c}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        updateTodo(todo.id, { kanban_column: c });
+                                                    }}
+                                                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors whitespace-nowrap shrink-0"
+                                                >
+                                                    {c}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        }
 
         return (
+
             <div className="h-full flex overflow-x-auto p-6 gap-6 bg-gray-50/50 dark:bg-[#050505]">
                 {columns.map((col) => {
                     const colTasks = projectTodos.filter(t => (t.kanban_column || 'Por hacer') === col);
@@ -5357,7 +5497,97 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         const projectLists = activeProject.lists || [];
 
+        if (isMobile) {
+            let filteredTodos = projectTodos;
+            
+            // Apply mobile filters
+            if (mobileTaskFilters.status === 'completed') filteredTodos = filteredTodos.filter(t => t.completed);
+            if (mobileTaskFilters.status === 'pending') filteredTodos = filteredTodos.filter(t => !t.completed);
+            if (mobileTaskFilters.sprint) filteredTodos = filteredTodos.filter(t => t.sprint_id === mobileTaskFilters.sprint);
+            if (mobileTaskFilters.list) filteredTodos = filteredTodos.filter(t => t.list_id === mobileTaskFilters.list);
+            if (mobileTaskFilters.assignee) filteredTodos = filteredTodos.filter(t => t.assigned_to === mobileTaskFilters.assignee || t.assignee === mobileTaskFilters.assignee);
+            if (mobileTaskFilters.priority) filteredTodos = filteredTodos.filter(t => t.priority === mobileTaskFilters.priority);
+            if (mobileTaskFilters.dueDate) {
+                filteredTodos = filteredTodos.filter(t => {
+                    if (mobileTaskFilters.dueDate === 'nodate') return !t.due_date;
+                    if (!t.due_date) return false;
+                    const date = parseISO(t.due_date);
+                    if (mobileTaskFilters.dueDate === 'overdue') return isPast(date) && !isToday(date);
+                    if (mobileTaskFilters.dueDate === 'today') return isToday(date);
+                    if (mobileTaskFilters.dueDate === 'upcoming') return !isPast(date) && !isToday(date);
+                    return true;
+                });
+            }
+
+            const activeFilterCount = Object.values(mobileTaskFilters).filter(v => v !== undefined).length;
+
+            return (
+                <div className="p-4 h-full overflow-y-auto pb-24 space-y-4 font-sans">
+                    <div className="flex items-center justify-between mb-2">
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Todas las Tareas</h2>
+                            <p className="text-xs font-medium text-gray-500 mt-0.5">{filteredTodos.length} tareas en total</p>
+                        </div>
+                        <button 
+                            onClick={() => setIsMobileFiltersOpen(true)}
+                            className={`p-2 rounded-xl border flex items-center gap-1.5 transition-colors ${
+                                activeFilterCount > 0 
+                                    ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400' 
+                                    : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300'
+                            }`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            {activeFilterCount > 0 && <span className="text-xs font-bold">{activeFilterCount}</span>}
+                        </button>
+                    </div>
+
+                    {filteredTodos.length === 0 ? (
+                        <div className="text-center py-10 opacity-60 text-sm">
+                            No se encontraron tareas con los filtros actuales.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {filteredTodos.map(task => (
+                                <div key={task.id} className="p-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl flex items-start gap-3 shadow-xs active:scale-[0.98] transition-transform" onClick={() => onEditTodo && onEditTodo(task)}>
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            updateTodo(task.id, { completed: !task.completed });
+                                        }}
+                                        className="mt-0.5 shrink-0"
+                                    >
+                                        {task.completed ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Circle className="w-5 h-5 text-zinc-300 dark:text-zinc-700" />}
+                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className={`text-xs font-semibold truncate ${task.completed ? 'line-through text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{task.text}</h3>
+                                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                                            {(task.assigned_to || task.assignee) && (
+                                                <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
+                                                    {(task.assigned_to || task.assignee)?.split('@')[0]}
+                                                </span>
+                                            )}
+                                            {task.due_date && !task.completed && (
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date)) ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/30' : 'text-zinc-500 bg-zinc-100 dark:bg-zinc-800'}`}>
+                                                    {format(parseISO(task.due_date), 'd MMM', { locale: es })}
+                                                </span>
+                                            )}
+                                            {task.kanban_column && (
+                                                <span className="text-[9px] font-medium text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+                                                    {task.kanban_column}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         if (projectLists.length === 0) {
+
             return (
                 <div className="p-8 max-w-md mx-auto w-full h-full flex flex-col items-center justify-center text-center space-y-4 font-sans my-auto py-20">
                     <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -7554,6 +7784,122 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     );
                 })()}
             </Modal>
+
+            {/* MOBILE TASK FILTERS BOTTOM SHEET */}
+            {isMobileFiltersOpen && (
+                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setIsMobileFiltersOpen(false)} />
+                    <motion.div 
+                        initial={{ y: '100%' }}
+                        animate={{ y: 0 }}
+                        exit={{ y: '100%' }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        className="relative w-full bg-white dark:bg-[#111] rounded-t-3xl shadow-xl max-h-[85vh] flex flex-col"
+                    >
+                        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Filtros de Tareas</h3>
+                            <button onClick={() => setIsMobileFiltersOpen(false)} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto space-y-5 pb-24">
+                            {/* Status */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Estado</label>
+                                <div className="flex gap-2">
+                                    {['pending', 'completed'].map(val => (
+                                        <button 
+                                            key={val}
+                                            onClick={() => setMobileTaskFilters(prev => ({ ...prev, status: prev.status === val ? undefined : val as any }))}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobileTaskFilters.status === val ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300'}`}
+                                        >
+                                            {val === 'pending' ? 'Pendientes' : 'Completadas'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Sprint */}
+                            {activeProject?.sprints && activeProject.sprints.length > 0 && (
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Sprint</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {activeProject.sprints.map(sprint => (
+                                            <button 
+                                                key={sprint.id}
+                                                onClick={() => setMobileTaskFilters(prev => ({ ...prev, sprint: prev.sprint === sprint.id ? undefined : sprint.id }))}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobileTaskFilters.sprint === sprint.id ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300'}`}
+                                            >
+                                                {sprint.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {/* Lista */}
+                            {activeProject?.lists && activeProject.lists.length > 0 && (
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Lista</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {activeProject.lists.map(list => (
+                                            <button 
+                                                key={list.id}
+                                                onClick={() => setMobileTaskFilters(prev => ({ ...prev, list: prev.list === list.id ? undefined : list.id }))}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobileTaskFilters.list === list.id ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300'}`}
+                                            >
+                                                {list.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {/* Prioridad */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Prioridad</label>
+                                <div className="flex gap-2">
+                                    {['high', 'medium', 'low'].map(val => (
+                                        <button 
+                                            key={val}
+                                            onClick={() => setMobileTaskFilters(prev => ({ ...prev, priority: prev.priority === val ? undefined : val as any }))}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobileTaskFilters.priority === val ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300'}`}
+                                        >
+                                            {val === 'high' ? 'Alta' : val === 'medium' ? 'Media' : 'Baja'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Fecha */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Fecha</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {['overdue', 'today', 'upcoming', 'nodate'].map(val => (
+                                        <button 
+                                            key={val}
+                                            onClick={() => setMobileTaskFilters(prev => ({ ...prev, dueDate: prev.dueDate === val ? undefined : val as any }))}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobileTaskFilters.dueDate === val ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300'}`}
+                                        >
+                                            {val === 'overdue' ? 'Atrasadas' : val === 'today' ? 'Hoy' : val === 'upcoming' ? 'Próximas' : 'Sin fecha'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white dark:bg-[#111] border-t border-gray-100 dark:border-gray-800 flex gap-3">
+                            <button 
+                                onClick={() => { setMobileTaskFilters({}); setIsMobileFiltersOpen(false); }}
+                                className="flex-1 py-3 text-sm font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-zinc-800 rounded-xl"
+                            >
+                                Limpiar
+                            </button>
+                            <button 
+                                onClick={() => setIsMobileFiltersOpen(false)}
+                                className="flex-1 py-3 text-sm font-bold text-white bg-gray-900 dark:bg-white dark:text-black rounded-xl"
+                            >
+                                Aplicar
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
 
             {/* MODAL EDITOR ENRIQUECIDO DE NOTAS DEL PROYECTO */}
             <ProjectNoteEditorModal
