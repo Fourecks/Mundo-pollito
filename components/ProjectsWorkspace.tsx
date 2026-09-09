@@ -180,6 +180,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [showDocPickerInChat, setShowDocPickerInChat] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const chatFileInputRef = useRef<HTMLInputElement>(null);
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
+    const [isChatAttachSheetOpen, setIsChatAttachSheetOpen] = useState(false);
+    const [activeMobileActionMessageId, setActiveMobileActionMessageId] = useState<string | null>(null);
 
     // Communication & Channels States
     const [selectedChannelId, setSelectedChannelId] = useState<string>('general');
@@ -3509,6 +3513,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         
         const messages = activeProject.chat_messages || [];
         const currentChannel = activeChannels.find(c => c.id === selectedChannelId) || activeChannels[0] || { id: 'general', name: 'general', emoji: '💬', description: 'Canal principal' };
+        const publicChannels = activeChannels.filter(c => !c.is_private);
+        const privateChannels = activeChannels.filter(c => c.is_private);
 
         // Filter messages by channel (handling legacy messages without channel_id as 'general') and exclude thread replies
         let channelMessages = messages.filter(m => {
@@ -3580,6 +3586,107 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
             onUpdateProject(activeProject.id, { chat_messages: [...messages, newReply] });
             setThreadInputText('');
+        };
+
+        const handleChatFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            if (!file || !activeProject) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                alert(`El archivo "${file.name}" supera los 5 MB. Por favor elige un archivo más pequeño.`);
+                return;
+            }
+
+            const formattedSize = file.size < 1024 * 1024 
+                ? `${(file.size / 1024).toFixed(1)} KB` 
+                : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
+            const newDocId = crypto.randomUUID();
+            const reader = new FileReader();
+
+            reader.onload = () => {
+                const dataUrl = reader.result as string;
+                
+                const newDoc: ProjectDoc = {
+                    id: newDocId,
+                    project_id: activeProject.id,
+                    title: file.name,
+                    content: dataUrl,
+                    category: file.type.startsWith('image/') ? 'Diseño' : 'Especificaciones',
+                    file_name: file.name,
+                    file_size: file.size,
+                    file_type: file.type || 'application/octet-stream',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                const updatedDocs = [...(activeProject.docs || []), newDoc];
+
+                const newMessage: ProjectChatMessage = {
+                    id: crypto.randomUUID(),
+                    project_id: activeProject.id,
+                    channel_id: currentChannel.id,
+                    sender_id: currentUser?.id,
+                    sender_name: currentUserName,
+                    sender_email: currentUserEmail,
+                    text: `📎 Archivo adjunto: **${file.name}** (${formattedSize})`,
+                    created_at: new Date().toISOString(),
+                    doc_reference: {
+                        id: newDoc.id,
+                        title: newDoc.title,
+                        file_type: newDoc.file_type || 'Documento',
+                        file_name: newDoc.file_name || newDoc.title,
+                        file_size_formatted: formattedSize,
+                        folder_name: 'Archivos de Chat'
+                    }
+                };
+
+                onUpdateProject(activeProject.id, {
+                    docs: updatedDocs,
+                    chat_messages: [...messages, newMessage]
+                });
+
+                setIsChatAttachSheetOpen(false);
+                if (chatFileInputRef.current) chatFileInputRef.current.value = '';
+                setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+            };
+
+            reader.readAsDataURL(file);
+        };
+
+        const handleShareExistingDoc = (doc: ProjectDoc) => {
+            if (!activeProject) return;
+
+            const formattedSize = doc.file_size 
+                ? (doc.file_size < 1024 * 1024 ? `${(doc.file_size / 1024).toFixed(1)} KB` : `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB`)
+                : '1.2 MB';
+
+            const newMessage: ProjectChatMessage = {
+                id: crypto.randomUUID(),
+                project_id: activeProject.id,
+                channel_id: currentChannel.id,
+                sender_id: currentUser?.id,
+                sender_name: currentUserName,
+                sender_email: currentUserEmail,
+                text: `📄 Documento compartido: **${doc.title}**`,
+                created_at: new Date().toISOString(),
+                doc_reference: {
+                    id: doc.id,
+                    title: doc.title,
+                    file_type: doc.file_type || doc.category || 'Documento',
+                    file_name: doc.file_name || doc.title,
+                    file_size_formatted: formattedSize,
+                    folder_name: 'Documentos del Proyecto'
+                }
+            };
+
+            onUpdateProject(activeProject.id, {
+                chat_messages: [...messages, newMessage]
+            });
+
+            setShowDocPickerInChat(false);
+            setIsChatAttachSheetOpen(false);
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         };
 
         const handleCreateChannel = (e: React.FormEvent) => {
@@ -3810,80 +3917,167 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         return (
             <div className="flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden">
-                {/* DESPLEGABLE LATERAL MÓVIL PARA CANALES */}
+                {/* SELECTOR MÓVIL DE CANALES (BOTTOM SHEET) */}
                 {isMobileChannelDrawerOpen && (
-                    <div className="fixed inset-0 z-[10000] flex md:hidden animate-in fade-in duration-200">
+                    <div className="fixed inset-0 z-[10000] flex flex-col justify-end md:hidden animate-in fade-in duration-200">
+                        {/* Backdrop */}
                         <div 
-                            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+                            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
                             onClick={() => setIsMobileChannelDrawerOpen(false)} 
                         />
-                        <div className="relative w-4/5 max-w-xs h-full bg-white dark:bg-[#0c0c0e] border-r border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
-                            {/* Drawer Header */}
-                            <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                        {/* Sheet Container */}
+                        <div className="relative w-full bg-white dark:bg-[#121214] rounded-t-3xl border-t border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col z-10 max-h-[82vh] animate-in slide-in-from-bottom duration-200 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                            {/* Handle */}
+                            <div className="pt-3 pb-1 flex justify-center shrink-0">
+                                <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                            </div>
+
+                            {/* Header */}
+                            <div className="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between shrink-0">
                                 <div className="flex items-center gap-2">
-                                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                                    <Hash className="w-4 h-4 text-blue-500" />
                                     <span className="text-sm font-bold text-zinc-900 dark:text-white">Canales</span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    {isProjectCreator && (
-                                        <button 
-                                            onClick={() => {
-                                                setIsMobileChannelDrawerOpen(false);
-                                                setIsCreateChannelOpen(true);
-                                            }}
-                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg text-blue-600 dark:text-blue-400"
-                                            title="Crear nuevo canal"
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                        </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMobileChannelDrawerOpen(false)}
+                                    className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                    aria-label="Cerrar"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Channels List */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {/* CANALES PÚBLICOS */}
+                                <div className="space-y-1">
+                                    <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-2 mb-1">
+                                        Canales Públicos
+                                    </div>
+                                    {publicChannels.map(chan => {
+                                        const isSelected = chan.id === currentChannel.id;
+                                        const hasUnread = !isSelected && (activeProject.chat_messages || []).some(m => {
+                                            if ((m.channel_id || 'general') !== chan.id) return false;
+                                            if (checkIsUser(m.sender_email, m.sender_id)) return false;
+                                            const lastRead = lastReadTimes[chan.id];
+                                            if (!lastRead) return true;
+                                            return m.created_at > lastRead;
+                                        });
+
+                                        return (
+                                            <button
+                                                key={chan.id}
+                                                onClick={() => {
+                                                    setSelectedChannelId(chan.id);
+                                                    setIsMobileChannelDrawerOpen(false);
+                                                }}
+                                                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs transition-all text-left ${
+                                                    isSelected
+                                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold shadow-xs'
+                                                        : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-[0.99]'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <span className={`font-mono text-sm ${isSelected ? 'text-blue-400 dark:text-blue-600' : 'text-zinc-400'}`}>#</span>
+                                                    <div className="truncate">
+                                                        <div className="truncate font-semibold text-sm">{chan.name}</div>
+                                                        {chan.description && (
+                                                            <div className={`text-[11px] truncate mt-0.5 ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                                                                {chan.description}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {hasUnread && (
+                                                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                                                    )}
+                                                    {isSelected && (
+                                                        <Check className="w-4 h-4 shrink-0" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* CANALES PRIVADOS */}
+                                <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                                    <div className="flex items-center justify-between px-2 mb-1">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                                            <Lock className="w-3 h-3 text-amber-500" />
+                                            <span>Canales Privados</span>
+                                        </div>
+                                        <span className="text-[10px] text-zinc-400 font-mono">{privateChannels.length}</span>
+                                    </div>
+
+                                    {privateChannels.length === 0 ? (
+                                        <div className="px-3 py-2 text-xs text-zinc-400 italic">
+                                            No hay canales privados
+                                        </div>
+                                    ) : (
+                                        privateChannels.map(chan => {
+                                            const isSelected = chan.id === currentChannel.id;
+                                            const isUnlocked = unlockedChannels[chan.id];
+                                            const hasUnread = !isSelected && (activeProject.chat_messages || []).some(m => {
+                                                if ((m.channel_id || 'general') !== chan.id) return false;
+                                                if (checkIsUser(m.sender_email, m.sender_id)) return false;
+                                                const lastRead = lastReadTimes[chan.id];
+                                                if (!lastRead) return true;
+                                                return m.created_at > lastRead;
+                                            });
+
+                                            return (
+                                                <button
+                                                    key={chan.id}
+                                                    onClick={() => {
+                                                        setSelectedChannelId(chan.id);
+                                                        setIsMobileChannelDrawerOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs transition-all text-left ${
+                                                        isSelected
+                                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold shadow-xs'
+                                                            : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-[0.99]'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <Lock className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-300 dark:text-amber-600' : 'text-amber-500'}`} />
+                                                        <div className="truncate">
+                                                            <div className="truncate font-semibold text-sm">{chan.name}</div>
+                                                            <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400'}`}>
+                                                                {isUnlocked ? '🔓 Desbloqueado' : '🔒 Requiere clave'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        {hasUnread && (
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                                                        )}
+                                                        {isSelected && (
+                                                            <Check className="w-4 h-4 shrink-0" />
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })
                                     )}
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsMobileChannelDrawerOpen(false)}
-                                        className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
                                 </div>
                             </div>
-                            {/* Channels List in Drawer */}
-                            <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                                {activeChannels.map(chan => {
-                                    const isSelected = chan.id === currentChannel.id;
-                                    const hasUnread = !isSelected && (activeProject.chat_messages || []).some(m => {
-                                        if ((m.channel_id || 'general') !== chan.id) return false;
-                                        if (checkIsUser(m.sender_email, m.sender_id)) return false;
-                                        const lastRead = lastReadTimes[chan.id];
-                                        if (!lastRead) return true;
-                                        return m.created_at > lastRead;
-                                    });
 
-                                    return (
-                                        <button
-                                            key={chan.id}
-                                            onClick={() => {
-                                                if (chan.is_private) {
-                                                    setUnlockedChannels(prev => ({ ...prev, [chan.id]: false }));
-                                                }
-                                                setSelectedChannelId(chan.id);
-                                                setIsMobileChannelDrawerOpen(false);
-                                            }}
-                                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors text-left ${
-                                                isSelected
-                                                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold shadow-xs'
-                                                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                {chan.is_private ? <Lock className="w-3.5 h-3.5 shrink-0" /> : <Hash className="w-3.5 h-3.5 shrink-0" />}
-                                                <span className="truncate">{chan.name}</span>
-                                            </div>
-                                            {hasUnread && (
-                                                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                                            )}
-                                        </button>
-                                    );
-                                })}
+                            {/* BOTÓN + NUEVO CANAL */}
+                            <div className="p-4 border-t border-zinc-100 dark:border-zinc-800/80 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsMobileChannelDrawerOpen(false);
+                                        setIsCreateChannelOpen(true);
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold shadow-sm active:scale-[0.99] transition-all"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>+ Nuevo canal</span>
+                                </button>
                             </div>
                         </div>
                     </div>
