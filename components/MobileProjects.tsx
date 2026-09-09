@@ -232,7 +232,7 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-2 gap-3">
                 {activeProjects.map(project => {
                     const projectTasks = allTodos.filter(t => t.project_id === project.id);
                     const completedTasks = projectTasks.filter(t => t.completed).length;
@@ -241,32 +241,35 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
 
                     return (
                         <motion.button
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
                             key={project.id}
                             onClick={() => handleSelectProject(project.id)}
-                            className="flex flex-col text-left p-5 rounded-3xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 active:scale-[0.98] transition-all"
+                            className="flex flex-col text-left p-4 rounded-3xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 active:scale-95 transition-all relative overflow-hidden h-full"
                         >
-                            <div className="flex justify-between items-start w-full mb-6">
-                                <div className="w-12 h-12 rounded-2xl bg-white dark:bg-black border border-zinc-100 dark:border-zinc-800 flex items-center justify-center text-2xl shadow-sm">
-                                    {project.emoji || '📁'}
-                                </div>
-                                <ChevronRight className="w-5 h-5 text-zinc-400" />
+                            <div className="w-10 h-10 rounded-full bg-white dark:bg-black border border-zinc-100 dark:border-zinc-800 flex items-center justify-center text-xl shadow-sm mb-3 shrink-0">
+                                {project.emoji || '📁'}
                             </div>
                             
-                            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
+                            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-1 leading-tight line-clamp-2">
                                 {project.name}
                             </h3>
                             
-                            <p className="text-sm text-zinc-500 font-medium mb-4">
+                            <p className="text-[11px] text-zinc-500 font-semibold mb-3">
                                 {totalTasks} {totalTasks === 1 ? 'tarea' : 'tareas'}
                             </p>
 
-                            <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                <div 
-                                    className="h-full bg-black dark:bg-white transition-all duration-500 ease-out rounded-full"
-                                    style={{ width: `${progress}%` }}
-                                />
+                            <div className="mt-auto w-full pt-2">
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <span className="text-[10px] font-bold text-zinc-400">Progreso</span>
+                                    <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300">{progress}%</span>
+                                </div>
+                                <div className="w-full h-1 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-black dark:bg-white rounded-full"
+                                        style={{ width: `${progress}%` }}
+                                    />
+                                </div>
                             </div>
                         </motion.button>
                     );
