@@ -7,12 +7,10 @@ import {
     ChevronLeft, 
     ChevronRight, 
     CalendarDays, 
-    BarChart3, 
     Flame, 
     CheckCircle2, 
     Circle,
     TrendingUp,
-    Sparkles,
     ArrowLeft,
     Trash2,
     Lock,
@@ -23,8 +21,10 @@ import {
 } from 'lucide-react';
 import { 
     ResponsiveContainer, 
-    BarChart, 
-    Bar, 
+    AreaChart,
+    Area,
+    LineChart, 
+    Line,
     XAxis, 
     YAxis, 
     Tooltip, 
@@ -187,7 +187,50 @@ const calculateLongestStreak = (habit: Habit, records: HabitRecord[]): number =>
     return maxStreak;
 };
 
-const POPULAR_EMOJIS = ['💧', '🏃', '🚴', '🧘', '🥗', '💤', '🍎', '💊', '📚', '✍️', '🧠', '🎯', '🎧', '💻', '☀️', '🌙', '🪴', '☕', '✨'];
+// Curated categorized emoji collections
+export const EMOJI_CATEGORIES = [
+    {
+        id: 'all',
+        label: 'Todos',
+        emojis: [
+            // Agua y Fitness
+            '💧', '🏃', '🚴', '🏋️', '🧘', '🏊', '🤸', '🧗', '🚶', '🥊', '⚽', '🏀', '🎾', '⛹️', '🥋', '💪', '🩺', '💊',
+            // Nutrición
+            '🥗', '🥑', '🍎', '🍌', '🥦', '🥕', '🧃', '🍵', '☕', '🫖', '🍳', '🥜', '🍇', '🍉', '🍊', '🍓', '🫐', '🥒', '🥩', '🥚',
+            // Mente & Estudio
+            '📚', '✍️', '🧠', '🎯', '💡', '📖', '🎓', '💻', '🎨', '♟️', '🧩', '📝', '🔍', '🎧', '🎻', '🎹', '🧘‍♂️', '🕯️', '🗣️', '🌍',
+            // Rutinas & Hogar
+            '⏰', '📅', '⏱️', '📋', '☀️', '🌙', '🌅', '🧹', '🚿', '🪥', '🪴', '🐶', '🐱', '💰', '💳', '🚫', '🚭', '✨', '🌱', '🏆',
+            // Bienestar & Sueño
+            '💤', '🛌', '🛀', '🧖', '💆', '❤️', '🔥', '⭐', '🚀', '🌺', '🍀', '🌈', '🕊️', '🧘‍♀️', '🪞', '🧴'
+        ]
+    },
+    {
+        id: 'fitness',
+        label: 'Salud & Fitness',
+        emojis: ['💧', '🏃', '🚴', '🏋️', '🧘', '🏊', '🤸', '🧗', '🚶', '🥊', '⚽', '🏀', '🎾', '⛹️', '🥋', '💪', '🩺', '💊', '🫀', '🩹', '🎽']
+    },
+    {
+        id: 'nutrition',
+        label: 'Nutrición',
+        emojis: ['🥗', '🥑', '🍎', '🍌', '🥦', '🥕', '🧃', '🍵', '☕', '🫖', '🍳', '🥜', '🍇', '🍉', '🍊', '🍓', '🫐', '🥒', '🥩', '🥚', '🥝', '🥣']
+    },
+    {
+        id: 'mind',
+        label: 'Mente & Foco',
+        emojis: ['📚', '✍️', '🧠', '🎯', '💡', '📖', '🎓', '💻', '🎨', '♟️', '🧩', '📝', '🔍', '🎧', '🎻', '🎹', '🧘‍♂️', '🕯️', '🗣️', '🌍', '📐', '🔬']
+    },
+    {
+        id: 'routines',
+        label: 'Rutinas & Hogar',
+        emojis: ['⏰', '📅', '⏱️', '📋', '☀️', '🌙', '🌅', '🧹', '🚿', '🪥', '🪴', '🐶', '🐱', '💰', '💳', '🚫', '🚭', '✨', '🌱', '🏆', '🎒', '🚪']
+    },
+    {
+        id: 'wellness',
+        label: 'Bienestar & Sueño',
+        emojis: ['💤', '🛌', '🛀', '🧖', '💆', '❤️', '🔥', '⭐', '🚀', '🌺', '🍀', '🌈', '🕊️', '🧘‍♀️', '🪞', '🧴', '🛋️', '🕯️', '🌻']
+    }
+];
 
 const weekdayItems = [
     { label: 'Lun', index: 1 },
@@ -217,6 +260,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
     // Form states for Create / Edit
     const [formName, setFormName] = useState('');
     const [formEmoji, setFormEmoji] = useState('💧');
+    const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('all');
     const [formFrequency, setFormFrequency] = useState<HabitFrequency>({ type: 'daily' });
 
     const todayObj = new Date();
@@ -518,11 +562,11 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                 </div>
 
                 <div className="flex-1 px-4 pt-4 space-y-5 max-w-lg mx-auto w-full">
-                    {/* KPI Cards Grid */}
+                    {/* KPI Cards Grid - Minimalist Monochrome */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
-                            <span className="text-[11px] font-semibold text-zinc-500 flex items-center gap-1.5">
-                                <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                                <TrendingUp className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                                 Cumplimiento (7d)
                             </span>
                             <div className="text-2xl font-black text-zinc-900 dark:text-white">
@@ -531,8 +575,8 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                         </div>
 
                         <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
-                            <span className="text-[11px] font-semibold text-zinc-500 flex items-center gap-1.5">
-                                <Flame className="w-3.5 h-3.5 text-amber-500" />
+                            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                                <Flame className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                                 Mejor Racha
                             </span>
                             <div className="text-2xl font-black text-zinc-900 dark:text-white">
@@ -541,8 +585,8 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                         </div>
 
                         <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
-                            <span className="text-[11px] font-semibold text-zinc-500 flex items-center gap-1.5">
-                                <CheckSquare className="w-3.5 h-3.5 text-indigo-500" />
+                            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                                <CheckSquare className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                                 Total Registros
                             </span>
                             <div className="text-2xl font-black text-zinc-900 dark:text-white">
@@ -551,8 +595,8 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                         </div>
 
                         <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-1">
-                            <span className="text-[11px] font-semibold text-zinc-500 flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                                <Target className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                                 Hábitos Activos
                             </span>
                             <div className="text-2xl font-black text-zinc-900 dark:text-white">
@@ -561,55 +605,68 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                         </div>
                     </div>
 
-                    {/* Recharts Bar Chart: Tendencia de Cumplimiento (14 días) */}
-                    <div className="p-4 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+                    {/* Minimalist Line/Area Chart: Tendencia de Hábitos (14 días) */}
+                    <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 space-y-3">
                         <div className="flex items-center justify-between">
                             <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                                <BarChart3 className="w-4 h-4 text-zinc-500" />
+                                <Activity className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />
                                 Tendencia de Hábitos (Últimos 14 días)
                             </h3>
+                            <span className="text-[10px] font-semibold text-zinc-400">
+                                Hábitos cumplidos
+                            </span>
                         </div>
 
                         <div className="h-44 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={statsData.chartDays} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150,150,150,0.15)" />
+                                <AreaChart data={statsData.chartDays} margin={{ top: 12, right: 8, left: -22, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="monochromeHabitArea" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#71717a" stopOpacity={0.25} />
+                                            <stop offset="95%" stopColor="#71717a" stopOpacity={0.0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(113, 113, 122, 0.15)" />
                                     <XAxis 
                                         dataKey="dayLabel" 
                                         axisLine={false} 
                                         tickLine={false} 
                                         tick={{ fontSize: 9, fill: '#71717a' }}
-                                        interval={2}
+                                        interval={1}
                                     />
                                     <YAxis 
                                         axisLine={false} 
                                         tickLine={false} 
                                         tick={{ fontSize: 9, fill: '#71717a' }} 
                                         domain={[0, 'auto']}
+                                        allowDecimals={false}
                                     />
                                     <Tooltip 
                                         content={({ active, payload }) => {
                                             if (active && payload && payload.length) {
                                                 const data = payload[0].payload;
                                                 return (
-                                                    <div className="bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 p-2 rounded-xl text-[11px] shadow-lg font-medium">
-                                                        <p className="font-bold">{data.dayLabel}</p>
-                                                        <p className="text-emerald-400 dark:text-emerald-600">{data.completados} de {data.programados} completados ({data.porcentaje}%)</p>
+                                                    <div className="bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 px-3 py-2 rounded-xl text-[11px] shadow-lg font-medium border border-zinc-800 dark:border-zinc-200">
+                                                        <p className="font-bold text-xs">{data.dayLabel}</p>
+                                                        <p className="text-zinc-300 dark:text-zinc-700">
+                                                            {data.completados} de {data.programados} completados ({data.porcentaje}%)
+                                                        </p>
                                                     </div>
                                                 );
                                             }
                                             return null;
                                         }}
                                     />
-                                    <Bar dataKey="completados" radius={[4, 4, 0, 0]}>
-                                        {statsData.chartDays.map((entry, index) => (
-                                            <Cell 
-                                                key={`cell-${index}`} 
-                                                fill={entry.isToday ? '#10b981' : '#3b82f6'} 
-                                            />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
+                                    <Area 
+                                        type="monotone" 
+                                        dataKey="completados" 
+                                        stroke="#18181b" 
+                                        strokeWidth={2}
+                                        fill="url(#monochromeHabitArea)" 
+                                        dot={{ r: 3, fill: '#18181b', stroke: '#ffffff', strokeWidth: 1.5 }}
+                                        activeDot={{ r: 5, fill: '#18181b', stroke: '#ffffff', strokeWidth: 2 }}
+                                    />
+                                </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
@@ -620,7 +677,6 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                         <div className="space-y-2.5">
                             {habits.map(habit => {
                                 const streak = calculateStreak(habit, records);
-                                const bestStreak = calculateLongestStreak(habit, records);
                                 
                                 // Count total completions for this habit
                                 const habitRecords = records.filter(r => Number(r.habit_id) === Number(habit.id));
@@ -650,8 +706,8 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
 
                                             {/* Streak Badge only if streak > 0 */}
                                             {streak > 0 && (
-                                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                                    <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300/60 dark:border-zinc-700/60">
+                                                    <Flame className="w-3 h-3 text-zinc-900 dark:text-zinc-100 fill-zinc-900 dark:fill-zinc-100" />
                                                     <span>{streak}d</span>
                                                 </div>
                                             )}
@@ -661,11 +717,11 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                         <div className="space-y-1">
                                             <div className="flex justify-between text-[10px] font-semibold text-zinc-500">
                                                 <span>Consistencia (30 días)</span>
-                                                <span className="text-zinc-700 dark:text-zinc-300 font-bold">{complianceRate30}%</span>
+                                                <span className="text-zinc-900 dark:text-zinc-100 font-bold">{complianceRate30}%</span>
                                             </div>
                                             <div className="h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                 <div 
-                                                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                                                    className="h-full bg-zinc-900 dark:bg-zinc-100 rounded-full transition-all duration-500"
                                                     style={{ width: `${complianceRate30}%` }}
                                                 />
                                             </div>
@@ -685,6 +741,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
     // ==========================================
     if (subPage === 'create' || subPage === 'edit') {
         const isEditing = subPage === 'edit' && habitToEdit !== null;
+        const activeCategoryData = EMOJI_CATEGORIES.find(c => c.id === selectedEmojiCategory) || EMOJI_CATEGORIES[0];
 
         return (
             <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-32">
@@ -713,7 +770,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
 
                 <div className="flex-1 px-5 pt-5 space-y-6 max-w-lg mx-auto w-full">
                     {/* Emoji + Name */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Nombre del Hábito</label>
                         <div className="flex gap-2.5 items-center">
                             <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-2xl shrink-0">
@@ -729,22 +786,48 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                             />
                         </div>
 
-                        {/* Popular Emojis Quick Picker */}
-                        <div className="flex flex-wrap gap-1.5 pt-2">
-                            {POPULAR_EMOJIS.map(em => (
-                                <button
-                                    key={em}
-                                    type="button"
-                                    onClick={() => setFormEmoji(em)}
-                                    className={`w-9 h-9 rounded-xl text-lg flex items-center justify-center transition-all ${
-                                        formEmoji === em 
-                                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 scale-110 shadow-xs' 
-                                            : 'bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200'
-                                    }`}
-                                >
-                                    {em}
-                                </button>
-                            ))}
+                        {/* Categorized & Horizontally Scrollable Emoji Picker */}
+                        <div className="space-y-2 pt-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Seleccionar icono</span>
+                                <span className="text-[10px] text-zinc-400">Desliza horizontalmente</span>
+                            </div>
+
+                            {/* Category chips */}
+                            <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1 touch-pan-x">
+                                {EMOJI_CATEGORIES.map(cat => (
+                                    <button
+                                        key={cat.id}
+                                        type="button"
+                                        onClick={() => setSelectedEmojiCategory(cat.id)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                                            selectedEmojiCategory === cat.id
+                                                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs'
+                                                : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                                        }`}
+                                    >
+                                        {cat.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* 2-row horizontally scrollable emoji strip */}
+                            <div className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto no-scrollbar py-2 px-1 touch-pan-x snap-x">
+                                {activeCategoryData.emojis.map(em => (
+                                    <button
+                                        key={em}
+                                        type="button"
+                                        onClick={() => setFormEmoji(em)}
+                                        className={`w-11 h-11 rounded-2xl text-xl flex items-center justify-center shrink-0 snap-start transition-all ${
+                                            formEmoji === em 
+                                                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 scale-105 shadow-xs border border-zinc-900 dark:border-white' 
+                                                : 'bg-zinc-100 dark:bg-zinc-900/80 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200'
+                                        }`}
+                                    >
+                                        {em}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
@@ -936,7 +1019,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                     onClick={() => setSubPage('stats')}
                     className="py-2.5 px-3 rounded-2xl bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-center gap-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 active:scale-98 transition-all"
                 >
-                    <BarChart3 className="w-4 h-4 text-zinc-500" />
+                    <Activity className="w-4 h-4 text-zinc-500" />
                     <span>Estadísticas</span>
                 </button>
             </div>
@@ -1087,7 +1170,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                 {habits.length === 0 && (
                     <div className="text-center py-16 px-4 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
                         <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-3 text-zinc-400">
-                            <Sparkles className="w-5 h-5" />
+                            <Target className="w-5 h-5" />
                         </div>
                         <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                             No tienes hábitos aún

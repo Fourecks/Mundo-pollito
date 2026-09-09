@@ -377,44 +377,37 @@ interface AppComponentProps {
 }
 
 const getExpandedAllTodos = (todosMap: { [key: string]: Todo[] }) => {
-  const expanded: { [key: string]: Todo[] } = {};
-  for (const key of Object.keys(todosMap)) {
-    expanded[key] = [...(todosMap[key] || [])];
-  }
-  const allTasks = Object.values(todosMap).flat();
-  const seenIds = new Set<number>();
-  const uniqueTasks: Todo[] = [];
-  allTasks.forEach(t => {
-    if (!seenIds.has(t.id)) {
-      seenIds.add(t.id);
-      uniqueTasks.push(t);
-    }
-  });
+  const normalized: { [key: string]: Todo[] } = {};
+  const today = new Date();
+  const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayKey = formatDateKey(today);
 
-  uniqueTasks.forEach(task => {
-    if (!task.completed && task.due_date && task.end_date && task.end_date > task.due_date) {
-      const start = new Date(task.due_date + 'T00:00:00');
-      const end = new Date(task.end_date + 'T00:00:00');
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
-        let curr = new Date(start);
-        curr.setDate(curr.getDate() + 1);
-        while (curr <= end) {
-          const year = curr.getFullYear();
-          const month = String(curr.getMonth() + 1).padStart(2, '0');
-          const day = String(curr.getDate()).padStart(2, '0');
-          const dateKey = `${year}-${month}-${day}`;
-          if (!expanded[dateKey]) {
-            expanded[dateKey] = [];
-          }
-          if (!expanded[dateKey].some(t => t.id === task.id)) {
-            expanded[dateKey].push(task);
-          }
-          curr.setDate(curr.getDate() + 1);
-        }
+  Object.values(todosMap || {}).flat().forEach(task => {
+    let targetKey = task.due_date || 'undated';
+
+    if (!task.completed && task.due_date && task.end_date) {
+      const startParts = task.due_date.split('-').map(Number);
+      const endParts = task.end_date.split('-').map(Number);
+      const startDate = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+      const endDate = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+
+      if (todayNormalized > endDate) {
+        targetKey = task.end_date;
+      } else if (todayNormalized >= startDate) {
+        targetKey = todayKey;
+      } else {
+        targetKey = task.due_date;
+      }
+    }
+
+    if (targetKey) {
+      if (!normalized[targetKey]) normalized[targetKey] = [];
+      if (!normalized[targetKey].some(t => t.id === task.id)) {
+        normalized[targetKey].push(task);
       }
     }
   });
-  return expanded;
+  return normalized;
 };
 
 const DesktopApp: React.FC<AppComponentProps> = (props) => {
@@ -4127,7 +4120,13 @@ const App: React.FC = () => {
     
     const newCompletedState = !todoToToggle.completed;
     const updatedSubtasks = (todoToToggle.subtasks || []).map(st => ({ ...st, completed: newCompletedState }));
-    const updatedTodo = { ...todoToToggle, completed: newCompletedState, subtasks: updatedSubtasks };
+    
+    // When marking complete a task with an end_date range, settle its due_date on the current day
+    let updatedDueDate = todoToToggle.due_date;
+    if (newCompletedState && todoToToggle.end_date) {
+        updatedDueDate = formatDateKey(new Date());
+    }
+    const updatedTodo = { ...todoToToggle, completed: newCompletedState, due_date: updatedDueDate, subtasks: updatedSubtasks };
     
     let nextState = getUpdatedTodosState(allTodos, updatedTodo);
     
@@ -4159,7 +4158,12 @@ const App: React.FC = () => {
       const newSubtasks = (todoToUpdate.subtasks || []).map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st);
       const allSubtasksCompleted = newSubtasks.length > 0 && newSubtasks.every(st => st.completed);
       const parentCompleted = allSubtasksCompleted;
-      const updatedTodo = { ...todoToUpdate, subtasks: newSubtasks, completed: parentCompleted };
+      
+      let updatedDueDate = todoToUpdate.due_date;
+      if (parentCompleted && todoToUpdate.end_date) {
+          updatedDueDate = formatDateKey(new Date());
+      }
+      const updatedTodo = { ...todoToUpdate, subtasks: newSubtasks, completed: parentCompleted, due_date: updatedDueDate };
       
       const nextState = getUpdatedTodosState(allTodos, updatedTodo);
       setAllTodos(nextState);
