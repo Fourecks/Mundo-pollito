@@ -27,6 +27,7 @@ import TodaysAgenda from './components/TodaysAgenda';
 import FinanceSummaryWidget from './components/FinanceSummaryWidget';
 import { rainSoundSrc, forestSoundSrc, coffeeShopSrc, oceanSoundSrc } from './assets/sounds';
 import MobileNav from './components/MobileNav';
+import MobileDashboard from './components/MobileDashboard';
 import MobileHeader from './components/MobileHeader';
 import MobileMusicPlayer from './components/MobileMusicPlayer';
 import MobilePomodoroWidget from './components/MobilePomodoroWidget';
@@ -2051,44 +2052,12 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
         return (
             <>
                 <div className={activeTab === 'home' ? 'h-full flex flex-col' : 'hidden'}>
-                    <header className="sticky top-0 p-4 landscape:p-2 z-30 flex items-center justify-between">
-                        <Greeting name={capitalizedUserName} />
-                        <button onClick={() => setActiveTab('progreso')} className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-full shadow-lg p-2 px-4 landscape:py-1 landscape:px-3 text-sm font-bold text-primary-dark dark:text-primary hover:bg-white dark:hover:bg-gray-800 transition-all">
-                            Progreso
-                        </button>
-                    </header>
-                    <div className="w-[92%] max-w-sm landscape:max-w-2xl mx-auto py-3 landscape:py-1 space-y-3">
-                         <BibleVerse />
-                         <MobilePomodoroWidget 
-                            timeLeft={pomodoroState.timeLeft} 
-                            isActive={pomodoroState.isActive} 
-                            mode={pomodoroState.mode} 
-                            onToggle={handlePomodoroToggle} 
-                            onOpenModal={() => setIsPomodoroModalOpen(true)} 
-                            onSwitchMode={handleSwitchMode}
-                            onReset={() => { setPomodoroState(s => ({ ...s, timeLeft: s.durations[s.mode], isActive: false, endTime: null })); }}
-                         />
-                        <TodaysAgenda 
-                            tasks={todayAgendaTasks} 
-                            calendarEvents={calendarEvents} 
-                            onToggleTask={(id) => handleToggleTodo(id, handleShowCompletionModal)} 
-                            onToggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)} 
-                            quickNotes={quickNotes} 
-                            onAddQuickNote={handleAddQuickNote} 
-                            onDeleteQuickNote={handleDeleteQuickNote} 
-                            onClearAllQuickNotes={handleClearAllQuickNotes} 
-                            activeFocusTaskId={pomodoroState.activeFocusTaskId}
-                            onSelectFocusTask={handleSelectFocusTask}
-                            focusSessions={focusSessions}
-                            isFocusTimerRunning={pomodoroState.isActive && pomodoroState.mode === 'work'}
-                            mainDailyGoal={todayMainGoal}
-                            onUpdateMainDailyGoal={handleUpdateMainDailyGoal}
-                            habits={habits}
-                            habitRecords={habitRecords}
-                            onOpenHabits={() => setActiveTab('habits')}
-                        />
-                        <FinanceSummaryWidget onClick={() => setActiveTab('finance')} />
-                    </div>
+                    <MobileDashboard 
+                        userName={capitalizedUserName} 
+                        setActiveTab={setActiveTab} 
+                        tasks={todayAgendaTasks} 
+                        calendarEvents={calendarEvents} 
+                    />
                 </div>
 
                 <div className={activeTab === 'tasks' ? 'h-full flex flex-col' : 'hidden'}>
@@ -2258,35 +2227,38 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 )}
 
                 <div className={activeTab === 'more' ? 'h-full flex flex-col' : 'hidden'}>
-                    <div className="p-4 pt-8 landscape:pt-2 max-w-xl mx-auto">
-                        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden">
-                            <div className="divide-y divide-black/5 dark:divide-white/10">
+                    <div className="p-6 pt-12 max-w-xl mx-auto w-full space-y-6">
+                        <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 mb-4">Ajustes</h2>
+                        <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-3xl overflow-hidden">
+                            <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
 
-                                <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <Settings className="w-5 h-5 text-primary" />
-                                        <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Configuración</h3>
+                                <button onClick={() => setIsCustomizationPanelOpen(true)} className="w-full flex justify-between items-center text-left p-5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/80">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-2 bg-white dark:bg-black rounded-xl border border-zinc-100 dark:border-zinc-800">
+                                            <Settings className="w-5 h-5 text-zinc-800 dark:text-zinc-200" />
+                                        </div>
+                                        <h3 className="font-medium text-base text-zinc-900 dark:text-zinc-100">Configuración</h3>
                                     </div>
                                     <ChevronRightIcon />
                                 </button>
 
-                                <div className="p-4 flex justify-between items-center">
-                                    <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Tema</h3>
+                                <div className="p-5 flex justify-between items-center">
+                                    <h3 className="font-medium text-base text-zinc-900 dark:text-zinc-100">Tema</h3>
                                     <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
                                 </div>
 
-                                <button onClick={() => setIsQuickCaptureSetupOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                                    <h3 className="font-bold text-lg text-primary-dark dark:text-primary">Captura Rápida</h3>
+                                <button onClick={() => setIsQuickCaptureSetupOpen(true)} className="w-full flex justify-between items-center text-left p-5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/80">
+                                    <h3 className="font-medium text-base text-zinc-900 dark:text-zinc-100">Captura Rápida</h3>
                                     <ChevronRightIcon />
                                 </button>
                                 
-                                <button onClick={() => setIsNotificationsPanelOpen(true)} className="w-full flex justify-between items-center text-left p-4 transition-colors hover:bg-black/5 dark:hover:bg-white/5" disabled={isPermissionBlocked}>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className={`font-bold text-lg transition-colors ${ isPermissionBlocked ? 'text-gray-400 dark:text-gray-500' : 'text-primary-dark dark:text-primary' }`}>
+                                <button onClick={() => setIsNotificationsPanelOpen(true)} className="w-full flex justify-between items-center text-left p-5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/80" disabled={isPermissionBlocked}>
+                                    <div className="flex items-center gap-3">
+                                        <h3 className={`font-medium text-base transition-colors ${ isPermissionBlocked ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-zinc-100' }`}>
                                             Notificaciones
                                         </h3>
                                         {projectInvitations.filter(i => i.status === 'pending').length > 0 && (
-                                            <span className="px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                                            <span className="px-2 py-0.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
                                                 {projectInvitations.filter(i => i.status === 'pending').length}
                                             </span>
                                         )}
@@ -2296,7 +2268,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
                             </div>
                         </div>
-                         <button onClick={onLogout} className="w-full mt-6 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 font-bold flex items-center justify-center gap-2 p-3 rounded-full shadow-md">
+                        <button onClick={onLogout} className="w-full mt-8 bg-zinc-100 dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-900/20 border border-zinc-200 dark:border-zinc-800 text-red-600 dark:text-red-400 font-medium flex items-center justify-center gap-2 p-4 rounded-3xl transition-colors">
                             <LogoutIcon />
                             Cerrar Sesión
                         </button>
@@ -2308,8 +2280,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
     return (
         <div className="h-[100dvh] w-screen text-gray-800 dark:text-gray-100 font-sans flex flex-col">
-            <ParticleLayer type={particleType} reduceParticles={isPowerSavingActive} />
-            
             <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[90000] flex items-center gap-2">
                 {isSyncing && (
                     <div className="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-2">
@@ -2327,17 +2297,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             <main className="flex-grow overflow-y-auto pb-28 landscape:pb-16 custom-scrollbar">
                 {renderContent()}
             </main>
-            
-             {(activeTrack || activeSpotifyTrack) && (
-                <div className="fixed bottom-[76px] landscape:bottom-[52px] left-0 right-0 z-50">
-                    <MobileMusicPlayer
-                        track={activeTrack || activeSpotifyTrack}
-                        queue={activeTrack?.queue || activeSpotifyTrack?.queue || []}
-                        onSelectTrack={handleSelectTrack}
-                        onClose={() => { setActiveTrack(null); setActiveSpotifyTrack(null); }}
-                    />
-                </div>
-            )}
 
             <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
             
@@ -5872,51 +5831,55 @@ const App: React.FC = () => {
       {/* Default background (underneath everything) */}
       <div className="absolute top-0 left-0 w-full h-full bg-gray-50 dark:bg-gray-950 -z-30"/>
       
-      {/* Image background (overlays default) */}
-      <div 
-          className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-20 transition-opacity duration-500"
-          style={{ 
-              backgroundImage: `url(${(activeBackground?.type === 'image' || (!activeBackground?.type && activeBackground?.url && !activeBackground.url.includes('youtube.com') && !activeBackground.url.endsWith('.mp4'))) ? activeBackground.url : ''})`,
-              opacity: (activeBackground?.type === 'image' || (!activeBackground?.type && activeBackground?.url && !activeBackground.url.includes('youtube.com') && !activeBackground.url.endsWith('.mp4'))) ? 1 : 0
-          }}
-      />
+      {!isMobile && (
+        <>
+          {/* Image background (overlays default) */}
+          <div 
+              className="absolute top-0 left-0 w-full h-full bg-cover bg-center -z-20 transition-opacity duration-500"
+              style={{ 
+                  backgroundImage: `url(${(activeBackground?.type === 'image' || (!activeBackground?.type && activeBackground?.url && !activeBackground.url.includes('youtube.com') && !activeBackground.url.endsWith('.mp4'))) ? activeBackground.url : ''})`,
+                  opacity: (activeBackground?.type === 'image' || (!activeBackground?.type && activeBackground?.url && !activeBackground.url.includes('youtube.com') && !activeBackground.url.endsWith('.mp4'))) ? 1 : 0
+              }}
+          />
 
-      {/* YouTube Video Background */}
-      {(() => {
-        const url = activeBackground?.url || '';
-        const isYt = activeBackground?.type === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be');
-        if (isYt && !isPowerSavingActive) {
-          const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-          if (match && match[1]) {
-            const videoId = match[1];
-            const ytEmbedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&disablekb=1&fs=0&autohide=1&loop=1&playlist=${videoId}&playsinline=1&enablejsapi=1`;
-            return (
-              <div className="absolute inset-0 -z-20 overflow-hidden pointer-events-none transition-opacity duration-500 bg-black">
-                <iframe
-                  src={ytEmbedUrl}
-                  title="Fondo Animado YouTube"
-                  className="absolute w-[250%] h-[250%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none border-0 aspect-video object-cover"
-                  allow="autoplay; encrypted-media"
-                />
-              </div>
-            );
-          }
-        }
-        return null;
-      })()}
+          {/* YouTube Video Background */}
+          {(() => {
+            const url = activeBackground?.url || '';
+            const isYt = activeBackground?.type === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be');
+            if (isYt && !isPowerSavingActive) {
+              const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+              if (match && match[1]) {
+                const videoId = match[1];
+                const ytEmbedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&disablekb=1&fs=0&autohide=1&loop=1&playlist=${videoId}&playsinline=1&enablejsapi=1`;
+                return (
+                  <div className="absolute inset-0 -z-20 overflow-hidden pointer-events-none transition-opacity duration-500 bg-black">
+                    <iframe
+                      src={ytEmbedUrl}
+                      title="Fondo Animado YouTube"
+                      className="absolute w-[250%] h-[250%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none border-0 aspect-video object-cover"
+                      allow="autoplay; encrypted-media"
+                    />
+                  </div>
+                );
+              }
+            }
+            return null;
+          })()}
 
-      {/* MP4/WebM Video background (persistent in DOM, overlays default) */}
-      <video 
-          ref={videoRef} 
-          loop 
-          muted 
-          playsInline 
-          className="absolute top-0 left-0 w-full h-full object-cover -z-20 transition-opacity duration-500"
-          style={{ 
-              opacity: ((activeBackground?.type === 'video' || (activeBackground?.url && (activeBackground.url.endsWith('.mp4') || activeBackground.url.endsWith('.webm')))) && !isPowerSavingActive) ? 1 : 0,
-              pointerEvents: 'none'
-          }}
-      />
+          {/* MP4/WebM Video background (persistent in DOM, overlays default) */}
+          <video 
+              ref={videoRef} 
+              loop 
+              muted 
+              playsInline 
+              className="absolute top-0 left-0 w-full h-full object-cover -z-20 transition-opacity duration-500"
+              style={{ 
+                  opacity: ((activeBackground?.type === 'video' || (activeBackground?.url && (activeBackground.url.endsWith('.mp4') || activeBackground.url.endsWith('.webm')))) && !isPowerSavingActive) ? 1 : 0,
+                  pointerEvents: 'none'
+              }}
+          />
+        </>
+      )}
       
       {isMobile ? <MobileApp {...appProps} /> : <DesktopApp {...appProps} />}
 
