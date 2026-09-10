@@ -3311,6 +3311,20 @@ const App: React.FC = () => {
                   }
                 }
 
+                if (oldProj && 
+                    oldProj.name === updateProj.name && 
+                    oldProj.emoji === updateProj.emoji && 
+                    oldProj.color === updateProj.color && 
+                    oldProj.project_mode === updateProj.project_mode && 
+                    oldProj.status === updateProj.status && 
+                    oldProj.priority === updateProj.priority && 
+                    oldProj.target_date === updateProj.target_date && 
+                    oldProj.description === updateProj.description &&
+                    JSON.stringify(oldProj.kanban_columns) === JSON.stringify(updateProj.kanban_columns) &&
+                    JSON.stringify(oldProj.channels) === JSON.stringify(updateProj.channels)) {
+                  return prev;
+                }
+
                 return prev.map(p => p.id === updateProj.id ? { ...p, ...updateProj } : p)
                   .sort((a, b) => a.name.localeCompare(b.name));
               });
@@ -3346,13 +3360,43 @@ const App: React.FC = () => {
 
           if (eventType === 'INSERT' || eventType === 'UPDATE') {
             const todo = newRecord as Todo;
-            // Only update if it belongs to this user or to a project the user has access to
+            
+            let isIdentical = false;
+            setAllTodos(current => {
+              let foundAndIdentical = false;
+              for (const key in current) {
+                const existing = current[key].find(t => t.id === todo.id);
+                if (existing) {
+                  if (existing.text === todo.text && 
+                      existing.completed === todo.completed && 
+                      existing.due_date === todo.due_date && 
+                      existing.start_time === todo.start_time && 
+                      existing.end_time === todo.end_time && 
+                      existing.priority === todo.priority && 
+                      existing.project_id === todo.project_id && 
+                      JSON.stringify(existing.subtasks) === JSON.stringify(todo.subtasks) &&
+                      existing.notes === todo.notes) {
+                    foundAndIdentical = true;
+                  }
+                  break;
+                }
+              }
+              if (foundAndIdentical) {
+                isIdentical = true;
+                return current;
+              }
+              return getUpdatedTodosState(current, todo);
+            });
+
+            if (isIdentical) {
+              return;
+            }
+
             const userProjects = await getAll<Project>('projects');
             const isRelevant = todo.user_id === user.id || 
               (todo.project_id && userProjects.some(p => p.id === todo.project_id));
 
             if (isRelevant) {
-              setAllTodos(current => getUpdatedTodosState(current, todo));
               const currentCached = await getAll<Todo>('todos');
               const updatedCached = currentCached.filter(t => t.id !== todo.id);
               updatedCached.push(todo);

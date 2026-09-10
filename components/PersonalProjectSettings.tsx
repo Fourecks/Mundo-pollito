@@ -69,18 +69,26 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
     }
   };
 
-  const handleArchive = async () => {
-    const nextArchiveState = !project.is_archived;
-    if (confirm(`¿Estás seguro de que quieres ${nextArchiveState ? 'archivar' : 'desarchivar'} este proyecto?`)) {
-      await onArchive(project.id, nextArchiveState);
-    }
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+
+  const confirmArchive = async () => {
+    await onArchive(project.id, !project.is_archived);
+    setShowArchiveModal(false);
   };
 
-  const handleDelete = async () => {
-    if (confirm(`¿ELIMINAR PROYECTO? \n\nEsta acción eliminará el proyecto "${project.name}" de forma permanente. Las tareas asociadas perderán su proyecto pero se conservarán.`)) {
-      await onDelete(project.id);
-      onSelectProject(null);
-    }
+  const confirmDelete = async () => {
+    await onDelete(project.id);
+    onSelectProject(null);
+    setShowDeleteModal(false);
+  };
+
+  const handleArchive = () => {
+    setShowArchiveModal(true);
+  };
+
+  const handleDelete = () => {
+    setShowDeleteModal(true);
   };
 
   const handleConvertProject = async () => {
@@ -337,6 +345,94 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
                     <span>Convertir</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ARCHIVE CONFIRMATION MODAL (FULL-SCREEN MOBILE, RESPONSIVE OVERLAY DESKTOP) */}
+      {showArchiveModal && (
+        <div className="fixed inset-0 z-[100020] flex flex-col md:items-center md:justify-center bg-white dark:bg-[#090909] md:bg-black/70 md:backdrop-blur-xs p-6 sm:p-8 animate-fade-in" onClick={() => setShowArchiveModal(false)}>
+          <div 
+            className="w-full max-w-md bg-white dark:bg-[#0e0e0e] rounded-3xl border border-gray-100 dark:border-zinc-800/80 shadow-2xl p-6 space-y-6 flex flex-col justify-between h-full md:h-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-gray-100 dark:bg-zinc-800 rounded-xl text-gray-500 dark:text-gray-400">
+                  <Archive className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  {project.is_archived ? '¿Desarchivar Proyecto?' : '¿Archivar Proyecto?'}
+                </h3>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed font-medium">
+                {project.is_archived 
+                  ? 'Este proyecto volverá a mostrarse en tu lista activa y podrás continuar trabajando en él de forma normal.' 
+                  : 'Este proyecto se ocultará de tu vista principal y de la barra lateral, pero todos sus datos se conservarán intactos.'}
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100 dark:border-zinc-800/60">
+              <button
+                type="button"
+                onClick={() => setShowArchiveModal(false)}
+                className="w-full sm:w-1/2 py-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl transition-all"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                onClick={confirmArchive}
+                className="w-full sm:w-1/2 py-3 bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-100 text-xs font-bold rounded-xl transition-all"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL (FULL-SCREEN MOBILE, RESPONSIVE OVERLAY DESKTOP) */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[100020] flex flex-col md:items-center md:justify-center bg-white dark:bg-[#090909] md:bg-black/70 md:backdrop-blur-xs p-6 sm:p-8 animate-fade-in" onClick={() => setShowDeleteModal(false)}>
+          <div 
+            className="w-full max-w-md bg-white dark:bg-[#0e0e0e] rounded-3xl border border-gray-100 dark:border-zinc-800/80 shadow-2xl p-6 space-y-6 flex flex-col justify-between h-full md:h-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-red-500/10 rounded-xl text-red-500">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-red-600 dark:text-red-400">¿Eliminar Proyecto?</h3>
+              </div>
+              
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed font-medium">
+                  Estás a punto de eliminar permanentemente el proyecto <span className="font-bold text-gray-800 dark:text-white">"{project.name}"</span>. 
+                </p>
+                <div className="bg-red-500/5 p-3 rounded-xl border border-red-200/20 text-[10px] text-red-500 dark:text-red-400 font-medium leading-normal">
+                  Esta acción es irreversible. Todas las tareas asociadas a este proyecto perderán su vinculación pero se conservarán de manera global en tu bandeja de tareas.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100 dark:border-zinc-800/60">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="w-full sm:w-1/2 py-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="w-full sm:w-1/2 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs"
+              >
+                Eliminar Proyecto
               </button>
             </div>
           </div>

@@ -305,6 +305,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         return activeList.length > 0 ? activeList[0] : (projects.length > 0 ? projects[0] : null);
     }, [projects, activeProjectId]);
 
+    const effectiveTab = useMemo(() => {
+        if (!activeProject) return activeTab;
+        if (activeProject.project_mode === 'personal') {
+            return ['overview', 'listas', 'kanban', 'settings'].includes(activeTab) ? activeTab : 'overview';
+        }
+        return activeTab;
+    }, [activeProject, activeTab]);
+
     const [searchedUsers, setSearchedUsers] = useState<{name: string, email: string, avatar?: string}[]>([]);
     const [isSearchingUsers, setIsSearchingUsers] = useState(false);
 
@@ -7232,19 +7240,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             <div className="flex-1 overflow-hidden relative">
                 {activeProject ? (
                     <>
-                        {activeTab === 'overview' && renderOverview()}
-                        {activeTab === 'kanban' && renderKanban()}
-                        {activeTab === 'listas' && renderListas()}
-                        {activeTab === 'mis_tareas' && renderMisTareas()}
-                        {activeTab === 'sprints' && renderSprints()}
-                        {activeTab === 'roadmap' && renderRoadmap()}
-                        {activeTab === 'docs' && renderDocs()}
-                        {activeTab === 'chat' && renderChat()}
-                        {activeTab === 'expenses' && renderExpenses()}
-                        {activeTab === 'time' && renderTime()}
-                        {activeTab === 'team' && renderTeam()}
-                        {activeTab === 'settings' && renderPersonalSettings()}
-                        {activeTab === 'mas_menu' && renderMasMenu()}
+                        {effectiveTab === 'overview' && renderOverview()}
+                        {effectiveTab === 'kanban' && renderKanban()}
+                        {effectiveTab === 'listas' && renderListas()}
+                        {effectiveTab === 'mis_tareas' && renderMisTareas()}
+                        {effectiveTab === 'sprints' && renderSprints()}
+                        {effectiveTab === 'roadmap' && renderRoadmap()}
+                        {effectiveTab === 'docs' && renderDocs()}
+                        {effectiveTab === 'chat' && renderChat()}
+                        {effectiveTab === 'expenses' && renderExpenses()}
+                        {effectiveTab === 'time' && renderTime()}
+                        {effectiveTab === 'team' && renderTeam()}
+                        {effectiveTab === 'settings' && renderPersonalSettings()}
+                        {effectiveTab === 'mas_menu' && renderMasMenu()}
                     </>
                 ) : (
                     <div className="h-full overflow-y-auto px-8 py-8 bg-zinc-50/50 dark:bg-[#080808] custom-scrollbar">
