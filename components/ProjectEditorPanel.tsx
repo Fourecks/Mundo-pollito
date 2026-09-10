@@ -30,7 +30,7 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
   projectToEdit
 }) => {
   const [step, setStep] = useState<'select_type' | 'form'>('select_type');
-  const [selectedMode, setSelectedMode] = useState<'personal' | 'advanced'>('advanced');
+  const [selectedMode, setSelectedMode] = useState<'personal' | 'advanced'>('personal');
   const [name, setName] = useState('');
   const [color, setColor] = useState('#18181b'); // Ultra minimal black/gray by default
 
@@ -69,7 +69,7 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
   const modalContent = (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/50 backdrop-blur-xs animate-fade-in" onClick={onClose}>
+        <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-200" onClick={onClose}>
           <motion.div 
             initial={{ y: '100%' }}
             animate={{ y: 0 }}

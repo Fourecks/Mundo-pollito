@@ -353,7 +353,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     <AnimatePresence>
       {isOpen && (
         <div 
-          className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/50 backdrop-blur-xs animate-fade-in"
+          className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-200"
           onClick={onClose}
         >
           <motion.div 

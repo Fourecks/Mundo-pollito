@@ -38,7 +38,7 @@ const ConfirmationModalWithOptions: React.FC<ConfirmationModalWithOptionsProps> 
 
   const modalContent = (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[100010] overflow-y-auto animate-fade-in"
+      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-[100010] overflow-y-auto transition-opacity duration-200"
       aria-modal="true"
       role="dialog"
       onClick={onClose}

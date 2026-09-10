@@ -9,7 +9,8 @@ import {
   AlertTriangle,
   X,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react';
 
 interface PersonalProjectSettingsProps {
@@ -107,17 +108,47 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-8 w-full pb-32 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Ajustes del Proyecto</h2>
-        <p className="text-xs font-medium text-gray-500 mt-0.5">
-          {project.project_mode === 'personal' 
-            ? 'Configura y personaliza tu espacio personal.' 
-            : 'Configura y personaliza tu espacio de proyecto avanzado.'}
-        </p>
+    <div className="fixed inset-0 z-[1000] bg-white dark:bg-[#0c0c0e] text-gray-900 dark:text-gray-100 flex flex-col overflow-y-auto font-sans">
+      {/* HEADER VENTANA COMPLETA */}
+      <div className="sticky top-0 z-30 bg-white/90 dark:bg-[#0c0c0e]/90 backdrop-blur-md border-b border-gray-100 dark:border-zinc-800/80 px-4 sm:px-8 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab('overview')}
+            className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-200 transition-all active:scale-95 flex items-center gap-2 text-xs font-bold"
+            title="Volver al proyecto"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Volver</span>
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{project.emoji || '📁'}</span>
+              <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{project.name}</h1>
+              <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full ${
+                project.project_mode === 'personal'
+                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                  : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+              }`}>
+                {project.project_mode === 'personal' ? 'Personal' : 'Avanzado'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Configuración completa del proyecto</p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleDelete}
+          className="px-3.5 py-2 text-xs font-bold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 rounded-xl transition-all active:scale-95 flex items-center gap-1.5"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>Eliminar</span>
+        </button>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6 bg-white dark:bg-zinc-900/50 p-6 rounded-2xl border border-gray-100 dark:border-zinc-800/80 shadow-2xs">
+      <div className="flex-1 max-w-3xl mx-auto w-full p-4 sm:p-8 space-y-8 pb-32">
+        <form onSubmit={handleSave} className="space-y-6 bg-white dark:bg-zinc-900/50 p-6 rounded-2xl border border-gray-100 dark:border-zinc-800/80 shadow-2xs">
         {/* Nombre y Emoji */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
           <div className="md:col-span-3 space-y-1.5">
@@ -273,6 +304,7 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
           </button>
         </div>
       </div>
+    </div>
 
       {/* CONVERSION MODAL */}
       {showConvertModal && (
