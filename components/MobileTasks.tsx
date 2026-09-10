@@ -483,9 +483,9 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     // ==========================================
     // PAGE 2: CREATE TASK (PÁGINA NUEVA TAREA)
     // ==========================================
-    if (subPage === 'create') {
+    const renderCreateForm = () => {
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40">
+            <div className="flex flex-col w-full bg-white dark:bg-[#0c0c0c] text-zinc-900 dark:text-zinc-50 pb-20">
                 {/* Sticky Top Header */}
                 <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
@@ -671,15 +671,13 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                     )}
 
                     {/* Más opciones Toggle */}
-                    {!showAdvancedCreate && (
-                        <button 
-                            type="button"
-                            onClick={() => setShowAdvancedCreate(true)}
-                            className="w-full py-3 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
-                        >
-                            + Más opciones
-                        </button>
-                    )}
+                    <button 
+                        type="button"
+                        onClick={() => setShowAdvancedCreate(!showAdvancedCreate)}
+                        className="w-full py-3 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
+                    >
+                        {showAdvancedCreate ? 'Ocultar opciones' : '+ Más opciones'}
+                    </button>
 
                     {showAdvancedCreate && (
                         <motion.div 
@@ -895,14 +893,15 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 </div>
             </div>
         );
-    }
+    };
 
     // ==========================================
     // PAGE 3: EDIT TASK (PÁGINA DETALLES DE TAREA)
     // ==========================================
-    if (subPage === 'edit' && activeEditingTask) {
+    const renderEditForm = () => {
+        if (!activeEditingTask) return null;
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40">
+            <div className="flex flex-col w-full bg-white dark:bg-[#0c0c0c] text-zinc-900 dark:text-zinc-50 pb-20">
                 {/* Sticky Top Header */}
                 <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
@@ -1087,15 +1086,13 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                     )}
 
                     {/* Más opciones Toggle */}
-                    {!showAdvancedEdit && (
-                        <button 
-                            type="button"
-                            onClick={() => setShowAdvancedEdit(true)}
-                            className="w-full py-3 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
-                        >
-                            + Más opciones
-                        </button>
-                    )}
+                    <button 
+                        type="button"
+                        onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
+                        className="w-full py-3 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
+                    >
+                        {showAdvancedEdit ? 'Ocultar opciones' : '+ Más opciones'}
+                    </button>
 
                     {showAdvancedEdit && (
                         <motion.div 
@@ -1373,7 +1370,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 </div>
             </div>
         );
-    }
+    };
 
     // ==========================================
     // PAGE 1: TASK LIST (PÁGINA PRINCIPAL TAREAS)
@@ -1486,7 +1483,6 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
 
             {/* Lista de Tareas */}
             <div className="space-y-2.5">
-                <AnimatePresence mode="popLayout">
                     {sortedTasks.map(task => {
                         const project = projects.find(p => p.id === task.project_id);
                         const isRange = !!task.due_date && !!task.end_date && task.end_date > task.due_date;
@@ -1494,11 +1490,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
 
                         return (
-                            <motion.div
-                                layout
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
+                            <div
                                 key={task.id}
                                 className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all active:scale-[0.99] ${
                                     task.completed 
@@ -1580,10 +1572,9 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                         )}
                                     </div>
                                 </div>
-                            </motion.div>
+                            </div>
                         );
                     })}
-                </AnimatePresence>
                 
                 {sortedTasks.length === 0 && (
                     <div className="text-center py-16 px-4 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
@@ -1599,6 +1590,72 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Create Task Bottom Sheet */}
+            <AnimatePresence>
+                {subPage === 'create' && (
+                    <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/40 backdrop-blur-xs" onClick={handleBackToList}>
+                        <motion.div 
+                            initial={{ y: '100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '100%' }}
+                            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+                            drag="y"
+                            dragConstraints={{ top: 0 }}
+                            dragElastic={{ top: 0.1, bottom: 0.8 }}
+                            onDragEnd={(e, info) => {
+                                if (info.velocity.y > 100 || info.offset.y > 150) {
+                                    handleBackToList();
+                                }
+                            }}
+                            className="relative bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-100 dark:border-zinc-800/80 shadow-2xl overflow-hidden z-[100011] max-h-[92vh] flex flex-col"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Drag Handle */}
+                            <div className="flex justify-center py-3.5 cursor-pointer" onClick={handleBackToList}>
+                                <div className="w-12 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full hover:bg-gray-300 dark:hover:bg-zinc-700 transition-colors" />
+                            </div>
+
+                            <div className="overflow-y-auto w-full">
+                                {renderCreateForm()}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Edit Task Bottom Sheet */}
+            <AnimatePresence>
+                {subPage === 'edit' && activeEditingTask && (
+                    <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/40 backdrop-blur-xs" onClick={handleBackToList}>
+                        <motion.div 
+                            initial={{ y: '100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '100%' }}
+                            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+                            drag="y"
+                            dragConstraints={{ top: 0 }}
+                            dragElastic={{ top: 0.1, bottom: 0.8 }}
+                            onDragEnd={(e, info) => {
+                                if (info.velocity.y > 100 || info.offset.y > 150) {
+                                    handleBackToList();
+                                }
+                            }}
+                            className="relative bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-100 dark:border-zinc-800/80 shadow-2xl overflow-hidden z-[100011] max-h-[92vh] flex flex-col"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Drag Handle */}
+                            <div className="flex justify-center py-3.5 cursor-pointer" onClick={handleBackToList}>
+                                <div className="w-12 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full hover:bg-gray-300 dark:hover:bg-zinc-700 transition-colors" />
+                            </div>
+
+                            <div className="overflow-y-auto w-full">
+                                {renderEditForm()}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

@@ -110,7 +110,11 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
     <div className="p-6 max-w-2xl mx-auto space-y-8 w-full pb-32 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
       <div>
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Ajustes del Proyecto</h2>
-        <p className="text-xs font-medium text-gray-500 mt-0.5">Configura y personaliza tu espacio personal.</p>
+        <p className="text-xs font-medium text-gray-500 mt-0.5">
+          {project.project_mode === 'personal' 
+            ? 'Configura y personaliza tu espacio personal.' 
+            : 'Configura y personaliza tu espacio de proyecto avanzado.'}
+        </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6 bg-white dark:bg-zinc-900/50 p-6 rounded-2xl border border-gray-100 dark:border-zinc-800/80 shadow-2xs">
@@ -210,25 +214,27 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
       </form>
 
       {/* CONVERT TO ADVANCED BANNER */}
-      <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 dark:from-purple-950/20 dark:to-indigo-950/20 p-6 rounded-2xl border border-purple-200/50 dark:border-purple-900/30 space-y-4 shadow-3xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1.5 flex-1 max-w-lg">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-500 animate-pulse" />
-            <h3 className="text-sm font-bold text-purple-950 dark:text-purple-300">Convertir a proyecto avanzado</h3>
+      {project.project_mode === 'personal' && (
+        <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 dark:from-purple-950/20 dark:to-indigo-950/20 p-6 rounded-2xl border border-purple-200/50 dark:border-purple-900/30 space-y-4 shadow-3xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1.5 flex-1 max-w-lg">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-500 animate-pulse" />
+              <h3 className="text-sm font-bold text-purple-950 dark:text-purple-300">Convertir a proyecto avanzado</h3>
+            </div>
+            <p className="text-xs text-purple-900/70 dark:text-purple-300/60 leading-relaxed font-medium">
+              Desbloquea herramientas de planificación ágil, sprints, hojas de ruta, seguimiento de gastos, registro de tiempo y colaboración con múltiples miembros del equipo.
+            </p>
           </div>
-          <p className="text-xs text-purple-900/70 dark:text-purple-300/60 leading-relaxed font-medium">
-            Desbloquea herramientas de planificación ágil, sprints, hojas de ruta, seguimiento de gastos, registro de tiempo y colaboración con múltiples miembros del equipo.
-          </p>
+          <button
+            type="button"
+            onClick={() => setShowConvertModal(true)}
+            className="px-4 py-3 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <span>Convertir ahora</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowConvertModal(true)}
-          className="px-4 py-3 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <span>Convertir ahora</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      )}
 
       {/* DANGER ZONE */}
       <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-zinc-800/80">

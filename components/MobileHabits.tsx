@@ -742,12 +742,13 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
     // ==========================================
     // PAGE: CREAR / EDITAR HÁBITO (FULL SCREEN)
     // ==========================================
-    if (subPage === 'create' || subPage === 'edit') {
+    const renderHabitForm = () => {
+        if (subPage !== 'create' && subPage !== 'edit') return null;
         const isEditing = subPage === 'edit' && habitToEdit !== null;
         const activeCategoryData = EMOJI_CATEGORIES.find(c => c.id === selectedEmojiCategory) || EMOJI_CATEGORIES[0];
 
         return (
-            <div className="flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-50 pb-40">
+            <div className="flex flex-col w-full bg-white dark:bg-[#0c0c0c] text-zinc-900 dark:text-zinc-50 pb-20">
                 {/* Header - Starts high up */}
                 <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                     <button 
@@ -981,7 +982,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                 </div>
             </div>
         );
-    }
+    };
 
     // ==========================================
     // PAGE: MAIN HABITS (PÁGINA PRINCIPAL)
@@ -1080,7 +1081,6 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
 
             {/* Habit List */}
             <div className="space-y-2.5">
-                <AnimatePresence mode="popLayout">
                     {habits.map(habit => {
                         const isApplicable = isDayApplicable(selectedDate, habit.frequency);
                         const isCompleted = isHabitCompletedOnDate(habit.id, selectedDateKey);
@@ -1090,11 +1090,7 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                         const isCompletedToday = isHabitCompletedOnDate(habit.id, todayDateKey);
 
                         return (
-                            <motion.div
-                                layout
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
+                            <div
                                 key={habit.id}
                                 className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all active:scale-[0.99] ${
                                     isCompleted 
@@ -1165,10 +1161,9 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                                         <span>{streak}d</span>
                                     </div>
                                 )}
-                            </motion.div>
+                            </div>
                         );
                     })}
-                </AnimatePresence>
 
                 {habits.length === 0 && (
                     <div className="text-center py-16 px-4 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
@@ -1184,6 +1179,39 @@ const MobileHabits: React.FC<MobileHabitsProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Habit Creation and Editing Bottom Sheet */}
+            <AnimatePresence>
+                {(subPage === 'create' || subPage === 'edit') && (
+                    <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/40 backdrop-blur-xs" onClick={() => setSubPage('main')}>
+                        <motion.div 
+                            initial={{ y: '100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '100%' }}
+                            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+                            drag="y"
+                            dragConstraints={{ top: 0 }}
+                            dragElastic={{ top: 0.1, bottom: 0.8 }}
+                            onDragEnd={(e, info) => {
+                                if (info.velocity.y > 100 || info.offset.y > 150) {
+                                    setSubPage('main');
+                                }
+                            }}
+                            className="relative bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-100 dark:border-zinc-800/80 shadow-2xl overflow-hidden z-[100011] max-h-[92vh] flex flex-col"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Drag Handle */}
+                            <div className="flex justify-center py-3.5 cursor-pointer" onClick={() => setSubPage('main')}>
+                                <div className="w-12 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full hover:bg-gray-300 dark:hover:bg-zinc-700 transition-colors" />
+                            </div>
+
+                            <div className="overflow-y-auto w-full">
+                                {renderHabitForm()}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
