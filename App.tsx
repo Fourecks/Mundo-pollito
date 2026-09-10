@@ -2425,13 +2425,15 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
             <AddTaskModal
                 isOpen={isAddTaskModalOpen}
                 onClose={() => setIsAddTaskModalOpen(false)}
-                onAddTask={(text) => {
-                    const options = viewingProjectId
-                      ? { projectId: viewingProjectId, isUndated: true }
-                      : undefined;
-                    handleAddTodo(text, options);
+                onAddTask={(text, options) => {
+                    const finalOptions = {
+                        ...(viewingProjectId ? { projectId: viewingProjectId, isUndated: true } : {}),
+                        ...options
+                    };
+                    handleAddTodo(text, finalOptions);
                     setIsAddTaskModalOpen(false);
                 }}
+                projects={projects}
             />
             <ProjectEditorPanel
                 isOpen={isProjectEditorOpen}

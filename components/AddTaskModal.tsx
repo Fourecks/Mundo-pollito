@@ -15,6 +15,7 @@ interface AddTaskModalProps {
   activeProject?: Project | null;
   initialDate?: string;
   initialAssignee?: string | null;
+  defaultKanbanColumn?: string | null;
 }
 
 const AddTaskModal: React.FC<AddTaskModalProps> = ({ 
@@ -25,7 +26,8 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
   fixedProjectId = null,
   activeProject = null,
   initialDate,
-  initialAssignee = ''
+  initialAssignee = '',
+  defaultKanbanColumn = 'Por hacer'
 }) => {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -228,7 +230,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
       recurrence: recurrenceToSave,
       notes: notes.trim() ? notes.trim() : undefined,
       subtasks: subtasksToSave.length > 0 ? subtasksToSave : undefined,
-      kanban_column: 'Por hacer'
+      kanban_column: defaultKanbanColumn || 'Por hacer'
     });
 
     onClose();

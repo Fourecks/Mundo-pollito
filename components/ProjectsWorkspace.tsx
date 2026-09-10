@@ -4,6 +4,7 @@ import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, Project
 import { sendPushNotification } from '../services/pushNotificationService';
 import ProjectNoteEditorModal from './ProjectNoteEditorModal';
 import PersonalProjectSettings from './PersonalProjectSettings';
+import AddTaskModal from './AddTaskModal';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal, DollarSign
 } from 'lucide-react';
@@ -1301,14 +1302,112 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsQuickAddOpen(true)}
-                                        className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                        aria-label="Agregar al proyecto"
-                                    >
-                                        <Plus className="w-5 h-5" />
-                                    </button>
+                                    <div className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsQuickAddOpen(!isQuickAddOpen)}
+                                            className="p-2 rounded-xl text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                            aria-label="Agregar al proyecto"
+                                            title="Agregar al proyecto"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                        </button>
+
+                                        {isQuickAddOpen && (
+                                            <>
+                                                <div 
+                                                    className="fixed inset-0 z-40" 
+                                                    onClick={() => setIsQuickAddOpen(false)} 
+                                                />
+                                                <div 
+                                                    className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 origin-top-right text-zinc-900 dark:text-zinc-100 font-sans"
+                                                    onClick={e => e.stopPropagation()}
+                                                >
+                                                    <div className="px-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800/80 mb-1">
+                                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                                                            Agregar al proyecto
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* 1. Nueva tarea */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            setKanbanAddModalCol(null);
+                                                            setShowQuickAddTaskModal(true);
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <CheckSquare className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Nueva tarea</span>
+                                                    </button>
+
+                                                    {/* 2. Nota */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            handleCreateProjectNote();
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <FileText className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Nota</span>
+                                                    </button>
+
+                                                    {/* 3. Archivo */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            fileInputRef.current?.click();
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <Paperclip className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Archivo</span>
+                                                    </button>
+
+                                                    {/* 4. Gasto */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            setIsExpenseModalOpen(true);
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <DollarSign className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Gasto</span>
+                                                    </button>
+
+                                                    {/* 5. Registrar tiempo */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            setIsTimeModalOpen(true);
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <Clock className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Tiempo</span>
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => setInboxModalOpen(true)}
@@ -1462,6 +1561,110 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 </>
                             ) : (
                                 <>
+                                    <div className="relative">
+                                        <button 
+                                            onClick={() => setIsQuickAddOpen(!isQuickAddOpen)}
+                                            className="px-2.5 py-1.5 text-xs bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 rounded-lg transition-all flex items-center gap-1.5 font-bold shadow-2xs"
+                                            title="Agregar al Proyecto"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Agregar
+                                        </button>
+
+                                        {isQuickAddOpen && (
+                                            <>
+                                                <div 
+                                                    className="fixed inset-0 z-40" 
+                                                    onClick={() => setIsQuickAddOpen(false)} 
+                                                />
+                                                <div 
+                                                    className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 origin-top-right text-zinc-900 dark:text-zinc-100 font-sans"
+                                                    onClick={e => e.stopPropagation()}
+                                                >
+                                                    <div className="px-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800/80 mb-1">
+                                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                                                            Agregar al proyecto
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* 1. Nueva tarea */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            setKanbanAddModalCol(null);
+                                                            setShowQuickAddTaskModal(true);
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <CheckSquare className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Nueva tarea</span>
+                                                    </button>
+
+                                                    {/* 2. Nota */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            handleCreateProjectNote();
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <FileText className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Nota</span>
+                                                    </button>
+
+                                                    {/* 3. Archivo */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            fileInputRef.current?.click();
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <Paperclip className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Archivo</span>
+                                                    </button>
+
+                                                    {/* 4. Gasto */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            setIsExpenseModalOpen(true);
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <DollarSign className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Gasto</span>
+                                                    </button>
+
+                                                    {/* 5. Registrar tiempo */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsQuickAddOpen(false);
+                                                            setIsTimeModalOpen(true);
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                                            <Clock className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <span>Tiempo</span>
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                     <button 
                                         onClick={() => setInboxModalOpen(true)}
                                         className="px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
@@ -2351,18 +2554,66 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                     <span className={`px-2 py-0.5 rounded font-medium border ${prioStyles}`}>
                                                         {prioLabel}
                                                     </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setAssignListTodoId(todo.id);
-                                                        }}
-                                                        className="text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 px-2 py-0.5 rounded transition-colors flex items-center gap-1 font-medium border border-gray-200 dark:border-gray-800"
-                                                        title="Añadir a una lista"
-                                                    >
-                                                        <List className="w-3 h-3 text-gray-400" />
-                                                        <span className="max-w-[100px] truncate">{listMatch ? listMatch.name : 'Añadir a Lista'}</span>
-                                                    </button>
+                                                    <div className="relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setAssignListTodoId(assignListTodoId === todo.id ? null : todo.id);
+                                                            }}
+                                                            className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 font-medium border border-zinc-200 dark:border-zinc-800"
+                                                            title="Añadir a una lista"
+                                                        >
+                                                            <List className="w-3 h-3 text-zinc-400" />
+                                                            <span className="max-w-[100px] truncate">{listMatch ? listMatch.name : 'Añadir a Lista'}</span>
+                                                        </button>
+                                                        {assignListTodoId === todo.id && (
+                                                            <>
+                                                                <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setAssignListTodoId(null); }} />
+                                                                <div 
+                                                                    className="absolute right-0 bottom-full mb-1 w-48 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1 text-xs"
+                                                                    onClick={e => e.stopPropagation()}
+                                                                >
+                                                                    <div className="px-2 py-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-800/80">
+                                                                        Asignar a Lista
+                                                                    </div>
+                                                                    {(activeProject?.lists || []).length === 0 ? (
+                                                                        <div className="p-2 text-center text-zinc-400 text-[11px]">
+                                                                            No hay listas creadas
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="max-h-40 overflow-y-auto space-y-0.5 py-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    updateTodo(todo.id, { list_id: null });
+                                                                                    setAssignListTodoId(null);
+                                                                                }}
+                                                                                className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800 ${!todo.list_id ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400'}`}
+                                                                            >
+                                                                                <span>(Sin lista)</span>
+                                                                                {!todo.list_id && <Check className="w-3 h-3 text-zinc-900 dark:text-white" />}
+                                                                            </button>
+                                                                            {(activeProject?.lists || []).map(l => (
+                                                                                <button
+                                                                                    key={l.id}
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        updateTodo(todo.id, { list_id: l.id });
+                                                                                        setAssignListTodoId(null);
+                                                                                    }}
+                                                                                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800 ${todo.list_id === l.id ? 'font-bold text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400'}`}
+                                                                                >
+                                                                                    <span className="truncate">{l.name}</span>
+                                                                                    {todo.list_id === l.id && <Check className="w-3 h-3 text-zinc-900 dark:text-white" />}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             );
                                         })()}
@@ -2372,7 +2623,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <button 
                                     onClick={() => {
                                         setKanbanAddModalCol(col);
-                                        setNewTaskText('');
+                                        setShowQuickAddTaskModal(true);
                                     }} 
                                     className="w-full py-2.5 text-xs font-medium text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 flex items-center justify-center gap-1.5 hover:bg-gray-200/60 dark:hover:bg-zinc-800/80 rounded-xl transition-colors border border-dashed border-gray-300 dark:border-zinc-800"
                                 >
@@ -2382,55 +2633,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
                     );
                 })}
-
-                {/* MODAL EMERGENTE PARA AÑADIR TAREA AL KANBAN */}
-                <Modal
-                    isOpen={kanbanAddModalCol !== null}
-                    onClose={() => { setKanbanAddModalCol(null); setNewTaskText(''); }}
-                    title={`Nueva Tarea en "${kanbanAddModalCol || ''}"`}
-                >
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            if (newTaskText.trim() && kanbanAddModalCol) {
-                                addTodo(newTaskText.trim(), { projectId: activeProject.id, kanban_column: kanbanAddModalCol });
-                            }
-                            setKanbanAddModalCol(null);
-                            setNewTaskText('');
-                        }}
-                        className="space-y-4 font-sans"
-                    >
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                                Descripción de la tarea
-                            </label>
-                            <input
-                                autoFocus
-                                type="text"
-                                value={newTaskText}
-                                onChange={e => setNewTaskText(e.target.value)}
-                                placeholder="¿Qué tarea deseas agregar?"
-                                className="w-full px-3.5 py-2.5 text-xs bg-gray-50 dark:bg-black border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-500/20 text-gray-900 dark:text-white"
-                                required
-                            />
-                        </div>
-                        <div className="flex items-center justify-end gap-2 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => { setKanbanAddModalCol(null); setNewTaskText(''); }}
-                                className="px-4 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="submit"
-                                className="px-4 py-2 text-xs font-semibold bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors shadow-2xs"
-                            >
-                                Añadir Tarea
-                            </button>
-                        </div>
-                    </form>
-                </Modal>
             </div>
         );
     };
@@ -6824,7 +7026,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </span>
                             <button
                                 type="button"
-                                onClick={() => setIsAddListItemModalOpen(true)}
+                                onClick={() => setShowQuickAddTaskModal(true)}
                                 className="px-3 py-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-xs"
                             >
                                 <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Nueva</span> Tarea
@@ -7164,123 +7366,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </table>
                     </div>
                 </div>
-
-                {/* MODAL / BOTTOM SHEET PARA AGREGAR TAREA A LA LISTA */}
-                {isAddListItemModalOpen && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-[9999] animate-in fade-in duration-200">
-                        <div 
-                            className="fixed inset-0" 
-                            onClick={() => setIsAddListItemModalOpen(false)}
-                        />
-                        <div className="relative w-full max-w-lg bg-white dark:bg-[#111] rounded-t-3xl sm:rounded-2xl border-t sm:border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl z-10 animate-in slide-in-from-bottom duration-200">
-                            <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
-                                <div>
-                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Nueva Tarea</h3>
-                                    <p className="text-xs text-zinc-400">En {(activeProject.project_mode || 'personal') === 'personal' ? activeProject.name : (activeCustomList?.name || 'Lista')}</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsAddListItemModalOpen(false)}
-                                    className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            <form onSubmit={async (e) => {
-                                await handleAddListTodo(e);
-                                setIsAddListItemModalOpen(false);
-                            }} className="mt-4 space-y-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                                        Título de la tarea
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="¿Qué se necesita hacer?"
-                                        value={newItemTitle}
-                                        onChange={e => setNewItemTitle(e.target.value)}
-                                        className="w-full px-3.5 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:border-zinc-500"
-                                        autoFocus
-                                        required
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                                            Responsable
-                                        </label>
-                                        <select
-                                            value={newItemAssignee}
-                                            onChange={e => setNewItemAssignee(e.target.value)}
-                                            className="w-full px-3 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 focus:outline-none"
-                                        >
-                                            <option value="">(Sin asignar)</option>
-                                            {realMembers.map(m => (
-                                                <option key={m.email} value={m.email}>{m.name || m.email.split('@')[0]}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                                            Fecha límite
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={newItemDueDate}
-                                            onChange={e => setNewItemDueDate(e.target.value)}
-                                            className="w-full px-3 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-700 dark:text-zinc-300 focus:outline-none"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                                        Prioridad
-                                    </label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {[
-                                            { id: 'low', label: 'Baja' },
-                                            { id: 'medium', label: 'Media' },
-                                            { id: 'high', label: 'Alta' }
-                                        ].map(p => (
-                                            <button
-                                                key={p.id}
-                                                type="button"
-                                                onClick={() => setNewItemPriority(p.id as any)}
-                                                className={`py-2 rounded-xl text-xs font-medium border transition-colors ${
-                                                    newItemPriority === p.id
-                                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white font-semibold'
-                                                        : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
-                                                }`}
-                                            >
-                                                {p.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="pt-2 flex justify-end gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsAddListItemModalOpen(false)}
-                                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 shadow-sm"
-                                    >
-                                        Guardar Tarea
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
             </div>
         );
     };
@@ -8801,105 +8886,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 })()}
             </Modal>
 
-            {/* ASSIGN TASK TO LIST MODAL */}
-            <Modal
-                isOpen={!!assignListTodoId}
-                onClose={() => setAssignListTodoId(null)}
-                title="Asignar Tarea a una Lista"
-            >
-                {(() => {
-                    const targetTodo = projectTodos.find(t => t.id === assignListTodoId);
-                    const lists = activeProject?.lists || [];
-
-                    if (!targetTodo) return null;
-
-                    if (lists.length === 0) {
-                        return (
-                            <div className="space-y-4 text-center py-4">
-                                <div className="w-10 h-10 mx-auto rounded-xl bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-500">
-                                    <List className="w-5 h-5" />
-                                </div>
-                                <div className="space-y-1">
-                                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">No hay listas creadas</h4>
-                                    <p className="text-xs text-gray-500 leading-relaxed max-w-xs mx-auto">
-                                        Este proyecto aún no tiene listas personalizadas a las cuales asignar esta tarea.
-                                    </p>
-                                </div>
-                                <div className="flex items-center justify-center gap-2 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setAssignListTodoId(null)}
-                                        className="px-3.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-zinc-800 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors font-medium"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setAssignListTodoId(null);
-                                            setCreateListModal({ isOpen: true, templateType: 'project_tracking' });
-                                        }}
-                                        className="px-3.5 py-1.5 text-xs font-semibold text-white dark:text-black bg-gray-900 dark:bg-white rounded-lg hover:bg-gray-800 transition-colors shadow-2xs"
-                                    >
-                                        Crear Primera Lista
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    }
-
-                    return (
-                        <div className="space-y-4">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Selecciona la lista a la cual deseas asignar la tarea <strong className="text-gray-900 dark:text-white">"{targetTodo.text}"</strong>:
-                            </p>
-                            <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                                {lists.map(list => {
-                                    const isCurrent = targetTodo.list_id === list.id;
-                                    return (
-                                        <button
-                                            key={list.id}
-                                            type="button"
-                                            onClick={() => {
-                                                updateTodo(targetTodo.id, { list_id: list.id });
-                                                setAssignListTodoId(null);
-                                            }}
-                                            className={`w-full text-left p-3 rounded-xl border flex items-center justify-between text-xs transition-colors ${
-                                                isCurrent
-                                                    ? 'bg-gray-100 dark:bg-zinc-800 border-gray-400 dark:border-gray-600 font-semibold text-gray-900 dark:text-white'
-                                                    : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/60'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <List className="w-3.5 h-3.5 text-gray-400" />
-                                                <span>{list.name}</span>
-                                            </div>
-                                            {isCurrent && (
-                                                <span className="text-[10px] px-2 py-0.5 rounded bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 font-medium">Asignada</span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            {targetTodo.list_id && (
-                                <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            updateTodo(targetTodo.id, { list_id: null as any });
-                                            setAssignListTodoId(null);
-                                        }}
-                                        className="w-full text-center py-1.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors font-medium"
-                                    >
-                                        Quitar de la lista actual
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })()}
-            </Modal>
-
             {/* MOBILE TASK FILTERS BOTTOM SHEET */}
             {isMobileFiltersOpen && (
                 <div className="fixed inset-0 z-[100] flex flex-col justify-end">
@@ -9016,110 +9002,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </div>
             )}
 
-            {/* QUICK ADD BOTTOM SHEET */}
-            {isQuickAddOpen && (
-                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-                    <div className="absolute inset-0 bg-black/40" onClick={() => setIsQuickAddOpen(false)} />
-                    <motion.div 
-                        initial={{ y: '100%' }}
-                        animate={{ y: 0 }}
-                        exit={{ y: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="relative w-full bg-white dark:bg-[#111] rounded-t-3xl shadow-xl max-h-[85vh] flex flex-col z-10"
-                    >
-                        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
-                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Agregar al proyecto</h3>
-                            <button onClick={() => setIsQuickAddOpen(false)} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="p-4 space-y-1 pb-10">
-                            <button 
-                                onClick={() => {
-                                    setIsQuickAddOpen(false);
-                                    setIsAddListItemModalOpen(true);
-                                }}
-                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
-                            >
-                                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                                    <CheckSquare className="w-5 h-5" />
-                                </div>
-                                <span>Nueva tarea</span>
-                            </button>
-
-                            <button 
-                                onClick={() => {
-                                    setIsQuickAddOpen(false);
-                                    if ((activeProject.project_mode || 'personal') === 'personal') {
-                                        setIsQuickMessageModalOpen(true);
-                                    } else {
-                                        setActiveTab('chat');
-                                    }
-                                }}
-                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
-                            >
-                                <div className="w-9 h-9 rounded-xl bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center justify-center">
-                                    <MessageSquare className="w-5 h-5" />
-                                </div>
-                                <span>Mensaje</span>
-                            </button>
-
-                            <button 
-                                onClick={() => {
-                                    setIsQuickAddOpen(false);
-                                    handleCreateProjectNote();
-                                }}
-                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
-                            >
-                                <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                                    <FileText className="w-5 h-5" />
-                                </div>
-                                <span>Nota</span>
-                            </button>
-
-                            <button 
-                                onClick={() => {
-                                    setIsQuickAddOpen(false);
-                                    fileInputRef.current?.click();
-                                }}
-                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
-                            >
-                                <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                                    <Paperclip className="w-5 h-5" />
-                                </div>
-                                <span>Archivo</span>
-                            </button>
-
-                            <button 
-                                onClick={() => {
-                                    setIsQuickAddOpen(false);
-                                    setIsExpenseModalOpen(true);
-                                }}
-                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
-                            >
-                                <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-                                    <DollarSign className="w-5 h-5" />
-                                </div>
-                                <span>Gasto</span>
-                            </button>
-
-                            <button 
-                                onClick={() => {
-                                    setIsQuickAddOpen(false);
-                                    setIsTimeModalOpen(true);
-                                }}
-                                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-left hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors font-semibold text-gray-800 dark:text-gray-200"
-                            >
-                                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                                    <Clock className="w-5 h-5" />
-                                </div>
-                                <span>Registrar tiempo</span>
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
-
             {/* QUICK MESSAGE MODAL FOR PERSONAL PROJECTS */}
             {isQuickMessageModalOpen && (
                 <Modal 
@@ -9188,112 +9070,27 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </Modal>
             )}
 
-            {/* QUICK ADD TASK MODAL FOR PERSONAL PROJECTS */}
-            {showQuickAddTaskModal && (
-                <Modal
-                    isOpen={showQuickAddTaskModal}
-                    onClose={() => {
-                        setShowQuickAddTaskModal(false);
-                        setQuickTaskTitle('');
-                        setQuickTaskPriority('medium');
-                        setQuickTaskDueDate('');
-                    }}
-                    title="Nueva Tarea"
-                >
-                    <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (!activeProject || !quickTaskTitle.trim()) return;
-
-                        await addTodo(quickTaskTitle.trim(), {
-                            projectId: activeProject.id,
-                            priority: quickTaskPriority,
-                            dueDate: quickTaskDueDate || undefined,
-                            kanban_column: 'Por hacer',
-                            completed: false
-                        });
-
-                        setShowQuickAddTaskModal(false);
-                        setQuickTaskTitle('');
-                        setQuickTaskPriority('medium');
-                        setQuickTaskDueDate('');
-                    }} className="space-y-4 font-sans">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                                Nombre de la tarea
-                            </label>
-                            <input
-                                type="text"
-                                value={quickTaskTitle}
-                                onChange={e => setQuickTaskTitle(e.target.value)}
-                                required
-                                placeholder="Escribe el título de la tarea..."
-                                className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-zinc-400"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                                    Prioridad
-                                </label>
-                                <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-zinc-900 p-1 rounded-xl border border-gray-200 dark:border-zinc-800">
-                                    {(['low', 'medium', 'high'] as const).map(prio => (
-                                        <button
-                                            key={prio}
-                                            type="button"
-                                            onClick={() => setQuickTaskPriority(prio)}
-                                            className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition-all ${
-                                                quickTaskPriority === prio
-                                                    ? 'bg-black dark:bg-white text-white dark:text-black shadow-2xs'
-                                                    : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
-                                            }`}
-                                        >
-                                            {prio === 'high' ? 'Alta' : prio === 'medium' ? 'Media' : 'Baja'}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                                    Fecha de vencimiento
-                                </label>
-                                <input
-                                    type="date"
-                                    value={quickTaskDueDate}
-                                    onChange={e => setQuickTaskDueDate(e.target.value)}
-                                    className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-xs text-gray-900 dark:text-white focus:outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        <p className="text-[11px] text-zinc-400 italic">
-                            * Esta tarea se agregará automáticamente al estado <strong className="text-zinc-700 dark:text-zinc-300 font-bold">Por hacer</strong>.
-                        </p>
-
-                        <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-zinc-800">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowQuickAddTaskModal(false);
-                                    setQuickTaskTitle('');
-                                    setQuickTaskPriority('medium');
-                                    setQuickTaskDueDate('');
-                                }}
-                                className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-xs hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="submit"
-                                className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black font-bold rounded-xl text-xs hover:opacity-90 transition-all shadow-2xs"
-                            >
-                                Crear Tarea
-                            </button>
-                        </div>
-                    </form>
-                </Modal>
-            )}
+            {/* UNIFIED ADD TASK MODAL FOR BOTH PERSONAL AND ADVANCED PROJECTS */}
+            <AddTaskModal
+                isOpen={showQuickAddTaskModal}
+                onClose={() => {
+                    setShowQuickAddTaskModal(false);
+                    setKanbanAddModalCol(null);
+                }}
+                onAddTask={async (text, options) => {
+                    await addTodo(text, {
+                        ...options,
+                        projectId: activeProject?.id,
+                        kanban_column: kanbanAddModalCol || options?.kanban_column || 'Por hacer'
+                    });
+                    setShowQuickAddTaskModal(false);
+                    setKanbanAddModalCol(null);
+                }}
+                projects={projects}
+                activeProject={activeProject}
+                fixedProjectId={activeProject?.id}
+                defaultKanbanColumn={kanbanAddModalCol || 'Por hacer'}
+            />
 
             {/* MODAL EDITOR ENRIQUECIDO DE NOTAS DEL PROYECTO */}
             <ProjectNoteEditorModal
