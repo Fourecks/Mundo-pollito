@@ -123,11 +123,11 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
               <span className="text-xl">{project.emoji || '📁'}</span>
               <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{project.name}</h1>
               <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full ${
-                project.project_mode === 'personal'
+                (project.project_mode || 'personal') === 'personal'
                   ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
                   : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
               }`}>
-                {project.project_mode === 'personal' ? 'Personal' : 'Avanzado'}
+                {(project.project_mode || 'personal') === 'personal' ? 'Personal' : 'Avanzado'}
               </span>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">Configuración completa del proyecto</p>
@@ -221,7 +221,7 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
       </form>
 
       {/* CONVERT TO ADVANCED BANNER */}
-      {project.project_mode === 'personal' && (
+      {(project.project_mode || 'personal') === 'personal' && (
         <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 dark:from-purple-950/20 dark:to-indigo-950/20 p-6 rounded-2xl border border-purple-200/50 dark:border-purple-900/30 space-y-4 shadow-3xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1.5 flex-1 max-w-lg">
             <div className="flex items-center gap-2">

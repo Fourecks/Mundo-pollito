@@ -238,7 +238,7 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
                     const completedTasks = projectTasks.filter(t => t.completed).length;
                     const totalTasks = projectTasks.length;
                     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-                    const isPersonal = project.project_mode === 'personal';
+                    const isPersonal = (project.project_mode || 'personal') === 'personal';
 
                     // Calculate ASCII progress blocks
                     const filledBlocks = Math.round(progress / 10);

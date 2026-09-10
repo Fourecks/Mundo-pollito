@@ -315,7 +315,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const effectiveTab = useMemo(() => {
         if (!activeProject) return activeTab;
-        if (activeProject.project_mode === 'personal') {
+        if ((activeProject.project_mode || 'personal') === 'personal') {
             return ['overview', 'listas', 'kanban', 'settings'].includes(activeTab) ? activeTab : 'overview';
         }
         return activeTab;
@@ -484,7 +484,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     useEffect(() => {
         if (!activeProject) return;
-        if (activeProject.project_mode === 'personal') {
+        if ((activeProject.project_mode || 'personal') === 'personal') {
             if (!['overview', 'listas', 'kanban', 'settings'].includes(activeTab)) {
                 setActiveTab('overview');
             }
@@ -1300,7 +1300,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                     {/* New Mobile 4-Tab Navigation */}
                     <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-800/80">
-                        {(activeProject.project_mode === 'personal'
+                        {((activeProject.project_mode || 'personal') === 'personal'
                             ? [
                                 { id: 'inicio', label: 'Resumen', target: 'overview' },
                                 { id: 'tareas', label: 'Tareas', target: 'listas' },
@@ -1313,7 +1313,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 { id: 'mas', label: 'Más', target: 'mas_menu' }
                               ]
                         ).map(tab => {
-                            const isActive = activeProject.project_mode === 'personal'
+                            const isActive = (activeProject.project_mode || 'personal') === 'personal'
                                 ? activeTab === tab.target
                                 : mobileMainTab === tab.id;
                             return (
@@ -1340,7 +1340,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     {/* Sub-navigation for Tareas */}
-                    {activeProject.project_mode !== 'personal' && mobileMainTab === 'tareas' && (
+                    {(activeProject.project_mode || 'personal') !== 'personal' && mobileMainTab === 'tareas' && (
                         <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar scrollbar-none border-b border-gray-100 dark:border-gray-800/80">
                             {[
                                 { id: 'mis_tareas', label: 'Mis tareas' },
@@ -1414,7 +1414,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                            {activeProject.project_mode === 'personal' ? (
+                            {(activeProject.project_mode || 'personal') === 'personal' ? (
                                 <>
                                     <button 
                                         onClick={() => setShowQuickAddTaskModal(true)}
@@ -1493,7 +1493,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1 overflow-x-auto pb-0.5 -mx-1 px-1 scrollbar-hide">
-                        {(activeProject.project_mode === 'personal'
+                        {((activeProject.project_mode || 'personal') === 'personal'
                             ? [
                                 { id: 'overview', label: 'Resumen', icon: Activity },
                                 { id: 'listas', label: 'Tareas', icon: CheckSquareIcon },
@@ -1749,7 +1749,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const renderOverview = () => {
         if (!activeProject) return null;
 
-        if (activeProject.project_mode === 'personal') {
+        if ((activeProject.project_mode || 'personal') === 'personal') {
             return renderPersonalOverview();
         }
         
@@ -2158,7 +2158,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const renderKanban = () => {
         if (!activeProject) return null;
-        const columns = activeProject.project_mode === 'personal'
+        const columns = (activeProject.project_mode || 'personal') === 'personal'
             ? ['Por hacer', 'En proceso', 'Completado']
             : (activeProject.kanban_columns || ['Por hacer', 'En progreso', 'Completado']);
 
@@ -6529,7 +6529,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const renderListas = () => {
         if (!activeProject) return null;
 
-        if (activeProject.project_mode === 'personal') {
+        if ((activeProject.project_mode || 'personal') === 'personal') {
             return renderPersonalTareas();
         }
 
@@ -6676,7 +6676,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             e.preventDefault();
             if (!newItemTitle.trim()) return;
             const assigneeValue = newItemAssignee.trim() || undefined;
-            const availableCols = activeProject.project_mode === 'personal'
+            const availableCols = (activeProject.project_mode || 'personal') === 'personal'
                 ? ['Por hacer', 'En proceso', 'Completado']
                 : (activeProject.kanban_columns && activeProject.kanban_columns.length > 0 ? activeProject.kanban_columns : ['Por hacer', 'En progreso', 'Completado']);
             const defaultCol = availableCols[0] || 'Por hacer';
@@ -6687,7 +6687,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 assigned_to: assigneeValue,
                 dueDate: newItemDueDate || undefined,
                 kanban_column: defaultCol,
-                list_id: activeProject.project_mode === 'personal' ? undefined : effectiveListId
+                list_id: (activeProject.project_mode || 'personal') === 'personal' ? undefined : effectiveListId
             });
             setNewItemTitle('');
             setNewItemDueDate('');
@@ -7175,7 +7175,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
                                 <div>
                                     <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Nueva Tarea</h3>
-                                    <p className="text-xs text-zinc-400">En {activeProject.project_mode === 'personal' ? activeProject.name : (activeCustomList?.name || 'Lista')}</p>
+                                    <p className="text-xs text-zinc-400">En {(activeProject.project_mode || 'personal') === 'personal' ? activeProject.name : (activeCustomList?.name || 'Lista')}</p>
                                 </div>
                                 <button
                                     type="button"
@@ -7319,7 +7319,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     const completedTasks = projectTasks.filter(t => t.completed).length;
                                     const totalTasks = projectTasks.length;
                                     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-                                    const isPersonal = project.project_mode === 'personal';
+                                    const isPersonal = (project.project_mode || 'personal') === 'personal';
 
                                     // Calculate ASCII progress blocks
                                     const filledBlocks = Math.round(progress / 10);
@@ -9049,7 +9049,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <button 
                                 onClick={() => {
                                     setIsQuickAddOpen(false);
-                                    if (activeProject.project_mode === 'personal') {
+                                    if ((activeProject.project_mode || 'personal') === 'personal') {
                                         setIsQuickMessageModalOpen(true);
                                     } else {
                                         setActiveTab('chat');

@@ -2889,7 +2889,7 @@ const App: React.FC = () => {
       setPlaylists(defaultPlaylistsList);
     }
     setQuickNotes(cachedQuickNotes);
-    setProjects(cachedProjects);
+    setProjects((cachedProjects || []).map(p => ({ ...p, project_mode: p.project_mode || 'personal' })));
     setHabitRecords(cachedHabitRecords);
 
     // Load cached project invitations
@@ -3081,7 +3081,11 @@ const App: React.FC = () => {
       }
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
-      if(projectsData) { setProjects(projectsData); await clearAndPutAll('projects', projectsData); }
+      if(projectsData) { 
+        const normalizedProjects = projectsData.map(p => ({ ...p, project_mode: p.project_mode || 'personal' }));
+        setProjects(normalizedProjects); 
+        await clearAndPutAll('projects', normalizedProjects); 
+      }
       if(invitationsData && user?.email) {
         setProjectInvitations(invitationsData);
         localStorage.setItem(`invitations_${user.email}`, JSON.stringify(invitationsData));
