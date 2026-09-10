@@ -235,10 +235,10 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
             <div className="space-y-3">
                 {activeProjects.map(project => {
                     const projectTasks = allTodos.filter(t => t.project_id === project.id);
-                    const pendingTasks = projectTasks.filter(t => !t.completed).length;
                     const completedTasks = projectTasks.filter(t => t.completed).length;
                     const totalTasks = projectTasks.length;
                     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                    const isPersonal = project.project_mode === 'personal';
 
                     // Calculate ASCII progress blocks
                     const filledBlocks = Math.round(progress / 10);
@@ -261,9 +261,18 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
                                     </h3>
                                 </div>
                                 
-                                <p className="text-[11px] text-zinc-500 font-semibold pl-7 mt-0.5">
-                                    {pendingTasks} {pendingTasks === 1 ? 'tarea pendiente' : 'tareas pendientes'}
-                                </p>
+                                <div className="flex items-center gap-2 pl-7 mt-1">
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                        isPersonal 
+                                            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30' 
+                                            : 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/30'
+                                    }`}>
+                                        {isPersonal ? 'Personal' : 'Avanzado'}
+                                    </span>
+                                    <span className="text-[11px] font-medium text-zinc-500">
+                                        • {completedTasks} de {totalTasks} {totalTasks === 1 ? 'tarea' : 'tareas'}
+                                    </span>
+                                </div>
 
                                 <div className="pl-7 pt-1.5">
                                     <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-300 tracking-wider">

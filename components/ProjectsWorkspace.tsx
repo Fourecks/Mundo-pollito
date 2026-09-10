@@ -7247,8 +7247,79 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {activeTab === 'mas_menu' && renderMasMenu()}
                     </>
                 ) : (
-                    <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-                        Selecciona un proyecto para comenzar.
+                    <div className="h-full overflow-y-auto px-8 py-8 bg-zinc-50/50 dark:bg-[#080808] custom-scrollbar">
+                        <div className="max-w-6xl mx-auto space-y-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Tus Proyectos</h2>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Selecciona un proyecto para ver sus detalles y herramientas.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {projects.filter(p => !p.is_archived).map(project => {
+                                    const projectTasks = allTodos.filter(t => t.project_id === project.id);
+                                    const completedTasks = projectTasks.filter(t => t.completed).length;
+                                    const totalTasks = projectTasks.length;
+                                    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                                    const isPersonal = project.project_mode === 'personal';
+
+                                    // Calculate ASCII progress blocks
+                                    const filledBlocks = Math.round(progress / 10);
+                                    const emptyBlocks = 10 - filledBlocks;
+                                    const blockString = '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
+
+                                    return (
+                                        <button
+                                            key={project.id}
+                                            onClick={() => onSelectProject(project.id)}
+                                            className="group flex flex-col text-left p-5 rounded-2xl bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-zinc-700 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-2.5 mb-3">
+                                                <span className="text-2xl shrink-0">{project.emoji || '📁'}</span>
+                                                <h3 className="text-sm font-bold text-gray-900 dark:text-white tracking-tight truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                    {project.name}
+                                                </h3>
+                                            </div>
+
+                                            {project.description && (
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed mb-4">
+                                                    {project.description}
+                                                </p>
+                                            )}
+
+                                            <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-800/80 w-full flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                                        isPersonal 
+                                                            ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30' 
+                                                            : 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/30'
+                                                    }`}>
+                                                        {isPersonal ? 'Personal' : 'Avanzado'}
+                                                    </span>
+                                                    <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                                                        • {completedTasks} de {totalTasks} {totalTasks === 1 ? 'tarea' : 'tareas'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="w-full mt-3">
+                                                <span className="text-[10px] font-mono font-bold text-gray-600 dark:text-gray-400 tracking-wider flex items-center justify-between">
+                                                    <span>{blockString}</span>
+                                                    <span className="text-gray-900 dark:text-white font-bold">{progress}%</span>
+                                                </span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+
+                                {projects.filter(p => !p.is_archived).length === 0 && (
+                                    <div className="col-span-full text-center py-16 bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-gray-800 rounded-2xl">
+                                        <FolderIcon className="w-10 h-10 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">No tienes proyectos creados</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Crea uno nuevo usando el botón en la barra superior.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
