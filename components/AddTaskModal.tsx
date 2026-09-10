@@ -79,9 +79,10 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
   const [subtaskInput, setSubtaskInput] = useState('');
 
   // Determine current project and whether it is advanced
-  const currentProject = (fixedProjectId || activeProject) 
-    ? (activeProject || projects.find(p => p.id === (fixedProjectId ?? activeProject?.id)))
-    : projects.find(p => p.id === selectedProjectId);
+  const effectiveProjectId = fixedProjectId ?? (activeProject?.id ?? selectedProjectId);
+  const currentProject = (activeProject && (!effectiveProjectId || activeProject.id === effectiveProjectId))
+    ? activeProject
+    : projects.find(p => p.id === effectiveProjectId);
 
   const isCurrentProjectAdvanced = currentProject?.project_mode === 'advanced';
 
@@ -240,15 +241,18 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
   const modalContent = (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-[100010] overflow-y-auto animate-in fade-in duration-150"
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-[100010] animate-in fade-in duration-200"
       aria-modal="true"
       role="dialog"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#111114] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl p-4 sm:p-6 w-full max-w-lg mx-auto flex flex-col my-auto max-h-[90vh] overflow-hidden text-zinc-900 dark:text-zinc-100"
+        className="bg-white dark:bg-[#111114] border-t sm:border border-zinc-200 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl shadow-2xl p-4 sm:p-6 w-full max-w-lg mx-auto flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden text-zinc-900 dark:text-zinc-100 animate-in slide-in-from-bottom duration-200"
         onClick={e => e.stopPropagation()}
       >
+        {/* Mobile handle indicator */}
+        <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto mb-2 sm:hidden shrink-0" />
+
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800/80 shrink-0">
           <div>
