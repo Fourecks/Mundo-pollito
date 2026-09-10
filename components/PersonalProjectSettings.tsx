@@ -33,7 +33,6 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description || '');
   const [emoji, setEmoji] = useState(project.emoji || '👤');
-  const [color, setColor] = useState(project.color || '#1e293b');
   const [targetDate, setTargetDate] = useState(project.target_date || '');
   const [isSaving, setIsSaving] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -44,12 +43,10 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
     setName(project.name);
     setDescription(project.description || '');
     setEmoji(project.emoji || '👤');
-    setColor(project.color || '#1e293b');
     setTargetDate(project.target_date || '');
   }, [project]);
 
   const emojis = ['👤', '🎯', '📚', '🏃‍♂️', '💪', '🎨', '💼', '🏡', '✈️', '🌟', '💻', '🧘', '🍕', '🚗', '🔑'];
-  const colors = ['#1e293b', '#ef4444', '#f97316', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899'];
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +57,7 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
         name: name.trim(),
         description: description.trim() || null,
         emoji,
-        color,
+        color: '#18181b',
         target_date: targetDate || null
       });
     } catch (err) {
@@ -194,37 +191,16 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
           />
         </div>
 
-        {/* Fecha Objetivo y Color */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">Fecha Objetivo</label>
-            <div className="relative">
-              <input
-                type="date"
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500/30 transition-all cursor-pointer"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">Color Identificador</label>
-            <div className="flex flex-wrap gap-2.5 pt-1.5">
-              {colors.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className="w-6 h-6 rounded-full border border-black/5 dark:border-white/5 relative flex items-center justify-center transition-transform hover:scale-110 active:scale-95 shrink-0"
-                  style={{ backgroundColor: c }}
-                >
-                  {color === c && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
-                  )}
-                </button>
-              ))}
-            </div>
+        {/* Fecha Objetivo */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">Fecha Objetivo</label>
+          <div className="relative">
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-base sm:text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400 transition-all cursor-pointer"
+            />
           </div>
         </div>
 
