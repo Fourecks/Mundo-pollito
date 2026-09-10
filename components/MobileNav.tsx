@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface MobileNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  hide?: boolean;
 }
 
 const navItems = [
@@ -15,8 +16,10 @@ const navItems = [
   { id: 'more', label: 'Perfil', icon: User },
 ];
 
-const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
+const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab, hide = false }) => {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+
+  if (hide) return null;
 
   const quickAddOptions = [
     { id: 'tasks', label: 'Tarea', icon: CheckSquare, color: 'text-rose-500' },
@@ -118,4 +121,4 @@ const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
   );
 };
 
-export default MobileNav;
+export default React.memo(MobileNav);

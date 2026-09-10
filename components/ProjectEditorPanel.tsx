@@ -39,12 +39,12 @@ const ProjectEditorPanel: React.FC<ProjectEditorPanelProps> = ({
       if (projectToEdit) {
         setName(projectToEdit.name);
         setColor(projectToEdit.color || '#18181b');
-        setSelectedMode(projectToEdit.project_mode || 'advanced');
+        setSelectedMode(projectToEdit.project_mode || 'personal');
         setStep('form');
       } else {
         setName('');
         setColor('#18181b');
-        setSelectedMode('advanced');
+        setSelectedMode('personal');
         setStep('select_type');
       }
     }

@@ -479,4 +479,4 @@ const TodoListModule: React.FC<TodoListModuleProps> = (props) => {
     );
 };
 
-export default TodoListModule;
+export default React.memo(TodoListModule);

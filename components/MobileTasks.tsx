@@ -1660,4 +1660,4 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     );
 };
 
-export default MobileTasks;
+export default React.memo(MobileTasks);

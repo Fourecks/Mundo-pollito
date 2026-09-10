@@ -1347,6 +1347,18 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     toggleShowDesktop
   ]);
 
+  const handleToggleTodoMobile = useCallback((id: number) => {
+    handleToggleTodo(id, handleShowCompletionModal);
+  }, [handleToggleTodo, handleShowCompletionModal]);
+
+  const handleToggleSubtaskMobile = useCallback((taskId: number, subtaskId: number) => {
+    handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal);
+  }, [handleToggleSubtask, handleShowCompletionModal]);
+
+  const handleUpdateProjectNameEmojiColor = useCallback((id: number, name: string, emoji: string | null, color: string | null) => {
+    handleUpdateProject(id, { name, emoji, color });
+  }, [handleUpdateProject]);
+
   return (
     <div className="h-screen w-screen text-gray-800 dark:text-gray-100 font-sans overflow-hidden">
         <CommandPalette 
@@ -1541,8 +1553,8 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
               <TodoListModule progressEmoji={uiSettings?.progressEmoji} 
                 allTodos={allTodos} 
                 addTodo={handleAddTodo} 
-                toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
-                toggleSubtask={(taskId, subtaskId) => handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal)}
+                toggleTodo={handleToggleTodoMobile}
+                toggleSubtask={handleToggleSubtaskMobile}
                 deleteTodo={handleDeleteTodo} 
                 updateTodo={handleUpdateTodo} 
                 onEditTodo={setTaskToEdit} 
@@ -1550,7 +1562,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
                 setSelectedDate={setSelectedDate} 
                 focusMode={isFocusMode}
                 onAddProject={handleAddProject}
-                onUpdateProject={(id, name, emoji, color) => handleUpdateProject(id, { name, emoji, color })}
+                onUpdateProject={handleUpdateProjectNameEmojiColor}
                 onDeleteProject={handleDeleteProject}
                 onDeleteProjectAndTasks={handleDeleteProjectAndTasks}
                 handleArchiveProject={handleArchiveProject}
@@ -1862,10 +1874,49 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
 
     const pomodoroAudioRef = useRef<HTMLAudioElement>(null);
 
-    const handleShowCompletionModal = (quote: string) => {
+    const handleShowCompletionModal = useCallback((quote: string) => {
         setCompletionQuote(quote);
         setShowCompletionModal(true);
-    };
+    }, []);
+
+    const capitalizedUserName = useMemo(() => {
+        if (!currentUser?.email) return 'Pollito';
+        const userName = currentUser.email.split('@')[0];
+        return userName.charAt(0).toUpperCase() + userName.slice(1);
+    }, [currentUser?.email]);
+
+    const handleToggleTodoMobile = useCallback((id: number) => {
+        handleToggleTodo(id, handleShowCompletionModal);
+    }, [handleToggleTodo, handleShowCompletionModal]);
+
+    const handleToggleSubtaskMobile = useCallback((taskId: number, subtaskId: number) => {
+        handleToggleSubtask(taskId, subtaskId, handleShowCompletionModal);
+    }, [handleToggleSubtask, handleShowCompletionModal]);
+
+    const handleUpdateProjectNameEmojiColor = useCallback((id: number, name: string, emoji: string | null, color: string | null) => {
+        handleUpdateProject(id, { name, emoji, color });
+    }, [handleUpdateProject]);
+
+    const handleAddProjectCallback = useCallback(async (name: string, emoji: string | null, color: string | null) => {
+        const p = await handleAddProject(name, emoji, color);
+        return p || null;
+    }, [handleAddProject]);
+
+    const handleUpdateProjectObjectCallback = useCallback(async (id: number, updates: Partial<Project>) => {
+        await handleUpdateProject(id, updates);
+    }, [handleUpdateProject]);
+
+    const handleArchiveProjectCallback = useCallback(async (id: number, isArchived: boolean) => {
+        await handleArchiveProject(id, isArchived);
+    }, [handleArchiveProject]);
+
+    const handleAddTodoCallback = useCallback(async (text: string, options?: any) => {
+        await handleAddTodo(text, options);
+    }, [handleAddTodo]);
+
+    const handleBackFromProjectsWorkspace = useCallback(() => {
+        setViewingProjectId(null);
+    }, []);
 
     const handleOpenProjectCreator = () => {
         setProjectToEdit(null);
@@ -2038,12 +2089,6 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       if (activeTrack) setActiveTrack(null);
     };
 
-    const capitalizedUserName = useMemo(() => {
-        if (!currentUser.email) return 'Pollito';
-        const userName = currentUser.email.split('@')[0];
-        return userName.charAt(0).toUpperCase() + userName.slice(1);
-    }, [currentUser.email]);
-
     const renderContent = () => {
         return (
             <>
@@ -2062,7 +2107,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                             allTodos={expandedAllTodos}
                             selectedDate={selectedDate}
                             setSelectedDate={setSelectedDate}
-                            toggleTodo={(id) => handleToggleTodo(id, handleShowCompletionModal)}
+                            toggleTodo={handleToggleTodoMobile}
                             onEditTodo={setTaskToEdit}
                             projects={projects}
                             onAddTodo={handleAddTodo}
@@ -2083,7 +2128,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 <div className="h-full flex-1 overflow-hidden">
                                     <ProjectsWorkspace 
                                       isMobile={true}
-                                      onBack={() => setViewingProjectId(null)}
+                                      onBack={handleBackFromProjectsWorkspace}
                                       currentUser={currentUser}
                                       projects={projects}
                                       notes={notes}
@@ -2100,21 +2145,12 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                       invitations={projectInvitations}
                                       onSendInvitation={onSendInvitation}
                                       pushPreferences={pushPreferences}
-                                      onSelectProject={(id) => setViewingProjectId(id)}
-                                      onAddProject={async (name, emoji, color) => {
-                                          const p = await handleAddProject(name, emoji, color);
-                                          return p || null;
-                                      }}
-                                      onUpdateProject={async (id, updates) => {
-                                          await handleUpdateProject(id, updates);
-                                      }}
+                                      onSelectProject={setViewingProjectId}
+                                      onAddProject={handleAddProjectCallback}
+                                      onUpdateProject={handleUpdateProjectObjectCallback}
                                       onDeleteProject={handleDeleteProject}
-                                      onArchiveProject={async (id, isArchived) => {
-                                          await handleArchiveProject(id, isArchived);
-                                      }}
-                                      addTodo={async (text, options) => {
-                                          await handleAddTodo(text, options);
-                                      }}
+                                      onArchiveProject={handleArchiveProjectCallback}
+                                      addTodo={handleAddTodoCallback}
                                       updateTodo={handleUpdateTodo}
                                       deleteTodo={handleDeleteTodo}
                                       onEditTodo={setTaskToEdit}
@@ -2286,7 +2322,18 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 {renderContent()}
             </main>
 
-            <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
+            <MobileNav 
+              activeTab={activeTab} 
+              setActiveTab={setActiveTab} 
+              hide={Boolean(
+                isProjectEditorOpen || 
+                isAddTaskModalOpen || 
+                taskToEdit || 
+                isCustomizationPanelOpen || 
+                isNotificationsPanelOpen || 
+                isQuickCaptureSetupOpen
+              )}
+            />
             
             <GlobalHuddleFloatingWidget
               onOpenProjectsWorkspace={(projectId) => {
@@ -4464,6 +4511,7 @@ const App: React.FC = () => {
         start_date: extraData?.start_date || null,
         target_date: extraData?.target_date || null,
         lead: extraData?.lead || null,
+        project_mode: extraData?.project_mode || 'personal',
         ...extraData
       };
       
@@ -4477,29 +4525,37 @@ const App: React.FC = () => {
       return savedProject;
   }, [user]);
 
-  const handleUpdateProject = async (projectId: number, updates: Partial<Project>) => {
-      const projectToUpdate = projects.find(p => p.id === projectId);
-      if(!projectToUpdate) return;
-      const updatedProject = { ...projectToUpdate, ...updates };
-      setProjects(p => p.map(project => project.id === projectId ? updatedProject : project));
-      
-      const savedProject = await syncableUpdate('projects', updatedProject);
-      if (savedProject) {
-        setProjects(p => p.map(project => project.id === projectId ? (savedProject as Project) : project));
-      }
-  };
+  const handleUpdateProject = useCallback(async (projectId: number, updates: Partial<Project>) => {
+      setProjects(prevProjects => {
+        const projectToUpdate = prevProjects.find(p => p.id === projectId);
+        if (!projectToUpdate) return prevProjects;
+        const updatedProject: Project = { 
+          ...projectToUpdate, 
+          ...updates,
+          project_mode: updates.project_mode || projectToUpdate.project_mode || 'personal'
+        };
+        syncableUpdate('projects', updatedProject).then(savedProject => {
+          if (savedProject) {
+            setProjects(p => p.map(project => project.id === projectId ? (savedProject as Project) : project));
+          }
+        });
+        return prevProjects.map(project => project.id === projectId ? updatedProject : project);
+      });
+  }, []);
 
-  const handleArchiveProject = async (projectId: number, isArchived: boolean) => {
-      const projectToUpdate = projects.find(p => p.id === projectId);
-      if(!projectToUpdate) return;
-      const updatedProject = { ...projectToUpdate, is_archived: isArchived };
-
-      setProjects(p => p.map(project => project.id === projectId ? updatedProject : project));
-      
-      // Use syncableUpdate which handles both online and offline scenarios
-      const savedProject = await syncableUpdate('projects', updatedProject);
-      setProjects(p => p.map(project => project.id === projectId ? savedProject : project));
-  };
+  const handleArchiveProject = useCallback(async (projectId: number, isArchived: boolean) => {
+      setProjects(prevProjects => {
+        const projectToUpdate = prevProjects.find(p => p.id === projectId);
+        if (!projectToUpdate) return prevProjects;
+        const updatedProject = { ...projectToUpdate, is_archived: isArchived };
+        syncableUpdate('projects', updatedProject).then(savedProject => {
+          if (savedProject) {
+            setProjects(p => p.map(project => project.id === projectId ? (savedProject as Project) : project));
+          }
+        });
+        return prevProjects.map(project => project.id === projectId ? (updatedProject as Project) : project);
+      });
+  }, []);
 
   const handleDeleteProject = async (projectId: number) => {
       setProjects(p => p.filter(project => project.id !== projectId));

@@ -9159,4 +9159,4 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     );
 };
 
-export default ProjectsWorkspace;
+export default React.memo(ProjectsWorkspace);

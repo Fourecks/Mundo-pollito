@@ -300,4 +300,4 @@ const MobileProjects: React.FC<MobileProjectsProps> = ({
     );
 };
 
-export default MobileProjects;
+export default React.memo(MobileProjects);
