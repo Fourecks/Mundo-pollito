@@ -165,6 +165,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     const [newTitle, setNewTitle] = useState('');
     const [newPriority, setNewPriority] = useState<Priority>('medium');
     const [newProjectId, setNewProjectId] = useState<number | null>(null);
+    const [newAssignee, setNewAssignee] = useState<string>('');
     const [newIsUndated, setNewIsUndated] = useState(false);
     const [newDueDate, setNewDueDate] = useState(selectedDateKey);
     const [newHasEndDate, setNewHasEndDate] = useState(false);
@@ -192,6 +193,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     const [editCompleted, setEditCompleted] = useState(false);
     const [editPriority, setEditPriority] = useState<Priority>('medium');
     const [editProjectId, setEditProjectId] = useState<number | null>(null);
+    const [editAssignee, setEditAssignee] = useState<string>('');
     const [editIsUndated, setEditIsUndated] = useState(false);
     const [editDueDate, setEditDueDate] = useState('');
     const [editHasEndDate, setEditHasEndDate] = useState(false);
@@ -288,12 +290,16 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
             : { frequency: 'none' };
 
         if (onAddTodo) {
+            const currentSelectedProj = projects.find(p => p.id === newProjectId);
+            const isAdv = currentSelectedProj?.project_mode === 'advanced';
             await onAddTodo(newTitle.trim(), {
                 projectId: newProjectId,
                 isUndated: newIsUndated,
                 dueDate: newIsUndated ? null : newDueDate,
                 endDate: newIsUndated || !newHasEndDate ? undefined : newEndDate,
                 priority: newPriority,
+                assignee: isAdv ? (newAssignee.trim() || null) : null,
+                assigned_to: isAdv ? (newAssignee.trim() || null) : null,
                 startTime: newHasTime && !newIsUndated ? newStartTime : undefined,
                 endTime: newHasTime && !newIsUndated ? newEndTime : undefined,
                 notes: newNotes.trim() ? newNotes.trim() : undefined,
@@ -312,6 +318,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
         setEditCompleted(task.completed || false);
         setEditPriority(task.priority || 'medium');
         setEditProjectId(task.project_id || null);
+        setEditAssignee(task.assigned_to || task.assignee || '');
         setEditIsUndated(!task.due_date);
         setEditDueDate(task.due_date || selectedDateKey);
         setEditHasEndDate(!!task.end_date);
@@ -420,12 +427,17 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
             ? { ...editRecurrence, id: editRecurrence.id || crypto.randomUUID() } 
             : { frequency: 'none' };
 
+        const selectedEditProj = projects.find(p => p.id === editProjectId);
+        const isEditAdv = selectedEditProj?.project_mode === 'advanced';
+
         const updatedTask: Todo = {
             ...activeEditingTask,
             text: editTitle.trim(),
             completed: editCompleted,
             priority: editPriority,
             project_id: editProjectId,
+            assignee: isEditAdv ? (editAssignee.trim() || null) : null,
+            assigned_to: isEditAdv ? (editAssignee.trim() || null) : null,
             due_date: editIsUndated ? null : (editDueDate || null),
             end_date: editIsUndated || !editHasEndDate ? undefined : editEndDate,
             start_time: editHasTime && !editIsUndated ? editStartTime : undefined,
@@ -657,18 +669,49 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Proyecto</label>
                             <select
                                 value={newProjectId || ''}
-                                onChange={e => setNewProjectId(e.target.value ? Number(e.target.value) : null)}
+                                onChange={e => {
+                                    const val = e.target.value ? Number(e.target.value) : null;
+                                    setNewProjectId(val);
+                                    setNewAssignee('');
+                                }}
                                 className="w-full box-border px-3.5 py-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
                             >
                                 <option value="">Sin proyecto asociado</option>
                                 {projects.map(pr => (
                                     <option key={pr.id} value={pr.id}>
-                                        {pr.emoji ? `${pr.emoji} ` : ''}{pr.name}
+                                        {pr.emoji ? `${pr.emoji} ` : ''}{pr.name} {pr.project_mode === 'advanced' ? '(Avanzado)' : ''}
                                     </option>
                                 ))}
                             </select>
                         </div>
                     )}
+
+                    {/* Asignar a - SOLO si el proyecto seleccionado es avanzado */}
+                    {(() => {
+                        const sel = projects.find(p => p.id === newProjectId);
+                        if (sel?.project_mode !== 'advanced') return null;
+                        const mems = sel.members ? [...sel.members] : [];
+                        if (sel.owner_email && !mems.some(m => m.email === sel.owner_email)) {
+                            mems.unshift({ id: 'owner', name: sel.owner_name || 'Creador', email: sel.owner_email, role: 'owner' });
+                        }
+                        return (
+                            <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70">
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Asignar a</label>
+                                <select
+                                    value={newAssignee}
+                                    onChange={e => setNewAssignee(e.target.value)}
+                                    className="w-full box-border px-3 py-2 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-hidden"
+                                >
+                                    <option value="">(Sin asignar)</option>
+                                    {mems.map(m => (
+                                        <option key={m.id || m.email || m.name} value={m.name || m.email}>
+                                            {m.name || m.email} {m.role ? `(${m.role})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        );
+                    })()}
 
                     {/* Más opciones Toggle */}
                     <button 
@@ -1072,18 +1115,49 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Proyecto</label>
                             <select
                                 value={editProjectId || ''}
-                                onChange={e => setEditProjectId(e.target.value ? Number(e.target.value) : null)}
+                                onChange={e => {
+                                    const val = e.target.value ? Number(e.target.value) : null;
+                                    setEditProjectId(val);
+                                    setEditAssignee('');
+                                }}
                                 className="w-full box-border px-3.5 py-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-50 focus:outline-hidden"
                             >
                                 <option value="">Sin proyecto asociado</option>
                                 {projects.map(pr => (
                                     <option key={pr.id} value={pr.id}>
-                                        {pr.emoji ? `${pr.emoji} ` : ''}{pr.name}
+                                        {pr.emoji ? `${pr.emoji} ` : ''}{pr.name} {pr.project_mode === 'advanced' ? '(Avanzado)' : ''}
                                     </option>
                                 ))}
                             </select>
                         </div>
                     )}
+
+                    {/* Asignar a - SOLO si el proyecto seleccionado es avanzado */}
+                    {(() => {
+                        const sel = projects.find(p => p.id === editProjectId);
+                        if (sel?.project_mode !== 'advanced') return null;
+                        const mems = sel.members ? [...sel.members] : [];
+                        if (sel.owner_email && !mems.some(m => m.email === sel.owner_email)) {
+                            mems.unshift({ id: 'owner', name: sel.owner_name || 'Creador', email: sel.owner_email, role: 'owner' });
+                        }
+                        return (
+                            <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70">
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Asignar a</label>
+                                <select
+                                    value={editAssignee}
+                                    onChange={e => setEditAssignee(e.target.value)}
+                                    className="w-full box-border px-3 py-2 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-100 focus:outline-hidden"
+                                >
+                                    <option value="">(Sin asignar)</option>
+                                    {mems.map(m => (
+                                        <option key={m.id || m.email || m.name} value={m.name || m.email}>
+                                            {m.name || m.email} {m.role ? `(${m.role})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        );
+                    })()}
 
                     {/* Más opciones Toggle */}
                     <button 
