@@ -77,7 +77,7 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'kanban_column', 'story_points', 'sprint_id', 'milestone_id', 'tags',
         'dependencies', 'comments', 'attachments', 'assignee', 'calendar_provider',
         'calendar_event_link', 'notion_page_id', 'notion_url', 'list_id',
-        'subject_id', 'unit_id', 'academic_type'
+        'subject_id', 'unit_id', 'academic_type', 'energy_level', 'is_pinned_home'
     ]),
     subtasks: new Set([
         'id', 'todo_id', 'created_at', 'text', 'completed'
@@ -88,7 +88,7 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'kanban_columns', 'sprints', 'milestones', 'docs', 'inbox', 'activities', 
         'members', 'template_type', 'goal_id', 'channels', 'chat_messages', 'polls',
         'huddles', 'expenses', 'time_entries', 'doc_folders', 'quarterly_priorities',
-        'lists', 'todos', 'owner_email', 'owner_name'
+        'lists', 'todos', 'owner_email', 'owner_name', 'project_mode', 'is_pinned_home'
     ]),
     project_invitations: new Set([
         'id', 'project_id', 'project_name', 'project_emoji', 'project_color',
