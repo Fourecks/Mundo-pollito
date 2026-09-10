@@ -1493,8 +1493,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         const totalTasks = projectTodos.length;
         const completedTasksCount = projectTodos.filter(t => t.completed || t.kanban_column === 'Completado').length;
-        const inProgressTasksCount = projectTodos.filter(t => !t.completed && t.kanban_column === 'En progreso').length;
-        const pendingTasksCount = projectTodos.filter(t => !t.completed && t.kanban_column !== 'En progreso' && t.kanban_column !== 'Completado').length;
+        const inProgressTasksCount = projectTodos.filter(t => !t.completed && (t.kanban_column === 'En progreso' || t.kanban_column === 'En proceso')).length;
+        const pendingTasksCount = projectTodos.filter(t => !t.completed && t.kanban_column !== 'En progreso' && t.kanban_column !== 'En proceso' && t.kanban_column !== 'Completado').length;
         
         const progress = totalTasks === 0 ? 0 : Math.round((completedTasksCount / totalTasks) * 100);
 
@@ -6094,7 +6094,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         } else if (personalFilter === 'todo') {
             filteredTodos = filteredTodos.filter(t => !t.completed && (t.kanban_column === 'Por hacer' || !t.kanban_column || t.kanban_column === ''));
         } else if (personalFilter === 'in_progress') {
-            filteredTodos = filteredTodos.filter(t => !t.completed && t.kanban_column === 'En progreso');
+            filteredTodos = filteredTodos.filter(t => !t.completed && (t.kanban_column === 'En proceso' || t.kanban_column === 'En progreso'));
         }
 
         if (listasSearch.trim()) {
@@ -6230,7 +6230,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         className="bg-transparent border-none text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-0 w-full p-0 py-0.5 cursor-pointer"
                                     >
                                         <option value="Por hacer" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">Por hacer</option>
-                                        <option value="En progreso" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">En progreso</option>
+                                        <option value="En proceso" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">En proceso</option>
                                         <option value="Completado" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">Completado</option>
                                     </select>
                                 </div>
@@ -6398,7 +6398,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                                                             isDone
                                                                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400'
-                                                                : task.kanban_column === 'En progreso'
+                                                                : (task.kanban_column === 'En progreso' || task.kanban_column === 'En proceso')
                                                                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400'
                                                                 : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400'
                                                         }`}>
