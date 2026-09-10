@@ -49,6 +49,7 @@ const PersonalProjectSettings: React.FC<PersonalProjectSettingsProps> = ({
 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
+    setActiveTab('overview');
     await onDelete(project.id);
     onSelectProject(null);
   };

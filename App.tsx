@@ -58,6 +58,7 @@ import HabitEditorPanel from './components/HabitEditorPanel';
 import ProgressView from './components/ProgressView';
 import { ProjectsWorkspace } from './components/ProjectsWorkspace';
 import { GlobalHuddleFloatingWidget } from './components/GlobalHuddleFloatingWidget';
+import { sortProjectsBySavedOrder } from './utils/projectOrder';
 import ChevronLeftIcon from './components/icons/ChevronLeftIcon';
 import CalendarModule from './components/CalendarModule';
 import { CalendarSyncService } from './services/calendarSyncService';
@@ -326,6 +327,7 @@ interface AppComponentProps {
   handleDeleteQuickNote: (id: number) => Promise<void>;
   handleClearAllQuickNotes: () => Promise<void>;
   // Setters for shared state
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   setBrowserSession: React.Dispatch<React.SetStateAction<BrowserSession>>;
   setSelectedDate: React.Dispatch<React.SetStateAction<Date>>;
   setPomodoroState: React.Dispatch<React.SetStateAction<any>>;
@@ -422,6 +424,7 @@ const DesktopApp: React.FC<AppComponentProps> = (props) => {
     handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator, onOpenHabitEditor,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
+    setProjects,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
     setActiveTrack, setActiveSpotifyTrack,
     googleApiToken, backgroundsAreLoading, handleAuthClick, onConnectOutlook, onDisconnectOutlook, outlookAccount,
@@ -1799,7 +1802,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
       handleAddHabit, handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator, onOpenHabitEditor,
       handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
       handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
-      setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
+      setProjects, setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
       setActiveTrack, setActiveSpotifyTrack,
       googleApiToken, backgroundsAreLoading, handleAuthClick, onConnectOutlook, onDisconnectOutlook, outlookAccount,
       handleAddBackground, handleDeleteBackground, handleToggleFavoriteBackground,
@@ -2164,6 +2167,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                                 onAddProject={handleOpenProjectCreator}
                                 onSelectProject={setViewingProjectId}
                                 allTodos={flatAllTodos}
+                                onReorderProjects={setProjects}
                             />
                         )}
                     </div>
@@ -2889,7 +2893,7 @@ const App: React.FC = () => {
       setPlaylists(defaultPlaylistsList);
     }
     setQuickNotes(cachedQuickNotes);
-    setProjects((cachedProjects || []).map(p => ({ ...p, project_mode: p.project_mode || 'personal' })));
+    setProjects(sortProjectsBySavedOrder((cachedProjects || []).map(p => ({ ...p, project_mode: p.project_mode || 'personal' }))));
     setHabitRecords(cachedHabitRecords);
 
     // Load cached project invitations
@@ -3082,7 +3086,7 @@ const App: React.FC = () => {
       if(playlistsData) { setPlaylists(playlistsData); await clearAndPutAll('playlists', playlistsData); }
       if(quickNotesData) { setQuickNotes(quickNotesData); await clearAndPutAll('quick_notes', quickNotesData); }
       if(projectsData) { 
-        const normalizedProjects = projectsData.map(p => ({ ...p, project_mode: p.project_mode || 'personal' }));
+        const normalizedProjects = sortProjectsBySavedOrder(projectsData.map(p => ({ ...p, project_mode: p.project_mode || 'personal' })));
         setProjects(normalizedProjects); 
         await clearAndPutAll('projects', normalizedProjects); 
       }
@@ -3270,7 +3274,7 @@ const App: React.FC = () => {
             if (isBelonging) {
               setProjects(prev => {
                 if (prev.some(p => p.id === insertProj.id)) return prev;
-                return [...prev, insertProj].sort((a, b) => a.name.localeCompare(b.name));
+                return sortProjectsBySavedOrder([...prev, insertProj]);
               });
               const currentCached = await getAll<Project>('projects');
               if (!currentCached.some(p => p.id === insertProj.id)) {
@@ -3372,8 +3376,7 @@ const App: React.FC = () => {
                   return prev;
                 }
 
-                return prev.map(p => p.id === updateProj.id ? { ...p, ...updateProj } : p)
-                  .sort((a, b) => a.name.localeCompare(b.name));
+                return sortProjectsBySavedOrder(prev.map(p => p.id === updateProj.id ? { ...p, ...updateProj } : p));
               });
               const currentCached = await getAll<Project>('projects');
               const updatedCached = currentCached.map(p => p.id === updateProj.id ? { ...p, ...updateProj } : p);
@@ -5910,6 +5913,7 @@ const App: React.FC = () => {
     handleAddHabit, handleUpdateHabit, handleDeleteHabit, handleToggleHabitRecord, onOpenHabitCreator: handleOpenHabitCreator, onOpenHabitEditor: handleOpenHabitEditor,
     handleAddPlaylist, handleUpdatePlaylist, handleDeletePlaylist,
     handleAddQuickNote, handleDeleteQuickNote, handleClearAllQuickNotes,
+    setProjects,
     setBrowserSession, setSelectedDate, setPomodoroState, setUiSettings,
     setActiveTrack, setActiveSpotifyTrack,
     googleApiToken, backgroundsAreLoading, handleAuthClick,

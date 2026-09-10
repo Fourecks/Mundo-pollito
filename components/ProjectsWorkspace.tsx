@@ -727,10 +727,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     }, []);
 
     React.useEffect(() => {
-        if (!activeProjectId && activeProject) {
+        if (!isMobile && !activeProjectId && activeProject) {
             onSelectProject(activeProject.id);
         }
-    }, [activeProjectId, activeProject, onSelectProject]);
+    }, [isMobile, activeProjectId, activeProject, onSelectProject]);
 
     const projectTodos = useMemo(() => activeProject ? allTodos.filter(t => t.project_id === activeProject.id) : [], [allTodos, activeProject]);
 
@@ -1278,23 +1278,50 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
                         
                         <div className="flex items-center gap-1">
-                            <button
-                                onClick={() => setIsQuickAddOpen(true)}
-                                className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                aria-label="Agregar al proyecto"
-                            >
-                                <Plus className="w-5 h-5" />
-                            </button>
-                            <button
-                                onClick={() => setInboxModalOpen(true)}
-                                className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 relative transition-colors"
-                                aria-label="Bandeja de entrada"
-                            >
-                                <Inbox className="w-5 h-5" />
-                                {activeProject.inbox && activeProject.inbox.length > 0 && (
-                                    <span className="absolute top-1.5 right-1 w-2 h-2 bg-amber-500 rounded-full" />
-                                )}
-                            </button>
+                            {((activeProject.project_mode || 'personal') === 'personal') ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowQuickAddTaskModal(true)}
+                                        className="p-2 rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                        aria-label="Nueva tarea"
+                                        title="Nueva tarea"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('settings')}
+                                        className="p-2 rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                        aria-label="Configuración"
+                                        title="Configuración"
+                                    >
+                                        <Settings className="w-5 h-5" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsQuickAddOpen(true)}
+                                        className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                        aria-label="Agregar al proyecto"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setInboxModalOpen(true)}
+                                        className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 relative transition-colors"
+                                        aria-label="Bandeja de entrada"
+                                    >
+                                        <Inbox className="w-5 h-5" />
+                                        {activeProject.inbox && activeProject.inbox.length > 0 && (
+                                            <span className="absolute top-1.5 right-1 w-2 h-2 bg-amber-500 rounded-full" />
+                                        )}
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -6197,8 +6224,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
         return (
             <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-3 w-full pb-24 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
-                {/* Header for Personal Tareas with + button, search toggle & compact filters dropdown */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-gray-100 dark:border-zinc-800">
+                {/* Header for Personal Tareas with controls placed on the right corner */}
+                <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-gray-100 dark:border-zinc-800">
                     <div className="flex items-center gap-2">
                         <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
                             <span>Tareas</span>
@@ -6206,12 +6233,15 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 {projectTodos.filter(t => !t.completed && t.kanban_column !== 'Completado').length}
                             </span>
                         </h2>
+                    </div>
 
-                        {/* Botón + al lado de Tareas para añadir nueva tarea */}
+                    {/* Botones a la derecha en la esquina: agregar (+), buscar y filtro */}
+                    <div className="flex items-center gap-1.5 ml-auto">
+                        {/* Botón + para añadir nueva tarea */}
                         <button
                             type="button"
                             onClick={() => setShowQuickAddTaskModal(true)}
-                            className="p-1.5 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 active:scale-95 transition-all flex items-center justify-center shadow-2xs"
+                            className="p-1.5 sm:p-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 active:scale-95 transition-all flex items-center justify-center shadow-2xs"
                             title="Añadir Tarea"
                             aria-label="Añadir Tarea"
                         >
@@ -6222,7 +6252,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <button
                             type="button"
                             onClick={() => setIsPersonalSearchOpen(!isPersonalSearchOpen)}
-                            className={`p-1.5 rounded-xl transition-all flex items-center justify-center ${
+                            className={`p-1.5 sm:p-2 rounded-xl transition-all flex items-center justify-center ${
                                 isPersonalSearchOpen || listasSearch.trim()
                                     ? 'bg-black dark:bg-white text-white dark:text-black shadow-2xs'
                                     : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
@@ -6238,7 +6268,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsPersonalFilterOpen(!isPersonalFilterOpen)}
-                                className={`p-1.5 rounded-xl transition-all flex items-center justify-center ${
+                                className={`p-1.5 sm:p-2 rounded-xl transition-all flex items-center justify-center ${
                                     isPersonalFilterOpen || personalDateFilter !== 'all' || personalPriorityFilter !== 'all'
                                         ? 'bg-black dark:bg-white text-white dark:text-black shadow-2xs'
                                         : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
@@ -6251,7 +6281,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                             {/* Menu Desplegable pequeño de Filtros */}
                             {isPersonalFilterOpen && (
-                                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-60 bg-white dark:bg-[#121215] border border-gray-200 dark:border-zinc-800 rounded-2xl p-3.5 shadow-2xl z-50 space-y-3 animate-in fade-in duration-150">
+                                <div className="absolute right-0 mt-2 w-60 bg-white dark:bg-[#121215] border border-gray-200 dark:border-zinc-800 rounded-2xl p-3.5 shadow-2xl z-50 space-y-3 animate-in fade-in duration-150">
                                     <div className="flex items-center justify-between pb-1.5 border-b border-gray-100 dark:border-zinc-800">
                                         <span className="text-[11px] font-bold text-gray-900 dark:text-white uppercase tracking-wider">Filtros</span>
                                         <button 
