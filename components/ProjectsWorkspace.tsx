@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, ProjectInboxItem, ProjectChatMessage, ProjectActivity, ProjectInvitation, ProjectChannel, ProjectPoll, ProjectHuddle, PushNotificationPreferences, ProjectQuarterlyPriority, ProjectMember, ProjectList, ProjectListItem, Priority, ProjectExpense, Folder, Note } from '../types';
 import { sendPushNotification } from '../services/pushNotificationService';
 import ProjectNoteEditorModal from './ProjectNoteEditorModal';
+import PersonalProjectSettings from './PersonalProjectSettings';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal, DollarSign
 } from 'lucide-react';
@@ -468,7 +469,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     useEffect(() => {
         if (!activeProject) return;
         if (activeProject.project_mode === 'personal') {
-            if (!['overview', 'listas', 'kanban'].includes(activeTab)) {
+            if (!['overview', 'listas', 'kanban', 'settings'].includes(activeTab)) {
                 setActiveTab('overview');
             }
         }
@@ -1446,6 +1447,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 { id: 'overview', label: 'Resumen', icon: Activity },
                                 { id: 'listas', label: 'Tareas', icon: CheckSquareIcon },
                                 { id: 'kanban', label: 'Tablero', icon: AlignLeft },
+                                { id: 'settings', label: 'Configuración', icon: Settings },
                               ]
                             : [
                                 { id: 'overview', label: 'Resumen', icon: Activity },
@@ -1484,6 +1486,20 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
                 </div>
             </div>
+        );
+    };
+
+    const renderPersonalSettings = () => {
+        if (!activeProject) return null;
+        return (
+            <PersonalProjectSettings
+                project={activeProject}
+                onUpdate={onUpdateProject}
+                onArchive={onArchiveProject}
+                onDelete={onDeleteProject}
+                onSelectProject={onSelectProject}
+                setActiveTab={setActiveTab}
+            />
         );
     };
 
@@ -7227,6 +7243,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         {activeTab === 'expenses' && renderExpenses()}
                         {activeTab === 'time' && renderTime()}
                         {activeTab === 'team' && renderTeam()}
+                        {activeTab === 'settings' && renderPersonalSettings()}
                         {activeTab === 'mas_menu' && renderMasMenu()}
                     </>
                 ) : (
