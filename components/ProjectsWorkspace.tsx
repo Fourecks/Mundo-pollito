@@ -1419,31 +1419,19 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <button 
                                         onClick={() => setShowQuickAddTaskModal(true)}
                                         className="p-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-all flex items-center justify-center font-bold text-xs shadow-2xs active:scale-95"
-                                        title="Nueva tarea en Por hacer"
+                                        title="Nueva tarea"
+                                        aria-label="Nueva tarea"
                                     >
                                         <Plus className="w-4 h-4" />
                                     </button>
                                     <button 
                                         onClick={() => setActiveTab('settings')} 
                                         className="px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-xl transition-all flex items-center gap-1.5 font-bold shadow-2xs"
-                                        title="Configuración del Proyecto"
+                                        title="Configuración"
+                                        aria-label="Configuración"
                                     >
                                         <Settings className="w-3.5 h-3.5" /> Configuración
                                     </button>
-                                    {isProjectCreator && (
-                                        <button 
-                                            onClick={() => {
-                                                if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"?`)) {
-                                                    onDeleteProject(activeProject.id);
-                                                    onSelectProject(null);
-                                                }
-                                            }}
-                                            className="p-2 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all flex items-center justify-center shadow-2xs"
-                                            title="Eliminar Proyecto"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    )}
                                 </>
                             ) : (
                                 <>
@@ -6208,100 +6196,80 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         };
 
         return (
-            <div className="p-6 max-w-2xl mx-auto space-y-4 w-full pb-24 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
-                {/* Header for Personal Tareas with + button, search toggle & filters popover */}
-                <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-100 dark:border-zinc-800">
-                    <div className="flex items-center gap-2.5">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-3 w-full pb-24 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
+                {/* Header for Personal Tareas with + button, search toggle & compact filters dropdown */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-gray-100 dark:border-zinc-800">
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
                             <span>Tareas</span>
                             <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                                 {projectTodos.filter(t => !t.completed && t.kanban_column !== 'Completado').length}
                             </span>
                         </h2>
-                        {/* Botón + al lado de Tareas */}
+
+                        {/* Botón + al lado de Tareas para añadir nueva tarea */}
                         <button
                             type="button"
                             onClick={() => setShowQuickAddTaskModal(true)}
-                            className="p-1.5 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-all flex items-center justify-center shadow-2xs active:scale-95"
-                            title="Añadir Tarea Rápidamente"
+                            className="p-1.5 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 active:scale-95 transition-all flex items-center justify-center shadow-2xs"
+                            title="Añadir Tarea"
+                            aria-label="Añadir Tarea"
                         >
                             <Plus className="w-4 h-4" />
                         </button>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                        {/* Lupa para desplegar buscador */}
+                        {/* Lupa para desplegar buscador pequeño */}
                         <button
                             type="button"
                             onClick={() => setIsPersonalSearchOpen(!isPersonalSearchOpen)}
-                            className={`p-2 rounded-xl transition-all border flex items-center justify-center ${
+                            className={`p-1.5 rounded-xl transition-all flex items-center justify-center ${
                                 isPersonalSearchOpen || listasSearch.trim()
-                                    ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white shadow-2xs'
-                                    : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-transparent hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                                    ? 'bg-black dark:bg-white text-white dark:text-black shadow-2xs'
+                                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
                             }`}
                             title="Buscar tareas"
+                            aria-label="Buscar tareas"
                         >
                             <Search className="w-4 h-4" />
                         </button>
 
-                        {/* Botón Desplegable de Filtros */}
+                        {/* Botón Desplegable pequeño de Filtros (Fecha y Prioridad) */}
                         <div className="relative">
                             <button
                                 type="button"
                                 onClick={() => setIsPersonalFilterOpen(!isPersonalFilterOpen)}
-                                className={`p-2 sm:px-3 rounded-xl transition-all border flex items-center gap-1.5 text-xs font-bold ${
-                                    isPersonalFilterOpen || personalDateFilter !== 'all' || personalPriorityFilter !== 'all' || personalFilter !== 'all'
-                                        ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white shadow-2xs'
-                                        : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-transparent hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                                className={`p-1.5 rounded-xl transition-all flex items-center justify-center ${
+                                    isPersonalFilterOpen || personalDateFilter !== 'all' || personalPriorityFilter !== 'all'
+                                        ? 'bg-black dark:bg-white text-white dark:text-black shadow-2xs'
+                                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
                                 }`}
-                                title="Filtrar tareas"
+                                title="Filtros (Fecha y Prioridad)"
+                                aria-label="Filtros"
                             >
                                 <SlidersHorizontal className="w-4 h-4" />
-                                <span className="hidden sm:inline">Filtros</span>
                             </button>
 
-                            {/* Menu Desplegable de Filtros */}
+                            {/* Menu Desplegable pequeño de Filtros */}
                             {isPersonalFilterOpen && (
-                                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#121215] border border-gray-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xl z-50 space-y-4 animate-in fade-in duration-150">
-                                    <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-zinc-800">
-                                        <span className="text-xs font-bold text-gray-900 dark:text-white">Filtros</span>
-                                        <button onClick={() => setIsPersonalFilterOpen(false)} className="text-gray-400 hover:text-gray-600">
+                                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-60 bg-white dark:bg-[#121215] border border-gray-200 dark:border-zinc-800 rounded-2xl p-3.5 shadow-2xl z-50 space-y-3 animate-in fade-in duration-150">
+                                    <div className="flex items-center justify-between pb-1.5 border-b border-gray-100 dark:border-zinc-800">
+                                        <span className="text-[11px] font-bold text-gray-900 dark:text-white uppercase tracking-wider">Filtros</span>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setIsPersonalFilterOpen(false)} 
+                                            className="text-gray-400 hover:text-gray-600 p-1"
+                                            aria-label="Cerrar filtros"
+                                        >
                                             <X className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
 
-                                    {/* Estado */}
+                                    {/* Filtrar por fecha */}
                                     <div>
-                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">Estado</span>
-                                        <div className="grid grid-cols-2 gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl">
+                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Por fecha</span>
+                                        <div className="grid grid-cols-2 gap-1">
                                             {[
                                                 { id: 'all', label: 'Todas' },
-                                                { id: 'todo', label: 'Por hacer' },
-                                                { id: 'in_progress', label: 'En proceso' },
-                                                { id: 'completed', label: 'Completadas' },
-                                            ].map(f => (
-                                                <button
-                                                    key={f.id}
-                                                    type="button"
-                                                    onClick={() => setPersonalFilter(f.id as any)}
-                                                    className={`px-2 py-1 text-[11px] font-semibold rounded-lg text-center transition-all ${
-                                                        personalFilter === f.id
-                                                            ? 'bg-white dark:bg-zinc-800 text-black dark:text-white font-bold shadow-2xs'
-                                                            : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
-                                                    }`}
-                                                >
-                                                    {f.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Fecha de vencimiento */}
-                                    <div>
-                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">Fecha de Vencimiento</span>
-                                        <div className="flex flex-wrap gap-1">
-                                            {[
-                                                { id: 'all', label: 'Cualquiera' },
                                                 { id: 'today', label: 'Hoy' },
                                                 { id: 'upcoming', label: 'Próximas' },
                                                 { id: 'overdue', label: 'Vencidas' },
@@ -6310,7 +6278,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                     key={df.id}
                                                     type="button"
                                                     onClick={() => setPersonalDateFilter(df.id as any)}
-                                                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all ${
+                                                    className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all text-center ${
                                                         personalDateFilter === df.id
                                                             ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
                                                             : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-gray-200 dark:border-zinc-800'
@@ -6322,10 +6290,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Prioridad */}
+                                    {/* Filtrar por prioridad */}
                                     <div>
-                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">Prioridad</span>
-                                        <div className="flex flex-wrap gap-1">
+                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Por prioridad</span>
+                                        <div className="grid grid-cols-2 gap-1">
                                             {[
                                                 { id: 'all', label: 'Todas' },
                                                 { id: 'high', label: 'Alta' },
@@ -6336,7 +6304,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                     key={pf.id}
                                                     type="button"
                                                     onClick={() => setPersonalPriorityFilter(pf.id as any)}
-                                                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all ${
+                                                    className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all text-center ${
                                                         personalPriorityFilter === pf.id
                                                             ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
                                                             : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-gray-200 dark:border-zinc-800'
@@ -6348,11 +6316,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         </div>
                                     </div>
 
-                                    {(personalFilter !== 'all' || personalDateFilter !== 'all' || personalPriorityFilter !== 'all') && (
+                                    {(personalDateFilter !== 'all' || personalPriorityFilter !== 'all') && (
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                setPersonalFilter('all');
                                                 setPersonalDateFilter('all');
                                                 setPersonalPriorityFilter('all');
                                             }}
@@ -6367,20 +6334,24 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
                 </div>
 
-                {/* Buscador pequeño desplegable */}
+                {/* Buscador pequeño desplegable (sin autoFocus para no abrir teclado molestamente) */}
                 {isPersonalSearchOpen && (
-                    <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl px-3.5 py-2 animate-in fade-in duration-150 shadow-2xs">
+                    <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl px-3 py-2 animate-in fade-in duration-150 shadow-2xs">
                         <Search className="w-4 h-4 text-zinc-400 shrink-0" />
                         <input
                             type="text"
                             value={listasSearch}
                             onChange={(e) => setListasSearch(e.target.value)}
                             placeholder="Buscar tarea..."
-                            autoFocus
                             className="bg-transparent border-none text-base sm:text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-0 w-full placeholder:text-zinc-400"
                         />
                         {listasSearch && (
-                            <button onClick={() => setListasSearch('')} className="text-zinc-400 hover:text-zinc-600">
+                            <button 
+                                type="button"
+                                onClick={() => setListasSearch('')} 
+                                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-0.5"
+                                aria-label="Limpiar búsqueda"
+                            >
                                 <X className="w-3.5 h-3.5" />
                             </button>
                         )}
@@ -9225,7 +9196,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 value={quickTaskTitle}
                                 onChange={e => setQuickTaskTitle(e.target.value)}
                                 required
-                                autoFocus
                                 placeholder="Escribe el título de la tarea..."
                                 className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-zinc-400"
                             />
