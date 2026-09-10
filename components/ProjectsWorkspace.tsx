@@ -263,6 +263,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [mobileKanbanColumn, setMobileKanbanColumn] = useState<string>('');
     const [touchStartX, setTouchStartX] = useState<number | null>(null);
     const [personalFilter, setPersonalFilter] = useState<'all' | 'todo' | 'in_progress' | 'completed'>('all');
+    const [isPersonalSearchOpen, setIsPersonalSearchOpen] = useState(false);
+    const [isPersonalFilterOpen, setIsPersonalFilterOpen] = useState(false);
+    const [personalDateFilter, setPersonalDateFilter] = useState<'all' | 'today' | 'upcoming' | 'overdue'>('all');
+    const [personalPriorityFilter, setPersonalPriorityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+    const [showQuickAddTaskModal, setShowQuickAddTaskModal] = useState(false);
+    const [quickTaskTitle, setQuickTaskTitle] = useState('');
+    const [quickTaskPriority, setQuickTaskPriority] = useState<Priority>('medium');
+    const [quickTaskDueDate, setQuickTaskDueDate] = useState('');
 
     const [newItemTitle, setNewItemTitle] = useState<string>('');
     const [newItemAssignee, setNewItemAssignee] = useState<string>('');
@@ -1406,45 +1414,80 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                            <button 
-                                onClick={() => setInboxModalOpen(true)}
-                                className="px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
-                                title="Bandeja de Novedades y Anuncios"
-                            >
-                                <Inbox className="w-3.5 h-3.5 text-amber-500" /> Bandeja
-                                {activeProject.inbox && activeProject.inbox.length > 0 && (
-                                    <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
-                                        {activeProject.inbox.length}
-                                    </span>
-                                )}
-                            </button>
-                            <button 
-                                onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} 
-                                className="px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
-                            >
-                                <Settings className="w-3.5 h-3.5" /> Ajustes
-                            </button>
-                            {isProjectCreator ? (
-                                <button 
-                                    onClick={() => {
-                                        if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"? Solo el creador puede realizar esta acción.`)) {
-                                            onDeleteProject(activeProject.id);
-                                            onSelectProject(null);
-                                        }
-                                    }}
-                                    className="p-1.5 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center justify-center font-medium shadow-sm"
-                                    title="Eliminar Proyecto (Solo Creador)"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                            {activeProject.project_mode === 'personal' ? (
+                                <>
+                                    <button 
+                                        onClick={() => setShowQuickAddTaskModal(true)}
+                                        className="p-2 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-all flex items-center justify-center font-bold text-xs shadow-2xs active:scale-95"
+                                        title="Nueva tarea en Por hacer"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveTab('settings')} 
+                                        className="px-3 py-2 text-xs border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded-xl transition-all flex items-center gap-1.5 font-bold shadow-2xs"
+                                        title="Configuración del Proyecto"
+                                    >
+                                        <Settings className="w-3.5 h-3.5" /> Configuración
+                                    </button>
+                                    {isProjectCreator && (
+                                        <button 
+                                            onClick={() => {
+                                                if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"?`)) {
+                                                    onDeleteProject(activeProject.id);
+                                                    onSelectProject(null);
+                                                }
+                                            }}
+                                            className="p-2 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all flex items-center justify-center shadow-2xs"
+                                            title="Eliminar Proyecto"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </>
                             ) : (
-                                <span 
-                                    className="px-2 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/80 rounded-lg flex items-center gap-1 border border-gray-200 dark:border-gray-700 cursor-not-allowed"
-                                    title="Solo el creador del proyecto puede eliminarlo"
-                                >
-                                    <Lock className="w-3 h-3" />
-                                    <span>Colaborador</span>
-                                </span>
+                                <>
+                                    <button 
+                                        onClick={() => setInboxModalOpen(true)}
+                                        className="px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
+                                        title="Bandeja de Novedades y Anuncios"
+                                    >
+                                        <Inbox className="w-3.5 h-3.5 text-amber-500" /> Bandeja
+                                        {activeProject.inbox && activeProject.inbox.length > 0 && (
+                                            <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                                                {activeProject.inbox.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button 
+                                        onClick={() => onOpenProjectEditor && onOpenProjectEditor(activeProject)} 
+                                        className="px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-1.5 font-medium shadow-sm"
+                                    >
+                                        <Settings className="w-3.5 h-3.5" /> Ajustes
+                                    </button>
+                                    {isProjectCreator ? (
+                                        <button 
+                                            onClick={() => {
+                                                if(confirm(`¿Estás seguro de eliminar el proyecto "${activeProject.name}"? Solo el creador puede realizar esta acción.`)) {
+                                                    onDeleteProject(activeProject.id);
+                                                    onSelectProject(null);
+                                                }
+                                            }}
+                                            className="p-1.5 text-xs border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center justify-center font-medium shadow-sm"
+                                            title="Eliminar Proyecto (Solo Creador)"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    ) : (
+                                        <span 
+                                            className="px-2 py-1 text-[11px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/80 rounded-lg flex items-center gap-1 border border-gray-200 dark:border-gray-700 cursor-not-allowed"
+                                            title="Solo el creador del proyecto puede eliminarlo"
+                                        >
+                                            <Lock className="w-3 h-3" />
+                                            <span>Colaborador</span>
+                                        </span>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
@@ -6110,7 +6153,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const renderPersonalTareas = () => {
         if (!activeProject) return null;
 
-        // Filter todos based on personalFilter (Todas | Por hacer | En progreso | Completadas) and search
+        // Filter todos based on personalFilter, date filter, priority filter and search
         let filteredTodos = projectTodos;
 
         if (personalFilter === 'completed') {
@@ -6119,6 +6162,18 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             filteredTodos = filteredTodos.filter(t => !t.completed && (t.kanban_column === 'Por hacer' || !t.kanban_column || t.kanban_column === ''));
         } else if (personalFilter === 'in_progress') {
             filteredTodos = filteredTodos.filter(t => !t.completed && (t.kanban_column === 'En proceso' || t.kanban_column === 'En progreso'));
+        }
+
+        if (personalDateFilter === 'today') {
+            filteredTodos = filteredTodos.filter(t => t.due_date && isToday(parseISO(t.due_date)));
+        } else if (personalDateFilter === 'upcoming') {
+            filteredTodos = filteredTodos.filter(t => t.due_date && !isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)));
+        } else if (personalDateFilter === 'overdue') {
+            filteredTodos = filteredTodos.filter(t => t.due_date && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)) && !t.completed && t.kanban_column !== 'Completado');
+        }
+
+        if (personalPriorityFilter !== 'all') {
+            filteredTodos = filteredTodos.filter(t => t.priority === personalPriorityFilter);
         }
 
         if (listasSearch.trim()) {
@@ -6152,189 +6207,185 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             }
         };
 
-        const handleQuickAdd = async (e: React.FormEvent) => {
-            e.preventDefault();
-            if (!newItemTitle.trim()) return;
-            
-            const isDoneCol = newItemKanbanColumn === 'Completado';
-
-            await addTodo(newItemTitle.trim(), {
-                projectId: activeProject.id,
-                priority: newItemPriority || 'medium',
-                dueDate: newItemDueDate || undefined,
-                startTime: newItemStartTime || undefined,
-                notes: newItemNotes.trim() || undefined,
-                kanban_column: newItemKanbanColumn,
-                completed: isDoneCol
-            });
-
-            // Reset states
-            setNewItemTitle('');
-            setNewItemDueDate('');
-            setNewItemStartTime('');
-            setNewItemNotes('');
-            setNewItemKanbanColumn('Por hacer');
-            setNewItemPriority('medium');
-        };
-
         return (
-            <div className="p-6 max-w-2xl mx-auto space-y-6 w-full pb-24 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
-                <div className="flex items-center justify-between mb-2">
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tareas</h2>
-                        <p className="text-xs font-medium text-gray-500 mt-0.5">
-                            {projectTodos.filter(t => !t.completed && t.kanban_column !== 'Completado').length} pendientes, {projectTodos.filter(t => t.completed || t.kanban_column === 'Completado').length} completadas
-                        </p>
+            <div className="p-6 max-w-2xl mx-auto space-y-4 w-full pb-24 font-sans text-gray-900 dark:text-gray-100 h-full overflow-y-auto">
+                {/* Header for Personal Tareas with + button, search toggle & filters popover */}
+                <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-100 dark:border-zinc-800">
+                    <div className="flex items-center gap-2.5">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span>Tareas</span>
+                            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                                {projectTodos.filter(t => !t.completed && t.kanban_column !== 'Completado').length}
+                            </span>
+                        </h2>
+                        {/* Botón + al lado de Tareas */}
+                        <button
+                            type="button"
+                            onClick={() => setShowQuickAddTaskModal(true)}
+                            className="p-1.5 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-all flex items-center justify-center shadow-2xs active:scale-95"
+                            title="Añadir Tarea Rápidamente"
+                        >
+                            <Plus className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {/* Lupa para desplegar buscador */}
+                        <button
+                            type="button"
+                            onClick={() => setIsPersonalSearchOpen(!isPersonalSearchOpen)}
+                            className={`p-2 rounded-xl transition-all border flex items-center justify-center ${
+                                isPersonalSearchOpen || listasSearch.trim()
+                                    ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white shadow-2xs'
+                                    : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-transparent hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                            }`}
+                            title="Buscar tareas"
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
+
+                        {/* Botón Desplegable de Filtros */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setIsPersonalFilterOpen(!isPersonalFilterOpen)}
+                                className={`p-2 sm:px-3 rounded-xl transition-all border flex items-center gap-1.5 text-xs font-bold ${
+                                    isPersonalFilterOpen || personalDateFilter !== 'all' || personalPriorityFilter !== 'all' || personalFilter !== 'all'
+                                        ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white shadow-2xs'
+                                        : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-transparent hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                                }`}
+                                title="Filtrar tareas"
+                            >
+                                <SlidersHorizontal className="w-4 h-4" />
+                                <span className="hidden sm:inline">Filtros</span>
+                            </button>
+
+                            {/* Menu Desplegable de Filtros */}
+                            {isPersonalFilterOpen && (
+                                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#121215] border border-gray-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xl z-50 space-y-4 animate-in fade-in duration-150">
+                                    <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-zinc-800">
+                                        <span className="text-xs font-bold text-gray-900 dark:text-white">Filtros</span>
+                                        <button onClick={() => setIsPersonalFilterOpen(false)} className="text-gray-400 hover:text-gray-600">
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+
+                                    {/* Estado */}
+                                    <div>
+                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">Estado</span>
+                                        <div className="grid grid-cols-2 gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl">
+                                            {[
+                                                { id: 'all', label: 'Todas' },
+                                                { id: 'todo', label: 'Por hacer' },
+                                                { id: 'in_progress', label: 'En proceso' },
+                                                { id: 'completed', label: 'Completadas' },
+                                            ].map(f => (
+                                                <button
+                                                    key={f.id}
+                                                    type="button"
+                                                    onClick={() => setPersonalFilter(f.id as any)}
+                                                    className={`px-2 py-1 text-[11px] font-semibold rounded-lg text-center transition-all ${
+                                                        personalFilter === f.id
+                                                            ? 'bg-white dark:bg-zinc-800 text-black dark:text-white font-bold shadow-2xs'
+                                                            : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                                                    }`}
+                                                >
+                                                    {f.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Fecha de vencimiento */}
+                                    <div>
+                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">Fecha de Vencimiento</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[
+                                                { id: 'all', label: 'Cualquiera' },
+                                                { id: 'today', label: 'Hoy' },
+                                                { id: 'upcoming', label: 'Próximas' },
+                                                { id: 'overdue', label: 'Vencidas' },
+                                            ].map(df => (
+                                                <button
+                                                    key={df.id}
+                                                    type="button"
+                                                    onClick={() => setPersonalDateFilter(df.id as any)}
+                                                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all ${
+                                                        personalDateFilter === df.id
+                                                            ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                                            : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-gray-200 dark:border-zinc-800'
+                                                    }`}
+                                                >
+                                                    {df.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Prioridad */}
+                                    <div>
+                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">Prioridad</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {[
+                                                { id: 'all', label: 'Todas' },
+                                                { id: 'high', label: 'Alta' },
+                                                { id: 'medium', label: 'Media' },
+                                                { id: 'low', label: 'Baja' },
+                                            ].map(pf => (
+                                                <button
+                                                    key={pf.id}
+                                                    type="button"
+                                                    onClick={() => setPersonalPriorityFilter(pf.id as any)}
+                                                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all ${
+                                                        personalPriorityFilter === pf.id
+                                                            ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white'
+                                                            : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-gray-200 dark:border-zinc-800'
+                                                    }`}
+                                                >
+                                                    {pf.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {(personalFilter !== 'all' || personalDateFilter !== 'all' || personalPriorityFilter !== 'all') && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPersonalFilter('all');
+                                                setPersonalDateFilter('all');
+                                                setPersonalPriorityFilter('all');
+                                            }}
+                                            className="w-full text-center text-[10px] font-bold text-red-500 hover:underline pt-1"
+                                        >
+                                            Limpiar filtros
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Quick Add Form */}
-                <form onSubmit={handleQuickAdd} className="bg-white dark:bg-zinc-900/50 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 shadow-2xs space-y-3">
-                    <div className="flex items-center gap-2">
-                        <Plus className="w-4 h-4 text-zinc-400 shrink-0" />
+                {/* Buscador pequeño desplegable */}
+                {isPersonalSearchOpen && (
+                    <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl px-3.5 py-2 animate-in fade-in duration-150 shadow-2xs">
+                        <Search className="w-4 h-4 text-zinc-400 shrink-0" />
                         <input
                             type="text"
-                            placeholder="Añadir una nueva tarea..."
-                            value={newItemTitle}
-                            onChange={(e) => setNewItemTitle(e.target.value)}
-                            className="flex-1 bg-transparent border-none text-sm focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder-zinc-400"
-                        />
-                        {newItemTitle.trim() && (
-                            <button
-                                type="submit"
-                                className="px-3 py-1 bg-black dark:bg-white text-white dark:text-black text-xs font-bold rounded-lg transition-all shrink-0 shadow-xs hover:scale-105"
-                            >
-                                Añadir
-                            </button>
-                        )}
-                    </div>
-                    
-                    {/* Expand details on focus/type */}
-                    {newItemTitle.trim() && (
-                        <div className="space-y-3 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
-                            {/* Form Input Grid */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {/* Due Date and Time Picker */}
-                                <div className="flex items-center gap-2.5">
-                                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors relative bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg w-full cursor-pointer">
-                                        <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
-                                        <input
-                                            type="date"
-                                            value={newItemDueDate}
-                                            onChange={(e) => setNewItemDueDate(e.target.value)}
-                                            className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                                            title="Fecha de vencimiento"
-                                        />
-                                        <span className="font-semibold text-[11px] truncate">
-                                            {newItemDueDate ? getFriendlyDate(newItemDueDate) : 'Asignar fecha'}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors relative bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg w-full cursor-pointer">
-                                        <Clock className="w-3.5 h-3.5 shrink-0" />
-                                        <input
-                                            type="time"
-                                            value={newItemStartTime}
-                                            onChange={(e) => setNewItemStartTime(e.target.value)}
-                                            className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                                            title="Hora de inicio"
-                                        />
-                                        <span className="font-semibold text-[11px] truncate">
-                                            {newItemStartTime ? newItemStartTime : 'Asignar hora'}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Column State Selector */}
-                                <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">Estado:</span>
-                                    <select
-                                        value={newItemKanbanColumn}
-                                        onChange={(e) => setNewItemKanbanColumn(e.target.value)}
-                                        className="bg-transparent border-none text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-0 w-full p-0 py-0.5 cursor-pointer"
-                                    >
-                                        <option value="Por hacer" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">Por hacer</option>
-                                        <option value="En proceso" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">En proceso</option>
-                                        <option value="Completado" className="dark:bg-zinc-900 text-zinc-800 dark:text-white">Completado</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Notes description input */}
-                            <div className="bg-zinc-100 dark:bg-zinc-800/40 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                                <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                                <input
-                                    type="text"
-                                    placeholder="Añadir una nota o descripción..."
-                                    value={newItemNotes}
-                                    onChange={(e) => setNewItemNotes(e.target.value)}
-                                    className="bg-transparent border-none text-xs focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder-zinc-400 w-full p-0"
-                                />
-                            </div>
-
-                            {/* Priority Selector */}
-                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-zinc-100/60 dark:border-zinc-800/40">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Prioridad:</span>
-                                    {(['low', 'medium', 'high'] as Priority[]).map((prio) => (
-                                        <button
-                                            key={prio}
-                                            type="button"
-                                            onClick={() => setNewItemPriority(prio)}
-                                            className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
-                                                newItemPriority === prio
-                                                    ? prio === 'high'
-                                                        ? 'bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300'
-                                                        : prio === 'medium'
-                                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
-                                                        : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300'
-                                                    : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
-                                            }`}
-                                        >
-                                            {prio === 'high' ? 'Alta' : prio === 'medium' ? 'Media' : 'Baja'}
-                                        </button>
-                                    ))}
-                                </div>
-                                <span className="text-[10px] text-zinc-400 italic">💡 Haz clic en la tarea para editar subtareas o subir archivos</span>
-                            </div>
-                        </div>
-                    )}
-                </form>
-
-                {/* Filters and Search Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                    <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-hide">
-                        {(['all', 'todo', 'in_progress', 'completed'] as const).map((filter) => (
-                            <button
-                                key={filter}
-                                onClick={() => setPersonalFilter(filter)}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
-                                    personalFilter === filter
-                                        ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs'
-                                        : 'bg-zinc-100 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-800'
-                                }`}
-                            >
-                                {filter === 'all' ? 'Todas' : filter === 'todo' ? 'Por hacer' : filter === 'in_progress' ? 'En proceso' : 'Completadas'}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900/60 border border-transparent dark:border-zinc-800 rounded-lg px-2.5 py-1.5 flex-1 max-w-xs">
-                        <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <input
-                            type="text"
-                            placeholder="Buscar tarea..."
                             value={listasSearch}
                             onChange={(e) => setListasSearch(e.target.value)}
-                            className="bg-transparent border-none text-xs focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder-zinc-400 w-full"
+                            placeholder="Buscar tarea..."
+                            autoFocus
+                            className="bg-transparent border-none text-base sm:text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-0 w-full placeholder:text-zinc-400"
                         />
-                        {listasSearch.trim() && (
+                        {listasSearch && (
                             <button onClick={() => setListasSearch('')} className="text-zinc-400 hover:text-zinc-600">
                                 <X className="w-3.5 h-3.5" />
                             </button>
                         )}
                     </div>
-                </div>
+                )}
 
                 {/* Tasks List */}
                 <div className="space-y-2 pt-2">
@@ -9130,6 +9181,114 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg text-xs hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
                             >
                                 Enviar Mensaje
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+
+            {/* QUICK ADD TASK MODAL FOR PERSONAL PROJECTS */}
+            {showQuickAddTaskModal && (
+                <Modal
+                    isOpen={showQuickAddTaskModal}
+                    onClose={() => {
+                        setShowQuickAddTaskModal(false);
+                        setQuickTaskTitle('');
+                        setQuickTaskPriority('medium');
+                        setQuickTaskDueDate('');
+                    }}
+                    title="Nueva Tarea"
+                >
+                    <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!activeProject || !quickTaskTitle.trim()) return;
+
+                        await addTodo(quickTaskTitle.trim(), {
+                            projectId: activeProject.id,
+                            priority: quickTaskPriority,
+                            dueDate: quickTaskDueDate || undefined,
+                            kanban_column: 'Por hacer',
+                            completed: false
+                        });
+
+                        setShowQuickAddTaskModal(false);
+                        setQuickTaskTitle('');
+                        setQuickTaskPriority('medium');
+                        setQuickTaskDueDate('');
+                    }} className="space-y-4 font-sans">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                                Nombre de la tarea
+                            </label>
+                            <input
+                                type="text"
+                                value={quickTaskTitle}
+                                onChange={e => setQuickTaskTitle(e.target.value)}
+                                required
+                                autoFocus
+                                placeholder="Escribe el título de la tarea..."
+                                className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                                    Prioridad
+                                </label>
+                                <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-zinc-900 p-1 rounded-xl border border-gray-200 dark:border-zinc-800">
+                                    {(['low', 'medium', 'high'] as const).map(prio => (
+                                        <button
+                                            key={prio}
+                                            type="button"
+                                            onClick={() => setQuickTaskPriority(prio)}
+                                            className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                                                quickTaskPriority === prio
+                                                    ? 'bg-black dark:bg-white text-white dark:text-black shadow-2xs'
+                                                    : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                                            }`}
+                                        >
+                                            {prio === 'high' ? 'Alta' : prio === 'medium' ? 'Media' : 'Baja'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                                    Fecha de vencimiento
+                                </label>
+                                <input
+                                    type="date"
+                                    value={quickTaskDueDate}
+                                    onChange={e => setQuickTaskDueDate(e.target.value)}
+                                    className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-base sm:text-xs text-gray-900 dark:text-white focus:outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <p className="text-[11px] text-zinc-400 italic">
+                            * Esta tarea se agregará automáticamente al estado <strong className="text-zinc-700 dark:text-zinc-300 font-bold">Por hacer</strong>.
+                        </p>
+
+                        <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-zinc-800">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowQuickAddTaskModal(false);
+                                    setQuickTaskTitle('');
+                                    setQuickTaskPriority('medium');
+                                    setQuickTaskDueDate('');
+                                }}
+                                className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-xs hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black font-bold rounded-xl text-xs hover:opacity-90 transition-all shadow-2xs"
+                            >
+                                Crear Tarea
                             </button>
                         </div>
                     </form>
