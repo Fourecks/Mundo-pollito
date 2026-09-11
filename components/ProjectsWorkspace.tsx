@@ -264,6 +264,10 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [shareComment, setShareComment] = useState<string>('');
     const [shareError, setShareError] = useState<string | null>(null);
     const [previewDocModal, setPreviewDocModal] = useState<ProjectDoc | null>(null);
+    const [activeDocForActions, setActiveDocForActions] = useState<ProjectDoc | null>(null);
+    const [moveDocModal, setMoveDocModal] = useState<{ isOpen: boolean; doc: ProjectDoc | null }>({ isOpen: false, doc: null });
+    const [targetFolderIdForMove, setTargetFolderIdForMove] = useState<string | null>(null);
+    const [renameDocModal, setRenameDocModal] = useState<{ isOpen: boolean; doc: ProjectDoc | null; newTitle: string }>({ isOpen: false, doc: null, newTitle: '' });
 
     // Sprint Detail & Share Update States
     const [activeSprint, setActiveSprint] = useState<Sprint | null>(null);
@@ -933,6 +937,56 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             const updatedDocs = (activeProject.docs || []).filter(d => d.id !== docId);
             onUpdateProject(activeProject.id, { docs: updatedDocs });
         }
+    };
+
+    // Helper: Move Doc or Note to folder
+    const handleConfirmMoveDoc = async (newFolderId: string | null) => {
+        if (!activeProject || !moveDocModal.doc) return;
+        const doc = moveDocModal.doc;
+        
+        if (doc.id.startsWith('note-')) {
+            const realNoteId = parseInt(doc.id.replace('note-', ''), 10);
+            const note = (notes || []).find(n => n.id === realNoteId);
+            if (note) {
+                const updatedNote: Note = {
+                    ...note,
+                    project_doc_folder_id: newFolderId
+                };
+                await onUpdateNote(updatedNote);
+            }
+        } else {
+            const updatedDocs = (activeProject.docs || []).map(d => 
+                d.id === doc.id ? { ...d, folder_id: newFolderId } : d
+            );
+            await onUpdateProject(activeProject.id, { docs: updatedDocs });
+        }
+        setMoveDocModal({ isOpen: false, doc: null });
+        setTargetFolderIdForMove(null);
+    };
+
+    // Helper: Rename Doc or Note
+    const handleConfirmRenameDoc = async () => {
+        if (!activeProject || !renameDocModal.doc || !renameDocModal.newTitle.trim()) return;
+        const doc = renameDocModal.doc;
+        const newTitle = renameDocModal.newTitle.trim();
+
+        if (doc.id.startsWith('note-')) {
+            const realNoteId = parseInt(doc.id.replace('note-', ''), 10);
+            const note = (notes || []).find(n => n.id === realNoteId);
+            if (note) {
+                const updatedNote: Note = {
+                    ...note,
+                    title: newTitle
+                };
+                await onUpdateNote(updatedNote);
+            }
+        } else {
+            const updatedDocs = (activeProject.docs || []).map(d => 
+                d.id === doc.id ? { ...d, title: newTitle } : d
+            );
+            await onUpdateProject(activeProject.id, { docs: updatedDocs });
+        }
+        setRenameDocModal({ isOpen: false, doc: null, newTitle: '' });
     };
 
     // Helper: Delete Doc Folder
