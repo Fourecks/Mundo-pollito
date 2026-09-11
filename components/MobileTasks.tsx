@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Todo, Project, Priority, Subtask, RecurrenceRule, CalendarProvider } from '../types';
+import MobileTaskDrawer from './MobileTaskDrawer';
 import { NotionService } from '../services/notionService';
 import { 
     CheckCircle2, 
@@ -94,6 +95,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     taskToEdit: externalTaskToEdit,
     setTaskToEdit: externalSetTaskToEdit
 }) => {
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [showAdvancedCreate, setShowAdvancedCreate] = useState(false);
     const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
 
@@ -1473,13 +1475,19 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 </div>
                 <button 
                     type="button"
-                    onClick={handleOpenCreatePage}
+                    onClick={() => setIsDrawerOpen(true)}
                     className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-md"
                     title="Nueva Tarea"
                     aria-label="Nueva Tarea"
                 >
                     <Plus className="w-5 h-5" />
                 </button>
+                <MobileTaskDrawer 
+                    isOpen={isDrawerOpen} 
+                    onClose={() => setIsDrawerOpen(false)} 
+                    onAddTask={onAddTodo!}
+                    projects={projects}
+                />
             </div>
 
             {/* Selector de Día (Día Anterior, Día Actual / Hoy, Día Siguiente) */}
