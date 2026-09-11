@@ -45,7 +45,7 @@ interface ProjectsWorkspaceProps {
     pushPreferences?: PushNotificationPreferences;
 }
 
-const Modal = ({ isOpen, onClose, title, children, showBackButton, onBack }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode, showBackButton?: boolean, onBack?: () => void }) => {
+const Modal = ({ isOpen, onClose, title, children, showBackButton, onBack }: { isOpen: boolean, onClose: () => void, title: React.ReactNode, children: React.ReactNode, showBackButton?: boolean, onBack?: () => void }) => {
     if (!isOpen) return null;
     return (
         <div 
@@ -143,7 +143,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     };
 
     // Share Sprint/Roadmap Update to Channel Modal
-    const [shareToChannelModal, setShareToChannelModal] = useState<{ isOpen: boolean; title: string; content: string } | null>(null);
+    const [shareToChannelModal, setShareToChannelModal] = useState<{ isOpen: boolean; title: React.ReactNode; content: string } | null>(null);
     const [shareChannelId, setShareChannelId] = useState<string>('general');
     const [shareChannelPassword, setShareChannelPassword] = useState<string>('');
     const [shareChannelError, setShareChannelError] = useState<string | null>(null);
@@ -268,7 +268,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [activeSprint, setActiveSprint] = useState<Sprint | null>(null);
     const [viewSprintModal, setViewSprintModal] = useState<Sprint | null>(null);
     const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
-    const [shareUpdateModal, setShareUpdateModal] = useState<{ isOpen: boolean; title: string; updateText: string } | null>(null);
+    const [shareUpdateModal, setShareUpdateModal] = useState<{ isOpen: boolean; title: React.ReactNode; updateText: string } | null>(null);
 
     // Custom Lists & Task Thread States
     const [selectedListId, setSelectedListId] = useState<string>('all');
@@ -1082,7 +1082,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         return <FileIcon className="w-5 h-5 text-gray-400" />;
     };
 
-    const renderEmptyState = (title: string, description: string, action?: React.ReactNode) => (
+    const renderEmptyState = (title: React.ReactNode, description: string, action?: React.ReactNode) => (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-gray-50 dark:bg-[#161616] rounded-xl border border-gray-200 dark:border-gray-800">
             <div className="w-12 h-12 bg-white dark:bg-black rounded-full flex items-center justify-center mb-4 border border-gray-200 dark:border-gray-700 shadow-sm">
                 <Sparkles className="w-6 h-6 text-gray-400" />
@@ -8271,7 +8271,26 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             <Modal
                 isOpen={!!viewSprintModal}
                 onClose={() => setViewSprintModal(null)}
-                title={viewSprintModal ? `Sprint: ${viewSprintModal.name}` : "Detalles del Sprint"}
+                showBackButton={true}
+                onBack={() => setViewSprintModal(null)}
+                title={viewSprintModal ? (
+                    <div className="flex items-center justify-between w-full pr-8">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm sm:text-base">{viewSprintModal.name}</span>
+                            <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full ${viewSprintModal.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : viewSprintModal.status === 'completed' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'}`}>
+                                {viewSprintModal.status === 'active' ? 'Activo' : viewSprintModal.status === 'completed' ? 'Completado' : 'Planificación'}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button onClick={(e) => { e.stopPropagation(); setShareSprintModal(viewSprintModal); }} className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors" title="Compartir sprint en chat">
+                                <Share2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setSprintModal({ isOpen: true, sprint: viewSprintModal }); }} className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors" title="Editar sprint">
+                                <Edit2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                ) : "Detalles del Sprint"}
             >
                 {viewSprintModal && (() => {
                     const sprintTasks = projectTodos.filter(t => t.sprint_id === viewSprintModal.id);
@@ -8285,40 +8304,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     return (
                         <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
                             {/* Header Summary */}
-                            <div className="p-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl space-y-2">
-                                <div className="flex justify-between items-center text-xs">
-                                    <span className="font-semibold text-gray-700 dark:text-gray-300">
-                                        Fechas: {viewSprintModal.start_date || 'Sin fecha'} — {viewSprintModal.end_date || 'Sin fecha'}
-                                    </span>
-                                    <span className="font-bold text-blue-600 dark:text-blue-400">
-                                        {completedTasks} / {totalTasks} tareas ({progress}%)
+                            <div className="flex gap-2">
+                                <div className="flex-1 p-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 rounded-xl flex flex-col min-w-0">
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Objetivo del Sprint</span>
+                                    <div className="text-xs text-gray-700 dark:text-gray-300 italic overflow-y-auto max-h-[60px] scrollbar-thin">
+                                        {viewSprintModal.goal ? `"${viewSprintModal.goal}"` : 'Sin objetivo definido'}
+                                    </div>
+                                </div>
+                                <div className="flex-1 p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-xl flex flex-col justify-center">
+                                    <div className="flex justify-between items-center text-xs mb-2">
+                                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Progreso</span>
+                                        <span className="font-bold text-blue-700 dark:text-blue-300">{completedTasks}/{totalTasks} ({progress}%)</span>
+                                    </div>
+                                    <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
+                                        <div className="bg-blue-600 dark:bg-blue-500 h-full transition-all duration-300" style={{ width: `${progress}%` }} />
+                                    </div>
+                                    <span className="text-[10px] text-gray-500 mt-2 truncate">
+                                        {viewSprintModal.start_date || '?'} — {viewSprintModal.end_date || '?'}
                                     </span>
                                 </div>
-                                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
-                                    <div className="bg-blue-600 dark:bg-blue-500 h-full transition-all duration-300" style={{ width: `${progress}%` }} />
-                                </div>
-                                {viewSprintModal.goal && (
-                                    <p className="text-xs text-gray-600 dark:text-gray-400 italic pt-1">
-                                        "{viewSprintModal.goal}"
-                                    </p>
-                                )}
                             </div>
 
-                            <form onSubmit={handleAddSprintTaskInternal} className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-xl space-y-3">
-                                <input
-                                    type="text"
-                                    value={sprintTaskText}
-                                    onChange={(e) => setSprintTaskText(e.target.value)}
-                                    placeholder="Nueva tarea del sprint..."
-                                    className="w-full text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800 focus:ring-1 focus:ring-blue-500 transition-all"
-                                />
-                                <button
-                                    type="submit"
-                                    className="w-full py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors"
-                                >
-                                    Añadir Tarea
-                                </button>
-                            </form>
+                            
 
                             {/* Sprint Tasks List */}
                             <div className="space-y-2">

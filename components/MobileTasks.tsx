@@ -96,6 +96,8 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     setTaskToEdit: externalSetTaskToEdit
 }) => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [expandedTasks, setExpandedTasks] = useState<number[]>([]);
+    const toggleExpandTask = (id: number, e: React.MouseEvent) => { e.stopPropagation(); setExpandedTasks(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]); };
     const [showAdvancedCreate, setShowAdvancedCreate] = useState(false);
     const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
 
@@ -1549,8 +1551,8 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
 
                         return (
+                            <div key={task.id} className="flex flex-col">
                             <div
-                                key={task.id}
                                 className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all active:scale-[0.99] ${
                                     task.completed 
                                         ? 'bg-zinc-50/70 dark:bg-zinc-900/40 border-zinc-200/40 dark:border-zinc-800/40 opacity-60' 
@@ -1608,7 +1610,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                                     className="w-2 h-2 rounded-full" 
                                                     style={{ backgroundColor: project.color || '#a1a1aa' }}
                                                 />
-                                                <span>{project.emoji ? `${project.emoji} ` : ''}{project.name}</span>
+                                                <span>{project.name}</span>
                                             </span>
                                         )}
 
@@ -1617,21 +1619,55 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                             <span className={`inline-flex items-center gap-1 ${
                                                 task.priority === 'high' ? 'text-rose-500 font-semibold' : 'text-amber-500 font-medium'
                                             }`}>
-                                                <Flag className="w-3 h-3" />
+                                                
                                                 <span>{task.priority === 'high' ? 'Alta' : 'Media'}</span>
                                             </span>
                                         )}
 
                                         {/* Subtasks Count */}
                                         {subtasksCount > 0 && (
-                                            <span className="inline-flex items-center gap-1 text-zinc-400 dark:text-zinc-500">
+                                            <span 
+                                                className="inline-flex items-center gap-1 text-zinc-500 dark:text-zinc-400 cursor-pointer hover:text-zinc-700"
+                                                onClick={(e) => toggleExpandTask(task.id, e)}
+                                            >
                                                 <CheckSquare className="w-3 h-3" />
                                                 <span>{completedSubtasks}/{subtasksCount}</span>
+                                                <ChevronDown className={`w-3 h-3 transition-transform ${expandedTasks.includes(task.id) ? 'rotate-180' : ''}`} />
                                             </span>
                                         )}
                                     </div>
                                 </div>
                             </div>
+                            
+                            {/* Expanded Subtasks */}
+                            {expandedTasks.includes(task.id) && subtasksCount > 0 && (
+                                <div className="pl-14 pr-4 pb-2 mt-1 space-y-2" onClick={e => e.stopPropagation()}>
+                                    {task.subtasks?.map(subtask => (
+                                        <label key={subtask.id} className="flex items-center gap-3 cursor-pointer group">
+                                            <div className="relative flex items-center justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={subtask.completed}
+                                                    onChange={() => {
+                                                        const newSubtasks = task.subtasks!.map(s => s.id === subtask.id ? { ...s, completed: !s.completed } : s);
+                                                        if (onUpdateTodo) {
+                                                            onUpdateTodo({ ...task, subtasks: newSubtasks });
+                                                        }
+                                                    }}
+                                                    className="sr-only"
+                                                />
+                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${subtask.completed ? 'bg-zinc-900 border-zinc-900 dark:bg-white dark:border-white' : 'border-zinc-300 dark:border-zinc-600'}`}>
+                                                    {subtask.completed && <Check className="w-3 h-3 text-white dark:text-zinc-900" strokeWidth={3} />}
+                                                </div>
+                                            </div>
+                                            <span className={`text-sm ${subtask.completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                                                {subtask.title || subtask.text}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         );
                     })}
                 

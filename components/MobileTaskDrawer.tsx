@@ -28,25 +28,25 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   const [text, setText] = useState(taskToEdit?.text || '');
   const [dueDate, setDueDate] = useState(taskToEdit?.due_date || new Date().toISOString().split('T')[0]);
   const [hasDueDate, setHasDueDate] = useState(!!(taskToEdit?.due_date || true));
-  const [hasEndDate, setHasEndDate] = useState(false);
-  const [endDate, setEndDate] = useState('');
+  const [hasEndDate, setHasEndDate] = useState(!!taskToEdit?.end_date);
+  const [endDate, setEndDate] = useState(taskToEdit?.end_date || '');
   
   const [priority, setPriority] = useState<Priority>(taskToEdit?.priority || 'medium');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(fixedProjectId || taskToEdit?.project_id || null);
-  const [assignee, setAssignee] = useState<string | null>(taskToEdit?.assignee || null);
+  const [assignee, setAssignee] = useState<string | null>(taskToEdit?.assignee || taskToEdit?.assigned_to || null);
   
   const [showAdvanced, setShowAdvanced] = useState(false);
   
-  const [timeEnabled, setTimeEnabled] = useState(!!taskToEdit?.time || !!taskToEdit?.start_time);
-  const [time, setTime] = useState(taskToEdit?.time || taskToEdit?.start_time || '');
+  const [timeEnabled, setTimeEnabled] = useState(!!taskToEdit?.start_time || !!taskToEdit?.time);
+  const [time, setTime] = useState(taskToEdit?.start_time || taskToEdit?.time || '');
   const [endTime, setEndTime] = useState(taskToEdit?.end_time || '');
   
-  const [repeatEnabled, setRepeatEnabled] = useState(taskToEdit?.repeat !== 'none' && !!taskToEdit?.repeat);
+  const [repeatEnabled, setRepeatEnabled] = useState(taskToEdit?.recurrence?.frequency && taskToEdit?.recurrence?.frequency !== 'none' || (taskToEdit?.repeat && taskToEdit?.repeat !== 'none'));
   const [repeat, setRepeat] = useState(taskToEdit?.recurrence?.frequency || taskToEdit?.repeat || 'none');
   const [customRepeatDays, setCustomRepeatDays] = useState<string[]>(taskToEdit?.recurrence?.customDays?.map(d => d.toString()) || []);
   
-  const [reminderEnabled, setReminderEnabled] = useState(taskToEdit?.reminder !== 'none' && !!taskToEdit?.reminder);
-  const [reminder, setReminder] = useState(taskToEdit?.reminder_at ? '30m' : (taskToEdit?.reminder || 'none'));
+  const [reminderEnabled, setReminderEnabled] = useState(!!taskToEdit?.reminder_offset || !!taskToEdit?.reminder_at);
+  const [reminder, setReminder] = useState(taskToEdit?.reminder_offset || (taskToEdit?.reminder_at ? '30m' : 'none'));
   
   const [notes, setNotes] = useState(taskToEdit?.notes || taskToEdit?.description || '');
   const [subtasks, setSubtasks] = useState<{ id: string, title: string, completed: boolean }[]>((taskToEdit?.subtasks || []).map(st => ({ 
@@ -56,62 +56,68 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   })));
 
   useEffect(() => {
-      if(taskToEdit) {
-        setText(taskToEdit.text);
-        setDueDate(taskToEdit.due_date || new Date().toISOString().split('T')[0]);
-        setHasDueDate(!!taskToEdit.due_date);
-        setPriority(taskToEdit.priority || 'medium');
-        setSelectedProjectId(fixedProjectId || taskToEdit.project_id || null);
-        setAssignee(taskToEdit.assignee || null);
-        setNotes(taskToEdit.notes || taskToEdit.description || '');
-        setSubtasks((taskToEdit.subtasks || []).map(st => ({ 
-            id: st.id.toString(), 
-            title: st.text || st.title, 
-            completed: st.completed 
-        })));
-        setTime(taskToEdit.time || taskToEdit.start_time || '');
-        setEndTime(taskToEdit.end_time || '');
-        setRepeat(taskToEdit.recurrence?.frequency || taskToEdit.repeat || 'none');
-        setCustomRepeatDays(taskToEdit.recurrence?.customDays?.map(d => d.toString()) || []);
-        setTimeEnabled(!!taskToEdit.time || !!taskToEdit.start_time);
-        setRepeatEnabled((!!taskToEdit.recurrence && taskToEdit.recurrence.frequency !== 'none') || (taskToEdit.repeat && taskToEdit.repeat !== 'none'));
-        setReminderEnabled(!!taskToEdit.reminder_at || (taskToEdit.reminder && taskToEdit.reminder !== 'none'));
-        setReminder(taskToEdit.reminder_at ? '30m' : (taskToEdit.reminder || 'none'));
-      } else {
-        setText('');
-        setDueDate(new Date().toISOString().split('T')[0]);
-        setHasDueDate(true);
-        setPriority('medium');
-        setSelectedProjectId(fixedProjectId || null);
-        setAssignee(null);
-        setNotes('');
-        setTime('');
-        setEndTime('');
-        setRepeat('none');
-        setCustomRepeatDays([]);
-        setSubtasks([]);
-        setTimeEnabled(false);
-        setRepeatEnabled(false);
-        setReminderEnabled(false);
-        setReminder('none');
+      if(isOpen) {
+        if(taskToEdit) {
+          setText(taskToEdit.text || '');
+          setDueDate(taskToEdit.due_date || new Date().toISOString().split('T')[0]);
+          setHasDueDate(!!taskToEdit.due_date);
+          setHasEndDate(!!taskToEdit.end_date);
+          setEndDate(taskToEdit.end_date || '');
+          setPriority(taskToEdit.priority || 'medium');
+          setSelectedProjectId(fixedProjectId || taskToEdit.project_id || null);
+          setAssignee(taskToEdit.assignee || taskToEdit.assigned_to || null);
+          setNotes(taskToEdit.notes || taskToEdit.description || '');
+          setSubtasks((taskToEdit.subtasks || []).map(st => ({ 
+              id: st.id.toString(), 
+              title: st.text || st.title || '', 
+              completed: st.completed || false 
+          })));
+          setTime(taskToEdit.start_time || taskToEdit.time || '');
+          setEndTime(taskToEdit.end_time || '');
+          setTimeEnabled(!!taskToEdit.start_time || !!taskToEdit.time);
+          
+          const freq = taskToEdit.recurrence?.frequency || taskToEdit.repeat || 'none';
+          setRepeat(freq);
+          setRepeatEnabled(freq !== 'none');
+          setCustomRepeatDays(taskToEdit.recurrence?.customDays?.map(d => d.toString()) || []);
+          
+          setReminderEnabled(!!taskToEdit.reminder_offset || !!taskToEdit.reminder_at);
+          setReminder(taskToEdit.reminder_offset || (taskToEdit.reminder_at ? '30m' : 'none'));
+        } else {
+          setText('');
+          setDueDate(new Date().toISOString().split('T')[0]);
+          setHasDueDate(true);
+          setHasEndDate(false);
+          setEndDate('');
+          setPriority('medium');
+          setSelectedProjectId(fixedProjectId || null);
+          setAssignee(null);
+          setNotes('');
+          setTime('');
+          setEndTime('');
+          setRepeat('none');
+          setCustomRepeatDays([]);
+          setSubtasks([]);
+          setTimeEnabled(false);
+          setRepeatEnabled(false);
+          setReminderEnabled(false);
+          setReminder('none');
+        }
+        setShowAdvanced(false);
+        setActiveSheet('main');
       }
-      setShowAdvanced(false);
-      setHasEndDate(false);
-      setEndDate('');
-      setActiveSheet('main');
   }, [taskToEdit, fixedProjectId, isOpen]);
 
   const handleSubmit = async () => {
     if (!text.trim()) return;
     const options = {
         dueDate: hasDueDate ? dueDate : null,
-        endDate: hasEndDate ? endDate : null,
-        time: timeEnabled && time ? time : null,
+        endDate: hasEndDate ? endDate : undefined,
+        startTime: timeEnabled && time ? time : null,
         endTime: timeEnabled && endTime ? endTime : null,
-        repeat: repeatEnabled ? repeat : 'none',
-        customRepeatDays: (repeatEnabled && repeat === 'custom') ? customRepeatDays : null,
-        reminder: reminderEnabled ? reminder : 'none',
-        description: notes,
+        recurrence: repeatEnabled && repeat !== 'none' ? { frequency: repeat, customDays: repeat === 'custom' ? customRepeatDays : undefined } : { frequency: 'none' },
+        reminder_offset: reminderEnabled && reminder !== 'none' ? reminder : null,
+        notes: notes,
         subtasks: subtasks.map(st => ({ 
             id: parseInt(st.id) || Date.now() + Math.random(), 
             text: st.title, 
@@ -130,10 +136,8 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   const selectedProject = projects.find(p => p.id === selectedProjectId);
-  const isAdvancedProject = selectedProject?.project_mode === 'advanced';
+  const isAdvancedProject = selectedProject?.project_mode === 'advanced' || !!(selectedProject?.members && selectedProject.members.length > 0);
 
   const renderHeader = (title: string) => (
       <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
@@ -144,8 +148,12 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   );
 
   const renderMainSheet = () => (
-    <>
-      <div className="p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto pb-8">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto pb-8"
+    >
         <input
           value={text}
           onChange={e => setText(e.target.value)}
@@ -166,7 +174,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
            </div>
            <div className="space-y-1 min-w-0">
                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Prioridad</label>
-               <select value={priority} onChange={e => setPriority(e.target.value as Priority)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
+               <select value={priority} onChange={e => setPriority(e.target.value as Priority)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white appearance-none">
                   <option value="low">Baja</option>
                   <option value="medium">Media</option>
                   <option value="high">Alta</option>
@@ -174,58 +182,58 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
            </div>
         </div>
 
-        <div className={isAdvancedProject ? "grid grid-cols-2 gap-3" : ""}>
+        <div className={isAdvancedProject && !fixedProjectId ? "grid grid-cols-2 gap-3" : ""}>
             {!fixedProjectId && (
-                <div className="min-w-0">
+                <div className="min-w-0 w-full mb-3">
                   <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Proyecto</label>
-                  <select value={selectedProjectId || ''} onChange={e => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
+                  <select value={selectedProjectId || ''} onChange={e => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white appearance-none">
                       <option value="">Ninguno</option>
                       {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
             )}
             {isAdvancedProject && (
-                <div className="min-w-0">
+                <div className="min-w-0 w-full mb-3">
                   <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Asignar a</label>
-                  <select value={assignee || ''} onChange={e => setAssignee(e.target.value || null)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
+                  <select value={assignee || ''} onChange={e => setAssignee(e.target.value || null)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white appearance-none">
                           <option value="">General (Sin asignar)</option>
-                          {selectedProject?.members?.map(m => <option key={m.id} value={m.email}>{m.name}</option>)}
+                          {selectedProject?.members?.map(m => <option key={m.id} value={m.email || m.name}>{m.name}</option>)}
                   </select>
                 </div>
             )}
         </div>
 
         {!showAdvanced && (timeEnabled || (repeatEnabled && repeat !== 'none') || (reminderEnabled && reminder !== 'none') || subtasks.length > 0 || notes) && (
-            <div className="flex flex-wrap gap-2 pt-2 pb-1">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-wrap gap-2 pt-2 pb-1">
                 {timeEnabled && time && (
-                    <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    <span onClick={() => setActiveSheet('time')} className="cursor-pointer px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                         {time} {endTime ? `- ${endTime}` : ''}
                     </span>
                 )}
                 {reminderEnabled && reminder !== 'none' && (
-                    <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    <span onClick={() => setActiveSheet('reminder')} className="cursor-pointer px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                         {reminder === '5m' ? '5 min antes' : reminder === '15m' ? '15 min antes' : reminder === '1h' ? '1 hora antes' : reminder === '1d' ? '1 día antes' : reminder}
                     </span>
                 )}
                 {repeatEnabled && repeat !== 'none' && (
-                    <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    <span onClick={() => setActiveSheet('repeat')} className="cursor-pointer px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                         {repeat === 'daily' ? 'Diario' : repeat === 'weekly' ? 'Semanal' : repeat === 'monthly' ? 'Mensual' : 'Personalizado'}
                     </span>
                 )}
                 {subtasks.length > 0 && (
-                    <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    <span onClick={() => setActiveSheet('subtasks')} className="cursor-pointer px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                         {subtasks.filter(s => s.completed).length}/{subtasks.length} Subtareas
                     </span>
                 )}
                 {notes && (
-                    <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    <span onClick={() => setActiveSheet('notes')} className="cursor-pointer px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                         Notas añadidas
                     </span>
                 )}
-            </div>
+            </motion.div>
         )}
 
-        <button onClick={() => setShowAdvanced(!showAdvanced)} className="flex items-center text-xs font-semibold text-zinc-900 dark:text-zinc-100 gap-1.5 py-2">
+        <button onClick={() => setShowAdvanced(!showAdvanced)} className="flex items-center text-xs font-semibold text-zinc-900 dark:text-zinc-100 gap-1.5 py-2 mt-2">
            {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
            Más opciones
         </button>
@@ -260,7 +268,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                       <button onClick={() => setActiveSheet('reminder')} className="flex items-center justify-between w-full py-3 border-t border-zinc-100 dark:border-zinc-800">
                          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Recordatorio</span>
                          <div className="flex items-center text-sm text-zinc-500 gap-1">
-                             {reminderEnabled && reminder !== 'none' ? (reminder === '5m' ? '5 min antes' : reminder === '15m' ? '15 min antes' : reminder === '1h' ? '1 hora antes' : reminder === '1d' ? '1 día antes' : 'Ninguno') : 'Ninguno'}
+                             {reminderEnabled && reminder !== 'none' ? (reminder === '5m' ? '5 min' : reminder === '15m' ? '15 min' : reminder === '1h' ? '1 hora' : '1 día') : 'Ninguno'}
                              <ChevronRight className="w-4 h-4" />
                          </div>
                       </button>
@@ -290,12 +298,11 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         <button onClick={handleSubmit} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-2xl shrink-0 mt-4">
           {taskToEdit ? 'Guardar Cambios' : 'Guardar Tarea'}
         </button>
-      </div>
-    </>
+    </motion.div>
   );
 
   const renderDateSheet = () => (
-    <div className="flex flex-col h-full max-h-[70vh]">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex flex-col h-full max-h-[70vh]">
         {renderHeader('Fecha')}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
            <label className="flex items-center gap-3">
@@ -334,11 +341,11 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
              </button>
            </div>
         </div>
-    </div>
+    </motion.div>
   );
 
   const renderTimeSheet = () => (
-    <div className="flex flex-col h-full max-h-[70vh]">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex flex-col h-full max-h-[70vh]">
         {renderHeader('Hora')}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
            <label className="flex items-center gap-3">
@@ -369,30 +376,30 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                </button>
            </div>
         </div>
-    </div>
+    </motion.div>
   );
 
   const renderRepeatSheet = () => (
-    <div className="flex flex-col h-full max-h-[70vh]">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex flex-col h-full max-h-[70vh]">
         {renderHeader('Repetición')}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
            <label className="flex items-center gap-3">
                <input type="radio" name="repeatType" checked={!repeatEnabled || repeat === 'none'} onChange={() => { setRepeatEnabled(false); setRepeat('none'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">No repetir</span>
            </label>
-           <label className="flex items-center gap-3">
+           <label className="flex items-center gap-3 mt-4">
                <input type="radio" name="repeatType" checked={repeatEnabled && repeat === 'daily'} onChange={() => { setRepeatEnabled(true); setRepeat('daily'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">Todos los días</span>
            </label>
-           <label className="flex items-center gap-3">
+           <label className="flex items-center gap-3 mt-4">
                <input type="radio" name="repeatType" checked={repeatEnabled && repeat === 'weekly'} onChange={() => { setRepeatEnabled(true); setRepeat('weekly'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">Cada semana</span>
            </label>
-           <label className="flex items-center gap-3">
+           <label className="flex items-center gap-3 mt-4">
                <input type="radio" name="repeatType" checked={repeatEnabled && repeat === 'monthly'} onChange={() => { setRepeatEnabled(true); setRepeat('monthly'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">Cada mes</span>
            </label>
-           <label className="flex items-center gap-3">
+           <label className="flex items-center gap-3 mt-4">
                <input type="radio" name="repeatType" checked={repeatEnabled && repeat === 'custom'} onChange={() => { setRepeatEnabled(true); setRepeat('custom'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">Personalizado</span>
            </label>
@@ -413,30 +420,30 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                </button>
            </div>
         </div>
-    </div>
+    </motion.div>
   );
 
   const renderReminderSheet = () => (
-    <div className="flex flex-col h-full max-h-[70vh]">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex flex-col h-full max-h-[70vh]">
         {renderHeader('Recordatorio')}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
            <label className="flex items-center gap-3">
                <input type="radio" name="reminderType" checked={!reminderEnabled || reminder === 'none'} onChange={() => { setReminderEnabled(false); setReminder('none'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">Sin recordatorio</span>
            </label>
-           <label className="flex items-center gap-3">
+           <label className="flex items-center gap-3 mt-4">
                <input type="radio" name="reminderType" checked={reminderEnabled && reminder === '5m'} onChange={() => { setReminderEnabled(true); setReminder('5m'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">5 minutos antes</span>
            </label>
-           <label className="flex items-center gap-3">
+           <label className="flex items-center gap-3 mt-4">
                <input type="radio" name="reminderType" checked={reminderEnabled && reminder === '15m'} onChange={() => { setReminderEnabled(true); setReminder('15m'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">15 minutos antes</span>
            </label>
-           <label className="flex items-center gap-3">
+           <label className="flex items-center gap-3 mt-4">
                <input type="radio" name="reminderType" checked={reminderEnabled && reminder === '1h'} onChange={() => { setReminderEnabled(true); setReminder('1h'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">1 hora antes</span>
            </label>
-           <label className="flex items-center gap-3">
+           <label className="flex items-center gap-3 mt-4">
                <input type="radio" name="reminderType" checked={reminderEnabled && reminder === '1d'} onChange={() => { setReminderEnabled(true); setReminder('1d'); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">1 día antes</span>
            </label>
@@ -447,18 +454,18 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                </button>
            </div>
         </div>
-    </div>
+    </motion.div>
   );
 
   const renderSubtasksSheet = () => (
-    <div className="flex flex-col h-full max-h-[70vh]">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex flex-col h-full max-h-[70vh]">
         {renderHeader('Subtareas')}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
             <div className="space-y-3">
                 {subtasks.map(st => (
                     <div key={st.id} className="flex items-start gap-3 group">
                         <input type="checkbox" checked={st.completed} onChange={() => setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, completed: !s.completed } : s))} className="w-5 h-5 mt-1 rounded text-zinc-900 border-zinc-300 focus:ring-zinc-900" />
-                        <textarea value={st.title} onChange={e => setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, title: e.target.value } : s))} placeholder="Título de subtarea..." className="flex-1 bg-transparent border-b border-zinc-200 dark:border-zinc-700 outline-none text-sm p-1 dark:text-white resize-none" rows={1} />
+                        <textarea value={st.title} onChange={e => setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, title: e.target.value } : s))} placeholder="Título de subtarea..." className="flex-1 bg-transparent border-b border-zinc-200 dark:border-zinc-700 outline-none text-sm p-1 dark:text-white resize-none" rows={2} />
                         <button type="button" onClick={() => setSubtasks(prev => prev.filter(s => s.id !== st.id))} className="text-zinc-400 hover:text-red-500 p-1">
                             <X className="w-4 h-4" />
                         </button>
@@ -475,11 +482,11 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                </button>
            </div>
         </div>
-    </div>
+    </motion.div>
   );
 
   const renderNotesSheet = () => (
-    <div className="flex flex-col h-full max-h-[70vh]">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex flex-col h-full max-h-[70vh]">
         {renderHeader('Notas / Detalles')}
         <div className="p-4 sm:p-6 flex flex-col flex-1">
            <textarea 
@@ -494,48 +501,57 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                </button>
            </div>
         </div>
-    </div>
+    </motion.div>
   );
 
   return (
-    <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/40 backdrop-blur-xs" onClick={onClose}>
-      <motion.div 
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        drag="y"
-        dragConstraints={{ top: 0 }}
-        onDragEnd={(_, info) => {
-            if (info.offset.y > 100) onClose();
-        }}
-        className="bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex justify-center py-3.5 cursor-pointer shrink-0" onClick={onClose}>
-            <div className="w-12 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100010] flex items-end justify-center">
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="absolute inset-0 bg-black/40 backdrop-blur-xs" 
+            onClick={onClose} 
+          />
+          <motion.div 
+            layout
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            drag="y"
+            dragConstraints={{ top: 0 }}
+            dragElastic={0.2}
+            onDragEnd={(_, info) => {
+                if (info.offset.y > 100 || info.velocity.y > 500) onClose();
+            }}
+            className="relative bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] z-10"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-center py-3.5 cursor-pointer shrink-0" onClick={onClose}>
+                <div className="w-12 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+            </div>
+            
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={activeSheet}
+                    className="flex-1 overflow-hidden flex flex-col min-h-0"
+                >
+                    {activeSheet === 'main' && renderMainSheet()}
+                    {activeSheet === 'date' && renderDateSheet()}
+                    {activeSheet === 'time' && renderTimeSheet()}
+                    {activeSheet === 'repeat' && renderRepeatSheet()}
+                    {activeSheet === 'reminder' && renderReminderSheet()}
+                    {activeSheet === 'subtasks' && renderSubtasksSheet()}
+                    {activeSheet === 'notes' && renderNotesSheet()}
+                </motion.div>
+            </AnimatePresence>
+          </motion.div>
         </div>
-        
-        <AnimatePresence mode="wait">
-            <motion.div
-                key={activeSheet}
-                initial={{ x: 20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: -20, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex-1 overflow-hidden flex flex-col min-h-0"
-            >
-                {activeSheet === 'main' && renderMainSheet()}
-                {activeSheet === 'date' && renderDateSheet()}
-                {activeSheet === 'time' && renderTimeSheet()}
-                {activeSheet === 'repeat' && renderRepeatSheet()}
-                {activeSheet === 'reminder' && renderReminderSheet()}
-                {activeSheet === 'subtasks' && renderSubtasksSheet()}
-                {activeSheet === 'notes' && renderNotesSheet()}
-            </motion.div>
-        </AnimatePresence>
-      </motion.div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 };
 
