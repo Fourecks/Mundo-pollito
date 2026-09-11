@@ -44,7 +44,7 @@ interface ProjectsWorkspaceProps {
     pushPreferences?: PushNotificationPreferences;
 }
 
-const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
+const Modal = ({ isOpen, onClose, title, children, showBackButton, onBack }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode, showBackButton?: boolean, onBack?: () => void }) => {
     if (!isOpen) return null;
     return (
         <div 
@@ -58,7 +58,18 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
                 {/* Mobile drag / handle indicator */}
                 <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto mt-2.5 sm:hidden shrink-0" />
                 <div className="px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between shrink-0">
-                    <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">{title}</h2>
+                    <div className="flex items-center gap-2.5">
+                        {showBackButton && (
+                            <button
+                                onClick={onBack || onClose}
+                                className="p-1.5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+                                title="Volver atrás"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                            </button>
+                        )}
+                        <h2 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">{title}</h2>
+                    </div>
                     <button 
                         onClick={onClose} 
                         className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -5533,6 +5544,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     isOpen={isCreateChannelOpen} 
                     onClose={() => setIsCreateChannelOpen(false)} 
                     title="Crear Nuevo Canal"
+                    showBackButton={true}
                 >
                     <form onSubmit={handleCreateChannel} className="space-y-4">
                         <div>
@@ -5610,6 +5622,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     isOpen={!!editingChannel}
                     onClose={() => setEditingChannel(null)}
                     title="Editar Canal"
+                    showBackButton={true}
                 >
                     {editingChannel && (
                         <form onSubmit={handleEditChannelSubmit} className="space-y-4">

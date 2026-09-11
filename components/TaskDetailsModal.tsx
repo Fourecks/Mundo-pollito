@@ -857,20 +857,20 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
 
               </main>
 
-              {/* Modal Footer (fijado abajo, con fondo difuminado y botones elegantes) */}
               <footer className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t border-gray-50 dark:border-zinc-900/60 bg-white/90 dark:bg-[#0c0c0c]/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
-                {todo && onDelete ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsConfirmDeleteOpen(true)}
-                    className="px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-rose-500 rounded-xl transition-colors flex items-center gap-1.5 active:scale-95"
-                  >
-                    <TrashIcon className="w-3.5 h-3.5" />
-                    Eliminar
-                  </button>
-                ) : <div />}
+                <div />
 
                 <div className="flex items-center gap-2">
+                  {todo && onDelete && (
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmDeleteOpen(true)}
+                      className="px-4 py-2.5 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors flex items-center gap-1.5 active:scale-95"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" />
+                      Eliminar
+                    </button>
+                  )}
                   <button 
                     type="button" 
                     onClick={onClose} 
