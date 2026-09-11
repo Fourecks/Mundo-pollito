@@ -65,6 +65,9 @@ import {
   Check,
   Search,
   Target,
+  SlidersHorizontal,
+  Plus,
+  Tag,
 } from "lucide-react";
 import {
   PieChart as RechartsPieChart,
@@ -90,8 +93,7 @@ interface EmojiPickerPopoverProps {
   label?: string;
 }
 
-const getTodayStr = (): string => {
-  const d = new Date();
+const getTodayStr = (d: Date = new Date()): string => {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -117,6 +119,76 @@ const parseLocalDate = (dateStr: string): Date => {
     return new Date(parts[0], parts[1] - 1, parts[2]);
   }
   return new Date(dateStr);
+};
+
+const getFriendlyDateHeader = (dateStr: string): string => {
+  if (!dateStr) return "";
+  const txDate = parseLocalDate(dateStr);
+  const now = new Date();
+  const todayStr = getTodayStr(now);
+  
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayStr = getTodayStr(yesterday);
+
+  const cleanDate = dateStr.split("T")[0];
+  if (cleanDate === todayStr) {
+    return "HOY";
+  }
+  if (cleanDate === yesterdayStr) {
+    return "AYER";
+  }
+
+  const months = [
+    "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+    "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"
+  ];
+  const day = txDate.getDate();
+  const month = months[txDate.getMonth()];
+  const year = txDate.getFullYear();
+  const currentYear = now.getFullYear();
+
+  if (year === currentYear) {
+    return `${day} ${month}`;
+  }
+  return `${day} ${month} ${year}`;
+};
+
+const formatDetailDate = (dateStr: string): string => {
+  if (!dateStr) return "";
+  const txDate = parseLocalDate(dateStr);
+  const days = [
+    "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"
+  ];
+  const months = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+  ];
+  const dayName = days[txDate.getDay()];
+  const day = txDate.getDate();
+  const monthName = months[txDate.getMonth()];
+  const year = txDate.getFullYear();
+  return `${dayName}, ${day} de ${monthName} de ${year}`;
+};
+
+const formatSimpleReadableDate = (dateStr: string): string => {
+  if (!dateStr) return "";
+  const cleanDate = dateStr.split("T")[0];
+  const todayStr = getTodayStr();
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayStr = getTodayStr(yesterday);
+
+  if (cleanDate === todayStr) return "Hoy";
+  if (cleanDate === yesterdayStr) return "Ayer";
+
+  const txDate = parseLocalDate(dateStr);
+  const months = [
+    "ene", "feb", "mar", "abr", "may", "jun",
+    "jul", "ago", "sep", "oct", "nov", "dic"
+  ];
+  return `${txDate.getDate()} ${months[txDate.getMonth()]} ${txDate.getFullYear()}`;
 };
 
 const EMOJI_CATEGORIES = [
@@ -694,14 +766,23 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     "ALL",
   );
   const [txFilterAccount, setTxFilterAccount] = useState<number | "ALL">("ALL");
+  const [txFilterCategory, setTxFilterCategory] = useState<number | "ALL">("ALL");
   const [txFilterDateRange, setTxFilterDateRange] = useState<
     "ALL" | "THIS_MONTH" | "LAST_MONTH" | "THIS_YEAR"
   >("THIS_MONTH");
+  const [showMobileTxFilters, setShowMobileTxFilters] = useState(false);
 
-  // --- Modal States ---
+  // --- Modal & Bottom Sheet States ---
   const [showTxModal, setShowTxModal] = useState(false);
   const [txType, setTxType] = useState<TransactionType>("EXPENSE");
   const [showAdvancedTx, setShowAdvancedTx] = useState(false);
+  const [showNewTxTypeSheet, setShowNewTxTypeSheet] = useState(false);
+  const [selectedTxDetail, setSelectedTxDetail] = useState<FinanceTransaction | null>(null);
+  const [editingTx, setEditingTx] = useState<FinanceTransaction | null>(null);
+  const [showCategoryPickerSheet, setShowCategoryPickerSheet] = useState(false);
+  const [categoryPickerSearch, setCategoryPickerSearch] = useState("");
+  const [showAccountPickerSheet, setShowAccountPickerSheet] = useState<"from" | "to" | null>(null);
+  const [showDatePickerSheet, setShowDatePickerSheet] = useState(false);
 
   const [showContributeModal, setShowContributeModal] = useState<number | null>(
     null,
@@ -1679,8 +1760,33 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     setTxAccountId("");
     setTxToAccountId("");
     setTxDescription("");
+    setTxDate(getTodayStr());
     setTxTransferFeeType("fixed");
     setTxTransferFeeValue("");
+    setEditingTx(null);
+    setShowAdvancedTx(false);
+  };
+
+  const openNewTransactionModal = (type: TransactionType = "EXPENSE") => {
+    resetTxForm();
+    setTxType(type);
+    setEditingTx(null);
+    setShowNewTxTypeSheet(false);
+    setShowTxModal(true);
+  };
+
+  const openEditTransaction = (tx: FinanceTransaction) => {
+    setEditingTx(tx);
+    const resolvedType: TransactionType =
+      tx.type === "TRANSFER_IN" ? "TRANSFER_OUT" : (tx.type as TransactionType);
+    setTxType(resolvedType);
+    setTxAmount((tx.amount_cents / 100).toFixed(2));
+    setTxAccountId(tx.account_id);
+    setTxCategoryId(tx.category_id || "");
+    setTxDate(tx.date ? tx.date.split("T")[0] : getTodayStr());
+    setTxDescription(tx.description || "");
+    setShowTxModal(true);
+    setSelectedTxDetail(null);
   };
 
   const handleAddTransaction = async (e: React.FormEvent) => {
@@ -1693,7 +1799,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     // Requirement 1: Mandatory Account Selection
     if (!txAccountId || txAccountId === "") {
       alert(
-        "⚠️ Debes seleccionar obligatoriamente una cuenta de origen para realizar la transacción.",
+        "⚠️ Debes seleccionar obligatoriamente una cuenta para realizar la transacción.",
       );
       return;
     }
@@ -1704,7 +1810,92 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     const selectedAcc = accounts.find((a) => a.id === Number(txAccountId));
     if (!selectedAcc) return alert("Cuenta no encontrada.");
 
-    // Requirement 1: Fund Validation for Expenses & Transfers
+    // Handle Edit Mode
+    if (editingTx) {
+      try {
+        const oldAcc = accounts.find((a) => a.id === editingTx.account_id);
+        if (oldAcc) {
+          // Revert old transaction balance
+          let revertedBal = oldAcc.balance_cents;
+          if (editingTx.type === "EXPENSE" || editingTx.type === "TRANSFER_OUT") {
+            revertedBal =
+              oldAcc.type === "credit"
+                ? revertedBal - editingTx.amount_cents
+                : revertedBal + editingTx.amount_cents;
+          } else if (editingTx.type === "INCOME" || editingTx.type === "TRANSFER_IN") {
+            revertedBal =
+              oldAcc.type === "credit"
+                ? revertedBal + editingTx.amount_cents
+                : Math.max(0, revertedBal - editingTx.amount_cents);
+          }
+
+          // Apply new transaction balance
+          let finalBal = revertedBal;
+          if (oldAcc.id === Number(txAccountId)) {
+            if (txType === "EXPENSE" || txType === "TRANSFER_OUT") {
+              finalBal =
+                oldAcc.type === "credit"
+                  ? finalBal + amountCents
+                  : Math.max(0, finalBal - amountCents);
+            } else {
+              finalBal =
+                oldAcc.type === "credit"
+                  ? Math.max(0, finalBal - amountCents)
+                  : finalBal + amountCents;
+            }
+            await supabase
+              .from("finance_accounts")
+              .update({ balance_cents: Math.max(0, finalBal) })
+              .eq("id", oldAcc.id);
+          } else {
+            // Revert old account
+            await supabase
+              .from("finance_accounts")
+              .update({ balance_cents: Math.max(0, revertedBal) })
+              .eq("id", oldAcc.id);
+            // Apply new account
+            let newAccBal = selectedAcc.balance_cents;
+            if (txType === "EXPENSE" || txType === "TRANSFER_OUT") {
+              newAccBal =
+                selectedAcc.type === "credit"
+                  ? newAccBal + amountCents
+                  : Math.max(0, newAccBal - amountCents);
+            } else {
+              newAccBal =
+                selectedAcc.type === "credit"
+                  ? Math.max(0, newAccBal - amountCents)
+                  : newAccBal + amountCents;
+            }
+            await supabase
+              .from("finance_accounts")
+              .update({ balance_cents: Math.max(0, newAccBal) })
+              .eq("id", selectedAcc.id);
+          }
+        }
+
+        await supabase
+          .from("finance_transactions")
+          .update({
+            account_id: txAccountId,
+            type: txType,
+            amount_cents: amountCents,
+            category_id: txCategoryId === "" ? null : txCategoryId,
+            date: txDate,
+            description: txDescription,
+          })
+          .eq("id", editingTx.id);
+
+        fetchFinanceData();
+        setShowTxModal(false);
+        resetTxForm();
+        return;
+      } catch (err) {
+        console.error("Error editing transaction:", err);
+        return;
+      }
+    }
+
+    // Requirement 1: Fund Validation for Expenses & Transfers (New Transactions)
     if (txType === "EXPENSE" || txType === "TRANSFER_OUT") {
       if (selectedAcc.type === "credit") {
         const limit = selectedAcc.credit_limit_cents || 0;
@@ -2221,11 +2412,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   };
 
   const handleDeleteTransaction = async (
-    id: number,
-    type: string,
-    amount_cents: number,
-    account_id: number,
+    target: any,
+    typeParam?: string,
+    amountCentsParam?: number,
+    accountIdParam?: number,
   ) => {
+    let id: number;
+    let type: string;
+    let amount_cents: number;
+    let account_id: number;
+
+    if (typeof target === "object" && target !== null) {
+      id = target.id;
+      type = target.type;
+      amount_cents = target.amount_cents;
+      account_id = target.account_id;
+    } else {
+      id = Number(target);
+      type = typeParam || "EXPENSE";
+      amount_cents = amountCentsParam || 0;
+      account_id = accountIdParam || 0;
+    }
+
     if (
       !confirm("¿Eliminar este movimiento? Se ajustará el saldo de la cuenta.")
     )
@@ -2237,31 +2445,46 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
       prev.map((a) => {
         if (a.id !== account_id) return a;
         let newBalance = a.balance_cents;
-        if (type === "EXPENSE" || type === "TRANSFER_OUT")
-          newBalance += amount_cents;
-        if (type === "INCOME" || type === "TRANSFER_IN")
-          newBalance -= amount_cents;
+        if (a.type === "credit") {
+          if (type === "EXPENSE") newBalance -= amount_cents;
+          if (type === "INCOME") newBalance += amount_cents;
+        } else {
+          if (type === "EXPENSE" || type === "TRANSFER_OUT")
+            newBalance += amount_cents;
+          if (type === "INCOME" || type === "TRANSFER_IN")
+            newBalance -= amount_cents;
+        }
         return { ...a, balance_cents: Math.max(0, newBalance) };
       }),
     );
 
     try {
-      const currentBalance =
-        accounts.find((a) => a.id === account_id)?.balance_cents || 0;
-      let newBalance = currentBalance;
-      if (type === "EXPENSE" || type === "TRANSFER_OUT")
-        newBalance += amount_cents;
-      if (type === "INCOME" || type === "TRANSFER_IN")
-        newBalance -= amount_cents;
-      newBalance = Math.max(0, newBalance);
+      const currentAcc = accounts.find((a) => a.id === account_id);
+      if (currentAcc) {
+        let newBalance = currentAcc.balance_cents;
+        if (currentAcc.type === "credit") {
+          if (type === "EXPENSE") newBalance -= amount_cents;
+          if (type === "INCOME") newBalance += amount_cents;
+        } else {
+          if (type === "EXPENSE" || type === "TRANSFER_OUT")
+            newBalance += amount_cents;
+          if (type === "INCOME" || type === "TRANSFER_IN")
+            newBalance -= amount_cents;
+        }
+        newBalance = Math.max(0, newBalance);
 
-      await Promise.allSettled([
-        supabase
-          .from("finance_accounts")
-          .update({ balance_cents: newBalance })
-          .eq("id", account_id),
-        supabase.from("finance_transactions").delete().eq("id", id),
-      ]);
+        await Promise.allSettled([
+          supabase
+            .from("finance_accounts")
+            .update({ balance_cents: newBalance })
+            .eq("id", account_id),
+          supabase.from("finance_transactions").delete().eq("id", id),
+        ]);
+      } else {
+        await supabase.from("finance_transactions").delete().eq("id", id);
+      }
+      setSelectedTxDetail(null);
+      await fetchFinanceData();
     } catch (err) {
       console.error("Error deleting transaction:", err);
     }
@@ -4894,190 +5117,393 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                 )}
 
                   {/* TRANSACTIONS TAB */}
-                  {effectiveTab === "transactions" && (
-                    <div className="space-y-6">
-                      <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-bold">
-                          Historial de Movimientos
-                        </h2>
-                      </div>
+                  {effectiveTab === "transactions" && (() => {
+                    const filtered = transactions.filter((tx) => {
+                      if (txFilterType !== "ALL" && tx.type !== txFilterType)
+                        return false;
+                      if (
+                        txFilterAccount !== "ALL" &&
+                        tx.account_id !== txFilterAccount
+                      )
+                        return false;
+                      if (
+                        txFilterCategory !== "ALL" &&
+                        tx.category_id !== txFilterCategory
+                      )
+                        return false;
+                      if (txFilterSearch.trim() !== "") {
+                        const searchLower = txFilterSearch.toLowerCase();
+                        const catName =
+                          categories.find((c) => c.id === tx.category_id)
+                            ?.name || "";
+                        const accName =
+                          accounts.find((a) => a.id === tx.account_id)?.name ||
+                          "";
+                        const desc = tx.description || "";
+                        if (
+                          !desc.toLowerCase().includes(searchLower) &&
+                          !catName.toLowerCase().includes(searchLower) &&
+                          !accName.toLowerCase().includes(searchLower)
+                        ) {
+                          return false;
+                        }
+                      }
 
-                      {/* Filters */}
-                      <div className="flex flex-col sm:flex-row gap-3 bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-gray-100 dark:border-gray-800">
-                        <input
-                          type="text"
-                          placeholder="Buscar descripción..."
-                          value={txFilterSearch}
-                          onChange={(e) => setTxFilterSearch(e.target.value)}
-                          className="flex-1 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm"
-                        />
-                        <select
-                          value={txFilterType}
-                          onChange={(e) =>
-                            setTxFilterType(e.target.value as any)
-                          }
-                          className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm"
-                        >
-                          <option value="ALL">Todos los tipos</option>
-                          <option value="EXPENSE">Gastos</option>
-                          <option value="INCOME">Ingresos</option>
-                          <option value="TRANSFER_OUT">Transferencias</option>
-                        </select>
-                        <select
-                          value={txFilterAccount}
-                          onChange={(e) =>
-                            setTxFilterAccount(
-                              e.target.value === "ALL"
-                                ? "ALL"
-                                : Number(e.target.value),
-                            )
-                          }
-                          className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm"
-                        >
-                          <option value="ALL">Todas las cuentas</option>
-                          {accounts.map((acc) => (
-                            <option key={acc.id} value={acc.id}>
-                              {acc.name}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={txFilterDateRange}
-                          onChange={(e) =>
-                            setTxFilterDateRange(e.target.value as any)
-                          }
-                          className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm font-medium"
-                        >
-                          <option value="THIS_MONTH">Este mes</option>
-                          <option value="LAST_MONTH">Mes anterior</option>
-                          <option value="THIS_YEAR">Este año</option>
-                          <option value="ALL">Todo el historial</option>
-                        </select>
-                      </div>
+                      const txDateObj = parseLocalDate(tx.date);
+                      const now = new Date();
+                      if (txFilterDateRange === "THIS_MONTH") {
+                        if (
+                          txDateObj.getMonth() !== now.getMonth() ||
+                          txDateObj.getFullYear() !== now.getFullYear()
+                        )
+                          return false;
+                      } else if (txFilterDateRange === "LAST_MONTH") {
+                        const lastMonth = new Date(
+                          now.getFullYear(),
+                          now.getMonth() - 1,
+                          1,
+                        );
+                        if (
+                          txDateObj.getMonth() !== lastMonth.getMonth() ||
+                          txDateObj.getFullYear() !== lastMonth.getFullYear()
+                        )
+                          return false;
+                      } else if (txFilterDateRange === "THIS_YEAR") {
+                        if (txDateObj.getFullYear() !== now.getFullYear())
+                          return false;
+                      }
 
-                      <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
-                        {transactions
-                          .filter((tx) => {
-                            if (
-                              txFilterType !== "ALL" &&
-                              tx.type !== txFilterType
-                            )
-                              return false;
-                            if (
-                              txFilterAccount !== "ALL" &&
-                              tx.account_id !== txFilterAccount
-                            )
-                              return false;
-                            if (
-                              txFilterSearch &&
-                              !tx.description
-                                ?.toLowerCase()
-                                .includes(txFilterSearch.toLowerCase())
-                            )
-                              return false;
+                      return true;
+                    });
 
-                            const txDateObj = parseLocalDate(tx.date);
-                            const now = new Date();
-                            if (txFilterDateRange === "THIS_MONTH") {
-                              if (
-                                txDateObj.getMonth() !== now.getMonth() ||
-                                txDateObj.getFullYear() !== now.getFullYear()
-                              )
-                                return false;
-                            } else if (txFilterDateRange === "LAST_MONTH") {
-                              const lastMonth = new Date(
-                                now.getFullYear(),
-                                now.getMonth() - 1,
-                                1,
-                              );
-                              if (
-                                txDateObj.getMonth() !== lastMonth.getMonth() ||
-                                txDateObj.getFullYear() !==
-                                  lastMonth.getFullYear()
-                              )
-                                return false;
-                            } else if (txFilterDateRange === "THIS_YEAR") {
-                              if (txDateObj.getFullYear() !== now.getFullYear())
-                                return false;
-                            }
+                    // Sort descending: newest date first, highest ID first
+                    const sortedTxs = [...filtered].sort((a, b) => {
+                      const da = new Date(a.date).getTime();
+                      const db = new Date(b.date).getTime();
+                      if (db !== da) return db - da;
+                      return b.id - a.id;
+                    });
 
-                            return true;
-                          })
-                          .map((tx) => (
-                            <div
-                              key={tx.id}
-                              className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 group"
-                            >
-                              <div className="flex items-center gap-4">
-                                <div
-                                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                                    tx.type === "EXPENSE" ||
-                                    tx.type === "TRANSFER_OUT"
-                                      ? "bg-red-50 dark:bg-red-500/10 text-red-500"
-                                      : tx.type === "INCOME"
-                                        ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500"
-                                        : "bg-blue-50 dark:bg-blue-500/10 text-blue-500"
-                                  }`}
-                                >
-                                  {tx.type === "EXPENSE" ||
-                                  tx.type === "TRANSFER_OUT" ? (
-                                    <TrendingDown className="w-4 h-4" />
-                                  ) : tx.type === "INCOME" ? (
-                                    <TrendingUp className="w-4 h-4" />
-                                  ) : (
-                                    <ArrowRightLeft className="w-4 h-4" />
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="font-medium text-gray-900 dark:text-white">
-                                    {tx.description ||
-                                      categories.find(
-                                        (c) => c.id === tx.category_id,
-                                      )?.name ||
-                                      "Sin descripción"}
-                                  </div>
-                                  <div className="text-xs text-gray-500 flex gap-2">
-                                    <span>{tx.date}</span>
-                                    <span>•</span>
-                                    <span>
-                                      {
-                                        accounts.find(
-                                          (a) => a.id === tx.account_id,
-                                        )?.name
-                                      }
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <span
-                                  className={`font-semibold ${tx.type === "EXPENSE" || tx.type === "TRANSFER_OUT" ? "text-gray-900 dark:text-white" : "text-emerald-600 dark:text-emerald-400"}`}
-                                >
-                                  {tx.type === "EXPENSE" ||
-                                  tx.type === "TRANSFER_OUT"
-                                    ? "-"
-                                    : "+"}
-                                  {formatCurrency(tx.amount_cents)}
-                                </span>
+                    // Group by clean date string (YYYY-MM-DD)
+                    const groupsMap = new Map<string, FinanceTransaction[]>();
+                    sortedTxs.forEach((tx) => {
+                      const cleanDate = tx.date.split("T")[0];
+                      if (!groupsMap.has(cleanDate)) {
+                        groupsMap.set(cleanDate, []);
+                      }
+                      groupsMap.get(cleanDate)!.push(tx);
+                    });
+
+                    const groupsList: { dateKey: string; label: string; items: FinanceTransaction[] }[] = [];
+                    groupsMap.forEach((items, dateKey) => {
+                      groupsList.push({
+                        dateKey,
+                        label: getFriendlyDateHeader(dateKey),
+                        items,
+                      });
+                    });
+
+                    const activeFilterCount =
+                      (txFilterType !== "ALL" ? 1 : 0) +
+                      (txFilterAccount !== "ALL" ? 1 : 0) +
+                      (txFilterCategory !== "ALL" ? 1 : 0) +
+                      (txFilterDateRange !== "THIS_MONTH" ? 1 : 0) +
+                      (txFilterSearch.trim() !== "" ? 1 : 0);
+
+                    return (
+                      <div className="space-y-4">
+                        {/* Header */}
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                              Movimientos
+                            </h2>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 hidden sm:block">
+                              Historial de ingresos, gastos y transferencias
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setShowNewTxTypeSheet(true)}
+                            className="flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2 rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Nuevo</span>
+                          </button>
+                        </div>
+
+                        {/* Search & Filter Trigger Bar */}
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                              type="text"
+                              placeholder="Buscar movimientos..."
+                              value={txFilterSearch}
+                              onChange={(e) => setTxFilterSearch(e.target.value)}
+                              className="w-full pl-9 pr-8 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-white transition-all"
+                            />
+                            {txFilterSearch && (
+                              <button
+                                onClick={() => setTxFilterSearch("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 p-1"
+                              >
+                                <XIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => setShowMobileTxFilters(true)}
+                            className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-colors shrink-0 ${
+                              activeFilterCount > 0
+                                ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 border-transparent shadow-sm"
+                                : "bg-gray-50 dark:bg-[#121212] text-gray-700 dark:text-zinc-300 border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                            }`}
+                          >
+                            <SlidersHorizontal className="w-4 h-4" />
+                            <span>Filtros</span>
+                            {activeFilterCount > 0 && (
+                              <span className={`w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                                activeFilterCount > 0
+                                  ? "bg-emerald-500 text-white"
+                                  : "bg-gray-200 dark:bg-zinc-700 text-gray-800 dark:text-zinc-200"
+                              }`}>
+                                {activeFilterCount}
+                              </span>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Active Filter Chips (visible only when filters are active) */}
+                        {activeFilterCount > 0 && (
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar text-xs">
+                            {txFilterType !== "ALL" && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 font-medium whitespace-nowrap">
+                                <span>Tipo:</span>
+                                <b>
+                                  {txFilterType === "EXPENSE"
+                                    ? "Gastos"
+                                    : txFilterType === "INCOME"
+                                      ? "Ingresos"
+                                      : "Transferencias"}
+                                </b>
                                 <button
-                                  onClick={() =>
-                                    handleDeleteTransaction(
-                                      tx.id,
-                                      tx.type,
-                                      tx.amount_cents,
-                                      tx.account_id,
-                                    )
-                                  }
-                                  className="opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
+                                  onClick={() => setTxFilterType("ALL")}
+                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 ml-0.5"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <XIcon className="w-3 h-3" />
                                 </button>
-                              </div>
+                              </span>
+                            )}
+
+                            {txFilterAccount !== "ALL" && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 font-medium whitespace-nowrap">
+                                <span>Cuenta:</span>
+                                <b>
+                                  {accounts.find((a) => a.id === txFilterAccount)?.name ||
+                                    "Cuenta"}
+                                </b>
+                                <button
+                                  onClick={() => setTxFilterAccount("ALL")}
+                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 ml-0.5"
+                                >
+                                  <XIcon className="w-3 h-3" />
+                                </button>
+                              </span>
+                            )}
+
+                            {txFilterCategory !== "ALL" && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 font-medium whitespace-nowrap">
+                                <span>Cat:</span>
+                                <b>
+                                  {categories.find((c) => c.id === txFilterCategory)?.name ||
+                                    "Categoría"}
+                                </b>
+                                <button
+                                  onClick={() => setTxFilterCategory("ALL")}
+                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 ml-0.5"
+                                >
+                                  <XIcon className="w-3 h-3" />
+                                </button>
+                              </span>
+                            )}
+
+                            {txFilterDateRange !== "THIS_MONTH" && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 font-medium whitespace-nowrap">
+                                <span>Periodo:</span>
+                                <b>
+                                  {txFilterDateRange === "LAST_MONTH"
+                                    ? "Mes anterior"
+                                    : txFilterDateRange === "THIS_YEAR"
+                                      ? "Este año"
+                                      : "Todo"}
+                                </b>
+                                <button
+                                  onClick={() => setTxFilterDateRange("THIS_MONTH")}
+                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 ml-0.5"
+                                >
+                                  <XIcon className="w-3 h-3" />
+                                </button>
+                              </span>
+                            )}
+
+                            {txFilterSearch && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 font-medium whitespace-nowrap">
+                                <span>Buscar:</span>
+                                <b>"{txFilterSearch}"</b>
+                                <button
+                                  onClick={() => setTxFilterSearch("")}
+                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 ml-0.5"
+                                >
+                                  <XIcon className="w-3 h-3" />
+                                </button>
+                              </span>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                setTxFilterType("ALL");
+                                setTxFilterAccount("ALL");
+                                setTxFilterCategory("ALL");
+                                setTxFilterDateRange("THIS_MONTH");
+                                setTxFilterSearch("");
+                              }}
+                              className="text-xs font-semibold text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-white px-2 py-1 underline"
+                            >
+                              Limpiar
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Transactions List Grouped by Date */}
+                        {groupsList.length === 0 ? (
+                          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-3">
+                            <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center mx-auto text-gray-400">
+                              <Receipt className="w-6 h-6" />
                             </div>
-                          ))}
+                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                              {transactions.length === 0
+                                ? "No tienes movimientos registrados"
+                                : "No se encontraron movimientos"}
+                            </div>
+                            <p className="text-xs text-gray-400 dark:text-zinc-500 max-w-xs mx-auto">
+                              {transactions.length === 0
+                                ? "Comienza registrando tus gastos cotidianos o ingresos para llevar el control."
+                                : "Intenta ajustando los filtros o el término de búsqueda."}
+                            </p>
+                            {transactions.length === 0 ? (
+                              <button
+                                onClick={() => setShowNewTxTypeSheet(true)}
+                                className="inline-flex items-center gap-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2 rounded-xl text-xs font-semibold mt-2"
+                              >
+                                <Plus className="w-4 h-4" />
+                                <span>Registrar movimiento</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setTxFilterType("ALL");
+                                  setTxFilterAccount("ALL");
+                                  setTxFilterCategory("ALL");
+                                  setTxFilterDateRange("THIS_MONTH");
+                                  setTxFilterSearch("");
+                                }}
+                                className="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold mt-2"
+                              >
+                                <span>Limpiar filtros</span>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {groupsList.map((group) => (
+                              <div key={group.dateKey} className="space-y-1.5">
+                                <div className="text-[11px] font-bold tracking-wider text-gray-400 dark:text-zinc-500 px-1 uppercase">
+                                  {group.label}
+                                </div>
+                                <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden divide-y divide-gray-100 dark:divide-zinc-800/60 shadow-sm">
+                                  {group.items.map((tx) => {
+                                    const isExpense =
+                                      tx.type === "EXPENSE" ||
+                                      tx.type === "TRANSFER_OUT";
+                                    const isTransfer =
+                                      tx.type === "TRANSFER_OUT" ||
+                                      tx.type === "TRANSFER_IN";
+                                    const cat = categories.find(
+                                      (c) => c.id === tx.category_id,
+                                    );
+                                    const acc = accounts.find(
+                                      (a) => a.id === tx.account_id,
+                                    );
+                                    const title =
+                                      tx.description ||
+                                      cat?.name ||
+                                      (isTransfer ? "Transferencia" : "Movimiento");
+                                    const accName = acc?.name || "Cuenta";
+                                    const catName = isTransfer
+                                      ? "Transferencia"
+                                      : cat?.name || "Sin categoría";
+
+                                    return (
+                                      <div
+                                        key={tx.id}
+                                        onClick={() => setSelectedTxDetail(tx)}
+                                        className="flex items-center justify-between p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer group active:bg-gray-100 dark:active:bg-zinc-800"
+                                      >
+                                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                                          <div
+                                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-xs ${
+                                              isTransfer
+                                                ? "bg-blue-50 dark:bg-blue-500/10 text-blue-500"
+                                                : isExpense
+                                                  ? "bg-red-50 dark:bg-red-500/10 text-red-500"
+                                                  : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500"
+                                            }`}
+                                          >
+                                            {isTransfer ? (
+                                              <ArrowRightLeft className="w-4 h-4" />
+                                            ) : isExpense ? (
+                                              <ArrowDownRight className="w-4 h-4" />
+                                            ) : (
+                                              <ArrowUpRight className="w-4 h-4" />
+                                            )}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                              {title}
+                                            </div>
+                                            <div className="text-[11px] text-gray-400 dark:text-zinc-500 truncate flex items-center gap-1.5">
+                                              <span>{catName}</span>
+                                              <span>•</span>
+                                              <span>{accName}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span
+                                            className={`text-sm font-semibold ${
+                                              isExpense
+                                                ? "text-gray-900 dark:text-white"
+                                                : "text-emerald-600 dark:text-emerald-400"
+                                            }`}
+                                          >
+                                            {isExpense ? "-" : "+"}
+                                            {formatCurrency(tx.amount_cents)}
+                                          </span>
+                                          <ChevronRight className="w-4 h-4 text-gray-300 dark:text-zinc-600 group-hover:text-gray-500 dark:group-hover:text-zinc-400 transition-colors" />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* BUDGETS TAB - Clean & Elegant Breakdown System */}
                   {effectiveTab === "budgets" &&
@@ -8786,341 +9212,849 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
       {/* Portaled Modals (renders to document.body, outside window boundaries) */}
       <FinancePortal>
-        {/* Quick Add Modal */}
+        {/* New Transaction Type Picker Sheet */}
+        <AnimatePresence>
+          {showNewTxTypeSheet && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4"
+              onClick={() => setShowNewTxTypeSheet(false)}
+            >
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-[#121214] rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-1">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                      Nuevo movimiento
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      ¿Qué tipo de transacción deseas registrar?
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowNewTxTypeSheet(false)}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => openNewTransactionModal("EXPENSE")}
+                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-rose-50/60 hover:bg-rose-50 dark:bg-rose-950/20 dark:hover:bg-rose-950/30 border border-rose-200/70 dark:border-rose-900/40 text-left transition-all active:scale-[0.99]"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-rose-500/20">
+                      <ArrowDownRight className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-rose-950 dark:text-rose-200">
+                        Registrar Gasto
+                      </div>
+                      <div className="text-xs text-rose-800/70 dark:text-rose-300/70 truncate">
+                        Compras, pagos de servicios, consumos
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-rose-400 shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openNewTransactionModal("INCOME")}
+                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-emerald-50/60 hover:bg-emerald-50 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40 text-left transition-all active:scale-[0.99]"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/20">
+                      <ArrowUpRight className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
+                        Registrar Ingreso
+                      </div>
+                      <div className="text-xs text-emerald-800/70 dark:text-emerald-300/70 truncate">
+                        Salarios, cobros, transferencias recibidas
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-emerald-400 shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openNewTransactionModal("TRANSFER_OUT")}
+                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-blue-50/60 hover:bg-blue-50 dark:bg-blue-950/20 dark:hover:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 text-left transition-all active:scale-[0.99]"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                      <ArrowRightLeft className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-blue-950 dark:text-blue-200">
+                        Transferencia entre cuentas
+                      </div>
+                      <div className="text-xs text-blue-800/70 dark:text-blue-300/70 truncate">
+                        Mover saldo propio de una cuenta a otra
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile Filters Bottom Sheet */}
+        <AnimatePresence>
+          {showMobileTxFilters && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4"
+              onClick={() => setShowMobileTxFilters(false)}
+            >
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-[#121214] rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-lg shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[85vh] overflow-y-auto space-y-5"
+              >
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800/80 pb-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                      Filtros de Movimientos
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Personaliza los resultados de tu historial
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowMobileTxFilters(false)}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Filter 1: Type */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                    Tipo de movimiento
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: "ALL", label: "Todos" },
+                      { id: "EXPENSE", label: "Gastos" },
+                      { id: "INCOME", label: "Ingresos" },
+                      { id: "TRANSFER_OUT", label: "Transferencias" },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setTxFilterType(t.id as any)}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center ${
+                          txFilterType === t.id
+                            ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white shadow-sm"
+                            : "bg-gray-50 dark:bg-zinc-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-zinc-700"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Filter 2: Date Range */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                    Período
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: "THIS_MONTH", label: "Este mes" },
+                      { id: "LAST_MONTH", label: "Mes anterior" },
+                      { id: "THIS_YEAR", label: "Este año" },
+                      { id: "ALL", label: "Todo el tiempo" },
+                    ].map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => setTxFilterDateRange(d.id as any)}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center ${
+                          txFilterDateRange === d.id
+                            ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white shadow-sm"
+                            : "bg-gray-50 dark:bg-zinc-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-zinc-700"
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Filter 3: Account */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                    Cuenta
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    <button
+                      type="button"
+                      onClick={() => setTxFilterAccount("ALL")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                        txFilterAccount === "ALL"
+                          ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white"
+                          : "bg-gray-50 dark:bg-zinc-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-zinc-700"
+                      }`}
+                    >
+                      Todas las cuentas
+                    </button>
+                    {accounts.map((acc) => (
+                      <button
+                        key={acc.id}
+                        type="button"
+                        onClick={() => setTxFilterAccount(acc.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                          txFilterAccount === acc.id
+                            ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white"
+                            : "bg-gray-50 dark:bg-zinc-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-zinc-700"
+                        }`}
+                      >
+                        {acc.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Filter 4: Category */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                    Categoría
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+                    <button
+                      type="button"
+                      onClick={() => setTxFilterCategory("ALL")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                        txFilterCategory === "ALL"
+                          ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white"
+                          : "bg-gray-50 dark:bg-zinc-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-zinc-700"
+                      }`}
+                    >
+                      Todas las categorías
+                    </button>
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setTxFilterCategory(cat.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                          txFilterCategory === cat.id
+                            ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white"
+                            : "bg-gray-50 dark:bg-zinc-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-zinc-700"
+                        }`}
+                      >
+                        <span>{cat.emoji || "🏷️"}</span>
+                        <span>{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bottom Actions */}
+                <div className="flex items-center gap-3 pt-2 border-t border-gray-100 dark:border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTxFilterType("ALL");
+                      setTxFilterAccount("ALL");
+                      setTxFilterCategory("ALL");
+                      setTxFilterDateRange("THIS_MONTH");
+                      setTxFilterSearch("");
+                    }}
+                    className="flex-1 py-3 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-center"
+                  >
+                    Restablecer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileTxFilters(false)}
+                    className="flex-1 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-bold rounded-xl shadow-sm hover:opacity-90 transition-opacity text-center"
+                  >
+                    Aplicar Filtros
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Transaction Detail Bottom Sheet */}
+        <AnimatePresence>
+          {selectedTxDetail && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4"
+              onClick={() => setSelectedTxDetail(null)}
+            >
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-[#121214] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-5"
+              >
+                {(() => {
+                  const tx = selectedTxDetail;
+                  const isExpense =
+                    tx.type === "EXPENSE" ||
+                    tx.type?.toLowerCase() === "expense" ||
+                    tx.type?.toLowerCase() === "gasto";
+                  const isIncome =
+                    tx.type === "INCOME" ||
+                    tx.type?.toLowerCase() === "income" ||
+                    tx.type?.toLowerCase() === "ingreso";
+                  const isTransfer = !isExpense && !isIncome;
+                  const cat = categories.find((c) => c.id === tx.category_id);
+                  const acc = accounts.find((a) => a.id === tx.account_id);
+
+                  return (
+                    <>
+                      {/* Header */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm ${
+                              isExpense
+                                ? "bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400"
+                                : isIncome
+                                  ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                  : "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                            }`}
+                          >
+                            {cat?.emoji || (isExpense ? "💸" : isIncome ? "💰" : "↔️")}
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {isExpense
+                                ? "Gasto"
+                                : isIncome
+                                  ? "Ingreso"
+                                  : "Transferencia"}
+                            </div>
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white line-clamp-1">
+                              {cat?.name || tx.description || "Movimiento"}
+                            </h3>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSelectedTxDetail(null)}
+                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                          <XIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Hero Amount */}
+                      <div className="bg-gray-50 dark:bg-zinc-900/60 p-4 rounded-2xl border border-gray-150 dark:border-zinc-800 text-center">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          Monto total
+                        </div>
+                        <div
+                          className={`text-3xl font-black tracking-tight ${
+                            isExpense
+                              ? "text-rose-600 dark:text-rose-400"
+                              : isIncome
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-blue-600 dark:text-blue-400"
+                          }`}
+                        >
+                          {isExpense ? "-" : isIncome ? "+" : ""}
+                          {formatCurrency(tx.amount_cents)}
+                        </div>
+                      </div>
+
+                      {/* Details List */}
+                      <div className="space-y-2.5 text-xs">
+                        <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-zinc-800/80">
+                          <span className="text-gray-500 dark:text-gray-400">Fecha</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {formatDetailDate(tx.date)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-zinc-800/80">
+                          <span className="text-gray-500 dark:text-gray-400">Cuenta</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {acc?.name || "Cuenta no especificada"}
+                          </span>
+                        </div>
+
+                        {cat && (
+                          <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-zinc-800/80">
+                            <span className="text-gray-500 dark:text-gray-400">Categoría</span>
+                            <span className="font-semibold text-gray-900 dark:text-white inline-flex items-center gap-1">
+                              <span>{cat.emoji}</span>
+                              <span>{cat.name}</span>
+                            </span>
+                          </div>
+                        )}
+
+                        {tx.description && (
+                          <div className="flex items-start justify-between py-2 border-b border-gray-100 dark:border-zinc-800/80 gap-3">
+                            <span className="text-gray-500 dark:text-gray-400 shrink-0">
+                              Descripción / Nota
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-white text-right">
+                              {tx.description}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditTransaction(tx)}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-bold transition-all shadow-sm"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTransaction(tx)}
+                          className="flex items-center justify-center gap-2 px-4 py-3 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-bold border border-rose-200 dark:border-rose-900/50 transition-colors"
+                          title="Eliminar movimiento"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Eliminar
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Quick Add / Edit Modal (Mobile Bottom Sheet & Desktop Modal) */}
         <AnimatePresence>
           {showTxModal && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
-              onClick={() => setShowTxModal(false)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
+              onClick={() => {
+                setShowTxModal(false);
+                resetTxForm();
+              }}
             >
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
+                initial={{ y: "100%", opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: "100%", opacity: 0 }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[90vh] overflow-y-auto custom-scrollbar my-auto"
+                className="bg-white dark:bg-[#0e0e11] rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-lg shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[92vh] overflow-y-auto custom-scrollbar my-0 sm:my-auto space-y-4"
               >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">
-                  Registrar{" "}
-                  {txType === "EXPENSE"
-                    ? "Gasto"
-                    : txType === "INCOME"
-                      ? "Ingreso"
-                      : "Transferencia"}
-                </h3>
-                <button
-                  onClick={() => setShowTxModal(false)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"
-                >
-                  <XIcon className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddTransaction} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Monto
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-lg">$</span>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      onKeyDown={blockNegativeKeys}
-                      required
-                      autoFocus
-                      value={txAmount}
-                      onChange={(e) =>
-                        setTxAmount(e.target.value.replace(/-/g, ""))
-                      }
-                      className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg"
-                      placeholder="0.00"
-                    />
+                {/* Header */}
+                <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                      {editingTx
+                        ? "Editar Movimiento"
+                        : txType === "EXPENSE"
+                          ? "Nuevo Gasto"
+                          : txType === "INCOME"
+                            ? "Nuevo Ingreso"
+                            : "Nueva Transferencia"}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {editingTx
+                        ? "Modifica los detalles del movimiento"
+                        : "Ingresa el monto y confirma para registrarlo"}
+                    </p>
                   </div>
+                  <button
+                    onClick={() => {
+                      setShowTxModal(false);
+                      resetTxForm();
+                    }}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <XIcon className="w-5 h-5" />
+                  </button>
                 </div>
 
-                {txType !== "TRANSFER_OUT" ? (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Cuenta de Origen (Obligatorio)
-                      </label>
-                      <select
+                {/* Type Switcher (only for new transactions or if changing type) */}
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 dark:bg-zinc-900 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setTxType("EXPENSE")}
+                    className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                      txType === "EXPENSE"
+                        ? "bg-rose-500 text-white shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                  >
+                    Gasto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTxType("INCOME")}
+                    className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                      txType === "INCOME"
+                        ? "bg-emerald-500 text-white shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                  >
+                    Ingreso
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTxType("TRANSFER_OUT")}
+                    className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                      txType === "TRANSFER_OUT"
+                        ? "bg-blue-500 text-white shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                  >
+                    Transferencia
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddTransaction} className="space-y-4">
+                  {/* Hero Amount Input */}
+                  <div className="bg-gray-50 dark:bg-zinc-900/70 p-4 rounded-2xl border border-gray-200/80 dark:border-zinc-800 text-center">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                      Monto a {txType === "EXPENSE" ? "gastar" : txType === "INCOME" ? "ingresar" : "transferir"}
+                    </label>
+                    <div className="relative flex items-center justify-center">
+                      <span className="text-2xl sm:text-3xl font-bold text-gray-400 mr-1.5">
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        onKeyDown={blockNegativeKeys}
                         required
-                        value={txAccountId}
-                        onChange={(e) => setTxAccountId(Number(e.target.value))}
-                        className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium"
-                      >
-                        <option value="" disabled>
-                          Selecciona la cuenta
-                        </option>
-                        {accounts.map((acc) => (
-                          <option key={acc.id} value={acc.id}>
-                            {acc.name} (
-                            {acc.type === "credit"
-                              ? `Disp: ${formatCurrency((acc.credit_limit_cents || 0) - Math.abs(acc.balance_cents))}`
-                              : `Saldo: ${formatCurrency(acc.balance_cents)}`}
-                            )
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Categoría
-                      </label>
-                      <select
-                        required
-                        value={txCategoryId}
+                        autoFocus
+                        value={txAmount}
                         onChange={(e) =>
-                          setTxCategoryId(Number(e.target.value))
+                          setTxAmount(e.target.value.replace(/-/g, ""))
                         }
-                        className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
-                      >
-                        <option value="" disabled>
-                          Selecciona una categoría
-                        </option>
-                        {categories
-                          .filter(
-                            (cat) =>
-                              !cat.type ||
-                              (txType === "EXPENSE"
-                                ? cat.type.toUpperCase() === "EXPENSE" ||
-                                  cat.type.toUpperCase() === "GASTO"
-                                : cat.type.toUpperCase() === "INCOME" ||
-                                  cat.type.toUpperCase() === "INGRESO"),
-                          )
-                          .map((cat) => (
-                            <option key={cat.id} value={cat.id}>
-                              {cat.emoji} {cat.name}{" "}
-                              {cat.budget_limit_cents &&
-                              cat.budget_limit_cents > 0
-                                ? `(Presupuesto: $${(cat.budget_limit_cents / 100).toFixed(2)})`
-                                : ""}
-                            </option>
-                          ))}
-                      </select>
+                        className="w-48 sm:w-64 py-1 bg-transparent text-3xl sm:text-4xl font-black text-center text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-zinc-700 focus:outline-none tracking-tight"
+                        placeholder="0.00"
+                      />
                     </div>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium mb-1">
-                          Desde (Origen)
+                  </div>
+
+                  {txType !== "TRANSFER_OUT" ? (
+                    <>
+                      {/* Account Selector */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                          Cuenta {txType === "EXPENSE" ? "de pago" : "destino"}
                         </label>
                         <select
                           required
                           value={txAccountId}
-                          onChange={(e) =>
-                            setTxAccountId(Number(e.target.value))
-                          }
-                          className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium"
+                          onChange={(e) => setTxAccountId(Number(e.target.value))}
+                          className="w-full px-3.5 py-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm font-medium text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                         >
                           <option value="" disabled>
-                            Origen
+                            Selecciona una cuenta
                           </option>
                           {accounts.map((acc) => (
                             <option key={acc.id} value={acc.id}>
-                              {acc.name} ({formatCurrency(acc.balance_cents)})
+                              {acc.name} (
+                              {acc.type === "credit"
+                                ? `Cupo disp: ${formatCurrency((acc.credit_limit_cents || 0) - Math.abs(acc.balance_cents))}`
+                                : `Saldo: ${formatCurrency(acc.balance_cents)}`}
+                              )
                             </option>
                           ))}
                         </select>
                       </div>
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium mb-1">
-                          Hacia (Destino)
+
+                      {/* Category Selector */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                          Categoría
                         </label>
                         <select
                           required
-                          value={txToAccountId}
+                          value={txCategoryId}
                           onChange={(e) =>
-                            setTxToAccountId(Number(e.target.value))
+                            setTxCategoryId(Number(e.target.value))
                           }
-                          className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium"
+                          className="w-full px-3.5 py-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm font-medium text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                         >
                           <option value="" disabled>
-                            Destino
+                            Selecciona una categoría
                           </option>
-                          {accounts.map((acc) => (
-                            <option key={acc.id} value={acc.id}>
-                              {acc.name}
-                            </option>
-                          ))}
+                          {categories
+                            .filter(
+                              (cat) =>
+                                !cat.type ||
+                                (txType === "EXPENSE"
+                                  ? cat.type.toUpperCase() === "EXPENSE" ||
+                                    cat.type.toUpperCase() === "GASTO"
+                                  : cat.type.toUpperCase() === "INCOME" ||
+                                    cat.type.toUpperCase() === "INGRESO"),
+                            )
+                            .map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.emoji} {cat.name}{" "}
+                                {cat.budget_limit_cents &&
+                                cat.budget_limit_cents > 0
+                                  ? `(Presupuesto: $${(cat.budget_limit_cents / 100).toFixed(2)})`
+                                  : ""}
+                              </option>
+                            ))}
                         </select>
                       </div>
-                    </div>
 
-                    {/* Transfer Fee option */}
-                    <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                          Comisión por transferencia (Opcional)
-                        </label>
-                        <div className="flex items-center bg-gray-200 dark:bg-zinc-800 rounded-lg p-0.5">
-                          <button
-                            type="button"
-                            onClick={() => setTxTransferFeeType("fixed")}
-                            className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-colors ${
-                              txTransferFeeType === "fixed"
-                                ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm"
-                                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                            }`}
-                          >
-                            $ Fijo
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setTxTransferFeeType("percent")}
-                            className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-colors ${
-                              txTransferFeeType === "percent"
-                                ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm"
-                                : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                            }`}
-                          >
-                            % Porc.
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs text-gray-400 font-bold">
-                          {txTransferFeeType === "fixed" ? "$" : "%"}
-                        </div>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder={
-                            txTransferFeeType === "fixed"
-                              ? "0.00 (sin comisión)"
-                              : "0.00 %"
-                          }
-                          value={txTransferFeeValue}
-                          onChange={(e) =>
-                            setTxTransferFeeValue(e.target.value)
-                          }
-                          className="w-full pl-7 pr-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
-                        />
-                      </div>
-
-                      {/* Live transfer preview */}
-                      {txAmount && parseFloat(txAmount) > 0 && (
-                        <div className="text-[11px] bg-white dark:bg-[#0a0a0a] p-2.5 rounded-xl border border-gray-150 dark:border-zinc-800 space-y-1">
-                          {(() => {
-                            const amount = parseFloat(txAmount) || 0;
-                            const feeVal = parseFloat(txTransferFeeValue) || 0;
-                            const feeAmount =
-                              txTransferFeeType === "fixed"
-                                ? feeVal
-                                : (amount * feeVal) / 100;
-                            const totalDebited = amount + feeAmount;
-                            return (
-                              <>
-                                <div className="flex justify-between text-gray-500">
-                                  <span>Monto transferido:</span>
-                                  <span>${amount.toFixed(2)}</span>
-                                </div>
-                                {feeAmount > 0 && (
-                                  <div className="flex justify-between text-amber-600 dark:text-amber-400 font-medium">
-                                    <span>
-                                      Comisión (
-                                      {txTransferFeeType === "fixed"
-                                        ? `$${feeVal.toFixed(2)}`
-                                        : `${feeVal}%`}
-                                      ):
-                                    </span>
-                                    <span>+${feeAmount.toFixed(2)}</span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between font-bold text-gray-800 dark:text-gray-200 border-t border-gray-100 dark:border-zinc-800 pt-1">
-                                  <span>Total a salir del origen:</span>
-                                  <span className="text-red-500">
-                                    ${totalDebited.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between font-semibold text-emerald-600 dark:text-emerald-400">
-                                  <span>Total a llegar al destino:</span>
-                                  <span>${amount.toFixed(2)}</span>
-                                </div>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvancedTx(!showAdvancedTx)}
-                    className="flex items-center justify-center gap-1 w-full py-2 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
-                  >
-                    {showAdvancedTx ? "Menos opciones" : "Más opciones"}{" "}
-                    {showAdvancedTx ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-
-                <AnimatePresence>
-                  {showAdvancedTx && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="space-y-4 overflow-hidden"
-                    >
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Fecha
-                        </label>
-                        <input
-                          type="date"
-                          value={txDate}
-                          onChange={(e) => setTxDate(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Descripción
+                      {/* Description */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                          Descripción o nota <span className="font-normal text-gray-400">(opcional)</span>
                         </label>
                         <input
                           type="text"
                           value={txDescription}
                           onChange={(e) => setTxDescription(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl"
-                          placeholder="Ej. Almuerzo con cliente"
+                          className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
+                          placeholder="Ej. Almuerzo, Uber, Supermercado..."
                         />
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                            Cuenta de Origen
+                          </label>
+                          <select
+                            required
+                            value={txAccountId}
+                            onChange={(e) =>
+                              setTxAccountId(Number(e.target.value))
+                            }
+                            className="w-full px-3.5 py-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm font-medium text-gray-900 dark:text-white"
+                          >
+                            <option value="" disabled>
+                              Origen
+                            </option>
+                            {accounts.map((acc) => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name} ({formatCurrency(acc.balance_cents)})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                            Cuenta de Destino
+                          </label>
+                          <select
+                            required
+                            value={txToAccountId}
+                            onChange={(e) =>
+                              setTxToAccountId(Number(e.target.value))
+                            }
+                            className="w-full px-3.5 py-3 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm font-medium text-gray-900 dark:text-white"
+                          >
+                            <option value="" disabled>
+                              Destino
+                            </option>
+                            {accounts.map((acc) => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
 
-                <div className="pt-4">
-                  <button
-                    type="submit"
-                    className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-3.5 rounded-xl font-medium shadow-sm hover:opacity-90 transition-opacity"
-                  >
-                    Guardar Movimiento
-                  </button>
-                </div>
-              </form>
+                      {/* Transfer Fee option */}
+                      <div className="bg-gray-50 dark:bg-zinc-900 p-3.5 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            Comisión por transferencia (Opcional)
+                          </label>
+                          <div className="flex items-center bg-gray-200 dark:bg-zinc-800 rounded-lg p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setTxTransferFeeType("fixed")}
+                              className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-colors ${
+                                txTransferFeeType === "fixed"
+                                  ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm"
+                                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                              }`}
+                            >
+                              $ Fijo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setTxTransferFeeType("percent")}
+                              className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-colors ${
+                                txTransferFeeType === "percent"
+                                  ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm"
+                                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                              }`}
+                            >
+                              % Porc.
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs text-gray-400 font-bold">
+                            {txTransferFeeType === "fixed" ? "$" : "%"}
+                          </div>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder={
+                              txTransferFeeType === "fixed"
+                                ? "0.00 (sin comisión)"
+                                : "0.00 %"
+                            }
+                            value={txTransferFeeValue}
+                            onChange={(e) =>
+                              setTxTransferFeeValue(e.target.value)
+                            }
+                            className="w-full pl-7 pr-3 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm"
+                          />
+                        </div>
+
+                        {/* Live transfer preview */}
+                        {txAmount && parseFloat(txAmount) > 0 && (
+                          <div className="text-[11px] bg-white dark:bg-[#0a0a0a] p-2.5 rounded-xl border border-gray-150 dark:border-zinc-800 space-y-1">
+                            {(() => {
+                              const amount = parseFloat(txAmount) || 0;
+                              const feeVal = parseFloat(txTransferFeeValue) || 0;
+                              const feeAmount =
+                                txTransferFeeType === "fixed"
+                                  ? feeVal
+                                  : (amount * feeVal) / 100;
+                              const totalDebited = amount + feeAmount;
+                              return (
+                                <>
+                                  <div className="flex justify-between text-gray-500">
+                                    <span>Monto transferido:</span>
+                                    <span>${amount.toFixed(2)}</span>
+                                  </div>
+                                  {feeAmount > 0 && (
+                                    <div className="flex justify-between text-amber-600 dark:text-amber-400 font-medium">
+                                      <span>
+                                        Comisión (
+                                        {txTransferFeeType === "fixed"
+                                          ? `$${feeVal.toFixed(2)}`
+                                          : `${feeVal}%`}
+                                        ):
+                                      </span>
+                                      <span>+${feeAmount.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between font-bold text-gray-800 dark:text-gray-200 border-t border-gray-100 dark:border-zinc-800 pt-1">
+                                    <span>Total a salir del origen:</span>
+                                    <span className="text-red-500">
+                                      ${totalDebited.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between font-semibold text-emerald-600 dark:text-emerald-400">
+                                    <span>Total a llegar al destino:</span>
+                                    <span>${amount.toFixed(2)}</span>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Advanced Collapsible */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedTx(!showAdvancedTx)}
+                      className="flex items-center justify-center gap-1.5 w-full py-2 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                      {showAdvancedTx ? "Ocultar fecha / opciones" : "Modificar fecha u otras opciones"}
+                      {showAdvancedTx ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+
+                  <AnimatePresence>
+                    {showAdvancedTx && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="space-y-3 overflow-hidden pt-1"
+                      >
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                            Fecha de movimiento
+                          </label>
+                          <input
+                            type="date"
+                            value={txDate}
+                            onChange={(e) => setTxDate(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs sm:text-sm text-gray-900 dark:text-white"
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Submit CTA */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-3.5 rounded-2xl text-xs sm:text-sm font-bold shadow-md hover:opacity-95 transition-opacity active:scale-[0.99]"
+                    >
+                      {editingTx
+                        ? "Guardar Cambios"
+                        : txType === "EXPENSE"
+                          ? "Guardar Gasto"
+                          : txType === "INCOME"
+                            ? "Guardar Ingreso"
+                            : "Transferir Fondos"}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
       {/* Quick Add Funds Modal (Insufficient funds flow) */}
       <AnimatePresence>
