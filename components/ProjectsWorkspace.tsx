@@ -3315,56 +3315,58 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 {isMobile ? (
                     /* REDISEÑO MÓVIL */
                     <div className="flex flex-col h-full overflow-hidden">
-                        {/* Header Minimalista */}
-                        <div className="px-4 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
-                            <h2 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">Documentos</h2>
-                            <button
-                                type="button"
-                                onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
-                                className="p-2 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"
-                            >
-                                <Plus className="w-5 h-5" />
-                            </button>
-                            
-                            {/* Menu Plus */}
-                            {isPlusMenuOpen && (
-                                <div className="absolute right-4 top-16 z-50 w-48 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-1">
-                                    <button
-                                        onClick={() => { fileInputRef.current?.click(); setIsPlusMenuOpen(false); }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
-                                    >
-                                        <Upload className="w-4 h-4" /> Subir archivo
-                                    </button>
-                                    <button
-                                        onClick={() => { setFolderModal({ isOpen: true, folder: null }); setIsPlusMenuOpen(false); }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
-                                    >
-                                        <FolderPlus className="w-4 h-4" /> Crear carpeta
-                                    </button>
-                                    <button
-                                        onClick={() => { handleCreateProjectNote(); setIsPlusMenuOpen(false); }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
-                                    >
-                                        <FilePlus className="w-4 h-4" /> Crear nota
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                        
-                        {/* Search */}
-                        <div className="px-4 py-3 shrink-0">
-                            <div className="relative">
+                        {/* Header Minimalista: Buscador y '+' */}
+                        <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3 shrink-0">
+                            <div className="relative flex-1">
                                 <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
                                 <input
                                     type="text"
-                                    placeholder={selectedFolderId ? `Buscar en ${activeFolderObj?.name || 'Carpeta'}...` : "Buscar archivos..."}
+                                    placeholder="Buscar archivos..."
                                     value={docSearchText}
                                     onChange={e => setDocSearchText(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-900 rounded-xl border-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 transition-all"
                                 />
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+                                className="p-2.5 text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl transition-all"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </button>
+                            
+                            {/* Menu Plus */}
+                            <AnimatePresence>
+                                {isPlusMenuOpen && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        className="absolute right-4 top-16 z-50 w-48 bg-white dark:bg-zinc-950 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-1"
+                                    >
+                                        <button
+                                            onClick={() => { fileInputRef.current?.click(); setIsPlusMenuOpen(false); }}
+                                            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl"
+                                        >
+                                            <Upload className="w-4 h-4" /> Subir archivo
+                                        </button>
+                                        <button
+                                            onClick={() => { setFolderModal({ isOpen: true, folder: null }); setIsPlusMenuOpen(false); }}
+                                            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl"
+                                        >
+                                            <FolderPlus className="w-4 h-4" /> Crear carpeta
+                                        </button>
+                                        <button
+                                            onClick={() => { handleCreateProjectNote(); setIsPlusMenuOpen(false); }}
+                                            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl"
+                                        >
+                                            <FilePlus className="w-4 h-4" /> Crear nota
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
-
+                        
                         {/* Contenido Principal */}
                         <div className="flex-1 overflow-y-auto px-4 pb-20">
                             {/* Si estamos en una subcarpeta, mostrar botón volver */}
@@ -3373,7 +3375,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     onClick={() => setSelectedFolderId(null)}
                                     className="flex items-center gap-1 text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-4"
                                 >
-                                    <ChevronLeft className="w-4 h-4" /> Volver a Documentos
+                                    <ChevronLeft className="w-4 h-4" /> Volver
                                 </button>
                             )}
 
@@ -3433,25 +3435,41 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         </div>
 
-                        {/* Menu Acciones archivo (Bottom sheet) */}
-                        {selectedDoc && (
-                            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-xs">
-                                <div className="w-full bg-white dark:bg-zinc-900 rounded-t-2xl p-4 animate-in slide-in-from-bottom duration-200">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h4 className="font-bold text-zinc-950 dark:text-zinc-50 truncate">{selectedDoc.title}</h4>
-                                        <button onClick={() => setSelectedDoc(null)} className="p-1 text-zinc-500"><X className="w-5 h-5" /></button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Vista previa</button>
-                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Compartir en canal</button>
-                                        <button onClick={() => { handleDownloadFile(selectedDoc); setSelectedDoc(null); }} className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Descargar</button>
-                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Mover a carpeta</button>
-                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Renombrar</button>
-                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg">Eliminar</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {/* Menu Acciones archivo (Overlay) */}
+                        <AnimatePresence>
+                            {selectedDoc && (
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40 backdrop-blur-sm"
+                                    onClick={() => setSelectedDoc(null)}
+                                >
+                                    <motion.div 
+                                        initial={{ y: "100%" }}
+                                        animate={{ y: 0 }}
+                                        exit={{ y: "100%" }}
+                                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                        className="w-full bg-white dark:bg-zinc-950 rounded-t-3xl p-4"
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full mx-auto mb-4" />
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="font-bold text-zinc-950 dark:text-zinc-50 truncate">{selectedDoc.title}</h4>
+                                            <button onClick={() => setSelectedDoc(null)} className="p-1 text-zinc-500"><X className="w-5 h-5" /></button>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <button onClick={() => { /* Implementar vista previa */ setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Vista previa</button>
+                                            <button onClick={() => { handleOpenShareDoc(selectedDoc); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Compartir en canal</button>
+                                            <button onClick={() => { handleDownloadFile(selectedDoc); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Descargar</button>
+                                            <button onClick={() => { /* Implementar mover */ setMoveDocModal({ isOpen: true, doc: selectedDoc }); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Mover a carpeta</button>
+                                            <button onClick={() => { /* Implementar renombrar */ setRenameDocModal({ isOpen: true, doc: selectedDoc, newTitle: selectedDoc.title }); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Renombrar</button>
+                                            <button onClick={() => { handleDeleteDoc(selectedDoc.id); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl">Eliminar</button>
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 ) : (
                     <div className="px-4 sm:px-6 py-3 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2.5 shrink-0">

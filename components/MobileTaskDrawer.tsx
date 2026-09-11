@@ -321,7 +321,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         {renderHeader('Fecha')}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
            <label className="flex items-center gap-3">
-               <input type="radio" name="dateType" checked={hasDueDate && !hasEndDate} onChange={() => { setHasDueDate(true); setHasEndDate(false); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
+               <input type="radio" name="dateType" checked={hasDueDate && !hasEndDate} onChange={() => { setHasDueDate(true); setHasEndDate(false); setEndDate(''); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">Un día</span>
            </label>
            {hasDueDate && !hasEndDate && (
@@ -329,7 +329,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
            )}
            
            <label className="flex items-center gap-3 mt-4">
-               <input type="radio" name="dateType" checked={hasDueDate && hasEndDate} onChange={() => { setHasDueDate(true); setHasEndDate(true); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
+               <input type="radio" name="dateType" checked={hasDueDate && hasEndDate} onChange={() => { setHasDueDate(true); setHasEndDate(true); if(!endDate) setEndDate(dueDate || new Date().toISOString().split('T')[0]); }} className="w-4 h-4 text-zinc-900 focus:ring-zinc-900" />
                <span className="text-sm font-semibold dark:text-white">Rango de fechas</span>
            </label>
            {hasDueDate && hasEndDate && (
