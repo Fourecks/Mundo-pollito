@@ -86,15 +86,14 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         </div>
         <div className="p-4 sm:p-6 space-y-4">
           <input
-            autoFocus
             value={text}
             onChange={e => setText(e.target.value)}
             placeholder="Título de la tarea"
             className="w-full text-lg font-bold bg-transparent placeholder-zinc-400 focus:outline-none dark:text-white"
           />
           
-          <div className="grid grid-cols-2 gap-3">
-             <div className="space-y-1">
+          <div className="flex gap-3">
+             <div className="flex-1 space-y-1">
                  <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
                      <button onClick={() => setHasDueDate(!hasDueDate)} className={`${hasDueDate ? 'text-zinc-900 dark:text-white' : 'text-zinc-400'}`}>
                         {hasDueDate ? 'Fecha' : 'Sin fecha'}
@@ -108,7 +107,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                     className={`w-full p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs dark:text-white ${!hasDueDate ? 'opacity-50' : ''}`} 
                  />
              </div>
-             <div className="space-y-1">
+             <div className="flex-1 space-y-1">
                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Prioridad</label>
                  <select value={priority} onChange={e => setPriority(e.target.value as Priority)} className="w-full p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs dark:text-white">
                     <option value="low">Baja</option>
