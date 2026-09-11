@@ -19,6 +19,9 @@ import {
   PlusIcon,
   XIcon,
   ArrowRightLeft,
+  ArrowDownRight,
+  ArrowUpRight,
+  MoreHorizontal,
   TrendingUp,
   TrendingDown,
   EyeIcon,
@@ -479,6 +482,7 @@ const FinancePortal: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
 interface FinanceModuleProps {
   onClose?: () => void;
+  isMobile?: boolean;
 }
 
 type TabType =
@@ -494,10 +498,95 @@ type TabType =
   | "settings";
 type TransactionType = "EXPENSE" | "INCOME" | "TRANSFER_OUT" | "TRANSFER_IN";
 
-export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
+export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile: propIsMobile }) => {
+  // --- Responsive Mobile Detection ---
+  const [screenIsMobile, setScreenIsMobile] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.matchMedia("(max-width: 767px), (orientation: landscape) and (max-height: 550px)").matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 767px), (orientation: landscape) and (max-height: 550px)");
+    const listener = () => setScreenIsMobile(media.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, []);
+
+  const isMobile = propIsMobile ?? screenIsMobile;
+
+  // --- Mobile Navigation State (Fase 1: Resumen | Movimientos | Planificar | Más) ---
+  const [mobileMainTab, setMobileMainTab] = useState<"overview" | "transactions" | "planning" | "more">("overview");
+  const [mobilePlanSubView, setMobilePlanSubView] = useState<null | "budgets" | "calendar" | "subscriptions" | "installments" | "savings" | "shopping">(null);
+  const [mobileMoreSubView, setMobileMoreSubView] = useState<null | "debts" | "stats" | "closing" | "accounts" | "categories" | "security" | "settings">(null);
+
+  const getPlanSubViewTitle = (sub: string | null) => {
+    switch (sub) {
+      case "budgets":
+        return "Presupuestos";
+      case "calendar":
+        return "Calendario de Pagos";
+      case "subscriptions":
+        return "Suscripciones";
+      case "installments":
+        return "Cuotas";
+      case "savings":
+        return "Metas de Ahorro";
+      case "shopping":
+        return "Listas de Compras";
+      default:
+        return "";
+    }
+  };
+
+  const getMoreSubViewTitle = (sub: string | null) => {
+    switch (sub) {
+      case "debts":
+        return "Deudas y Tarjetas";
+      case "stats":
+        return "Análisis Financiero";
+      case "closing":
+        return "Cierre y Reportes";
+      case "accounts":
+        return "Cuentas";
+      case "categories":
+        return "Categorías";
+      case "security":
+        return "Seguridad";
+      case "settings":
+        return "Ajustes";
+      default:
+        return "";
+    }
+  };
+
   // --- Global State ---
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+
+  const effectiveTab: string = useMemo(() => {
+    if (!isMobile) return activeTab;
+    if (mobileMainTab === "overview") return "overview";
+    if (mobileMainTab === "transactions") return "transactions";
+    if (mobileMainTab === "planning") {
+      if (mobilePlanSubView === null) return "planning_menu";
+      if (mobilePlanSubView === "calendar" || mobilePlanSubView === "subscriptions" || mobilePlanSubView === "installments") {
+        return "planning";
+      }
+      return mobilePlanSubView;
+    }
+    if (mobileMainTab === "more") {
+      if (mobileMoreSubView === null) return "more_menu";
+      if (["accounts", "categories", "security", "settings"].includes(mobileMoreSubView)) {
+        return "settings";
+      }
+      return mobileMoreSubView;
+    }
+    return activeTab;
+  }, [isMobile, activeTab, mobileMainTab, mobilePlanSubView, mobileMoreSubView]);
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
+  const [showMobileTransferMenu, setShowMobileTransferMenu] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // --- Data State ---
@@ -2283,8 +2372,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
       // Redirect dynamically so the user sees their new account/card instantly
       if (isCard) {
         setActiveTab("debts");
+        if (isMobile) {
+          setMobileMainTab("more");
+          setMobileMoreSubView("debts");
+        }
       } else {
         setActiveTab("overview");
+        if (isMobile) {
+          setMobileMainTab("overview");
+          setMobilePlanSubView(null);
+          setMobileMoreSubView(null);
+        }
       }
     } catch (err: any) {
       console.error("Unexpected error in handleCreateAccount:", err);
@@ -3806,6 +3904,498 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
     </div>
   );
 
+  const renderMobileTopNav = () => (
+    <div className="w-full grid grid-cols-4 border-b border-gray-200 dark:border-zinc-800 mb-4 select-none bg-white dark:bg-[#0a0a0a]">
+      {[
+        { id: "overview", label: "Resumen", icon: LayoutDashboard },
+        { id: "transactions", label: "Movimientos", icon: ListOrdered },
+        { id: "planning", label: "Planificar", icon: CalendarDays },
+        { id: "more", label: "Más", icon: Layers },
+      ].map((tab) => {
+        const isActive = mobileMainTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => {
+              if (tab.id === "overview") {
+                setMobileMainTab("overview");
+                setActiveTab("overview");
+                setMobilePlanSubView(null);
+                setMobileMoreSubView(null);
+              } else if (tab.id === "transactions") {
+                setMobileMainTab("transactions");
+                setActiveTab("transactions");
+                setMobilePlanSubView(null);
+                setMobileMoreSubView(null);
+              } else if (tab.id === "planning") {
+                setMobileMainTab("planning");
+                setMobilePlanSubView(null);
+              } else if (tab.id === "more") {
+                setMobileMainTab("more");
+                setMobileMoreSubView(null);
+              }
+            }}
+            className={`relative flex flex-col items-center justify-center py-2.5 px-1 text-xs font-semibold transition-colors ${
+              isActive
+                ? "text-gray-900 dark:text-white"
+                : "text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-300"
+            }`}
+          >
+            <tab.icon className="w-4 h-4 mb-1 shrink-0" />
+            <span className="text-[11px] leading-tight truncate">{tab.label}</span>
+            {isActive && (
+              <motion.div
+                layoutId="finance-mobile-active-tab"
+                className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full"
+                transition={{ type: "spring", stiffness: 350, damping: 30 }}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  // Helper to format short date for transactions (e.g., "2 sep")
+  const formatTxDateShort = (dateStr: string) => {
+    try {
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+        const day = parseInt(parts[2], 10);
+        const monthIndex = parseInt(parts[1], 10) - 1;
+        const monthNames = [
+          "ene", "feb", "mar", "abr", "may", "jun",
+          "jul", "ago", "sep", "oct", "nov", "dic"
+        ];
+        return `${day} ${monthNames[monthIndex] || ""}`;
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Helper to format payment date badge (e.g. { day: "17", month: "SEP" })
+  const formatPaymentDateBadge = (dateStr: string) => {
+    try {
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+        const day = parseInt(parts[2], 10);
+        const monthIndex = parseInt(parts[1], 10) - 1;
+        const monthNames = [
+          "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+          "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"
+        ];
+        return {
+          day: String(day),
+          month: monthNames[monthIndex] || "---",
+        };
+      }
+    } catch {
+      // fallback
+    }
+    return { day: "--", month: "---" };
+  };
+
+  // Upcoming payments calculation for Mobile Overview (compromisos próximos sin alterar balance)
+  const upcomingPayments = useMemo(() => {
+    const list: Array<{
+      id: string;
+      name: string;
+      amount_cents: number;
+      dateStr: string;
+      source: "subscription" | "installment" | "debt";
+      subLabel?: string;
+    }> = [];
+
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const todayYear = now.getFullYear();
+    const todayMonth = now.getMonth();
+    const todayDay = now.getDate();
+
+    // 1. Recurring / Subscriptions (active and non-income)
+    recurring.forEach((r) => {
+      if (r.is_active === false || r.type === "INCOME") return;
+      const targetDate = r.next_date || r.start_date || todayStr;
+      const cat = categories.find((c) => c.id === r.category_id);
+      list.push({
+        id: `rec-${r.id}`,
+        name: r.description || cat?.name || "Suscripción",
+        amount_cents: r.amount_cents,
+        dateStr: targetDate,
+        source: "subscription",
+        subLabel: "Suscripción",
+      });
+    });
+
+    // 2. Active Installments (cuotas pendientes)
+    installments.forEach((inst) => {
+      if (inst.status !== "ACTIVE" || inst.paid_installments >= inst.total_installments) return;
+      const pDay = inst.payment_day || parseInt(inst.start_date.substring(8, 10), 10) || 15;
+      let targetDate: string;
+      if (pDay >= todayDay) {
+        const mm = String(todayMonth + 1).padStart(2, "0");
+        const dd = String(pDay).padStart(2, "0");
+        targetDate = `${todayYear}-${mm}-${dd}`;
+      } else {
+        const nextMonthDate = new Date(todayYear, todayMonth + 1, pDay);
+        targetDate = nextMonthDate.toISOString().split("T")[0];
+      }
+      list.push({
+        id: `inst-${inst.id}`,
+        name: inst.name,
+        amount_cents: inst.installment_amount_cents,
+        dateStr: targetDate,
+        source: "installment",
+        subLabel: `Cuota ${inst.paid_installments + 1}/${inst.total_installments}`,
+      });
+    });
+
+    // 3. Debts to pay (OWE)
+    debts.forEach((d) => {
+      if (d.type === "OWE" && !d.is_archived && d.remaining_cents > 0 && d.due_date) {
+        list.push({
+          id: `debt-${d.id}`,
+          name: d.name,
+          amount_cents: d.remaining_cents,
+          dateStr: d.due_date,
+          source: "debt",
+          subLabel: "Compromiso de pago",
+        });
+      }
+    });
+
+    // Sort ascending by dateStr
+    list.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+
+    // Show upcoming (today or future), or nearest if none in the future
+    const upcomingOrToday = list.filter((item) => item.dateStr >= todayStr);
+    const finalItems = upcomingOrToday.length > 0 ? upcomingOrToday : list;
+
+    return finalItems.slice(0, 3);
+  }, [recurring, installments, debts, categories]);
+
+  const renderMobileOverview = () => {
+    const netMonthCents = incomeThisMonth - expensesThisMonth;
+
+    return (
+      <div className="space-y-4 pb-32 animate-in fade-in duration-200">
+        {/* 1. BALANCE PRINCIPAL */}
+        <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+              Balance total
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsPrivacyMode(!isPrivacyMode)}
+              className="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-xl transition-colors cursor-pointer"
+              title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+              aria-label={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+            >
+              {isPrivacyMode ? (
+                <EyeOffIcon className="w-4 h-4" />
+              ) : (
+                <EyeIcon className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-1.5">
+            {formatCurrency(totalBalanceCents)}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-zinc-400">
+            Disponible entre tus cuentas
+          </p>
+        </div>
+
+        {/* 2. RESUMEN DEL MES */}
+        <div className="space-y-1.5">
+          <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400 px-1">
+            Este mes
+          </span>
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-sm space-y-3">
+            {/* Ingresos & Gastos */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
+                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Ingresos</span>
+                </div>
+                <div className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+                  {formatCurrency(incomeThisMonth)}
+                </div>
+              </div>
+
+              <div className="space-y-1 border-l border-gray-100 dark:border-zinc-800/80 pl-4">
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
+                  <ArrowDownRight className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                  <span>Gastos</span>
+                </div>
+                <div className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+                  {formatCurrency(expensesThisMonth)}
+                </div>
+              </div>
+            </div>
+
+            {/* Disponible del período */}
+            <div className="border-t border-gray-100 dark:border-zinc-800/80 pt-2.5 flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">
+                Disponible
+              </span>
+              <span
+                className={`text-sm font-bold tracking-tight ${
+                  netMonthCents >= 0
+                    ? "text-gray-900 dark:text-white"
+                    : "text-red-500 dark:text-red-400"
+                }`}
+              >
+                {formatCurrency(netMonthCents)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. ACCIONES RÁPIDAS */}
+        <div className="flex items-center gap-2 relative">
+          <button
+            type="button"
+            onClick={() => {
+              setTxType("EXPENSE");
+              setShowTxModal(true);
+            }}
+            className="flex-1 min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+          >
+            <ArrowDownRight className="w-4 h-4 text-red-400 dark:text-red-500 shrink-0" />
+            <span>Gasto</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTxType("INCOME");
+              setShowTxModal(true);
+            }}
+            className="flex-1 min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 text-gray-900 dark:text-white rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+          >
+            <ArrowUpRight className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span>Ingreso</span>
+          </button>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowMobileTransferMenu(!showMobileTransferMenu)}
+              className="w-11 min-h-[44px] flex items-center justify-center bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 text-gray-600 dark:text-zinc-300 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+              title="Más acciones"
+              aria-label="Más acciones rápidas"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+
+            {showMobileTransferMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setShowMobileTransferMenu(false)}
+                />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-48 bg-white dark:bg-[#0d0d0d] border border-gray-200 dark:border-zinc-800 rounded-xl shadow-lg p-1.5 animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMobileTransferMenu(false);
+                      setTxType("TRANSFER_OUT");
+                      setShowTxModal(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-800 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800/80 rounded-lg transition-colors text-left cursor-pointer"
+                  >
+                    <ArrowRightLeft className="w-4 h-4 text-gray-500 dark:text-zinc-400 shrink-0" />
+                    <span>Transferencia</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* 4. PRÓXIMOS PAGOS */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+              Próximos pagos
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMainTab("planning");
+                setMobilePlanSubView("calendar");
+                setActiveTab("planning");
+              }}
+              className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
+            >
+              Ver todos
+            </button>
+          </div>
+
+          {upcomingPayments.length === 0 ? (
+            <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl text-center">
+              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                No tienes pagos próximos.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-sm overflow-hidden">
+              {upcomingPayments.map((item) => {
+                const dateInfo = formatPaymentDateBadge(item.dateStr);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (item.source === "subscription") {
+                        setMobileMainTab("planning");
+                        setMobilePlanSubView("subscriptions");
+                        setActiveTab("planning");
+                      } else if (item.source === "installment") {
+                        setMobileMainTab("planning");
+                        setMobilePlanSubView("installments");
+                        setActiveTab("planning");
+                      } else if (item.source === "debt") {
+                        setMobileMainTab("more");
+                        setMobileMoreSubView("debts");
+                        setActiveTab("debts");
+                      } else {
+                        setMobileMainTab("planning");
+                        setMobilePlanSubView("calendar");
+                        setActiveTab("planning");
+                      }
+                    }}
+                    className="w-full flex items-center justify-between p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors text-left cursor-pointer min-h-[48px]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <div className="w-10 text-center shrink-0">
+                        <div className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
+                          {dateInfo.day}
+                        </div>
+                        <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase leading-tight tracking-wider">
+                          {dateInfo.month}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                          {item.name}
+                        </div>
+                        {item.subLabel && (
+                          <div className="text-[11px] text-gray-400 dark:text-zinc-500 truncate">
+                            {item.subLabel}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(item.amount_cents)}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* 5. MOVIMIENTOS RECIENTES */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+              Movimientos recientes
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMainTab("transactions");
+                setActiveTab("transactions");
+              }}
+              className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
+            >
+              Ver todos
+            </button>
+          </div>
+
+          {transactions.length === 0 ? (
+            <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl text-center space-y-2">
+              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                Aún no tienes movimientos.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setTxType("EXPENSE");
+                  setShowTxModal(true);
+                }}
+                className="text-xs font-semibold text-gray-900 dark:text-white underline hover:opacity-80 cursor-pointer"
+              >
+                Registrar movimiento
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-sm overflow-hidden">
+              {transactions.slice(0, 4).map((tx) => {
+                const isExpense = tx.type === "EXPENSE" || tx.type === "TRANSFER_OUT";
+                const cat = categories.find((c) => c.id === tx.category_id);
+                const acc = accounts.find((a) => a.id === tx.account_id);
+                const title = tx.description || cat?.name || "Movimiento";
+                const dateShort = formatTxDateShort(tx.date);
+                const accName = acc?.name || "Cuenta";
+
+                return (
+                  <div
+                    key={tx.id}
+                    onClick={() => {
+                      setMobileMainTab("transactions");
+                      setActiveTab("transactions");
+                    }}
+                    className="flex items-center justify-between p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer min-h-[48px]"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <span className="text-xs font-bold shrink-0">
+                        {isExpense ? (
+                          <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />
+                        ) : (
+                          <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                          {title}
+                        </div>
+                        <div className="text-[11px] text-gray-400 dark:text-zinc-500 truncate">
+                          {accName} · {dateShort}
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      className={`text-sm font-semibold shrink-0 ${
+                        isExpense
+                          ? "text-gray-900 dark:text-white"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      {isExpense ? "-" : "+"}
+                      {formatCurrency(tx.amount_cents)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="relative flex flex-col h-full bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 overflow-hidden">
       {/* Content Area */}
@@ -3865,7 +4455,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
             </div>
           ) : (
             <>
-              {renderTabs()}
+              {isMobile ? renderMobileTopNav() : renderTabs()}
 
               {financialAlerts.length > 0 && (
                 <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl shadow-sm space-y-2">
@@ -3897,15 +4487,173 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
 
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={activeTab}
+                  key={effectiveTab}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.2, ease: "easeOut" }}
                 >
+                  {/* Mobile Hierarchical Back Header: Planificar */}
+                  {isMobile && mobileMainTab === "planning" && mobilePlanSubView && (
+                    <div className="mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setMobilePlanSubView(null)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors mb-1.5 py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        <span>Planificar</span>
+                      </button>
+                      <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                        {getPlanSubViewTitle(mobilePlanSubView)}
+                      </h2>
+                    </div>
+                  )}
+
+                  {/* Mobile Hierarchical Back Header: Más */}
+                  {isMobile && mobileMainTab === "more" && mobileMoreSubView && (
+                    <div className="mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setMobileMoreSubView(null)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors mb-1.5 py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        <span>Más</span>
+                      </button>
+                      <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                        {getMoreSubViewTitle(mobileMoreSubView)}
+                      </h2>
+                    </div>
+                  )}
+
+                  {/* MOBILE PLANIFICAR MENU */}
+                  {effectiveTab === "planning_menu" && (
+                    <div className="space-y-4">
+                      <div>
+                        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                          Planificar
+                        </h2>
+                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                          Organiza tu dinero y próximos compromisos.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        {[
+                          { id: "budgets", label: "Presupuestos", icon: PieChart },
+                          { id: "calendar", label: "Calendario de pagos", icon: CalendarDays },
+                          { id: "subscriptions", label: "Suscripciones", icon: Calendar },
+                          { id: "installments", label: "Cuotas", icon: Layers },
+                          { id: "savings", label: "Metas de ahorro", icon: CheckCircle2 },
+                          { id: "shopping", label: "Listas de compras", icon: ShoppingCart },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setMobilePlanSubView(item.id as any);
+                              if (item.id === "calendar") setPlanningSubTab("calendar");
+                              if (item.id === "subscriptions") setPlanningSubTab("subscriptions");
+                              if (item.id === "installments") setPlanningSubTab("installments");
+                            }}
+                            className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-700 dark:text-zinc-300 shrink-0">
+                                <item.icon className="w-4 h-4" />
+                              </div>
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                {item.label}
+                              </span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MOBILE MÁS MENU */}
+                  {effectiveTab === "more_menu" && (
+                    <div className="space-y-6">
+                      <div>
+                        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                          Más
+                        </h2>
+                      </div>
+
+                      {/* FINANZAS SECTION */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold tracking-wider uppercase text-gray-400 dark:text-zinc-500 px-1 block">
+                          FINANZAS
+                        </span>
+                        <div className="space-y-2">
+                          {[
+                            { id: "debts", label: "Deudas y tarjetas", icon: Banknote },
+                            { id: "stats", label: "Análisis financiero", icon: BarChart3 },
+                            { id: "closing", label: "Cierre y reportes", icon: Archive },
+                          ].map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => setMobileMoreSubView(item.id as any)}
+                              className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-700 dark:text-zinc-300 shrink-0">
+                                  <item.icon className="w-4 h-4" />
+                                </div>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  {item.label}
+                                </span>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* GESTIÓN SECTION */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold tracking-wider uppercase text-gray-400 dark:text-zinc-500 px-1 block">
+                          GESTIÓN
+                        </span>
+                        <div className="space-y-2">
+                          {[
+                            { id: "accounts", label: "Cuentas", icon: Wallet },
+                            { id: "categories", label: "Categorías", icon: ListOrdered },
+                            { id: "security", label: "Seguridad", icon: ShieldCheck },
+                            { id: "settings", label: "Ajustes", icon: Settings },
+                          ].map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => setMobileMoreSubView(item.id as any)}
+                              className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-700 dark:text-zinc-300 shrink-0">
+                                  <item.icon className="w-4 h-4" />
+                                </div>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  {item.label}
+                                </span>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* OVERVIEW TAB */}
-                  {activeTab === "overview" && (
-                    <div className="space-y-8">
+                  {effectiveTab === "overview" && (
+                    isMobile ? (
+                      renderMobileOverview()
+                    ) : (
+                      <div className="space-y-8">
                       {/* Stats Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 shadow-sm flex items-center justify-between gap-4">
@@ -4125,7 +4873,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                                   No has definido un presupuesto para este mes.
                                 </p>
                                 <button
-                                  onClick={() => setActiveTab("budgets")}
+                                  onClick={() => {
+                                    setActiveTab("budgets");
+                                    if (isMobile) {
+                                      setMobileMainTab("planning");
+                                      setMobilePlanSubView("budgets");
+                                    }
+                                  }}
                                   className="text-gray-900 dark:text-white text-sm font-medium hover:underline"
                                 >
                                   Crear presupuesto
@@ -4136,10 +4890,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                         </div>
                       </div>
                     </div>
-                  )}
+                  )
+                )}
 
                   {/* TRANSACTIONS TAB */}
-                  {activeTab === "transactions" && (
+                  {effectiveTab === "transactions" && (
                     <div className="space-y-6">
                       <div className="flex justify-between items-center">
                         <h2 className="text-xl font-bold">
@@ -4325,7 +5080,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                   )}
 
                   {/* BUDGETS TAB - Clean & Elegant Breakdown System */}
-                  {activeTab === "budgets" &&
+                  {effectiveTab === "budgets" &&
                     (() => {
                       const currentSelectedMonthBudget = budgets.find(
                         (b) => b.month === selectedBudgetMonth,
@@ -4800,32 +5555,34 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     })()}
 
                   {/* PLANNING TAB */}
-                  {activeTab === "planning" && (
+                  {effectiveTab === "planning" && (
                     <div className="space-y-6">
                       {/* Planning Sub-nav */}
-                      <div className="flex gap-1.5 p-1 bg-gray-100 dark:bg-zinc-800 rounded-xl overflow-x-auto scrollbar-none">
-                        <button
-                          onClick={() => setPlanningSubTab("calendar")}
-                          className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === "calendar" ? "bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
-                        >
-                          <CalendarDays className="w-3.5 h-3.5" />
-                          Calendario de Pagos
-                        </button>
-                        <button
-                          onClick={() => setPlanningSubTab("subscriptions")}
-                          className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === "subscriptions" ? "bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                          Suscripciones ({recurring.length})
-                        </button>
-                        <button
-                          onClick={() => setPlanningSubTab("installments")}
-                          className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === "installments" ? "bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
-                        >
-                          <Layers className="w-3.5 h-3.5" />
-                          Cuotas ({installments.length})
-                        </button>
-                      </div>
+                      {!isMobile && (
+                        <div className="flex gap-1.5 p-1 bg-gray-100 dark:bg-zinc-800 rounded-xl overflow-x-auto scrollbar-none">
+                          <button
+                            onClick={() => setPlanningSubTab("calendar")}
+                            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === "calendar" ? "bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
+                          >
+                            <CalendarDays className="w-3.5 h-3.5" />
+                            Calendario de Pagos
+                          </button>
+                          <button
+                            onClick={() => setPlanningSubTab("subscriptions")}
+                            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === "subscriptions" ? "bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            Suscripciones ({recurring.length})
+                          </button>
+                          <button
+                            onClick={() => setPlanningSubTab("installments")}
+                            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap shrink-0 ${planningSubTab === "installments" ? "bg-white dark:bg-[#0a0a0a] shadow-sm text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
+                          >
+                            <Layers className="w-3.5 h-3.5" />
+                            Cuotas ({installments.length})
+                          </button>
+                        </div>
+                      )}
 
                       {/* Sub-tab 1: Payment Calendar */}
                       {planningSubTab === "calendar" && (
@@ -5488,7 +6245,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                   )}
 
                   {/* SAVINGS TAB */}
-                  {activeTab === "savings" && (
+                  {effectiveTab === "savings" && (
                     <div className="space-y-6">
                       <div className="flex justify-between items-center border-b border-gray-200 dark:border-zinc-800 pb-3">
                         <div>
@@ -5893,7 +6650,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                   )}
 
                   {/* SHOPPING TAB */}
-                  {activeTab === "shopping" && (
+                  {effectiveTab === "shopping" && (
                     <div className="space-y-6">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
@@ -6331,7 +7088,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                   )}
 
                   {/* DEBTS & CARDS TAB */}
-                  {activeTab === "debts" && (
+                  {effectiveTab === "debts" && (
                     <div className="space-y-10">
                       {/* Credit & Debit Cards Visual Section */}
                       <div className="space-y-4">
@@ -6718,7 +7475,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                   )}
 
                   {/* STATS TAB */}
-                  {activeTab === "stats" &&
+                  {effectiveTab === "stats" &&
                     (() => {
                       // Calculate analytics metrics
                       const totalIncome = transactions
@@ -7283,7 +8040,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                     })()}
 
                   {/* CLOSING TAB */}
-                  {activeTab === "closing" && (
+                  {effectiveTab === "closing" && (
                     <div className="space-y-6 max-w-4xl mx-auto">
                       <div className="flex justify-between items-center border-b border-gray-200 dark:border-zinc-800 pb-3">
                         <div>
@@ -7550,20 +8307,23 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                   )}
 
                   {/* SETTINGS TAB */}
-                  {activeTab === "settings" && (
+                  {effectiveTab === "settings" && (
                     <div className="space-y-8 max-w-4xl mx-auto">
-                      <div className="border-b border-gray-200 dark:border-zinc-800 pb-4">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                          Configuración del Sistema
-                        </h2>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Gestiona tus cuentas financieras, categorías de
-                          presupuesto y opciones de seguridad
-                        </p>
-                      </div>
+                      {(!isMobile || mobileMoreSubView === "settings") && (
+                        <div className="border-b border-gray-200 dark:border-zinc-800 pb-4">
+                          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                            Configuración del Sistema
+                          </h2>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Gestiona tus cuentas financieras, categorías de
+                            presupuesto y opciones de seguridad
+                          </p>
+                        </div>
+                      )}
 
                       <div className="space-y-8">
                         {/* SECTION 1: ACCOUNTS */}
+                        {(!isMobile || mobileMoreSubView === "accounts" || mobileMoreSubView === "settings") && (
                         <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-zinc-800 pb-3">
                             <div>
@@ -7720,8 +8480,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             ))}
                           </div>
                         </div>
+                        )}
 
                         {/* SECTION 2: CATEGORIES & BUDGETS */}
+                        {(!isMobile || mobileMoreSubView === "categories" || mobileMoreSubView === "settings") && (
                         <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-6">
                           <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
                             <div>
@@ -7850,8 +8612,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             </div>
                           </div>
                         </div>
+                        )}
 
                         {/* SECTION 3: SECURITY & PIN */}
+                        {(!isMobile || mobileMoreSubView === "security" || mobileMoreSubView === "settings") && (
                         <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
                           <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
                             <div>
@@ -8009,6 +8773,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose }) => {
                             )}
                           </div>
                         </div>
+                        )}
                       </div>
                     </div>
                   )}
