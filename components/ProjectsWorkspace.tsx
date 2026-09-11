@@ -9,7 +9,7 @@ import AddTaskModal from './AddTaskModal';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal, DollarSign
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear, isTomorrow, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cleanToPlainText } from '../utils/textCleaner';
@@ -1333,108 +1333,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     <div className="relative">
                                         <button
                                             type="button"
-                                            onClick={() => setIsQuickAddOpen(!isQuickAddOpen)}
+                                            onClick={() => setIsQuickAddOpen(true)}
                                             className="p-2 rounded-xl text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                             aria-label="Agregar al proyecto"
                                             title="Agregar al proyecto"
                                         >
                                             <Plus className="w-5 h-5" />
                                         </button>
-
-                                        {isQuickAddOpen && (
-                                            <>
-                                                <div 
-                                                    className="fixed inset-0 z-40" 
-                                                    onClick={() => setIsQuickAddOpen(false)} 
-                                                />
-                                                <div 
-                                                    className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 origin-top-right text-zinc-900 dark:text-zinc-100 font-sans"
-                                                    onClick={e => e.stopPropagation()}
-                                                >
-                                                    <div className="px-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800/80 mb-1">
-                                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                                            Agregar al proyecto
-                                                        </span>
-                                                    </div>
-                                                    
-                                                    {/* 1. Nueva tarea */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            setKanbanAddModalCol(null);
-                                                            setShowQuickAddTaskModal(true);
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <CheckSquare className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Nueva tarea</span>
-                                                    </button>
-
-                                                    {/* 2. Nota */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            handleCreateProjectNote();
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <FileText className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Nota</span>
-                                                    </button>
-
-                                                    {/* 3. Archivo */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            setActiveTab('docs');
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <Paperclip className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Archivo</span>
-                                                    </button>
-
-                                                    {/* 4. Gasto */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            setIsExpenseModalOpen(true);
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <DollarSign className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Gasto</span>
-                                                    </button>
-
-                                                    {/* 5. Registrar tiempo */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            setIsTimeModalOpen(true);
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <Clock className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Tiempo</span>
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
                                     </div>
                                     <button
                                         type="button"
@@ -1591,107 +1496,12 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <>
                                     <div className="relative">
                                         <button 
-                                            onClick={() => setIsQuickAddOpen(!isQuickAddOpen)}
+                                            onClick={() => setIsQuickAddOpen(true)}
                                             className="px-2.5 py-1.5 text-xs bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 rounded-lg transition-all flex items-center gap-1.5 font-bold shadow-2xs"
                                             title="Agregar al Proyecto"
                                         >
                                             <Plus className="w-3.5 h-3.5" /> Agregar
                                         </button>
-
-                                        {isQuickAddOpen && (
-                                            <>
-                                                <div 
-                                                    className="fixed inset-0 z-40" 
-                                                    onClick={() => setIsQuickAddOpen(false)} 
-                                                />
-                                                <div 
-                                                    className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 origin-top-right text-zinc-900 dark:text-zinc-100 font-sans"
-                                                    onClick={e => e.stopPropagation()}
-                                                >
-                                                    <div className="px-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800/80 mb-1">
-                                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                                            Agregar al proyecto
-                                                        </span>
-                                                    </div>
-                                                    
-                                                    {/* 1. Nueva tarea */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            setKanbanAddModalCol(null);
-                                                            setShowQuickAddTaskModal(true);
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <CheckSquare className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Nueva tarea</span>
-                                                    </button>
-
-                                                    {/* 2. Nota */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            handleCreateProjectNote();
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <FileText className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Nota</span>
-                                                    </button>
-
-                                                    {/* 3. Archivo */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            setActiveTab('docs');
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <Paperclip className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Archivo</span>
-                                                    </button>
-
-                                                    {/* 4. Gasto */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            setIsExpenseModalOpen(true);
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <DollarSign className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Gasto</span>
-                                                    </button>
-
-                                                    {/* 5. Registrar tiempo */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setIsQuickAddOpen(false);
-                                                            setIsTimeModalOpen(true);
-                                                        }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
-                                                    >
-                                                        <div className="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                                                            <Clock className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <span>Tiempo</span>
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
                                     </div>
                                     <button 
                                         onClick={() => setInboxModalOpen(true)}
@@ -2699,33 +2509,33 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             return (
                 <div className="p-8 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6 font-sans">
                     {/* Top Navigation Back & Sprint Title - Clean 2-Row Native Mobile Layout */}
-                    <div className="bg-white dark:bg-[#111] p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-3">
+                    <div className="space-y-4">
                         {/* Fila 1: Regresar, Nombre, Estado, Compartir, Editar */}
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <button
                                     type="button"
                                     onClick={() => setSelectedSprintId(null)}
-                                    className="p-1.5 sm:px-2.5 sm:py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 flex items-center gap-1"
+                                    className="p-2 sm:px-3 sm:py-2 bg-gray-100 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 flex items-center gap-1.5"
                                     aria-label="Volver a Sprints"
                                     title="Volver a Sprints"
                                 >
                                     <ChevronLeft className="w-4 h-4" />
                                     <span className="hidden sm:inline">Sprints</span>
                                 </button>
-                                <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white tracking-tight truncate">
+                                <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-tight truncate">
                                     {currentSprint.name}
                                 </h2>
-                                <span className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full font-semibold border shrink-0 ${
-                                    currentSprint.status === 'active' ? 'bg-zinc-100 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100' :
-                                    currentSprint.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                                    'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
+                                <span className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                                    currentSprint.status === 'active' ? 'bg-zinc-900 text-white dark:bg-white dark:text-black' :
+                                    currentSprint.status === 'completed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                                    'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
                                 }`}>
-                                    {currentSprint.status === 'active' ? '● En Curso' : currentSprint.status === 'completed' ? '✓ Completado' : 'Planificación'}
+                                    {currentSprint.status === 'active' ? 'En Curso' : currentSprint.status === 'completed' ? 'Completado' : 'Planificación'}
                                 </span>
                             </div>
 
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -2736,48 +2546,64 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         setShareError(null);
                                         setShareUpdateModal({ isOpen: true, title: `Compartir Sprint: ${currentSprint.name}`, updateText: text });
                                     }}
-                                    className="p-2 sm:px-3 sm:py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-700 shadow-2xs"
+                                    className="p-2 sm:px-3 sm:py-2 text-xs bg-gray-100 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
                                     title="Compartir Sprint en Canal"
                                     aria-label="Compartir Sprint"
                                 >
-                                    <Share2 className="w-3.5 h-3.5 text-blue-500" />
+                                    <Share2 className="w-4 h-4 text-blue-500" />
                                     <span className="hidden sm:inline">Compartir</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setSprintModal({ isOpen: true, sprint: currentSprint })}
-                                    className="p-2 sm:px-3 sm:py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-sm"
+                                    className="p-2 sm:px-3 sm:py-2 bg-zinc-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-zinc-800 dark:hover:bg-gray-200 transition-colors flex items-center gap-1.5"
                                     title="Editar Sprint"
                                     aria-label="Editar Sprint"
                                 >
-                                    <Edit2 className="w-3.5 h-3.5" />
+                                    <Edit2 className="w-4 h-4" />
                                     <span className="hidden sm:inline">Editar</span>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Fila 2: Fecha y rango sin montar nada */}
-                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-100 dark:border-gray-800/60">
-                            <CalendarIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        {/* Fila 2: Fecha y rango */}
+                        <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 pl-1">
+                            <CalendarIcon className="w-4 h-4 shrink-0 text-gray-400" />
                             <span>Rango: {currentSprint.start_date || 'Sin fecha de inicio'} — {currentSprint.end_date || 'Sin fecha de fin'}</span>
                         </div>
                     </div>
 
-                    {/* Sprint Goal & Progress Card */}
-                    <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-4">
-                        {currentSprint.goal && (
-                            <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed bg-gray-50 dark:bg-zinc-900/40 p-3.5 rounded-xl border border-gray-100 dark:border-gray-800">
-                                <strong className="font-bold text-gray-900 dark:text-white block mb-0.5">🎯 Objetivo del Sprint:</strong>
-                                {currentSprint.goal}
-                            </p>
-                        )}
-                        <div className="space-y-1.5">
-                            <div className="flex justify-between text-xs font-medium text-gray-500">
-                                <span>Progreso de Tareas ({completedTasks} / {totalTasks} tareas)</span>
-                                <span>{progress}%</span>
-                            </div>
-                            <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-600 dark:bg-blue-400 transition-all duration-300" style={{ width: `${progress}%` }} />
+                    {/* Sprint Goal & Progress Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                        {/* Box 1: Objetivo */}
+                        <div className="bg-white dark:bg-[#111] p-5 sm:p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex flex-col max-h-[160px]">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2 shrink-0">
+                                <Target className="w-4 h-4 text-zinc-400" /> Objetivo del Sprint
+                            </h3>
+                            {currentSprint.goal ? (
+                                <div className="overflow-y-auto pr-2 custom-scrollbar">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">
+                                        {currentSprint.goal}
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-400 italic">No se ha definido un objetivo para este sprint.</p>
+                            )}
+                        </div>
+
+                        {/* Box 2: Progreso */}
+                        <div className="bg-white dark:bg-[#111] p-5 sm:p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex flex-col justify-center">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-blue-500" /> Progreso de Tareas
+                            </h3>
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    <span>{completedTasks} de {totalTasks} completadas</span>
+                                    <span>{progress}%</span>
+                                </div>
+                                <div className="w-full h-2.5 bg-gray-100 dark:bg-gray-800/80 rounded-full overflow-hidden">
+                                    <div className="h-full bg-blue-600 dark:bg-blue-500 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2786,7 +2612,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Sprint Tasks */}
                         <div className="bg-transparent p-0 rounded-none border-0 shadow-none space-y-4">
-                            <div className="flex items-center justify-between pb-3">
+                            <div className="flex items-center justify-between pb-1">
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <CheckSquare className="w-4 h-4 text-emerald-500" /> Tareas del Sprint ({sprintTasks.length})
                                 </h3>
@@ -2796,22 +2622,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         setSprintIdForAddTask(currentSprint.id);
                                         setShowQuickAddTaskModal(true);
                                     }}
-                                    className="px-2.5 py-1 text-xs bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1 shadow-2xs"
+                                    className="px-2.5 py-1.5 text-xs bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1 shadow-2xs"
                                 >
                                     <Plus className="w-3.5 h-3.5" /> Nueva Tarea
                                 </button>
                             </div>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSprintIdForAddTask(currentSprint.id);
-                                    setShowQuickAddTaskModal(true);
-                                }}
-                                className="w-full py-2.5 px-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors border border-dashed border-zinc-300 dark:border-zinc-700"
-                            >
-                                <Plus className="w-4 h-4 text-blue-500" /> Crear tarea en este sprint
-                            </button>
 
                             {sprintTasks.length === 0 ? (
                                 <p className="text-xs text-gray-400 py-6 text-center">No hay tareas asignadas a este sprint todavía. Añade desde el backlog abajo.</p>
@@ -8073,7 +7888,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         <input 
                             name="name" 
                             required 
-                            autoFocus
                             placeholder="Ej. Rediseño de Plataforma, Campaña Q3..." 
                             className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500" 
                         />
@@ -9204,6 +9018,114 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 projects={projects}
                 fixedProjectId={activeProject?.id}
             />
+
+            <AnimatePresence>
+                {isQuickAddOpen && (
+                    <div className="fixed inset-0 z-[100020] flex items-end justify-center">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-xs" 
+                            onClick={() => setIsQuickAddOpen(false)} 
+                        />
+                        <motion.div 
+                            initial={{ y: "100%" }}
+                            animate={{ y: 0 }}
+                            exit={{ y: "100%" }}
+                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            className="relative bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-200 dark:border-zinc-800 shadow-2xl overflow-hidden pb-8 font-sans"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex justify-center py-3.5 cursor-pointer" onClick={() => setIsQuickAddOpen(false)}>
+                                <div className="w-12 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+                            </div>
+                            <div className="px-6 py-2 border-b border-zinc-100 dark:border-zinc-800/80 mb-2">
+                                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                                    Agregar al proyecto
+                                </span>
+                            </div>
+                            <div className="px-4 space-y-1">
+                                {/* 1. Nueva tarea */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsQuickAddOpen(false);
+                                        setKanbanAddModalCol(null);
+                                        setShowQuickAddTaskModal(true);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                >
+                                    <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                        <CheckSquare className="w-4 h-4" />
+                                    </div>
+                                    <span>Nueva tarea</span>
+                                </button>
+
+                                {/* 2. Nota */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsQuickAddOpen(false);
+                                        handleCreateProjectNote();
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                >
+                                    <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                        <FileText className="w-4 h-4" />
+                                    </div>
+                                    <span>Nota</span>
+                                </button>
+
+                                {/* 3. Archivo */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsQuickAddOpen(false);
+                                        setActiveTab('docs');
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                >
+                                    <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                        <Paperclip className="w-4 h-4" />
+                                    </div>
+                                    <span>Archivo</span>
+                                </button>
+
+                                {/* 4. Gasto */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsQuickAddOpen(false);
+                                        setIsExpenseModalOpen(true);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                >
+                                    <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                        <DollarSign className="w-4 h-4" />
+                                    </div>
+                                    <span>Gasto</span>
+                                </button>
+
+                                {/* 5. Registrar tiempo */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsQuickAddOpen(false);
+                                        setIsTimeModalOpen(true);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
+                                >
+                                    <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                                        <Clock className="w-4 h-4" />
+                                    </div>
+                                    <span>Tiempo</span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* MODAL EDITOR ENRIQUECIDO DE NOTAS DEL PROYECTO */}
             <ProjectNoteEditorModal
