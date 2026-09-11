@@ -25,7 +25,7 @@ import {
     RefreshCw,
     Bell,
     X,
-    ExternalLink
+    ExternalLink, ChevronDown
 } from 'lucide-react';
 import { format, addDays, subDays, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
