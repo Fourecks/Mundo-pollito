@@ -34,9 +34,12 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   const [hasEndDate, setHasEndDate] = useState(false);
   const [endDate, setEndDate] = useState('');
   const [time, setTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [repeat, setRepeat] = useState('none');
+  const [customRepeatDays, setCustomRepeatDays] = useState<string[]>([]);
   const [reminder, setReminder] = useState('none');
   const [notes, setNotes] = useState(taskToEdit?.description || '');
+  const [subtasks, setSubtasks] = useState<{ id: string, title: string, completed: boolean }[]>([]);
 
   useEffect(() => {
       if(taskToEdit) {
@@ -53,7 +56,16 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         setPriority('medium');
         setSelectedProjectId(fixedProjectId || null);
         setAssignee(null);
+        setNotes('');
+        setTime('');
+        setEndTime('');
+        setRepeat('none');
+        setCustomRepeatDays([]);
+        setSubtasks([]);
       }
+      setShowAdvanced(false);
+      setHasEndDate(false);
+      setEndDate('');
   }, [taskToEdit, fixedProjectId, isOpen]);
 
   const handleSubmit = async () => {
@@ -62,9 +74,12 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         dueDate: hasDueDate ? dueDate : null,
         endDate: hasEndDate ? endDate : null,
         time: time || null,
+        endTime: endTime || null,
         repeat,
+        customRepeatDays: repeat === 'custom' ? customRepeatDays : null,
         reminder,
         description: notes,
+        subtasks,
         priority,
         projectId: fixedProjectId ?? selectedProjectId,
         assignee
@@ -82,8 +97,8 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   console.log("Debugging selectedProject:", selectedProject);
-  // Robust detection: check mode OR existence of members
-  const isAdvancedProject = selectedProject?.project_mode === 'advanced' || (selectedProject?.members && selectedProject.members.length > 0);
+  // Robust detection: Only advanced projects have Assignee field
+  const isAdvancedProject = selectedProject?.project_mode === 'advanced';
 
   return (
     <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/40 backdrop-blur-xs" onClick={onClose}>
@@ -106,9 +121,9 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
             className="w-full text-lg font-bold bg-transparent placeholder-zinc-400 focus:outline-none dark:text-white"
           />
           
-          <div className="flex gap-3">
-             <div className="flex-1 space-y-1">
-                 <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">
+          <div className="grid grid-cols-2 gap-3">
+             <div className="space-y-1 min-w-0">
+                 <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-semibold uppercase tracking-wider block mb-1">
                      <span>{hasDueDate ? 'Fecha de inicio' : 'Sin fecha'}</span>
                  </div>
                  <input 
@@ -116,12 +131,12 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                     disabled={!hasDueDate}
                     value={dueDate} 
                     onChange={e => setDueDate(e.target.value)} 
-                    className={`w-full p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white ${!hasDueDate ? 'opacity-50' : ''}`} 
+                    className={`w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white ${!hasDueDate ? 'opacity-50' : ''}`} 
                  />
              </div>
-             <div className="flex-1 space-y-1">
+             <div className="space-y-1 min-w-0">
                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Prioridad</label>
-                 <select value={priority} onChange={e => setPriority(e.target.value as Priority)} className="w-full p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
+                 <select value={priority} onChange={e => setPriority(e.target.value as Priority)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
                     <option value="low">Baja</option>
                     <option value="medium">Media</option>
                     <option value="high">Alta</option>
@@ -131,19 +146,19 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
 
           <div className={isAdvancedProject ? "grid grid-cols-2 gap-3" : ""}>
               {!fixedProjectId && (
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Proyecto</label>
-                    <select value={selectedProjectId || ''} onChange={e => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)} className="w-full p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
+                    <select value={selectedProjectId || ''} onChange={e => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
                         <option value="">Ninguno</option>
                         {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
               )}
               {isAdvancedProject && (
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Asignar a</label>
-                    <select value={assignee || ''} onChange={e => setAssignee(e.target.value || null)} className="w-full p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
-                            <option value="">Yo</option>
+                    <select value={assignee || ''} onChange={e => setAssignee(e.target.value || null)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white">
+                            <option value="">General (Sin asignar)</option>
                             {selectedProject?.members?.map(m => <option key={m.id} value={m.email}>{m.name}</option>)}
                     </select>
                   </div>
@@ -167,14 +182,17 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                         {/* FECHAS AVANZADAS */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Asignar fecha</span>
-                                <input type="checkbox" checked={hasDueDate} onChange={() => setHasDueDate(!hasDueDate)} className="w-4 h-4 rounded text-zinc-900 focus:ring-zinc-900 border-zinc-300" />
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Sin fecha</span>
+                                <input type="checkbox" checked={!hasDueDate} onChange={() => {
+                                    const noDate = !hasDueDate;
+                                    setHasDueDate(!noDate);
+                                    if (noDate) setHasEndDate(false);
+                                }} className="w-4 h-4 rounded text-zinc-900 focus:ring-zinc-900 border-zinc-300" />
                             </div>
-                            <div className="flex items-center justify-between">
+                            <div className={`flex items-center justify-between ${!hasDueDate ? 'opacity-50' : ''}`}>
                                 <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Rango de fecha</span>
-                                <input type="checkbox" checked={hasEndDate} onChange={() => {
+                                <input type="checkbox" checked={hasEndDate} disabled={!hasDueDate} onChange={() => {
                                     setHasEndDate(!hasEndDate);
-                                    if (!hasEndDate) setHasDueDate(true);
                                 }} className="w-4 h-4 rounded text-zinc-900 focus:ring-zinc-900 border-zinc-300" />
                             </div>
                             {hasEndDate && (
@@ -194,14 +212,25 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                         <div className="h-px bg-zinc-200 dark:bg-zinc-700/50 w-full" />
 
                         {/* HORA */}
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Hora</label>
-                            <input 
-                                type="time"
-                                value={time}
-                                onChange={e => setTime(e.target.value)}
-                                className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white"
-                            />
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Hora inicio</label>
+                                <input 
+                                    type="time"
+                                    value={time}
+                                    onChange={e => setTime(e.target.value)}
+                                    className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Hora fin</label>
+                                <input 
+                                    type="time"
+                                    value={endTime}
+                                    onChange={e => setEndTime(e.target.value)}
+                                    className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white"
+                                />
+                            </div>
                         </div>
 
                         {/* REPETICION */}
@@ -212,7 +241,67 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                                 <option value="daily">Diariamente</option>
                                 <option value="weekly">Semanalmente</option>
                                 <option value="monthly">Mensualmente</option>
+                                <option value="custom">Personalizada</option>
                             </select>
+                            {repeat === 'custom' && (
+                                <div className="flex justify-between mt-2">
+                                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            onClick={() => {
+                                                setCustomRepeatDays(prev => 
+                                                    prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+                                                );
+                                            }}
+                                            className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${
+                                                customRepeatDays.includes(day) 
+                                                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' 
+                                                : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                                            }`}
+                                        >
+                                            {day}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* SUBTAREAS */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Subtareas</label>
+                            <div className="space-y-2">
+                                {subtasks.map(st => (
+                                    <div key={st.id} className="flex items-center gap-2">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={st.completed}
+                                            onChange={() => {
+                                                setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, completed: !s.completed } : s));
+                                            }}
+                                            className="w-4 h-4 rounded text-zinc-900 border-zinc-300"
+                                        />
+                                        <input 
+                                            value={st.title}
+                                            onChange={e => {
+                                                setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, title: e.target.value } : s));
+                                            }}
+                                            placeholder="Título de subtarea..."
+                                            className="flex-1 bg-transparent border-b border-zinc-200 dark:border-zinc-700 outline-none text-sm px-1 py-0.5 dark:text-white"
+                                        />
+                                        <button type="button" onClick={() => setSubtasks(prev => prev.filter(s => s.id !== st.id))} className="text-zinc-400 hover:text-red-500">
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button 
+                                    type="button"
+                                    onClick={() => setSubtasks(prev => [...prev, { id: Math.random().toString(36).substring(7), title: '', completed: false }])}
+                                    className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1"
+                                >
+                                    + Añadir subtarea
+                                </button>
+                            </div>
                         </div>
 
                         {/* RECORDATORIO */}

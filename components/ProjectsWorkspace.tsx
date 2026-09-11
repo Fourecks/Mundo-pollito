@@ -2511,8 +2511,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     {/* Top Navigation Back & Sprint Title - Clean 2-Row Native Mobile Layout */}
                     <div className="space-y-4">
                         {/* Fila 1: Regresar, Nombre, Estado, Compartir, Editar */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2 sm:gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                                 <button
                                     type="button"
                                     onClick={() => setSelectedSprintId(null)}
@@ -2574,7 +2574,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     {/* Sprint Goal & Progress Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         {/* Box 1: Objetivo */}
                         <div className="bg-white dark:bg-[#111] p-5 sm:p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex flex-col max-h-[160px]">
                             <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2 shrink-0">
