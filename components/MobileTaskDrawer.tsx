@@ -52,6 +52,19 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         setPriority(taskToEdit.priority || 'medium');
         setSelectedProjectId(fixedProjectId || taskToEdit.project_id || null);
         setAssignee(taskToEdit.assignee || null);
+        setNotes(taskToEdit.notes || '');
+        setSubtasks((taskToEdit.subtasks || []).map(st => ({ 
+            id: st.id.toString(), 
+            title: st.text, 
+            completed: st.completed 
+        })));
+        setTime(taskToEdit.start_time || '');
+        setEndTime(taskToEdit.end_time || '');
+        setRepeat(taskToEdit.recurrence?.frequency || 'none');
+        setCustomRepeatDays(taskToEdit.recurrence?.customDays?.map(d => d.toString()) || []);
+        setTimeEnabled(!!taskToEdit.start_time);
+        setRepeatEnabled(!!taskToEdit.recurrence && taskToEdit.recurrence.frequency !== 'none');
+        setReminderEnabled(!!taskToEdit.reminder_at);
       } else {
         setText('');
         setDueDate(new Date().toISOString().split('T')[0]);
@@ -85,7 +98,11 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         customRepeatDays: (repeatEnabled && repeat === 'custom') ? customRepeatDays : null,
         reminder: reminderEnabled ? reminder : 'none',
         description: notes,
-        subtasks,
+        subtasks: subtasks.map(st => ({ 
+            id: parseInt(st.id) || Date.now(), 
+            text: st.title, 
+            completed: st.completed 
+        })),
         priority,
         projectId: fixedProjectId ?? selectedProjectId,
         assignee
@@ -132,10 +149,10 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
             className="w-full text-lg font-bold bg-transparent placeholder-zinc-400 focus:outline-none dark:text-white"
           />
           
-          <div className="grid grid-cols-2 gap-3">
+           <div className="grid grid-cols-2 gap-3 mb-2">
              <div className="space-y-1 min-w-0">
                  <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-semibold uppercase tracking-wider block mb-1">
-                     <span>{hasDueDate ? 'Fecha de inicio' : 'Sin fecha'}</span>
+                     <span>{hasDueDate ? 'Fecha' : 'Sin fecha'}</span>
                  </div>
                  <input 
                     type="date" 
@@ -192,30 +209,31 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                     <div className="p-4 bg-zinc-50 dark:bg-zinc-800/30 rounded-2xl space-y-4">
                         {/* FECHAS AVANZADAS */}
                         <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Sin fecha</span>
-                                <input type="checkbox" checked={!hasDueDate} onChange={() => {
-                                    const noDate = !hasDueDate;
-                                    setHasDueDate(!noDate);
-                                    if (noDate) setHasEndDate(false);
-                                }} className="w-4 h-4 rounded text-zinc-900 focus:ring-zinc-900 border-zinc-300" />
-                            </div>
-                            <div className={`flex items-center justify-between ${!hasDueDate ? 'opacity-50' : ''}`}>
-                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Rango de fecha</span>
-                                <input type="checkbox" checked={hasEndDate} disabled={!hasDueDate} onChange={() => {
-                                    setHasEndDate(!hasEndDate);
-                                }} className="w-4 h-4 rounded text-zinc-900 focus:ring-zinc-900 border-zinc-300" />
-                            </div>
-                            {hasEndDate && (
-                                <div className="pt-1">
-                                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Fecha de finalización</label>
-                                    <input 
-                                        type="date" 
-                                        disabled={!hasDueDate}
-                                        value={endDate}
-                                        onChange={e => setEndDate(e.target.value)}
-                                        className={`w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white ${!hasDueDate ? 'opacity-50' : ''}`}
-                                    />
+                            <label className="flex items-center justify-between cursor-pointer w-full">
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Fecha activa</span>
+                                <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${hasDueDate ? 'bg-zinc-900 dark:bg-white' : 'bg-zinc-300 dark:bg-zinc-600'}`} onClick={() => setHasDueDate(!hasDueDate)}>
+                                    <div className={`w-4 h-4 rounded-full bg-white dark:bg-zinc-900 transition-transform ${hasDueDate ? 'translate-x-4' : ''}`} />
+                                </div>
+                            </label>
+                            
+                            {hasDueDate && (
+                                <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
+                                    <label className="flex items-center justify-between cursor-pointer w-full">
+                                        <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Rango de fecha</span>
+                                        <input type="checkbox" checked={hasEndDate} onChange={() => setHasEndDate(!hasEndDate)} className="w-4 h-4" />
+                                    </label>
+                                    
+                                    {hasEndDate && (
+                                        <div className="pt-1">
+                                            <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Fecha de finalización</label>
+                                            <input 
+                                                type="date" 
+                                                value={endDate}
+                                                onChange={e => setEndDate(e.target.value)}
+                                                className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -224,9 +242,8 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
 
                         {/* HORA */}
                         <div className="space-y-2">
-                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Hora</span>
-                                <input type="checkbox" checked={timeEnabled} onChange={() => setTimeEnabled(!timeEnabled)} className="w-4 h-4 rounded text-zinc-900 border-zinc-300" />
+                             <div className="flex items-center justify-between cursor-pointer" onClick={() => setTimeEnabled(!timeEnabled)}>
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Hora {timeEnabled ? <ChevronUp className="inline w-4 h-4"/> : <ChevronDown className="inline w-4 h-4"/>}</span>
                             </div>
                             {timeEnabled && (
                                 <div className="grid grid-cols-2 gap-3">
@@ -254,9 +271,8 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
 
                         {/* REPETICION */}
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Repetición</span>
-                                <input type="checkbox" checked={repeatEnabled} onChange={() => setRepeatEnabled(!repeatEnabled)} className="w-4 h-4 rounded text-zinc-900 border-zinc-300" />
+                            <div className="flex items-center justify-between cursor-pointer" onClick={() => setRepeatEnabled(!repeatEnabled)}>
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Repetición {repeatEnabled ? <ChevronUp className="inline w-4 h-4"/> : <ChevronDown className="inline w-4 h-4"/>}</span>
                             </div>
                             {repeatEnabled && (
                                 <>
@@ -295,9 +311,8 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
 
                         {/* RECORDATORIO */}
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Recordatorio</span>
-                                <input type="checkbox" checked={reminderEnabled} onChange={() => setReminderEnabled(!reminderEnabled)} className="w-4 h-4 rounded text-zinc-900 border-zinc-300" />
+                            <div className="flex items-center justify-between cursor-pointer" onClick={() => setReminderEnabled(!reminderEnabled)}>
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Recordatorio {reminderEnabled ? <ChevronUp className="inline w-4 h-4"/> : <ChevronDown className="inline w-4 h-4"/>}</span>
                             </div>
                             {reminderEnabled && (
                                 <select value={reminder} onChange={e => setReminder(e.target.value)} className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white">
