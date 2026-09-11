@@ -4521,6 +4521,9 @@ const App: React.FC = () => {
         target_date: extraData?.target_date || null,
         lead: extraData?.lead || null,
         project_mode: extraData?.project_mode || 'personal',
+        channels: extraData?.channels || [
+          { id: 'general', project_id: tempId, name: 'general', description: 'Canal principal para el equipo', emoji: '💬', is_private: false, created_at: new Date().toISOString() }
+        ],
         ...extraData
       };
       

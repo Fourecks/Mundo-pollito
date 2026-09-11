@@ -16,6 +16,7 @@ interface AddTaskModalProps {
   initialDate?: string;
   initialAssignee?: string | null;
   defaultKanbanColumn?: string | null;
+  defaultSprintId?: string | null;
 }
 
 const AddTaskModal: React.FC<AddTaskModalProps> = ({ 
@@ -27,7 +28,8 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
   activeProject = null,
   initialDate,
   initialAssignee = '',
-  defaultKanbanColumn = 'Por hacer'
+  defaultKanbanColumn = 'Por hacer',
+  defaultSprintId = null
 }) => {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -77,6 +79,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
   // Subtasks
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtaskInput, setSubtaskInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Determine current project and whether it is advanced
   const effectiveProjectId = fixedProjectId ?? (activeProject?.id ?? selectedProjectId);
@@ -203,38 +206,44 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || isSubmitting) return;
 
-    const effectiveProjectId = fixedProjectId ?? selectedProjectId;
-    const isAdv = isCurrentProjectAdvanced;
+    setIsSubmitting(true);
+    try {
+      const effectiveProjectId = fixedProjectId ?? selectedProjectId;
+      const isAdv = isCurrentProjectAdvanced;
 
-    let subtasksToSave = [...subtasks];
-    if (subtaskInput.trim()) {
-      subtasksToSave.push({ id: Date.now(), text: subtaskInput.trim(), completed: false });
+      let subtasksToSave = [...subtasks];
+      if (subtaskInput.trim()) {
+        subtasksToSave.push({ id: Date.now(), text: subtaskInput.trim(), completed: false });
+      }
+
+      const recurrenceToSave: RecurrenceRule = (hasRecurrence && !isUndated)
+        ? { frequency: recurrenceFreq, id: crypto.randomUUID() }
+        : { frequency: 'none' };
+
+      await onAddTask(text.trim(), {
+        projectId: effectiveProjectId,
+        isUndated,
+        dueDate: isUndated ? null : dueDate,
+        endDate: isUndated || !hasEndDate ? undefined : endDate,
+        priority,
+        assignee: isAdv ? (assignee.trim() || null) : null,
+        assigned_to: isAdv ? (assignee.trim() || null) : null,
+        startTime: hasTime && !isUndated ? startTime : undefined,
+        endTime: hasTime && !isUndated ? endTime : undefined,
+        reminder_offset: hasReminder && !isUndated ? reminderOffset : undefined,
+        recurrence: recurrenceToSave,
+        notes: notes.trim() ? notes.trim() : undefined,
+        subtasks: subtasksToSave.length > 0 ? subtasksToSave : undefined,
+        kanban_column: defaultKanbanColumn || 'Por hacer',
+        sprint_id: defaultSprintId || undefined
+      });
+
+      onClose();
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const recurrenceToSave: RecurrenceRule = (hasRecurrence && !isUndated)
-      ? { frequency: recurrenceFreq, id: crypto.randomUUID() }
-      : { frequency: 'none' };
-
-    await onAddTask(text.trim(), {
-      projectId: effectiveProjectId,
-      isUndated,
-      dueDate: isUndated ? null : dueDate,
-      endDate: isUndated || !hasEndDate ? undefined : endDate,
-      priority,
-      assignee: isAdv ? (assignee.trim() || null) : null,
-      assigned_to: isAdv ? (assignee.trim() || null) : null,
-      startTime: hasTime && !isUndated ? startTime : undefined,
-      endTime: hasTime && !isUndated ? endTime : undefined,
-      reminder_offset: hasReminder && !isUndated ? reminderOffset : undefined,
-      recurrence: recurrenceToSave,
-      notes: notes.trim() ? notes.trim() : undefined,
-      subtasks: subtasksToSave.length > 0 ? subtasksToSave : undefined,
-      kanban_column: defaultKanbanColumn || 'Por hacer'
-    });
-
-    onClose();
   };
 
   if (!isOpen) return null;

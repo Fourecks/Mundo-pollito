@@ -282,6 +282,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [personalDateFilter, setPersonalDateFilter] = useState<'all' | 'today' | 'upcoming' | 'overdue'>('all');
     const [personalPriorityFilter, setPersonalPriorityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
     const [showQuickAddTaskModal, setShowQuickAddTaskModal] = useState(false);
+    const [sprintIdForAddTask, setSprintIdForAddTask] = useState<number | null>(null);
     const [quickTaskTitle, setQuickTaskTitle] = useState('');
     const [quickTaskPriority, setQuickTaskPriority] = useState<Priority>('medium');
     const [quickTaskDueDate, setQuickTaskDueDate] = useState('');
@@ -636,10 +637,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         if (!activeProject) return [];
         if (!activeProject.channels || activeProject.channels.length === 0) {
             return [
-                { id: 'general', project_id: activeProject.id, name: 'general', description: 'Canal principal para charlar de todo un poco', emoji: '💬', is_private: false, created_at: activeProject.created_at },
-                { id: 'ideas', project_id: activeProject.id, name: 'ideas', description: 'Tormenta de ideas y sugerencias del proyecto', emoji: '💡', is_private: false, created_at: activeProject.created_at },
-                { id: 'anuncios', project_id: activeProject.id, name: 'anuncios', description: 'Notificaciones oficiales del proyecto', emoji: '📢', is_private: false, created_at: activeProject.created_at },
-                { id: 'privado', project_id: activeProject.id, name: 'privado', description: 'Conversaciones privadas entre líderes', emoji: '🔒', is_private: true, created_at: activeProject.created_at }
+                { id: 'general', project_id: activeProject.id, name: 'general', description: 'Canal principal para el equipo', emoji: '💬', is_private: false, created_at: activeProject.created_at }
             ];
         }
         return activeProject.channels;
@@ -1165,7 +1163,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const renderMisTareas = () => {
         if (!activeProject) return null;
-        const myTodos = projectTodos.filter(t => (t.assigned_to === currentUserEmail || t.created_by === currentUserEmail));
+        const myTodos = projectTodos.filter(t => {
+            const assignee = t.assigned_to || t.assignee;
+            if (assignee && assignee !== currentUserEmail) return false;
+            return true;
+        });
         
         const atrasadas = myTodos.filter(t => !t.completed && t.due_date && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)));
         const hoy = myTodos.filter(t => !t.completed && t.due_date && isToday(parseISO(t.due_date)));
@@ -1378,7 +1380,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         type="button"
                                                         onClick={() => {
                                                             setIsQuickAddOpen(false);
-                                                            fileInputRef.current?.click();
+                                                            setActiveTab('docs');
                                                         }}
                                                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
                                                     >
@@ -1635,7 +1637,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                         type="button"
                                                         onClick={() => {
                                                             setIsQuickAddOpen(false);
-                                                            fileInputRef.current?.click();
+                                                            setActiveTab('docs');
                                                         }}
                                                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left group"
                                                     >
@@ -2683,50 +2685,68 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
             return (
                 <div className="p-8 max-w-6xl mx-auto w-full h-full overflow-y-auto pb-24 space-y-6 font-sans">
-                    {/* Top Navigation Back & Sprint Title */}
-                    <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setSelectedSprintId(null)}
-                                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5"
-                            >
-                                <ChevronLeft className="w-4 h-4" /> Volver a Sprints
-                            </button>
-                            <div>
-                                <div className="flex items-center gap-2.5">
-                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">{currentSprint.name}</h2>
-                                    <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${
-                                        currentSprint.status === 'active' ? 'bg-zinc-100 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100' :
-                                        currentSprint.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
-                                        'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
-                                    }`}>
-                                        {currentSprint.status === 'active' ? '● En Curso' : currentSprint.status === 'completed' ? '✓ Completado' : 'Planificación'}
-                                    </span>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-0.5">Fechas: {currentSprint.start_date || 'Sin inicio'} - {currentSprint.end_date || 'Sin fin'}</p>
+                    {/* Top Navigation Back & Sprint Title - Clean 2-Row Native Mobile Layout */}
+                    <div className="bg-white dark:bg-[#111] p-4 sm:p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-3">
+                        {/* Fila 1: Regresar, Nombre, Estado, Compartir, Editar */}
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedSprintId(null)}
+                                    className="p-1.5 sm:px-2.5 sm:py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 flex items-center gap-1"
+                                    aria-label="Volver a Sprints"
+                                    title="Volver a Sprints"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Sprints</span>
+                                </button>
+                                <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white tracking-tight truncate">
+                                    {currentSprint.name}
+                                </h2>
+                                <span className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full font-semibold border shrink-0 ${
+                                    currentSprint.status === 'active' ? 'bg-zinc-100 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100' :
+                                    currentSprint.status === 'completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300' :
+                                    'bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
+                                }`}>
+                                    {currentSprint.status === 'active' ? '● En Curso' : currentSprint.status === 'completed' ? '✓ Completado' : 'Planificación'}
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const text = `📌 **Sprint: ${currentSprint.name}**\n• Progreso: ${completedTasks}/${totalTasks} tareas (${progress}%)\n• Tareas completadas: ${completedTasks} de ${totalTasks}`;
+                                        setShareTargetChannelId(selectedChannelId || 'general');
+                                        setShareChannelPassword('');
+                                        setShareComment('');
+                                        setShareError(null);
+                                        setShareUpdateModal({ isOpen: true, title: `Compartir Sprint: ${currentSprint.name}`, updateText: text });
+                                    }}
+                                    className="p-2 sm:px-3 sm:py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-700 shadow-2xs"
+                                    title="Compartir Sprint en Canal"
+                                    aria-label="Compartir Sprint"
+                                >
+                                    <Share2 className="w-3.5 h-3.5 text-blue-500" />
+                                    <span className="hidden sm:inline">Compartir</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSprintModal({ isOpen: true, sprint: currentSprint })}
+                                    className="p-2 sm:px-3 sm:py-1.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-sm"
+                                    title="Editar Sprint"
+                                    aria-label="Editar Sprint"
+                                >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Editar</span>
+                                </button>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => {
-                                    const text = `📌 **Sprint: ${currentSprint.name}**\n• Progreso: ${completedTasks}/${totalTasks} tareas (${progress}%)\n• Tareas completadas: ${completedTasks} de ${totalTasks}`;
-                                    setShareTargetChannelId(selectedChannelId || 'general');
-                                    setShareChannelPassword('');
-                                    setShareComment('');
-                                    setShareError(null);
-                                    setShareUpdateModal({ isOpen: true, title: `Compartir Sprint: ${currentSprint.name}`, updateText: text });
-                                }}
-                                className="px-3.5 py-2 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 border border-gray-200 dark:border-gray-700 shadow-2xs"
-                            >
-                                <Share2 className="w-3.5 h-3.5 text-blue-500" /> Compartir en Canal
-                            </button>
-                            <button
-                                onClick={() => setSprintModal({ isOpen: true, sprint: currentSprint })}
-                                className="px-3.5 py-2 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors flex items-center gap-1.5 shadow-sm"
-                            >
-                                <Edit2 className="w-3.5 h-3.5" /> Editar Sprint
-                            </button>
+                        {/* Fila 2: Fecha y rango sin montar nada */}
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-100 dark:border-gray-800/60">
+                            <CalendarIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span>Rango: {currentSprint.start_date || 'Sin fecha de inicio'} — {currentSprint.end_date || 'Sin fecha de fin'}</span>
                         </div>
                     </div>
 
@@ -2757,24 +2777,28 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <CheckSquare className="w-4 h-4 text-emerald-500" /> Tareas del Sprint ({sprintTasks.length})
                                 </h3>
-                            </div>
-
-                            <div className="flex gap-2 mb-4">
-                                <input
-                                    type="text"
-                                    value={sprintTaskText}
-                                    onChange={(e) => setSprintTaskText(e.target.value)}
-                                    placeholder="Nueva tarea del sprint..."
-                                    className="flex-1 text-xs p-2.5 rounded-xl bg-gray-50 dark:bg-zinc-900/40 border border-gray-200 dark:border-gray-800 focus:ring-1 focus:ring-blue-500 transition-all"
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSprintTask(e)}
-                                />
                                 <button
-                                    onClick={(e) => handleAddSprintTask(e)}
-                                    className="px-4 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                                    type="button"
+                                    onClick={() => {
+                                        setSprintIdForAddTask(currentSprint.id);
+                                        setShowQuickAddTaskModal(true);
+                                    }}
+                                    className="px-2.5 py-1 text-xs bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1 shadow-2xs"
                                 >
-                                    Añadir
+                                    <Plus className="w-3.5 h-3.5" /> Nueva Tarea
                                 </button>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSprintIdForAddTask(currentSprint.id);
+                                    setShowQuickAddTaskModal(true);
+                                }}
+                                className="w-full py-2.5 px-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors border border-dashed border-zinc-300 dark:border-zinc-700"
+                            >
+                                <Plus className="w-4 h-4 text-blue-500" /> Crear tarea en este sprint
+                            </button>
 
                             {sprintTasks.length === 0 ? (
                                 <p className="text-xs text-gray-400 py-6 text-center">No hay tareas asignadas a este sprint todavía. Añade desde el backlog abajo.</p>
@@ -4601,7 +4625,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
 
         return (
-            <div className={`flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden ${isMobile && !isChatInputFocused ? 'pb-24' : ''}`}>
+            <div className={`flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden ${isMobile && !isChatInputFocused ? 'pb-14' : ''}`}>
                 {/* SELECTOR MÓVIL DE CANALES (BOTTOM SHEET) */}
                 {isMobileChannelDrawerOpen && (
                     <div className="fixed inset-0 z-[10000] flex flex-col justify-end md:hidden animate-in fade-in duration-200">
@@ -4651,19 +4675,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         });
 
                                         return (
-                                            <button
+                                            <div
                                                 key={chan.id}
-                                                onClick={() => {
-                                                    setSelectedChannelId(chan.id);
-                                                    setIsMobileChannelDrawerOpen(false);
-                                                }}
-                                                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs transition-all text-left ${
+                                                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs transition-all ${
                                                     isSelected
                                                         ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold shadow-xs'
                                                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-[0.99]'
                                                 }`}
                                             >
-                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedChannelId(chan.id);
+                                                        setIsMobileChannelDrawerOpen(false);
+                                                    }}
+                                                    className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+                                                >
                                                     <span className={`font-mono text-sm ${isSelected ? 'text-blue-400 dark:text-blue-600' : 'text-zinc-400'}`}>#</span>
                                                     <div className="truncate">
                                                         <div className="truncate font-semibold text-sm">{chan.name}</div>
@@ -4673,16 +4700,49 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 shrink-0">
+                                                </button>
+                                                <div className="flex items-center gap-1.5 shrink-0">
                                                     {hasUnread && (
-                                                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                                                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 mr-1" />
+                                                    )}
+                                                    {chan.id !== 'general' && isProjectCreator && (
+                                                        <div className="flex items-center gap-0.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setIsMobileChannelDrawerOpen(false);
+                                                                    setEditingChannel(chan);
+                                                                    setEditingChannelName(chan.name);
+                                                                    setEditingChannelDescription(chan.description || '');
+                                                                    setEditingChannelEmoji(chan.emoji);
+                                                                    setEditingChannelIsPrivate(chan.is_private);
+                                                                    setEditingChannelPassword(chan.password || '');
+                                                                }}
+                                                                className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'text-zinc-300 hover:text-white hover:bg-zinc-800 dark:text-zinc-600 dark:hover:text-black dark:hover:bg-zinc-200' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                                                                title="Editar canal"
+                                                            >
+                                                                <Edit2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setIsMobileChannelDrawerOpen(false);
+                                                                    setChannelToDelete(chan);
+                                                                }}
+                                                                className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'text-red-300 hover:text-red-100 hover:bg-red-900/40 dark:text-red-600 dark:hover:text-red-800' : 'text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'}`}
+                                                                title="Eliminar canal"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
                                                     )}
                                                     {isSelected && (
-                                                        <Check className="w-4 h-4 shrink-0" />
+                                                        <Check className="w-4 h-4 shrink-0 ml-1" />
                                                     )}
                                                 </div>
-                                            </button>
+                                            </div>
                                         );
                                     })}
                                 </div>
@@ -4714,19 +4774,22 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                             });
 
                                             return (
-                                                <button
+                                                <div
                                                     key={chan.id}
-                                                    onClick={() => {
-                                                        setSelectedChannelId(chan.id);
-                                                        setIsMobileChannelDrawerOpen(false);
-                                                    }}
-                                                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs transition-all text-left ${
+                                                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs transition-all ${
                                                         isSelected
                                                             ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold shadow-xs'
                                                             : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-[0.99]'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedChannelId(chan.id);
+                                                            setIsMobileChannelDrawerOpen(false);
+                                                        }}
+                                                        className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+                                                    >
                                                         <Lock className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-300 dark:text-amber-600' : 'text-amber-500'}`} />
                                                         <div className="truncate">
                                                             <div className="truncate font-semibold text-sm">{chan.name}</div>
@@ -4734,16 +4797,49 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                 {isUnlocked ? '🔓 Desbloqueado' : '🔒 Requiere clave'}
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 shrink-0">
+                                                    </button>
+                                                    <div className="flex items-center gap-1.5 shrink-0">
                                                         {hasUnread && (
-                                                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 mr-1" />
+                                                        )}
+                                                        {isProjectCreator && (
+                                                            <div className="flex items-center gap-0.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setIsMobileChannelDrawerOpen(false);
+                                                                        setEditingChannel(chan);
+                                                                        setEditingChannelName(chan.name);
+                                                                        setEditingChannelDescription(chan.description || '');
+                                                                        setEditingChannelEmoji(chan.emoji);
+                                                                        setEditingChannelIsPrivate(chan.is_private);
+                                                                        setEditingChannelPassword(chan.password || '');
+                                                                    }}
+                                                                    className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'text-zinc-300 hover:text-white hover:bg-zinc-800 dark:text-zinc-600 dark:hover:text-black dark:hover:bg-zinc-200' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                                                                    title="Editar canal"
+                                                                >
+                                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setIsMobileChannelDrawerOpen(false);
+                                                                        setChannelToDelete(chan);
+                                                                    }}
+                                                                    className={`p-1.5 rounded-lg transition-colors ${isSelected ? 'text-red-300 hover:text-red-100 hover:bg-red-900/40 dark:text-red-600 dark:hover:text-red-800' : 'text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'}`}
+                                                                    title="Eliminar canal"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
                                                         )}
                                                         {isSelected && (
-                                                            <Check className="w-4 h-4 shrink-0" />
+                                                            <Check className="w-4 h-4 shrink-0 ml-1" />
                                                         )}
                                                     </div>
-                                                </button>
+                                                </div>
                                             );
                                         })
                                     )}
@@ -4758,7 +4854,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         setIsMobileChannelDrawerOpen(false);
                                         setIsCreateChannelOpen(true);
                                     }}
-                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold shadow-sm active:scale-[0.99] transition-all"
+                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-zinc-900 dark:bg-white hover:opacity-90 active:scale-[0.99] text-white dark:text-zinc-900 text-xs font-bold shadow-sm transition-all"
                                 >
                                     <Plus className="w-4 h-4" />
                                     <span>+ Nuevo canal</span>
@@ -5432,305 +5528,285 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
                 </div>
 
-                {/* 10. CREATE CHANNEL DIALOG/MODAL */}
-                {isCreateChannelOpen && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full shadow-2xl relative">
-                            
+                {/* 10. CREATE CHANNEL MODAL */}
+                <Modal 
+                    isOpen={isCreateChannelOpen} 
+                    onClose={() => setIsCreateChannelOpen(false)} 
+                    title="Crear Nuevo Canal"
+                >
+                    <form onSubmit={handleCreateChannel} className="space-y-4">
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Nombre del Canal</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-xs text-zinc-400 font-bold">#</span>
+                                <input 
+                                    type="text" 
+                                    placeholder="ej. desarrollo"
+                                    value={newChannelName}
+                                    onChange={e => setNewChannelName(e.target.value)}
+                                    className="w-full pl-7 pr-3 py-2 text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-zinc-900 dark:focus:border-white text-zinc-900 dark:text-white font-semibold"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Descripción</label>
+                            <textarea 
+                                placeholder="¿De qué trata este canal?"
+                                value={newChannelDescription}
+                                onChange={e => setNewChannelDescription(e.target.value)}
+                                className="w-full p-2 text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-zinc-900 dark:focus:border-white text-zinc-900 dark:text-white"
+                                rows={2}
+                            />
+                        </div>
+
+                        <div className="space-y-3 pt-1">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-700 dark:text-zinc-300">
+                                <input 
+                                    type="checkbox" 
+                                    checked={newChannelIsPrivate}
+                                    onChange={e => setNewChannelIsPrivate(e.target.checked)}
+                                    className="rounded text-zinc-900 dark:text-white border-zinc-300 dark:border-zinc-700"
+                                />
+                                <span>Canal Privado 🔒</span>
+                            </label>
+
+                            {newChannelIsPrivate && (
+                                <div className="pt-1">
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Contraseña de Acceso (Opcional)</label>
+                                    <input 
+                                        type="password" 
+                                        placeholder="ej. secreto123"
+                                        value={newChannelPassword}
+                                        onChange={e => setNewChannelPassword(e.target.value)}
+                                        className="w-full p-2 text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-zinc-900 dark:focus:border-white text-zinc-900 dark:text-white"
+                                    />
+                                    <p className="text-[10px] text-zinc-500 mt-1">Los demás miembros necesitarán esta contraseña para unirse al canal privado.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="pt-2 flex justify-end gap-2">
                             <button 
+                                type="button" 
                                 onClick={() => setIsCreateChannelOpen(false)}
-                                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                                className="px-4 py-2 text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl font-semibold"
                             >
-                                <X className="w-4 h-4" />
+                                Cancelar
                             </button>
-
-                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4">Crear Nuevo Canal</h3>
-                            
-                            <form onSubmit={handleCreateChannel} className="space-y-4">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Nombre del Canal</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2.5 text-xs text-gray-400 font-bold">#</span>
-                                        <input 
-                                            type="text" 
-                                            placeholder="ej. desarrollo"
-                                            value={newChannelName}
-                                            onChange={e => setNewChannelName(e.target.value)}
-                                            className="w-full pl-7 pr-3 py-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white font-semibold"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Descripción</label>
-                                    <textarea 
-                                        placeholder="¿De qué trata este canal?"
-                                        value={newChannelDescription}
-                                        onChange={e => setNewChannelDescription(e.target.value)}
-                                        className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
-                                        rows={2}
-                                    />
-                                </div>
-
-                                <div className="space-y-3 pt-1">
-                                    <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
-                                        <input 
-                                            type="checkbox"
-                                            checked={newChannelIsPrivate}
-                                            onChange={e => setNewChannelIsPrivate(e.target.checked)}
-                                            className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
-                                        />
-                                        <span>Canal Privado 🔒</span>
-                                    </label>
-
-                                    {newChannelIsPrivate && (
-                                        <div className="pt-1">
-                                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Contraseña de Acceso (Opcional)</label>
-                                            <input 
-                                                type="password" 
-                                                placeholder="ej. secreto123"
-                                                value={newChannelPassword}
-                                                onChange={e => setNewChannelPassword(e.target.value)}
-                                                className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
-                                            />
-                                            <p className="text-[10px] text-gray-500 mt-1">Los demás miembros necesitarán esta contraseña para unirse al canal privado.</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="pt-2 flex justify-end gap-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsCreateChannelOpen(false)}
-                                        className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg font-semibold"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button 
-                                        type="submit" 
-                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow"
-                                    >
-                                        Crear Canal
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* 11. EDIT CHANNEL DIALOG/MODAL */}
-                {editingChannel && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full shadow-2xl relative">
-                            
                             <button 
-                                onClick={() => setEditingChannel(null)}
-                                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                                type="submit" 
+                                className="px-5 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-xs font-bold shadow hover:opacity-90 active:scale-[0.99]"
                             >
-                                <X className="w-4 h-4" />
+                                Crear Canal
                             </button>
-
-                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 font-sans">Editar Canal</h3>
-                            
-                            <form onSubmit={handleEditChannelSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Nombre del Canal</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-2.5 text-xs text-gray-400 font-bold">#</span>
-                                        <input 
-                                            type="text" 
-                                            placeholder="ej. desarrollo"
-                                            value={editingChannelName}
-                                            onChange={e => setEditingChannelName(e.target.value)}
-                                            className="w-full pl-7 pr-3 py-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white font-semibold"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Descripción</label>
-                                    <textarea 
-                                        placeholder="¿De qué trata este canal?"
-                                        value={editingChannelDescription}
-                                        onChange={e => setEditingChannelDescription(e.target.value)}
-                                        className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
-                                        rows={2}
-                                    />
-                                </div>
-
-                                <div className="space-y-3 pt-1">
-                                    <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
-                                        <input 
-                                            type="checkbox"
-                                            checked={editingChannelIsPrivate}
-                                            onChange={e => setEditingChannelIsPrivate(e.target.checked)}
-                                            className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
-                                        />
-                                        <span>Canal Privado 🔒</span>
-                                    </label>
-
-                                    {editingChannelIsPrivate && (
-                                        <div className="pt-1">
-                                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Contraseña de Acceso (Opcional)</label>
-                                            <input 
-                                                type="password" 
-                                                placeholder="ej. secreto123"
-                                                value={editingChannelPassword}
-                                                onChange={e => setEditingChannelPassword(e.target.value)}
-                                                className="w-full p-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
-                                            />
-                                            <p className="text-[10px] text-gray-500 mt-1">Los demás miembros necesitarán esta contraseña para unirse al canal privado.</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="pt-2 flex justify-end gap-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setEditingChannel(null)}
-                                        className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg font-semibold"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button 
-                                        type="submit" 
-                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow"
-                                    >
-                                        Guardar Cambios
-                                    </button>
-                                </div>
-                            </form>
                         </div>
-                    </div>
-                )}
+                    </form>
+                </Modal>
 
-                {/* 12. CREATE POLL DIALOG/MODAL */}
-                {isCreatePollOpen && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full shadow-2xl relative">
-                            
-                            <button 
-                                onClick={() => setIsCreatePollOpen(false)}
-                                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-
-                            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4">Crear Encuesta de Equipo</h3>
-                            
-                            <form onSubmit={handleCreatePollSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Pregunta de la Encuesta</label>
+                {/* 11. EDIT CHANNEL MODAL */}
+                <Modal
+                    isOpen={!!editingChannel}
+                    onClose={() => setEditingChannel(null)}
+                    title="Editar Canal"
+                >
+                    {editingChannel && (
+                        <form onSubmit={handleEditChannelSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Nombre del Canal</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-xs text-zinc-400 font-bold">#</span>
                                     <input 
                                         type="text" 
-                                        placeholder="ej. ¿Cuándo hacemos la retrospectiva?"
-                                        value={newPollQuestion}
-                                        onChange={e => setNewPollQuestion(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white font-semibold"
+                                        placeholder="ej. desarrollo"
+                                        value={editingChannelName}
+                                        onChange={e => setEditingChannelName(e.target.value)}
+                                        className="w-full pl-7 pr-3 py-2 text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-zinc-900 dark:focus:border-white text-zinc-900 dark:text-white font-semibold"
                                         required
                                     />
                                 </div>
-
-                                <div className="space-y-2">
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Opciones</label>
-                                    {newPollOptions.map((opt, idx) => (
-                                        <div key={idx} className="flex items-center gap-1">
-                                            <input 
-                                                type="text" 
-                                                placeholder={`Opción ${idx + 1}`}
-                                                value={opt}
-                                                onChange={e => {
-                                                    const copy = [...newPollOptions];
-                                                    copy[idx] = e.target.value;
-                                                    setNewPollOptions(copy);
-                                                }}
-                                                className="flex-1 px-3 py-1.5 text-xs bg-gray-100 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 dark:text-white"
-                                                required={idx < 2}
-                                            />
-                                            {newPollOptions.length > 2 && (
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => setNewPollOptions(newPollOptions.filter((_, i) => i !== idx))}
-                                                    className="p-1.5 hover:bg-red-50 text-red-500 dark:hover:bg-red-950 rounded"
-                                                >
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                    
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setNewPollOptions([...newPollOptions, ''])}
-                                        className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 pt-1"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" /> Añadir otra opción
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center gap-2 pt-1">
-                                    <input 
-                                        type="checkbox"
-                                        id="allow_mult"
-                                        checked={newPollAllowMultiple}
-                                        onChange={e => setNewPollAllowMultiple(e.target.checked)}
-                                        className="rounded text-blue-600 border-gray-300 focus:ring-blue-500"
-                                    />
-                                    <label htmlFor="allow_mult" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
-                                        Permitir votar múltiples opciones
-                                    </label>
-                                </div>
-
-                                <div className="pt-2 flex justify-end gap-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsCreatePollOpen(false)}
-                                        className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg font-semibold"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button 
-                                        type="submit" 
-                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow"
-                                    >
-                                        Lanzar Encuesta
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* 13. CONFIRM DELETE CHANNEL MODAL */}
-                {channelToDelete && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full shadow-2xl text-center">
-                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 flex items-center justify-center mx-auto mb-3">
-                                <AlertTriangle className="w-6 h-6" />
                             </div>
-                            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">¿Eliminar canal #{channelToDelete.name}?</h3>
-                            <p className="text-xs text-gray-500 mb-6">
-                                Esta acción es irreversible. Se eliminarán permanentemente todos los mensajes y archivos enviados en este canal.
-                            </p>
-                            <div className="flex justify-center gap-2">
+
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Descripción</label>
+                                <textarea 
+                                    placeholder="¿De qué trata este canal?"
+                                    value={editingChannelDescription}
+                                    onChange={e => setEditingChannelDescription(e.target.value)}
+                                    className="w-full p-2 text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-zinc-900 dark:focus:border-white text-zinc-900 dark:text-white"
+                                    rows={2}
+                                />
+                            </div>
+
+                            <div className="space-y-3 pt-1">
+                                <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-700 dark:text-zinc-300">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={editingChannelIsPrivate}
+                                        onChange={e => setEditingChannelIsPrivate(e.target.checked)}
+                                        className="rounded text-zinc-900 dark:text-white border-zinc-300 dark:border-zinc-700"
+                                    />
+                                    <span>Canal Privado 🔒</span>
+                                </label>
+
+                                {editingChannelIsPrivate && (
+                                    <div className="pt-1">
+                                        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Contraseña de Acceso (Opcional)</label>
+                                        <input 
+                                            type="password" 
+                                            placeholder="ej. secreto123"
+                                            value={editingChannelPassword}
+                                            onChange={e => setEditingChannelPassword(e.target.value)}
+                                            className="w-full p-2 text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-zinc-900 dark:focus:border-white text-zinc-900 dark:text-white"
+                                        />
+                                        <p className="text-[10px] text-zinc-500 mt-1">Los demás miembros necesitarán esta contraseña para unirse al canal privado.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-2 flex justify-end gap-2">
                                 <button 
-                                    onClick={() => setChannelToDelete(null)}
-                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-semibold"
+                                    type="button" 
+                                    onClick={() => setEditingChannel(null)}
+                                    className="px-4 py-2 text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl font-semibold"
                                 >
                                     Cancelar
                                 </button>
                                 <button 
+                                    type="submit" 
+                                    className="px-5 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-xs font-bold shadow hover:opacity-90 active:scale-[0.99]"
+                                >
+                                    Guardar Cambios
+                                </button>
+                            </div>
+                        </form>
+                    )}
+                </Modal>
+
+                {/* 12. CREATE POLL MODAL */}
+                <Modal
+                    isOpen={isCreatePollOpen}
+                    onClose={() => setIsCreatePollOpen(false)}
+                    title="Crear Encuesta de Equipo"
+                >
+                    <form onSubmit={handleCreatePollSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Pregunta de la Encuesta</label>
+                            <input 
+                                type="text" 
+                                placeholder="ej. ¿Cuándo hacemos la retrospectiva?"
+                                value={newPollQuestion}
+                                onChange={e => setNewPollQuestion(e.target.value)}
+                                className="w-full px-3 py-2 text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-zinc-900 dark:focus:border-white text-zinc-900 dark:text-white font-semibold"
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Opciones</label>
+                            {newPollOptions.map((opt, idx) => (
+                                <div key={idx} className="flex items-center gap-1">
+                                    <input 
+                                        type="text" 
+                                        placeholder={`Opción ${idx + 1}`}
+                                        value={opt}
+                                        onChange={e => {
+                                            const copy = [...newPollOptions];
+                                            copy[idx] = e.target.value;
+                                            setNewPollOptions(copy);
+                                        }}
+                                        className="flex-1 px-3 py-1.5 text-xs bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:border-zinc-900 dark:focus:border-white text-zinc-900 dark:text-white"
+                                        required={idx < 2}
+                                    />
+                                    {newPollOptions.length > 2 && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setNewPollOptions(newPollOptions.filter((_, i) => i !== idx))}
+                                            className="p-1.5 hover:bg-red-50 text-red-500 dark:hover:bg-red-950/50 rounded-lg"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            
+                            <button 
+                                type="button" 
+                                onClick={() => setNewPollOptions([...newPollOptions, ''])}
+                                className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 pt-1"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> Añadir otra opción
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                            <input 
+                                type="checkbox" 
+                                id="allow_mult"
+                                checked={newPollAllowMultiple}
+                                onChange={e => setNewPollAllowMultiple(e.target.checked)}
+                                className="rounded text-zinc-900 dark:text-white border-zinc-300 dark:border-zinc-700"
+                            />
+                            <label htmlFor="allow_mult" className="text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
+                                Permitir votar múltiples opciones
+                            </label>
+                        </div>
+
+                        <div className="pt-2 flex justify-end gap-2">
+                            <button 
+                                type="button" 
+                                onClick={() => setIsCreatePollOpen(false)}
+                                className="px-4 py-2 text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl font-semibold"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                type="submit" 
+                                className="px-5 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-xs font-bold shadow hover:opacity-90 active:scale-[0.99]"
+                            >
+                                Lanzar Encuesta
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* 13. CONFIRM DELETE CHANNEL MODAL */}
+                <Modal
+                    isOpen={!!channelToDelete}
+                    onClose={() => setChannelToDelete(null)}
+                    title="Eliminar Canal"
+                >
+                    {channelToDelete && (
+                        <div className="text-center space-y-4">
+                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 flex items-center justify-center mx-auto">
+                                <AlertTriangle className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-zinc-900 dark:text-white mb-1">¿Eliminar canal #{channelToDelete.name}?</h3>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    Esta acción es irreversible. Se eliminarán permanentemente todos los mensajes y archivos enviados en este canal.
+                                </p>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => setChannelToDelete(null)}
+                                    className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-semibold"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="button"
                                     onClick={() => confirmDeleteChannel(channelToDelete)}
-                                    className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow"
+                                    className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow active:scale-[0.99]"
                                 >
                                     Eliminar Canal
                                 </button>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </Modal>
 
             </div>
         );
@@ -9089,19 +9165,23 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 onClose={() => {
                     setShowQuickAddTaskModal(false);
                     setKanbanAddModalCol(null);
+                    setSprintIdForAddTask(null);
                 }}
                 onAddTask={async (text, options) => {
                     await addTodo(text, {
                         ...options,
                         projectId: activeProject?.id,
+                        sprint_id: sprintIdForAddTask !== null ? sprintIdForAddTask : options?.sprint_id,
                         kanban_column: kanbanAddModalCol || options?.kanban_column || 'Por hacer'
                     });
                     setShowQuickAddTaskModal(false);
                     setKanbanAddModalCol(null);
+                    setSprintIdForAddTask(null);
                 }}
                 projects={projects}
                 activeProject={activeProject}
                 fixedProjectId={activeProject?.id}
+                defaultSprintId={sprintIdForAddTask || undefined}
                 defaultKanbanColumn={kanbanAddModalCol || 'Por hacer'}
             />
 
