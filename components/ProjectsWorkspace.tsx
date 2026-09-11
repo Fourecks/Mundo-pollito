@@ -2784,8 +2784,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     {/* Tareas del Sprint & Backlog Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Sprint Tasks */}
-                        <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-4">
-                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800/80 pb-3">
+                        <div className="bg-transparent p-0 rounded-none border-0 shadow-none space-y-4">
+                            <div className="flex items-center justify-between pb-3">
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <CheckSquare className="w-4 h-4 text-emerald-500" /> Tareas del Sprint ({sprintTasks.length})
                                 </h3>
@@ -2847,8 +2847,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         </div>
 
                         {/* Backlog / Available Tasks */}
-                        <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs space-y-4">
-                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800/80 pb-3">
+                        <div className="bg-transparent p-0 rounded-none border-0 shadow-none space-y-4">
+                            <div className="flex items-center justify-between pb-3">
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <Layers className="w-4 h-4 text-blue-500" /> Tareas Disponibles (Backlog)
                                 </h3>
