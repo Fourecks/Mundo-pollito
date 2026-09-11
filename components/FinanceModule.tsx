@@ -838,6 +838,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     getTodayStr(),
   );
   const [includeAvailableCredit, setIncludeAvailableCredit] = useState(false);
+  const [showNewSubscriptionModal, setShowNewSubscriptionModal] = useState(false);
+  const [showNewSavingsGoalModal, setShowNewSavingsGoalModal] = useState(false);
+  const [showCreateShoppingListModal, setShowCreateShoppingListModal] = useState(false);
+  const [showSetTotalBudgetModal, setShowSetTotalBudgetModal] = useState(false);
 
   // --- Form States (Transaction) ---
   const [txAmount, setTxAmount] = useState("");
@@ -2868,6 +2872,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         ]);
     }
     setBudgetAmount("");
+    setShowSetTotalBudgetModal(false);
     fetchFinanceData(true);
   };
 
@@ -4752,47 +4757,148 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                   {/* MOBILE PLANIFICAR MENU */}
                   {effectiveTab === "planning_menu" && (
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                       <div>
                         <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
                           Planificar
                         </h2>
                         <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-                          Organiza tu dinero y próximos compromisos.
+                          Organiza tu dinero, límites mensuales y próximos compromisos.
                         </p>
                       </div>
 
+                      {/* SECTION 1: PRESUPUESTO */}
                       <div className="space-y-2">
-                        {[
-                          { id: "budgets", label: "Presupuestos", icon: PieChart },
-                          { id: "calendar", label: "Calendario de pagos", icon: CalendarDays },
-                          { id: "subscriptions", label: "Suscripciones", icon: Calendar },
-                          { id: "installments", label: "Cuotas", icon: Layers },
-                          { id: "savings", label: "Metas de ahorro", icon: CheckCircle2 },
-                          { id: "shopping", label: "Listas de compras", icon: ShoppingCart },
-                        ].map((item) => (
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-zinc-500 px-1">
+                          Presupuesto
+                        </span>
+                        <div className="space-y-2">
                           <button
-                            key={item.id}
                             type="button"
                             onClick={() => {
-                              setMobilePlanSubView(item.id as any);
-                              if (item.id === "calendar") setPlanningSubTab("calendar");
-                              if (item.id === "subscriptions") setPlanningSubTab("subscriptions");
-                              if (item.id === "installments") setPlanningSubTab("installments");
+                              setMobilePlanSubView("budgets");
                             }}
-                            className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left"
+                            className="w-full flex items-center justify-between p-3.5 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left shadow-2xs"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-700 dark:text-zinc-300 shrink-0">
-                                <item.icon className="w-4 h-4" />
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-800 dark:text-zinc-200 shrink-0">
+                                <PieChart className="w-4 h-4" />
                               </div>
-                              <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                {item.label}
-                              </span>
+                              <div className="min-w-0">
+                                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                  Presupuestos
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                                  Límites mensuales y categorías de gasto
+                                </div>
+                              </div>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0" />
+                            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0 ml-2" />
                           </button>
-                        ))}
+                        </div>
+                      </div>
+
+                      {/* SECTION 2: PAGOS Y COMPROMISOS */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-zinc-500 px-1">
+                          Pagos y Compromisos
+                        </span>
+                        <div className="space-y-2">
+                          {[
+                            {
+                              id: "calendar",
+                              label: "Calendario de pagos",
+                              subtitle: "Vencimientos y fechas clave del mes",
+                              icon: CalendarDays,
+                            },
+                            {
+                              id: "subscriptions",
+                              label: "Suscripciones",
+                              subtitle: `Servicios y cargos recurrentes (${recurring.length})`,
+                              icon: Calendar,
+                            },
+                            {
+                              id: "installments",
+                              label: "Cuotas",
+                              subtitle: `Compras diferidas y avance (${installments.length})`,
+                              icon: Layers,
+                            },
+                          ].map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setMobilePlanSubView(item.id as any);
+                                if (item.id === "calendar") setPlanningSubTab("calendar");
+                                if (item.id === "subscriptions") setPlanningSubTab("subscriptions");
+                                if (item.id === "installments") setPlanningSubTab("installments");
+                              }}
+                              className="w-full flex items-center justify-between p-3.5 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left shadow-2xs"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-800 dark:text-zinc-200 shrink-0">
+                                  <item.icon className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                    {item.label}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                                    {item.subtitle}
+                                  </div>
+                                </div>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0 ml-2" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* SECTION 3: OBJETIVOS Y COMPRAS */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-zinc-500 px-1">
+                          Objetivos y Compras
+                        </span>
+                        <div className="space-y-2">
+                          {[
+                            {
+                              id: "savings",
+                              label: "Metas de ahorro",
+                              subtitle: `Fondos y objetivos futuros (${savingsGoals.length})`,
+                              icon: CheckCircle2,
+                            },
+                            {
+                              id: "shopping",
+                              label: "Listas de compras",
+                              subtitle: `Artículos y listas pendientes (${shoppingLists.filter(l => !l.is_archived).length})`,
+                              icon: ShoppingCart,
+                            },
+                          ].map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setMobilePlanSubView(item.id as any);
+                              }}
+                              className="w-full flex items-center justify-between p-3.5 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left shadow-2xs"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-800 dark:text-zinc-200 shrink-0">
+                                  <item.icon className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                    {item.label}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                                    {item.subtitle}
+                                  </div>
+                                </div>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0 ml-2" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -5706,38 +5812,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                 </span>
                               </div>
                               <div className="flex items-center sm:justify-end">
-                                <form
-                                  onSubmit={handleSetBudget}
-                                  className="flex items-center gap-1.5 w-full sm:w-auto"
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setBudgetAmount(
+                                      currentSelectedMonthBudget && currentSelectedMonthBudget.total_amount_cents > 0
+                                        ? (currentSelectedMonthBudget.total_amount_cents / 100).toString()
+                                        : ""
+                                    );
+                                    setShowSetTotalBudgetModal(true);
+                                  }}
+                                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 border border-gray-200/80 dark:border-zinc-700 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap"
                                 >
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    onKeyDown={blockNegativeKeys}
-                                    value={budgetAmount}
-                                    onChange={(e) =>
-                                      setBudgetAmount(
-                                        e.target.value.replace(/-/g, ""),
-                                      )
-                                    }
-                                    placeholder={
-                                      currentSelectedMonthBudget
-                                        ? (
-                                            currentSelectedMonthBudget.total_amount_cents /
-                                            100
-                                          ).toFixed(2)
-                                        : "Meta global"
-                                    }
-                                    className="w-24 px-2.5 py-1 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-lg text-xs outline-none"
-                                  />
-                                  <button
-                                    type="submit"
-                                    className="px-2.5 py-1 bg-white dark:bg-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-zinc-700 rounded-lg text-[11px] font-medium transition-colors whitespace-nowrap"
-                                  >
-                                    Fijar
-                                  </button>
-                                </form>
+                                  {currentSelectedMonthBudget && currentSelectedMonthBudget.total_amount_cents > 0
+                                    ? "Editar Meta Global"
+                                    : "Fijar Meta Global"}
+                                </button>
                               </div>
                             </div>
 
@@ -5772,6 +5862,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   total
                                 </p>
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingBudgetItem(null);
+                                  setBudgetItemName("");
+                                  setBudgetItemAmount("");
+                                  setBudgetItemIcon("🏷️");
+                                  setBudgetItemColor("#27272a");
+                                  setBudgetItemCategoryId("");
+                                  setShowBudgetItemModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-all shadow-2xs"
+                              >
+                                <PlusIcon className="w-3.5 h-3.5" />
+                                <span>Nuevo Desglose</span>
+                              </button>
                             </div>
 
                             {monthBudgetItems.length === 0 ? (
@@ -6294,251 +6400,258 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       )}
 
                       {/* Sub-tab 2: Subscriptions */}
-                      {planningSubTab === "subscriptions" && (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                          <div className="lg:col-span-4">
-                            <h3 className="text-base font-semibold mb-3 text-gray-900 dark:text-white">
-                              Añadir Suscripción / Pago
-                            </h3>
-                            <form
-                              onSubmit={handleCreateRecurring}
-                              className="bg-white dark:bg-[#0a0a0a] p-5 rounded-2xl border border-gray-100 dark:border-zinc-800 space-y-4 shadow-sm"
-                            >
-                              <div>
-                                <label className="block text-xs font-semibold mb-1 text-gray-500">
-                                  Descripción
-                                </label>
-                                <input
-                                  required
-                                  type="text"
-                                  value={recDesc}
-                                  onChange={(e) => setRecDesc(e.target.value)}
-                                  placeholder="Netflix, Gimnasio, Spotify..."
-                                  className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-xs font-semibold mb-1 text-gray-500">
-                                    Monto
-                                  </label>
-                                  <input
-                                    required
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    onKeyDown={blockNegativeKeys}
-                                    value={recAmount}
-                                    onChange={(e) =>
-                                      setRecAmount(
-                                        e.target.value.replace(/-/g, ""),
-                                      )
-                                    }
-                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-semibold mb-1 text-gray-500">
-                                    Frecuencia
-                                  </label>
-                                  <select
-                                    value={recFrequency}
-                                    onChange={(e) =>
-                                      setRecFrequency(e.target.value)
-                                    }
-                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
-                                  >
-                                    <option value="once">Pago Único</option>
-                                    <option value="monthly">Mensual</option>
-                                    <option value="yearly">Anual</option>
-                                    <option value="weekly">Semanal</option>
-                                  </select>
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold mb-1 text-gray-500">
-                                  Próximo cobro
-                                </label>
-                                <input
-                                  required
-                                  type="date"
-                                  value={recNextDate}
-                                  onChange={(e) =>
-                                    setRecNextDate(e.target.value)
-                                  }
-                                  className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold mb-1 text-gray-500">
-                                  Pagar con Cuenta / Tarjeta
-                                </label>
-                                <select
-                                  required
-                                  value={recAccountId}
-                                  onChange={(e) =>
-                                    setRecAccountId(
-                                      e.target.value
-                                        ? Number(e.target.value)
-                                        : "",
-                                    )
-                                  }
-                                  className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
-                                >
-                                  <option value="">Selecciona cuenta...</option>
-                                  {accounts.map((acc) => (
-                                    <option key={acc.id} value={acc.id}>
-                                      {acc.name} (
-                                      {formatCurrency(acc.balance_cents)})
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold mb-1 text-gray-500">
-                                  Categoría / Presupuesto
-                                </label>
-                                <select
-                                  value={recCategoryId}
-                                  onChange={(e) =>
-                                    setRecCategoryId(
-                                      e.target.value
-                                        ? Number(e.target.value)
-                                        : "",
-                                    )
-                                  }
-                                  className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium"
-                                >
-                                  <option value="">Sin categoría asignada</option>
-                                  {categories
-                                    .filter(
-                                      (cat) =>
-                                        !cat.type ||
-                                        cat.type.toUpperCase() === "EXPENSE" ||
-                                        cat.type.toUpperCase() === "GASTO",
-                                    )
-                                    .map((cat) => (
-                                      <option key={cat.id} value={cat.id}>
-                                        {cat.emoji || "🏷️"} {cat.name}{" "}
-                                        {cat.budget_limit_cents &&
-                                        cat.budget_limit_cents > 0
-                                          ? `(Presupuesto: $${(cat.budget_limit_cents / 100).toFixed(2)})`
-                                          : ""}
-                                      </option>
-                                    ))}
-                                </select>
-                              </div>
-                              <button
-                                type="submit"
-                                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
-                              >
-                                Añadir recurrente
-                              </button>
-                            </form>
-                          </div>
+                      {planningSubTab === "subscriptions" && (() => {
+                        const totalMonthlyRecurring = recurring.reduce((acc, r) => {
+                          if (r.frequency === "yearly") return acc + Math.round(r.amount_cents / 12);
+                          if (r.frequency === "weekly") return acc + Math.round(r.amount_cents * 4.33);
+                          return acc + r.amount_cents;
+                        }, 0);
 
-                          <div className="lg:col-span-8">
-                            <h3 className="text-base font-semibold mb-3 text-gray-900 dark:text-white">
-                              Suscripciones Registradas
-                            </h3>
-                            <div className="space-y-2.5">
-                              {recurring.length === 0 ? (
-                                <p className="text-gray-500 text-xs py-4">
-                                  No hay suscripciones activas.
+                        return (
+                          <div className="space-y-5 max-w-5xl mx-auto">
+                            {/* Header & Action */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-150 dark:border-zinc-800">
+                              <div>
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                  <Calendar className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                                  Suscripciones
+                                </h3>
+                                <p className="text-xs text-gray-500">
+                                  Servicios periódicos y pagos recurrentes programados
                                 </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRecDesc("");
+                                  setRecAmount("");
+                                  setRecFrequency("monthly");
+                                  setRecNextDate(getTodayStr());
+                                  setRecAccountId(accounts.length > 0 ? accounts[0].id : "");
+                                  setRecCategoryId("");
+                                  setShowNewSubscriptionModal(true);
+                                }}
+                                className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2.5 rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-95"
+                              >
+                                <PlusIcon className="w-4 h-4" />
+                                Nueva Suscripción
+                              </button>
+                            </div>
+
+                            {/* Summary Card */}
+                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                    Costo Mensual Estimado
+                                  </span>
+                                  <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                                    {formatCurrency(totalMonthlyRecurring)}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                    Suscripciones Activas
+                                  </span>
+                                  <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                                    {recurring.length}
+                                  </span>
+                                </div>
+                                <div className="col-span-2 sm:col-span-1">
+                                  <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                    Próximo Vencimiento
+                                  </span>
+                                  <span className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {recurring.length > 0
+                                      ? [...recurring].sort((a, b) => a.next_date.localeCompare(b.next_date))[0]?.next_date
+                                      : "Ninguno"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Subscriptions List */}
+                            <div className="space-y-3">
+                              {recurring.length === 0 ? (
+                                <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-3">
+                                  <div className="w-10 h-10 bg-gray-50 dark:bg-zinc-900 rounded-xl flex items-center justify-center mx-auto text-gray-400">
+                                    <Calendar className="w-5 h-5" />
+                                  </div>
+                                  <div className="space-y-1 max-w-sm mx-auto">
+                                    <p className="font-semibold text-sm text-gray-900 dark:text-white">
+                                      No hay suscripciones registradas
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      Agrega streaming, gimnasio, servicios o cualquier pago recurrente para proyectar tus finanzas.
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRecDesc("");
+                                      setRecAmount("");
+                                      setRecFrequency("monthly");
+                                      setRecNextDate(getTodayStr());
+                                      setRecAccountId(accounts.length > 0 ? accounts[0].id : "");
+                                      setRecCategoryId("");
+                                      setShowNewSubscriptionModal(true);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shadow-2xs"
+                                  >
+                                    <PlusIcon className="w-3.5 h-3.5" />
+                                    Añadir Suscripción
+                                  </button>
+                                </div>
                               ) : (
-                                recurring.map((r) => {
-                                  const targetAcc = accounts.find(
-                                    (a) => a.id === r.account_id,
-                                  );
-                                  const targetCat = categories.find(
-                                    (c) => c.id === r.category_id,
-                                  );
-                                  return (
-                                    <div
-                                      key={r.id}
-                                      className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl shadow-sm hover:border-gray-200 dark:hover:border-zinc-700 transition-all"
-                                    >
-                                      <div className="flex items-center gap-3.5 min-w-0">
-                                        <div className="p-2 bg-gray-100 dark:bg-zinc-900 text-gray-500 dark:text-zinc-400 rounded-xl">
-                                          <Receipt className="w-4 h-4" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {recurring.map((r) => {
+                                    const targetAcc = accounts.find((a) => a.id === r.account_id);
+                                    const targetCat = categories.find((c) => c.id === r.category_id);
+                                    const freqLabel =
+                                      r.frequency === "monthly"
+                                        ? "Mensual"
+                                        : r.frequency === "yearly"
+                                          ? "Anual"
+                                          : r.frequency === "weekly"
+                                            ? "Semanal"
+                                            : "Único";
+
+                                    return (
+                                      <div
+                                        key={r.id}
+                                        className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
+                                      >
+                                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                                          <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 flex items-center justify-center shrink-0">
+                                            <Receipt className="w-4 h-4" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                              <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                                                {r.description}
+                                              </p>
+                                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 uppercase tracking-wider shrink-0">
+                                                {freqLabel}
+                                              </span>
+                                            </div>
+                                            <p className="text-xs text-gray-400 truncate mt-0.5">
+                                              Próximo: {r.next_date}
+                                              {targetAcc ? ` • ${targetAcc.name}` : ""}
+                                              {targetCat ? ` • ${targetCat.name}` : ""}
+                                            </p>
+                                          </div>
                                         </div>
-                                        <div className="min-w-0">
-                                          <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">
-                                            {r.description}
-                                          </p>
-                                          <p className="text-xs text-gray-400">
-                                            Próximo cobro: {r.next_date} •{" "}
-                                            {r.frequency === "monthly"
-                                              ? "Mensual"
-                                              : r.frequency === "yearly"
-                                                ? "Anual"
-                                                : r.frequency === "weekly"
-                                                  ? "Semanal"
-                                                  : "Único"}
-                                            {targetAcc
-                                              ? ` • Tarjeta: ${targetAcc.name}`
-                                              : ""}
-                                          </p>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                          <span className="font-bold text-sm text-gray-900 dark:text-white">
+                                            {formatCurrency(r.amount_cents)}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteRecurring(r.id)}
+                                            className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                            title="Eliminar suscripción"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
                                         </div>
                                       </div>
-                                      <div className="flex items-center gap-4 shrink-0">
-                                        <span className="font-semibold text-sm text-gray-900 dark:text-white">
-                                          -{formatCurrency(r.amount_cents)}
-                                        </span>
-                                        <button
-                                          onClick={() =>
-                                            handleDeleteRecurring(r.id)
-                                          }
-                                          className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })
+                                    );
+                                  })}
+                                </div>
                               )}
                             </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Sub-tab 3: Installments (Cuotas Financiadas) */}
-                      {planningSubTab === "installments" && (
-                        <div className="space-y-6">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h3 className="text-xl font-bold">
-                                Cuotas Financiadas
-                              </h3>
-                              <p className="text-xs text-gray-500">
-                                Compras realizadas en cuotas mensuales y su
-                                progreso de pago
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => setShowInstallmentModal(true)}
-                              className="flex items-center gap-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm hover:opacity-90"
-                            >
-                              <PlusIcon className="w-4 h-4" />
-                              Nueva Compra a Cuotas
-                            </button>
-                          </div>
+                      {planningSubTab === "installments" && (() => {
+                        const activeInsts = installments.filter((i) => i.status === "ACTIVE");
+                        const totalFinanced = activeInsts.reduce((sum, i) => sum + (i.total_amount_cents || 0), 0);
+                        const monthlyCommitment = activeInsts.reduce((sum, i) => sum + (i.installment_amount_cents || 0), 0);
+                        const totalRemainingDebt = activeInsts.reduce(
+                          (sum, i) => sum + Math.max(0, (i.total_installments - i.paid_installments) * (i.installment_amount_cents || 0)),
+                          0
+                        );
 
-                          {installments.length === 0 ? (
-                            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-3xl p-12 text-center space-y-3">
-                              <Layers className="w-12 h-12 text-gray-400 mx-auto opacity-70" />
-                              <p className="font-semibold text-gray-700 dark:text-gray-300">
-                                No tienes compras a cuotas registradas
-                              </p>
-                              <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                                Registra tus compras diferidas (ej.
-                                Electrodomésticos, viajes, tecnología) para
-                                controlar tus pagos mensuales.
-                              </p>
+                        return (
+                          <div className="space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div>
+                                <h3 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                  Cuotas Financiadas
+                                </h3>
+                                <p className="text-xs text-gray-500">
+                                  Compras diferidas en cuotas mensuales y su progreso de amortización
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => setShowInstallmentModal(true)}
+                                className="inline-flex items-center justify-center gap-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2.5 rounded-xl font-semibold text-xs shadow-2xs hover:opacity-90 transition-all self-start sm:self-auto"
+                              >
+                                <PlusIcon className="w-4 h-4" />
+                                <span>Nueva Compra a Cuotas</span>
+                              </button>
                             </div>
-                          ) : (
+
+                            {/* Summary Metrics */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                              <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl">
+                                <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                                  Compromiso Mensual
+                                </span>
+                                <span className="text-lg font-bold text-gray-900 dark:text-white mt-1 block">
+                                  {formatCurrency(monthlyCommitment)}
+                                </span>
+                                <span className="text-[11px] text-gray-400 block mt-0.5">
+                                  {activeInsts.length} {activeInsts.length === 1 ? "cuota activa" : "cuotas activas"}
+                                </span>
+                              </div>
+                              <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl">
+                                <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                                  Deuda Restante
+                                </span>
+                                <span className="text-lg font-bold text-amber-600 dark:text-amber-400 mt-1 block">
+                                  {formatCurrency(totalRemainingDebt)}
+                                </span>
+                                <span className="text-[11px] text-gray-400 block mt-0.5">
+                                  por amortizar
+                                </span>
+                              </div>
+                              <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl col-span-2 sm:col-span-1">
+                                <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                                  Total Financiado Original
+                                </span>
+                                <span className="text-lg font-bold text-gray-900 dark:text-white mt-1 block">
+                                  {formatCurrency(totalFinanced)}
+                                </span>
+                                <span className="text-[11px] text-gray-400 block mt-0.5">
+                                  {installments.length} {installments.length === 1 ? "plan total" : "planes totales"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {installments.length === 0 ? (
+                              <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-3xl p-10 text-center space-y-3">
+                                <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-zinc-900 flex items-center justify-center mx-auto text-gray-400">
+                                  <Layers className="w-6 h-6" />
+                                </div>
+                                <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                                  No tienes compras a cuotas registradas
+                                </p>
+                                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                                  Registra tus compras diferidas (ej. electrodomésticos, tecnología, viajes) para controlar tus pagos mensuales.
+                                </p>
+                                <button
+                                  onClick={() => setShowInstallmentModal(true)}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-all shadow-2xs"
+                                >
+                                  <PlusIcon className="w-3.5 h-3.5" />
+                                  <span>Crear Primera Cuota</span>
+                                </button>
+                              </div>
+                            ) : (
                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                               {installments.map((inst) => {
                                 const pct = Math.min(
@@ -6666,615 +6779,520 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             </div>
                           )}
                         </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   )}
 
                   {/* SAVINGS TAB */}
-                  {effectiveTab === "savings" && (
-                    <div className="space-y-6">
-                      <div className="flex justify-between items-center border-b border-gray-200 dark:border-zinc-800 pb-3">
-                        <div>
-                          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                            Metas de Ahorro
-                          </h2>
-                          <p className="text-xs text-gray-500">
-                            Planifica, realiza aportes y monitorea tus objetivos
-                            financieros
-                          </p>
+                  {effectiveTab === "savings" && (() => {
+                    const totalCurrentSaved = savingsGoals.reduce((sum, g) => sum + g.current_amount_cents, 0);
+                    const totalTargetGoals = savingsGoals.reduce((sum, g) => sum + g.target_amount_cents, 0);
+                    const overallProgress = totalTargetGoals > 0 ? Math.min(100, Math.round((totalCurrentSaved / totalTargetGoals) * 100)) : 0;
+
+                    return (
+                      <div className="space-y-5 max-w-5xl mx-auto">
+                        {/* Header & Action */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-150 dark:border-zinc-800">
+                          <div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                              <Target className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                              Metas de Ahorro
+                            </h2>
+                            <p className="text-xs text-gray-500">
+                              Planifica, realiza aportes y monitorea tus objetivos financieros
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGoalName("");
+                              setGoalTargetAmount("");
+                              setGoalTargetDate("");
+                              setGoalFrequency("MONTHLY");
+                              setGoalCustomContribution("");
+                              setShowNewSavingsGoalModal(true);
+                            }}
+                            className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2.5 rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-95"
+                          >
+                            <PlusIcon className="w-4 h-4" />
+                            Nueva Meta
+                          </button>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                        {/* Summary Metrics */}
+                        <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <div>
+                              <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                Total Ahorrado
+                              </span>
+                              <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(totalCurrentSaved)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                Meta Total
+                              </span>
+                              <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(totalTargetGoals)}
+                              </span>
+                            </div>
+                            <div className="col-span-2 sm:col-span-1">
+                              <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                Metas Activas
+                              </span>
+                              <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                                {savingsGoals.length} {savingsGoals.length === 1 ? "meta" : "metas"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {totalTargetGoals > 0 && (
+                            <div className="pt-2 border-t border-gray-200 dark:border-zinc-800/80">
+                              <div className="flex justify-between text-[11px] text-gray-500 font-medium mb-1">
+                                <span>Progreso global</span>
+                                <span>{overallProgress}%</span>
+                              </div>
+                              <div className="h-2 bg-gray-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-500"
+                                  style={{ width: `${overallProgress}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {/* Goals List */}
-                        <div className="lg:col-span-8 space-y-3">
+                        <div className="space-y-3">
                           {savingsGoals.length === 0 ? (
-                            <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-xl p-8 text-center text-gray-400 text-xs">
-                              No hay metas de ahorro activas. Crea una meta a la
-                              derecha para comenzar.
+                            <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-3">
+                              <div className="w-10 h-10 bg-gray-50 dark:bg-zinc-900 rounded-xl flex items-center justify-center mx-auto text-gray-400">
+                                <Target className="w-5 h-5" />
+                              </div>
+                              <div className="space-y-1 max-w-sm mx-auto">
+                                <p className="font-semibold text-sm text-gray-900 dark:text-white">
+                                  No hay metas de ahorro activas
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Crea tu primera meta de ahorro (fondo de emergencia, viaje, compra) para monitorear tu progreso.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGoalName("");
+                                  setGoalTargetAmount("");
+                                  setGoalTargetDate("");
+                                  setGoalFrequency("MONTHLY");
+                                  setGoalCustomContribution("");
+                                  setShowNewSavingsGoalModal(true);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shadow-2xs"
+                              >
+                                <PlusIcon className="w-3.5 h-3.5" />
+                                Añadir Primera Meta
+                              </button>
                             </div>
                           ) : (
-                            savingsGoals.map((goal) => {
-                              const progress = Math.min(
-                                100,
-                                Math.round(
-                                  (goal.current_amount_cents /
-                                    goal.target_amount_cents) *
-                                    100,
-                                ),
-                              );
-                              const freqLabel =
-                                goal.frequency === "WEEKLY"
-                                  ? "semanal"
-                                  : goal.frequency === "BIWEEKLY"
-                                    ? "quincenal"
-                                    : "mensual";
-                              const cuotaInfo = calculateSavingsCuota(
-                                goal.target_amount_cents,
-                                goal.current_amount_cents,
-                                goal.target_date,
-                                goal.frequency || "MONTHLY",
-                                goal.custom_contribution_cents,
-                              );
-                              const projection =
-                                calculateEstimatedCompletionDate(goal);
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {savingsGoals.map((goal) => {
+                                const progress = Math.min(
+                                  100,
+                                  Math.round(
+                                    (goal.current_amount_cents / goal.target_amount_cents) * 100,
+                                  ),
+                                );
+                                const freqLabel =
+                                  goal.frequency === "WEEKLY"
+                                    ? "semanal"
+                                    : goal.frequency === "BIWEEKLY"
+                                      ? "quincenal"
+                                      : "mensual";
+                                const cuotaInfo = calculateSavingsCuota(
+                                  goal.target_amount_cents,
+                                  goal.current_amount_cents,
+                                  goal.target_date,
+                                  goal.frequency || "MONTHLY",
+                                  goal.custom_contribution_cents,
+                                );
+                                const projection = calculateEstimatedCompletionDate(goal);
 
-                              return (
-                                <div
-                                  key={goal.id}
-                                  className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 p-4 rounded-xl space-y-3 shadow-2xs"
-                                >
-                                  <div className="flex justify-between items-start">
-                                    <div className="min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">
-                                          {goal.name}
-                                        </h3>
-                                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-zinc-700 uppercase tracking-wider">
-                                          {freqLabel}
-                                        </span>
-                                        {!goal.target_date && (
-                                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 uppercase tracking-wider">
-                                            Indefinida
+                                return (
+                                  <div
+                                    key={goal.id}
+                                    className="bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 p-4 rounded-2xl space-y-3 shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
+                                  >
+                                    <div className="flex justify-between items-start">
+                                      <div className="min-w-0 pr-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <h3 className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                                            {goal.name}
+                                          </h3>
+                                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                            {freqLabel}
                                           </span>
+                                        </div>
+                                        {goal.target_date ? (
+                                          <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                            <Calendar className="w-3 h-3 text-gray-400" />
+                                            Meta para: {goal.target_date}
+                                          </p>
+                                        ) : (
+                                          <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                            <Calendar className="w-3 h-3 text-gray-400" />
+                                            Sin fecha límite (Indefinida)
+                                          </p>
                                         )}
                                       </div>
-                                      {goal.target_date ? (
-                                        <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
-                                          <Calendar className="w-3 h-3 text-gray-400" />{" "}
-                                          Meta para: {goal.target_date}
-                                        </p>
-                                      ) : (
-                                        <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
-                                          <Calendar className="w-3 h-3 text-gray-400" />{" "}
-                                          Sin fecha límite (Indefinida)
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-3 shrink-0">
-                                      <div className="text-right">
-                                        <p className="font-bold text-sm text-gray-900 dark:text-white">
-                                          {formatCurrency(
-                                            goal.current_amount_cents,
-                                          )}
-                                        </p>
-                                        <p className="text-[10px] text-gray-400">
-                                          de{" "}
-                                          {formatCurrency(
-                                            goal.target_amount_cents,
-                                          )}
-                                        </p>
-                                      </div>
-                                      <button
-                                        onClick={() =>
-                                          handleDeleteGoal(goal.id)
-                                        }
-                                        className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                        title="Eliminar meta"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  </div>
 
-                                  {/* Calculator & Projection Badges */}
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                    {cuotaInfo.cuota !== null &&
-                                      cuotaInfo.cuota > 0 && (
-                                        <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-lg border border-gray-200 dark:border-zinc-800 flex items-center justify-between">
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <div className="text-right">
+                                          <p className="font-bold text-sm text-gray-900 dark:text-white">
+                                            {formatCurrency(goal.current_amount_cents)}
+                                          </p>
+                                          <p className="text-[10px] text-gray-400">
+                                            de {formatCurrency(goal.target_amount_cents)}
+                                          </p>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteGoal(goal.id)}
+                                          className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                          title="Eliminar meta"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Badges */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                      {cuotaInfo.cuota !== null && cuotaInfo.cuota > 0 && (
+                                        <div className="p-2 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800 flex items-center justify-between">
                                           <div>
                                             <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">
-                                              Abono ({freqLabel})
+                                              Abono sugerido
                                             </span>
                                             <span className="font-bold text-gray-900 dark:text-white text-xs">
                                               ${cuotaInfo.cuota.toFixed(2)}
                                             </span>
                                           </div>
-                                          <span className="text-[10px] text-gray-400 bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-zinc-700">
+                                          <span className="text-[10px] text-gray-500 bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-zinc-700">
                                             ~{cuotaInfo.periods} abonos
                                           </span>
                                         </div>
                                       )}
-                                    {projection && (
-                                      <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-lg border border-gray-200 dark:border-zinc-800">
-                                        <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider flex items-center gap-1">
-                                          <Target className="w-3 h-3 text-gray-500" />{" "}
-                                          Proyección
-                                        </span>
-                                        <span className="font-medium text-gray-700 dark:text-gray-300 text-xs">
-                                          {projection.isCompleted
-                                            ? projection.text
-                                            : `Estimado: ${projection.dateFormatted}`}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
+                                      {projection && (
+                                        <div className="p-2 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
+                                          <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider flex items-center gap-1">
+                                            <Target className="w-3 h-3 text-gray-500" /> Proyección
+                                          </span>
+                                          <span className="font-medium text-gray-700 dark:text-gray-300 text-xs">
+                                            {projection.isCompleted
+                                              ? projection.text
+                                              : `Estimado: ${projection.dateFormatted}`}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
 
-                                  <div className="space-y-1.5">
-                                    <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
-                                        style={{ width: `${progress}%` }}
-                                      />
-                                    </div>
-                                    <div className="flex justify-between items-center pt-0.5">
-                                      <span className="text-[11px] text-gray-400 font-medium">
-                                        {progress}% completado
-                                      </span>
-                                      <button
-                                        onClick={() => {
-                                          setShowContributeModal(goal.id);
-                                          if (
-                                            goal.custom_contribution_cents &&
-                                            goal.custom_contribution_cents > 0
-                                          ) {
-                                            setContributeAmount(
-                                              (
-                                                goal.custom_contribution_cents /
-                                                100
-                                              ).toFixed(2),
-                                            );
-                                          } else if (
-                                            cuotaInfo.cuota &&
-                                            cuotaInfo.cuota > 0
-                                          ) {
-                                            setContributeAmount(
-                                              cuotaInfo.cuota.toFixed(2),
-                                            );
-                                          }
-                                        }}
-                                        className="text-xs font-medium bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 px-3 py-1.5 rounded-lg transition-colors"
-                                      >
-                                        Aportar
-                                      </button>
+                                    {/* Progress Bar & Actions */}
+                                    <div className="space-y-1.5 pt-1">
+                                      <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                                          style={{ width: `${progress}%` }}
+                                        />
+                                      </div>
+                                      <div className="flex justify-between items-center pt-0.5">
+                                        <span className="text-[11px] text-gray-400 font-medium">
+                                          {progress}% completado
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowContributeModal(goal.id);
+                                            if (
+                                              goal.custom_contribution_cents &&
+                                              goal.custom_contribution_cents > 0
+                                            ) {
+                                              setContributeAmount(
+                                                (goal.custom_contribution_cents / 100).toFixed(2),
+                                              );
+                                            } else if (cuotaInfo.cuota && cuotaInfo.cuota > 0) {
+                                              setContributeAmount(cuotaInfo.cuota.toFixed(2));
+                                            }
+                                          }}
+                                          className="text-xs font-semibold bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 px-3 py-1.5 rounded-xl transition-all shadow-2xs active:scale-95"
+                                        >
+                                          Aportar
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
-                        {/* Create Goal Form */}
-                        <div className="lg:col-span-4">
-                          <form
-                            onSubmit={handleCreateSavingsGoal}
-                            className="bg-white dark:bg-[#0c0c0c] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 shadow-xs sticky top-4"
-                          >
-                            <div className="space-y-1">
-                              <h3 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
-                                <Target className="w-4 h-4 text-gray-700 dark:text-gray-300" />{" "}
-                                Nueva Meta
-                              </h3>
-                              <p className="text-xs text-gray-500">
-                                Planifica tu próxima meta de ahorro (con o sin
-                                fecha)
-                              </p>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                Nombre de la Meta
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                value={goalName}
-                                onChange={(e) => setGoalName(e.target.value)}
-                                placeholder="Ej. Fondo de Reserva"
-                                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                Monto Objetivo ($)
-                              </label>
-                              <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                  <span className="text-gray-400 text-sm">
-                                    $
-                                  </span>
-                                </div>
-                                <input
-                                  required
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  onKeyDown={blockNegativeKeys}
-                                  value={goalTargetAmount}
-                                  onChange={(e) =>
-                                    setGoalTargetAmount(
-                                      e.target.value.replace(/-/g, ""),
-                                    )
-                                  }
-                                  placeholder="0.00"
-                                  className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
-                                />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                  Frecuencia
-                                </label>
-                                <select
-                                  value={goalFrequency}
-                                  onChange={(e) =>
-                                    setGoalFrequency(e.target.value as any)
-                                  }
-                                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
-                                >
-                                  <option value="MONTHLY">Mensual</option>
-                                  <option value="BIWEEKLY">Quincenal</option>
-                                  <option value="WEEKLY">Semanal</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                  Fecha límite (Opcional)
-                                </label>
-                                <input
-                                  type="date"
-                                  value={goalTargetDate}
-                                  onChange={(e) =>
-                                    setGoalTargetDate(e.target.value)
-                                  }
-                                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
-                                />
-                              </div>
-                            </div>
-
-                            {!goalTargetDate && (
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                  Abono deseado por período ($)
-                                </label>
-                                <div className="relative">
-                                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <span className="text-gray-400 text-sm">
-                                      $
-                                    </span>
-                                  </div>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    onKeyDown={blockNegativeKeys}
-                                    value={goalCustomContribution}
-                                    onChange={(e) =>
-                                      setGoalCustomContribution(
-                                        e.target.value.replace(/-/g, ""),
-                                      )
-                                    }
-                                    placeholder="Ej. 100.00"
-                                    className="w-full pl-7 pr-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
-                                  />
-                                </div>
-                                <p className="text-[10px] text-gray-400 mt-1">
-                                  Sin fecha límite, la meta es indefinida.
-                                  Escribe el abono a realizar en cada período (
-                                  {goalFrequency === "WEEKLY"
-                                    ? "semanal"
-                                    : goalFrequency === "BIWEEKLY"
-                                      ? "quincenal"
-                                      : "mensual"}
-                                  ).
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Live Cuota Calculator Preview */}
-                            {goalTargetAmount &&
-                              parseFloat(goalTargetAmount) > 0 && (
-                                <div className="p-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl space-y-1 text-sm text-gray-700 dark:text-gray-300 mt-2">
-                                  {(() => {
-                                    const targetCents = Math.round(
-                                      parseFloat(goalTargetAmount) * 100,
-                                    );
-                                    const freqStr =
-                                      goalFrequency === "WEEKLY"
-                                        ? "semanal"
-                                        : goalFrequency === "BIWEEKLY"
-                                          ? "quincenal"
-                                          : "mensual";
-
-                                    if (goalTargetDate) {
-                                      const calc = calculateSavingsCuota(
-                                        targetCents,
-                                        0,
-                                        goalTargetDate,
-                                        goalFrequency,
-                                      );
-                                      if (!calc.cuota) return null;
-                                      return (
-                                        <>
-                                          <span className="font-semibold text-gray-900 dark:text-white block">
-                                            Cuota: ${calc.cuota.toFixed(2)} /{" "}
-                                            {freqStr}
-                                          </span>
-                                          <p className="text-xs text-gray-500 mt-1">
-                                            Abonando ${calc.cuota.toFixed(2)} en{" "}
-                                            {calc.periods} períodos (
-                                            {calc.daysRemaining} días).
-                                          </p>
-                                        </>
-                                      );
-                                    } else if (
-                                      goalCustomContribution &&
-                                      parseFloat(goalCustomContribution) > 0
-                                    ) {
-                                      const contribCents = Math.round(
-                                        parseFloat(goalCustomContribution) *
-                                          100,
-                                      );
-                                      const periods = Math.ceil(
-                                        targetCents / contribCents,
-                                      );
-                                      const daysPerPeriod =
-                                        goalFrequency === "WEEKLY"
-                                          ? 7
-                                          : goalFrequency === "BIWEEKLY"
-                                            ? 14
-                                            : 30;
-                                      const totalDays = periods * daysPerPeriod;
-                                      return (
-                                        <>
-                                          <span className="font-semibold text-gray-900 dark:text-white block">
-                                            Meta Indefinida • Abono: $
-                                            {parseFloat(
-                                              goalCustomContribution,
-                                            ).toFixed(2)}{" "}
-                                            / {freqStr}
-                                          </span>
-                                          <p className="text-xs text-gray-500 mt-1">
-                                            Alcanzarás tu meta en aprox.{" "}
-                                            {periods} períodos (~{totalDays}{" "}
-                                            días).
-                                          </p>
-                                        </>
-                                      );
-                                    } else {
-                                      return (
-                                        <span className="text-xs text-gray-500 block">
-                                          Meta Indefinida (sin fecha límite).
-                                          Ingresa cuánto deseas abonar por
-                                          período arriba.
-                                        </span>
-                                      );
-                                    }
-                                  })()}
-                                </div>
-                              )}
-
-                            <button
-                              type="submit"
-                              className="w-full bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 py-3 rounded-xl text-sm font-semibold transition-colors shadow-xs mt-2"
-                            >
-                              Crear Meta de Ahorro
-                            </button>
-                          </form>
-                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* SHOPPING TAB */}
-                  {effectiveTab === "shopping" && (
-                    <div className="space-y-6">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div>
-                          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <ShoppingCart className="w-5 h-5 text-gray-700 dark:text-gray-300" />{" "}
-                            Listas de Compras
-                          </h2>
-                          <p className="text-xs text-gray-500">
-                            Organiza artículos, precios, cantidades y carga a
-                            gastos
-                          </p>
-                        </div>
-                        <div className="flex bg-gray-100 dark:bg-[#141414] p-1 rounded-xl border border-gray-200 dark:border-zinc-800 text-xs font-medium shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setShoppingFilter("active")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${shoppingFilter === "active" ? "bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs font-semibold" : "text-gray-500 hover:text-gray-900 dark:hover:text-white"}`}
-                          >
-                            Activas (
-                            {shoppingLists.filter((l) => !l.is_archived).length}
-                            )
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShoppingFilter("archived")}
-                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${shoppingFilter === "archived" ? "bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-xs font-semibold" : "text-gray-500 hover:text-gray-900 dark:hover:text-white"}`}
-                          >
-                            <Archive className="w-3.5 h-3.5" /> Archivadas (
-                            {shoppingLists.filter((l) => l.is_archived).length})
-                          </button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-2 space-y-6">
-                          {(() => {
-                            const displayedLists = shoppingLists.filter((l) =>
-                              shoppingFilter === "archived"
-                                ? l.is_archived
-                                : !l.is_archived,
-                            );
-                            if (displayedLists.length === 0) {
-                              return (
-                                <div className="p-8 text-center bg-gray-50 dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-2">
-                                  <ShoppingCart className="w-7 h-7 mx-auto text-gray-400" />
-                                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                    {shoppingFilter === "archived"
-                                      ? "No hay listas archivadas."
-                                      : "No hay listas de compras activas."}
-                                  </p>
-                                  <p className="text-xs text-gray-400">
-                                    {shoppingFilter === "archived"
-                                      ? "Puedes archivar listas completadas o guardadas."
-                                      : "Crea tu primera lista a la derecha para organizar artículos."}
-                                  </p>
-                                </div>
-                              );
-                            }
+                  {effectiveTab === "shopping" && (() => {
+                    const activeLists = shoppingLists.filter((l) => !l.is_archived);
+                    const archivedLists = shoppingLists.filter((l) => l.is_archived);
+                    const displayedLists = shoppingFilter === "archived" ? archivedLists : activeLists;
 
-                            return displayedLists.map((list) => {
-                              const listItems = shoppingItems.filter(
-                                (i) => i.list_id === list.id,
-                              );
-                              const completed = listItems.filter(
-                                (i) => i.is_purchased,
-                              ).length;
+                    const totalActiveItems = shoppingItems.filter((i) => {
+                      const parentList = shoppingLists.find((l) => l.id === i.list_id);
+                      return parentList && !parentList.is_archived;
+                    });
+                    const totalActiveEstCents = totalActiveItems.reduce(
+                      (acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0),
+                      0,
+                    );
+                    const totalActiveBoughtCents = totalActiveItems
+                      .filter((i) => i.is_purchased)
+                      .reduce(
+                        (acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0),
+                        0,
+                      );
+
+                    return (
+                      <div className="space-y-5 max-w-4xl mx-auto">
+                        {/* Header & Actions */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-150 dark:border-zinc-800">
+                          <div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                              <ShoppingCart className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                              Listas de Compras
+                            </h2>
+                            <p className="text-xs text-gray-500">
+                              Organiza artículos, precios, cantidades y carga a gastos
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex bg-gray-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-gray-200 dark:border-zinc-700/60 text-xs font-medium">
+                              <button
+                                type="button"
+                                onClick={() => setShoppingFilter("active")}
+                                className={`px-2.5 py-1.5 rounded-lg transition-all ${
+                                  shoppingFilter === "active"
+                                    ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-2xs font-semibold"
+                                    : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                }`}
+                              >
+                                Activas ({activeLists.length})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShoppingFilter("archived")}
+                                className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                                  shoppingFilter === "archived"
+                                    ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-2xs font-semibold"
+                                    : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                }`}
+                              >
+                                <Archive className="w-3 h-3" /> Archivadas ({archivedLists.length})
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewListName("");
+                                setShowCreateShoppingListModal(true);
+                              }}
+                              className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2.5 rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-95"
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                              Nueva Lista
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Summary Metrics */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800">
+                          <div>
+                            <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                              Total Estimado
+                            </span>
+                            <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                              {formatCurrency(totalActiveEstCents)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                              Total Comprado
+                            </span>
+                            <span className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                              {formatCurrency(totalActiveBoughtCents)}
+                            </span>
+                          </div>
+                          <div className="col-span-2 sm:col-span-1">
+                            <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                              Listas Activas
+                            </span>
+                            <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                              {activeLists.length} {activeLists.length === 1 ? "lista" : "listas"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Lists Content */}
+                        <div className="space-y-4">
+                          {displayedLists.length === 0 ? (
+                            <div className="p-8 text-center bg-white dark:bg-[#0a0a0a] rounded-2xl border border-dashed border-gray-200 dark:border-zinc-800 space-y-3">
+                              <div className="w-10 h-10 bg-gray-50 dark:bg-zinc-900 rounded-xl flex items-center justify-center mx-auto text-gray-400">
+                                <ShoppingCart className="w-5 h-5" />
+                              </div>
+                              <div className="space-y-1 max-w-sm mx-auto">
+                                <p className="font-semibold text-sm text-gray-900 dark:text-white">
+                                  {shoppingFilter === "archived"
+                                    ? "No hay listas archivadas"
+                                    : "No hay listas de compras activas"}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {shoppingFilter === "archived"
+                                    ? "Puedes archivar listas completadas o guardadas para tenerlas como referencia."
+                                    : "Crea tu primera lista para organizar artículos, precios y compras de supermercado o pendientes."}
+                                </p>
+                              </div>
+                              {shoppingFilter !== "archived" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewListName("");
+                                    setShowCreateShoppingListModal(true);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shadow-2xs"
+                                >
+                                  <PlusIcon className="w-3.5 h-3.5" />
+                                  Crear Primera Lista
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            displayedLists.map((list) => {
+                              const listItems = shoppingItems.filter((i) => i.list_id === list.id);
+                              const completed = listItems.filter((i) => i.is_purchased).length;
                               const totalItems = listItems.length;
                               const progress =
-                                totalItems === 0
-                                  ? 0
-                                  : Math.round((completed / totalItems) * 100);
+                                totalItems === 0 ? 0 : Math.round((completed / totalItems) * 100);
 
                               const totalEstCents = listItems.reduce(
                                 (acc, item) =>
-                                  acc +
-                                  (item.quantity || 1) *
-                                    (item.price_cents || 0),
+                                  acc + (item.quantity || 1) * (item.price_cents || 0),
                                 0,
                               );
                               const totalBoughtCents = listItems
                                 .filter((i) => i.is_purchased)
                                 .reduce(
                                   (acc, item) =>
-                                    acc +
-                                    (item.quantity || 1) *
-                                      (item.price_cents || 0),
+                                    acc + (item.quantity || 1) * (item.price_cents || 0),
                                   0,
                                 );
-                              const totalPendingCents = Math.max(
-                                0,
-                                totalEstCents - totalBoughtCents,
-                              );
+                              const totalPendingCents = Math.max(0, totalEstCents - totalBoughtCents);
 
                               return (
                                 <div
                                   key={list.id}
-                                  className="bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl shadow-xs space-y-4"
+                                  className="bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 p-4 sm:p-5 rounded-2xl shadow-2xs space-y-3.5"
                                 >
-                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-gray-100 dark:border-zinc-800/80 gap-2">
+                                  {/* List Header */}
+                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-2.5 border-b border-gray-100 dark:border-zinc-800/80 gap-2">
                                     <div>
-                                      <h3 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                                      <h3 className="font-bold text-sm sm:text-base text-gray-900 dark:text-white flex items-center gap-2">
                                         <span>{list.name}</span>
                                         {list.is_archived && (
-                                          <span className="text-[10px] font-medium bg-gray-100 dark:bg-zinc-800 text-gray-500 px-2 py-0.5 rounded-full">
+                                          <span className="text-[10px] font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-500 px-2 py-0.5 rounded-md">
                                             Archivada
                                           </span>
                                         )}
                                       </h3>
                                       <p className="text-[11px] text-gray-400 mt-0.5">
-                                        {completed} de {totalItems} artículos
-                                        marcados
+                                        {completed} de {totalItems} artículos marcados ({progress}%)
                                       </p>
                                     </div>
                                     <div className="flex items-center gap-1.5 self-end sm:self-auto">
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          handleResetShoppingList(list.id)
-                                        }
+                                        onClick={() => handleResetShoppingList(list.id)}
                                         className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all flex items-center gap-1 text-xs font-medium"
                                         title="Restablecer lista"
                                       >
                                         <RefreshCw className="w-3.5 h-3.5" />
-                                        <span className="hidden sm:inline">
-                                          Restablecer
-                                        </span>
+                                        <span className="hidden sm:inline">Restablecer</span>
                                       </button>
 
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          handleToggleArchiveShoppingList(list)
-                                        }
+                                        onClick={() => handleToggleArchiveShoppingList(list)}
                                         className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all flex items-center gap-1 text-xs font-medium"
-                                        title={
-                                          list.is_archived
-                                            ? "Desarchivar lista"
-                                            : "Archivar lista"
-                                        }
+                                        title={list.is_archived ? "Desarchivar lista" : "Archivar lista"}
                                       >
                                         <Archive className="w-3.5 h-3.5" />
                                         <span className="hidden sm:inline">
-                                          {list.is_archived
-                                            ? "Desarchivar"
-                                            : "Archivar"}
+                                          {list.is_archived ? "Desarchivar" : "Archivar"}
                                         </span>
                                       </button>
 
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          handleDeleteShoppingList(list.id)
-                                        }
+                                        onClick={() => handleDeleteShoppingList(list.id)}
                                         className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
                                         title="Eliminar lista"
                                       >
-                                        <Trash2 className="w-4 h-4" />
+                                        <Trash2 className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
                                   </div>
 
-                                  {/* Barra de progreso */}
-                                  <div className="h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                  {/* Progress bar */}
+                                  <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                     <div
                                       className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
                                       style={{ width: `${progress}%` }}
                                     />
                                   </div>
 
-                                  {/* Resumen financiero */}
-                                  <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800 text-center">
+                                  {/* Financial summary banner */}
+                                  <div className="grid grid-cols-3 gap-2 p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800 text-center">
                                     <div>
-                                      <span className="text-[10px] uppercase font-medium text-gray-400 block">
+                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block">
                                         Estimado
                                       </span>
-                                      <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                                      <span className="text-xs font-bold text-gray-900 dark:text-white">
                                         {formatCurrency(totalEstCents)}
                                       </span>
                                     </div>
                                     <div>
-                                      <span className="text-[10px] uppercase font-medium text-gray-400 block">
+                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block">
                                         Comprado
                                       </span>
-                                      <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                         {formatCurrency(totalBoughtCents)}
                                       </span>
                                     </div>
                                     <div>
-                                      <span className="text-[10px] uppercase font-medium text-gray-400 block">
+                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block">
                                         Pendiente
                                       </span>
-                                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
                                         {formatCurrency(totalPendingCents)}
                                       </span>
                                     </div>
                                   </div>
 
-                                  {/* Cargar a Gasto Banner */}
-                                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
+                                  {/* Load to expense trigger */}
+                                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
                                     <div className="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2">
                                       <Banknote className="w-4 h-4 text-gray-500 shrink-0" />
                                       <span>
@@ -7286,16 +7304,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                     </div>
                                     <button
                                       type="button"
-                                      disabled={
-                                        completed === 0 || totalBoughtCents <= 0
-                                      }
-                                      onClick={() =>
-                                        handleOpenLoadExpenseModal(list)
-                                      }
-                                      className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
+                                      disabled={completed === 0 || totalBoughtCents <= 0}
+                                      onClick={() => handleOpenLoadExpenseModal(list)}
+                                      className={`w-full sm:w-auto px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                                         completed === 0 || totalBoughtCents <= 0
                                           ? "bg-gray-100 dark:bg-zinc-800 text-gray-400 border border-gray-200 dark:border-zinc-700 cursor-not-allowed"
-                                          : "bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white cursor-pointer shadow-xs"
+                                          : "bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white cursor-pointer shadow-2xs active:scale-95"
                                       }`}
                                       title={
                                         completed === 0
@@ -7308,29 +7322,30 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                     </button>
                                   </div>
 
-                                  {/* Lista de artículos (Deslizable, max 2-3 visibles) */}
-                                  <div className="space-y-1.5 max-h-[155px] overflow-y-auto no-scrollbar pr-0.5">
+                                  {/* Items list */}
+                                  <div className="space-y-1.5 max-h-[170px] overflow-y-auto no-scrollbar pr-0.5">
                                     {listItems.length === 0 ? (
-                                      <p className="text-xs text-gray-400 italic py-3 text-center">
-                                        No hay artículos en esta lista.
+                                      <p className="text-xs text-gray-400 italic py-2 text-center">
+                                        No hay artículos en esta lista aún.
                                       </p>
                                     ) : (
                                       listItems.map((item) => {
                                         const itemTotalCents =
-                                          (item.quantity || 1) *
-                                          (item.price_cents || 0);
+                                          (item.quantity || 1) * (item.price_cents || 0);
                                         return (
                                           <div
                                             key={item.id}
                                             className="flex items-center justify-between p-2.5 bg-gray-50/70 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800/80 group hover:border-gray-200 dark:hover:border-zinc-700 transition-all"
                                           >
-                                            <div className="flex items-center gap-3 min-w-0">
+                                            <div className="flex items-center gap-2.5 min-w-0">
                                               <button
                                                 type="button"
-                                                onClick={() =>
-                                                  handleToggleShoppingItem(item)
-                                                }
-                                                className={`w-4 h-4 rounded border ${item.is_purchased ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900" : "border-gray-300 dark:border-zinc-700 hover:border-gray-400"} flex items-center justify-center transition-all shrink-0`}
+                                                onClick={() => handleToggleShoppingItem(item)}
+                                                className={`w-4 h-4 rounded border ${
+                                                  item.is_purchased
+                                                    ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900"
+                                                    : "border-gray-300 dark:border-zinc-700 hover:border-gray-400"
+                                                } flex items-center justify-center transition-all shrink-0`}
                                               >
                                                 {item.is_purchased && (
                                                   <CheckCircle2 className="w-3 h-3" />
@@ -7338,30 +7353,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                               </button>
                                               <div className="truncate">
                                                 <span
-                                                  className={`text-xs font-medium ${item.is_purchased ? "line-through text-gray-400" : "text-gray-900 dark:text-white"}`}
+                                                  className={`text-xs font-medium ${
+                                                    item.is_purchased
+                                                      ? "line-through text-gray-400"
+                                                      : "text-gray-900 dark:text-white"
+                                                  }`}
                                                 >
                                                   {item.name}
                                                 </span>
-                                                {((item.quantity &&
-                                                  item.quantity > 1) ||
-                                                  (item.price_cents &&
-                                                    item.price_cents > 0)) && (
+                                                {((item.quantity && item.quantity > 1) ||
+                                                  (item.price_cents && item.price_cents > 0)) && (
                                                   <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                                                    {item.quantity &&
-                                                      item.quantity > 1 && (
-                                                        <span className="font-medium text-gray-500 dark:text-gray-400">
-                                                          {item.quantity} ud.
-                                                        </span>
-                                                      )}
-                                                    {item.price_cents &&
-                                                      item.price_cents > 0 && (
-                                                        <span>
-                                                          c/u:{" "}
-                                                          {formatCurrency(
-                                                            item.price_cents,
-                                                          )}
-                                                        </span>
-                                                      )}
+                                                    {item.quantity && item.quantity > 1 && (
+                                                      <span className="font-medium text-gray-500 dark:text-gray-400">
+                                                        {item.quantity} ud.
+                                                      </span>
+                                                    )}
+                                                    {item.price_cents && item.price_cents > 0 && (
+                                                      <span>
+                                                        c/u: {formatCurrency(item.price_cents)}
+                                                      </span>
+                                                    )}
                                                   </div>
                                                 )}
                                               </div>
@@ -7369,20 +7381,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                             <div className="flex items-center gap-2 shrink-0">
                                               {itemTotalCents > 0 && (
                                                 <span
-                                                  className={`text-xs font-semibold ${item.is_purchased ? "text-gray-400 line-through" : "text-gray-900 dark:text-white"}`}
+                                                  className={`text-xs font-semibold ${
+                                                    item.is_purchased
+                                                      ? "text-gray-400 line-through"
+                                                      : "text-gray-900 dark:text-white"
+                                                  }`}
                                                 >
-                                                  {formatCurrency(
-                                                    itemTotalCents,
-                                                  )}
+                                                  {formatCurrency(itemTotalCents)}
                                                 </span>
                                               )}
                                               <button
                                                 type="button"
-                                                onClick={() =>
-                                                  handleDeleteShoppingItem(
-                                                    item.id,
-                                                  )
-                                                }
+                                                onClick={() => handleDeleteShoppingItem(item.id)}
                                                 className="text-gray-400 hover:text-red-500 p-1 opacity-60 group-hover:opacity-100 transition-opacity"
                                                 title="Eliminar artículo"
                                               >
@@ -7395,12 +7405,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                     )}
                                   </div>
 
-                                  {/* Formulario para añadir artículo */}
+                                  {/* Formulario para añadir artículo inline a esta lista específica */}
                                   <form
-                                    onSubmit={(e) =>
-                                      handleAddShoppingItem(e, list.id)
-                                    }
-                                    className="pt-3 border-t border-gray-100 dark:border-zinc-800 space-y-2"
+                                    onSubmit={(e) => handleAddShoppingItem(e, list.id)}
+                                    className="pt-2.5 border-t border-gray-100 dark:border-zinc-800 space-y-2"
                                   >
                                     <div className="flex flex-col sm:flex-row gap-2">
                                       <input
@@ -7421,9 +7429,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                           type="number"
                                           min="1"
                                           step="1"
-                                          value={
-                                            newItemQuantities[list.id] || "1"
-                                          }
+                                          value={newItemQuantities[list.id] || "1"}
                                           onChange={(e) =>
                                             setNewItemQuantities((prev) => ({
                                               ...prev,
@@ -7447,11 +7453,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                             onChange={(e) =>
                                               setNewItemPrices((prev) => ({
                                                 ...prev,
-                                                [list.id]:
-                                                  e.target.value.replace(
-                                                    /-/g,
-                                                    "",
-                                                  ),
+                                                [list.id]: e.target.value.replace(/-/g, ""),
                                               }))
                                             }
                                             placeholder="Precio"
@@ -7461,7 +7463,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         </div>
                                         <button
                                           type="submit"
-                                          className="px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shrink-0 flex items-center gap-1"
+                                          className="px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shrink-0 flex items-center gap-1 shadow-2xs"
                                         >
                                           <PlusIcon className="w-3.5 h-3.5" />
                                           Añadir
@@ -7471,47 +7473,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   </form>
                                 </div>
                               );
-                            });
-                          })()}
-                        </div>
-                        <div>
-                          <form
-                            onSubmit={handleCreateShoppingList}
-                            className="bg-white dark:bg-[#0c0c0c] p-6 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-4 sticky top-6 shadow-xs"
-                          >
-                            <div className="space-y-1">
-                              <h3 className="font-semibold text-base text-gray-900 dark:text-white flex items-center gap-2">
-                                <ShoppingCart className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-                                Nueva Lista
-                              </h3>
-                              <p className="text-xs text-gray-500">
-                                Crea una lista minimalista para tus compras
-                              </p>
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                                Nombre de la lista
-                              </label>
-                              <input
-                                required
-                                type="text"
-                                value={newListName}
-                                onChange={(e) => setNewListName(e.target.value)}
-                                placeholder="Ej. Supermercado Semanal"
-                                className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
-                              />
-                            </div>
-                            <button
-                              type="submit"
-                              className="w-full bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs"
-                            >
-                              Crear Lista
-                            </button>
-                          </form>
+                            })
+                          )}
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* DEBTS & CARDS TAB */}
                   {effectiveTab === "debts" && (
@@ -11970,6 +11937,85 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-sm"
                   >
                     Desactivar PIN
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Set Global Total Budget Modal */}
+      <AnimatePresence>
+        {showSetTotalBudgetModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            onClick={() => setShowSetTotalBudgetModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0c0c0c] rounded-2xl p-5 w-full max-w-sm border border-gray-200 dark:border-zinc-800 space-y-4"
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                    Meta Global del Mes
+                  </h3>
+                  <p className="text-[11px] text-gray-500">
+                    Establece el tope máximo de gastos para el mes seleccionado
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSetTotalBudgetModal(false)}
+                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSetBudget} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400">
+                    Monto Total Presupuestado ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    autoFocus
+                    onKeyDown={blockNegativeKeys}
+                    value={budgetAmount}
+                    onChange={(e) =>
+                      setBudgetAmount(e.target.value.replace(/-/g, ""))
+                    }
+                    placeholder="Ej. 1500.00"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-base font-bold outline-none text-gray-900 dark:text-white"
+                  />
+                  <p className="text-[11px] text-gray-400">
+                    Este monto actúa como el techo general para comparar contra tus gastos totales del mes.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowSetTotalBudgetModal(false)}
+                    className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
+                  >
+                    Guardar Meta
                   </button>
                 </div>
               </form>
