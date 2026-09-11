@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { X, Calendar as CalendarIcon, Flag, ChevronDown, ChevronUp } from 'lucide-react';
-import { Priority, Project } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar as CalendarIcon, Flag, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { Priority, Project, Todo } from '../types';
 
 interface MobileTaskDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (text: string, options?: any) => Promise<void> | void;
+  onAddTask?: (text: string, options?: any) => Promise<void> | void;
+  onEditTask?: (task: Todo, text: string, options?: any) => Promise<void> | void;
+  taskToEdit?: Todo | null;
   projects?: Project[];
   fixedProjectId?: number | null;
 }
@@ -14,27 +16,55 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   isOpen,
   onClose,
   onAddTask,
+  onEditTask,
+  taskToEdit,
   projects = [],
   fixedProjectId = null
 }) => {
-  const [text, setText] = useState('');
-  const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
-  const [priority, setPriority] = useState<Priority>('medium');
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(fixedProjectId);
+  const [text, setText] = useState(taskToEdit?.text || '');
+  const [dueDate, setDueDate] = useState(taskToEdit?.due_date || new Date().toISOString().split('T')[0]);
+  const [priority, setPriority] = useState<Priority>(taskToEdit?.priority || 'medium');
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(fixedProjectId || taskToEdit?.project_id || null);
+  const [assignee, setAssignee] = useState<string | null>(taskToEdit?.assignee || null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+      if(taskToEdit) {
+        setText(taskToEdit.text);
+        setDueDate(taskToEdit.due_date || new Date().toISOString().split('T')[0]);
+        setPriority(taskToEdit.priority || 'medium');
+        setSelectedProjectId(fixedProjectId || taskToEdit.project_id || null);
+        setAssignee(taskToEdit.assignee || null);
+      } else {
+        setText('');
+        setDueDate(new Date().toISOString().split('T')[0]);
+        setPriority('medium');
+        setSelectedProjectId(fixedProjectId || null);
+        setAssignee(null);
+      }
+  }, [taskToEdit, fixedProjectId, isOpen]);
 
   const handleSubmit = async () => {
     if (!text.trim()) return;
-    await onAddTask(text.trim(), {
-      dueDate,
-      priority,
-      projectId: fixedProjectId ?? selectedProjectId,
-    });
+    const options = {
+        dueDate,
+        priority,
+        projectId: fixedProjectId ?? selectedProjectId,
+        assignee
+    };
+    
+    if (taskToEdit && onEditTask) {
+        await onEditTask(taskToEdit, text.trim(), options);
+    } else if (onAddTask) {
+        await onAddTask(text.trim(), options);
+    }
     onClose();
-    setText('');
   };
 
   if (!isOpen) return null;
+
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const isAdvancedProject = selectedProject?.project_mode === 'advanced';
 
   return (
     <div className="fixed inset-0 z-[100010] flex items-end justify-center bg-black/40 backdrop-blur-xs animate-in fade-in duration-200" onClick={onClose}>
@@ -76,13 +106,22 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
           </button>
 
           {showAdvanced && (
-            <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-2xl text-xs text-zinc-500">
-                (Opciones avanzadas: recordatorios, subtareas, notas...)
+            <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-2xl text-xs space-y-3">
+                {isAdvancedProject && (
+                    <div className="space-y-1">
+                        <label className="text-zinc-500 flex items-center gap-1.5"><User className="w-3.5 h-3.5"/> Asignar a</label>
+                        <select value={assignee || ''} onChange={e => setAssignee(e.target.value || null)} className="w-full p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                             <option value="">Sin asignar</option>
+                             {selectedProject?.members?.map(m => <option key={m.id} value={m.email}>{m.name}</option>)}
+                        </select>
+                    </div>
+                )}
+                <div className="text-zinc-500">(Recordatorios, subtareas, notas...)</div>
             </div>
           )}
 
           <button onClick={handleSubmit} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-2xl">
-            Guardar Tarea
+            {taskToEdit ? 'Guardar Cambios' : 'Guardar Tarea'}
           </button>
         </div>
       </div>

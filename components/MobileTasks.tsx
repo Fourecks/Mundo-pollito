@@ -316,49 +316,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
 
     const handleOpenEditPage = (task: Todo) => {
         setActiveEditingTask(task);
-        setEditTitle(task.text || '');
-        setEditCompleted(task.completed || false);
-        setEditPriority(task.priority || 'medium');
-        setEditProjectId(task.project_id || null);
-        setEditAssignee(task.assigned_to || task.assignee || '');
-        setEditIsUndated(!task.due_date);
-        setEditDueDate(task.due_date || selectedDateKey);
-        setEditHasEndDate(!!task.end_date);
-        setEditEndDate(task.end_date || task.due_date || selectedDateKey);
-        setEditHasTime(!!task.start_time);
-        setEditStartTime(task.start_time || '09:00');
-        setEditEndTime(task.end_time || '10:00');
-
-        setEditHasReminder(!!task.reminder_at || !!(task.reminder_offset !== undefined && task.reminder_offset > 0));
-        if (task.reminder_at) {
-            setEditReminderType('custom');
-            try {
-                const d = new Date(task.reminder_at);
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                const hour = String(d.getHours()).padStart(2, '0');
-                const minute = String(d.getMinutes()).padStart(2, '0');
-                setEditCustomReminderDate(`${year}-${month}-${day}`);
-                setEditCustomReminderTime(`${hour}:${minute}`);
-            } catch (e) {
-                setEditCustomReminderDate('');
-                setEditCustomReminderTime('');
-            }
-        } else {
-            setEditReminderType(String(task.reminder_offset || '0'));
-            setEditCustomReminderDate('');
-            setEditCustomReminderTime('');
-        }
-
-        setEditHasRecurrence(task.recurrence?.frequency !== 'none' && !!task.recurrence);
-        setEditRecurrence(task.recurrence || { frequency: 'none' });
-
-        setEditNotes(task.notes || '');
-        setEditSubtasks(task.subtasks || []);
-        setEditSubtaskInput('');
-        setShowDeleteConfirm(false);
-        setSubPage('edit');
+        setIsDrawerOpen(true); // Open the drawer instead of switching subpage
     };
 
     const handleAddSubtaskEdit = () => {
@@ -1484,8 +1442,15 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 </button>
                 <MobileTaskDrawer 
                     isOpen={isDrawerOpen} 
-                    onClose={() => setIsDrawerOpen(false)} 
-                    onAddTask={onAddTodo!}
+                    onClose={() => {setIsDrawerOpen(false); setActiveEditingTask(null);}} 
+                    onAddTask={onAddTodo}
+                    onEditTask={(_, text, options) => {
+                        if (activeEditingTask && onUpdateTodo) {
+                             const updatedTask = { ...activeEditingTask, text, ...options };
+                             onUpdateTodo(updatedTask);
+                        }
+                    }}
+                    taskToEdit={activeEditingTask}
                     projects={projects}
                 />
             </div>
