@@ -3981,7 +3981,7 @@ const App: React.FC = () => {
     
     // Find and remove the original task
     for (const key in newAllTodos) {
-        const index = newAllTodos[key].findIndex(t => t.id === todoToUpdate.id);
+        const index = newAllTodos[key].findIndex(t => String(t.id) === String(todoToUpdate.id));
         if (index !== -1) {
             newAllTodos[key].splice(index, 1);
             if (newAllTodos[key].length === 0 && key !== 'undated') {
@@ -4008,9 +4008,9 @@ const App: React.FC = () => {
     return newAllTodos;
 }
 
-  const findTodoById = (id: number): Todo | null => {
+  const findTodoById = (id: number | string): Todo | null => {
     for (const key in allTodos) {
-      const found = allTodos[key].find(t => t.id === id);
+      const found = allTodos[key]?.find(t => String(t.id) === String(id));
       if (found) return found;
     }
     return null;
