@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { Priority, Project, Todo } from '../types';
+import { formatTime12h, formatDateRangeSafe } from '../src/utils/dateFormatter';
 
 interface MobileTaskDrawerProps {
   isOpen: boolean;
@@ -131,7 +132,8 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         priority,
         projectId: fixedProjectId ?? selectedProjectId,
         project_id: fixedProjectId ?? selectedProjectId,
-        assignee
+        assignee: isAdvancedProject ? assignee : null,
+        assigned_to: isAdvancedProject ? assignee : null
     };
     
     if (taskToEdit && onEditTask) {
@@ -143,7 +145,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
-  const isAdvancedProject = selectedProject?.project_mode === 'advanced' || !!(selectedProject?.members && selectedProject.members.length > 0);
+  const isAdvancedProject = selectedProject?.project_mode === 'advanced';
 
   const renderHeader = (title: string) => (
       <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
@@ -174,7 +176,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                </div>
                <div className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-sm font-medium dark:text-white flex items-center justify-between">
                    <span className={!hasDueDate ? 'opacity-50' : ''}>
-                       {hasDueDate ? (hasEndDate ? `${new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})} - ${new Date(endDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})}` : new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})) : 'Sin fecha'}
+                       {hasDueDate ? formatDateRangeSafe(dueDate, hasEndDate ? endDate : null) : 'Sin fecha'}
                    </span>
                </div>
            </div>
@@ -192,7 +194,14 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
             {!fixedProjectId && (
                 <div className="min-w-0 w-full mb-3">
                   <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Proyecto</label>
-                  <select value={selectedProjectId || ''} onChange={e => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white appearance-none">
+                  <select value={selectedProjectId || ''} onChange={e => {
+                    const val = e.target.value ? Number(e.target.value) : null;
+                    setSelectedProjectId(val);
+                    const proj = projects.find(p => p.id === val);
+                    if (proj?.project_mode !== 'advanced') {
+                      setAssignee(null);
+                    }
+                  }} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white appearance-none">
                       <option value="">Ninguno</option>
                       {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
@@ -203,7 +212,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                   <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Asignar a</label>
                   <select value={assignee || ''} onChange={e => setAssignee(e.target.value || null)} className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none outline-none text-sm font-medium dark:text-white appearance-none">
                           <option value="">General (Sin asignar)</option>
-                          {selectedProject?.members?.map(m => <option key={m.id} value={m.email || m.name}>{m.name}</option>)}
+                          {selectedProject?.members?.map(m => <option key={m.id || m.email} value={m.email || m.name}>{m.name || m.email}</option>)}
                   </select>
                 </div>
             )}
@@ -213,7 +222,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-wrap gap-2 pt-2 pb-1">
                 {timeEnabled && time && (
                     <span onClick={() => setActiveSheet('time')} className="cursor-pointer px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                        {time} {endTime ? `- ${endTime}` : ''}
+                        {formatTime12h(time)}{endTime ? ` - ${formatTime12h(endTime)}` : ''}
                     </span>
                 )}
                 {reminderEnabled && reminder !== 'none' && (

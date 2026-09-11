@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Todo, Priority, Subtask, FocusSession } from '../types';
 import SubtaskIcon from './icons/SubtaskIcon';
 import ChevronDownIcon from './icons/ChevronDownIcon';
+import { formatTime12h, formatDateRangeSafe } from '../src/utils/dateFormatter';
 
 interface TodoItemProps {
   todo: Todo;
@@ -24,31 +25,11 @@ const priorityMap: { [key in Priority]: { color: string; label: string, borderCo
 };
 
 const formatTime = (timeStr: string) => {
-    if (!timeStr) return '';
-    const [hour, minute] = timeStr.split(':');
-    const d = new Date();
-    d.setHours(parseInt(hour), parseInt(minute));
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return formatTime12h(timeStr);
 };
 
 const formatDueDate = (todo: Todo): string => {
-    if (!todo.due_date) return '';
-
-    const formatDate = (dateStr: string) => {
-        const [year, month, day] = dateStr.split('-').map(Number);
-        const date = new Date(Date.UTC(year, month - 1, day));
-        return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-    };
-
-    // If there's an end date, format a range
-    if (todo.end_date && todo.end_date > todo.due_date) {
-        const startDateString = formatDate(todo.due_date);
-        const endDateString = formatDate(todo.end_date);
-        return `${startDateString} - ${endDateString}`;
-    }
-    
-    // For single day tasks, do not show any date.
-    return '';
+    return formatDateRangeSafe(todo.due_date, todo.end_date);
 };
 
 
@@ -109,9 +90,9 @@ const TodoItem: React.FC<TodoItemProps> = ({
         {/* Task Text & Subtask Toggle */}
         <div className="flex-grow flex items-center gap-2 ml-4 min-w-0">
             {color && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />}
-            {todo.start_time && !todo.end_date && (
+            {todo.start_time && (
                 <span className={`text-xs font-semibold text-primary-dark dark:text-primary flex-shrink-0 ${todo.completed ? 'opacity-70' : ''}`}>
-                    {formatTime(todo.start_time)}
+                    {formatTime(todo.start_time)}{todo.end_time ? ` - ${formatTime(todo.end_time)}` : ''}
                 </span>
             )}
             <span 

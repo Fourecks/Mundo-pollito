@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear, isTomorrow, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cleanToPlainText } from '../utils/textCleaner';
+import { formatTime12h, formatDateSafe, formatDateRangeSafe, parseLocalDate } from '../src/utils/dateFormatter';
 
 interface ProjectsWorkspaceProps {
     isMobile?: boolean;
@@ -315,6 +316,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [isMobileFolderDrawerOpen, setIsMobileFolderDrawerOpen] = useState(false);
     const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+    const [quickAddAction, setQuickAddAction] = useState<'tarea' | 'gasto' | 'nota' | 'tiempo' | null>(null);
     const [quickAddType, setQuickAddType] = useState<'tarea' | 'gasto' | 'nota' | 'tiempo'>('tarea');
     const [quickExpenseDesc, setQuickExpenseDesc] = useState('');
     const [quickExpenseAmount, setQuickExpenseAmount] = useState('');
@@ -1644,13 +1646,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const getFriendlyDate = (dateStr?: string) => {
             if (!dateStr) return '';
             try {
-                const date = parseISO(dateStr);
+                const date = parseLocalDate(dateStr);
                 if (isToday(date)) return 'Hoy';
                 if (isTomorrow(date)) return 'Mañana';
                 if (isYesterday(date)) return 'Ayer';
                 return format(date, 'd MMM', { locale: es });
             } catch (e) {
-                return dateStr;
+                return formatDateSafe(dateStr);
             }
         };
 
@@ -6351,13 +6353,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const getFriendlyDate = (dateStr?: string) => {
             if (!dateStr) return '';
             try {
-                const date = parseISO(dateStr);
+                const date = parseLocalDate(dateStr);
                 if (isToday(date)) return 'Hoy';
                 if (isTomorrow(date)) return 'Mañana';
                 if (isYesterday(date)) return 'Ayer';
                 return format(date, 'd MMM', { locale: es });
             } catch (e) {
-                return dateStr;
+                return formatDateSafe(dateStr);
             }
         };
 
@@ -9045,410 +9047,504 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
                             className="absolute inset-0 bg-black/40 backdrop-blur-xs" 
-                            onClick={() => setIsQuickAddOpen(false)} 
+                            onClick={() => {
+                                setIsQuickAddOpen(false);
+                                setQuickAddAction(null);
+                            }} 
                         />
                         <motion.div 
                             layout
                             initial={{ y: "100%", opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
                             exit={{ y: "100%", opacity: 0 }}
-                            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+                            transition={{ type: "spring", damping: 30, stiffness: 350 }}
                             className="relative bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-200 dark:border-zinc-800 shadow-2xl overflow-hidden font-sans z-10 flex flex-col"
                             onClick={e => e.stopPropagation()}
                         >
                             {/* DRAG HANDLE */}
-                            <div className="flex justify-center py-3.5 cursor-pointer shrink-0" onClick={() => setIsQuickAddOpen(false)}>
+                            <div className="flex justify-center py-3 cursor-pointer shrink-0" onClick={() => {
+                                setIsQuickAddOpen(false);
+                                setQuickAddAction(null);
+                            }}>
                                 <div className="w-12 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
                             </div>
 
-                            {/* HEADER & SELECTOR TABS */}
-                            <div className="px-5 pb-3 border-b border-zinc-100 dark:border-zinc-800/80">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                        Agregar al proyecto: <span className="text-blue-600 dark:text-blue-400">{activeProject?.name || 'Proyecto'}</span>
-                                    </span>
+                            {/* HEADER */}
+                            <div className="px-5 pb-3 border-b border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between">
+                                {quickAddAction ? (
                                     <button 
                                         type="button"
-                                        onClick={() => setIsQuickAddOpen(false)}
-                                        className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                        onClick={() => setQuickAddAction(null)}
+                                        className="flex items-center gap-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <ChevronLeft className="w-4 h-4" />
+                                        <span>Volver</span>
                                     </button>
-                                </div>
+                                ) : (
+                                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                        Agregar a: <span className="text-zinc-600 dark:text-zinc-300">{activeProject?.name || 'Proyecto'}</span>
+                                    </span>
+                                )}
 
-                                {/* Segmented Control */}
-                                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl">
-                                    {[
-                                        { id: 'tarea', label: 'Tarea', icon: CheckSquare },
-                                        { id: 'gasto', label: 'Gasto', icon: DollarSign },
-                                        { id: 'nota', label: 'Nota', icon: FileText },
-                                        { id: 'tiempo', label: 'Tiempo', icon: Clock },
-                                    ].map(tab => {
-                                        const Icon = tab.icon;
-                                        const isActive = quickAddType === tab.id;
-                                        return (
-                                            <button
-                                                key={tab.id}
-                                                type="button"
-                                                onClick={() => setQuickAddType(tab.id as any)}
-                                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                                                    isActive 
-                                                        ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' 
-                                                        : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-                                                }`}
-                                            >
-                                                <Icon className="w-3.5 h-3.5 shrink-0" />
-                                                <span>{tab.label}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                    {quickAddAction === 'tarea' && 'Nueva Tarea'}
+                                    {quickAddAction === 'gasto' && 'Registrar Gasto'}
+                                    {quickAddAction === 'tiempo' && 'Registrar Tiempo'}
+                                    {quickAddAction === 'nota' && 'Nueva Nota'}
+                                </span>
+
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        setIsQuickAddOpen(false);
+                                        setQuickAddAction(null);
+                                    }}
+                                    className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
 
-                            {/* DYNAMIC FORM BODY WITH SMOOTH TRANSITION */}
-                            <div className="p-5 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                            {/* DYNAMIC CONTENT CONTAINER WITH SMOOTH RESIZING */}
+                            <motion.div layout className="p-5 max-h-[75vh] overflow-y-auto custom-scrollbar">
                                 <AnimatePresence mode="wait">
-                                    <motion.div
-                                        key={quickAddType}
-                                        initial={{ opacity: 0, scale: 0.98, y: 8 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.98, y: -8 }}
-                                        transition={{ duration: 0.18, ease: "easeInOut" }}
-                                    >
-                                        {/* 1. FORM TAREA */}
-                                        {quickAddType === 'tarea' && (
-                                            <form 
-                                                onSubmit={async (e) => {
-                                                    e.preventDefault();
-                                                    if (!activeProject || !quickTaskTitle.trim()) return;
-                                                    await addTodo(quickTaskTitle.trim(), {
-                                                        projectId: activeProject.id,
-                                                        priority: quickTaskPriority,
-                                                        dueDate: quickTaskDueDate
-                                                    });
-                                                    setQuickTaskTitle('');
-                                                    setIsQuickAddOpen(false);
-                                                }}
-                                                className="space-y-4"
+                                    {/* SELECTION MENU LIST (DEFAULT) */}
+                                    {quickAddAction === null && (
+                                        <motion.div
+                                            key="selection-menu"
+                                            initial={{ opacity: 0, scale: 0.98 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.98 }}
+                                            transition={{ duration: 0.15 }}
+                                            className="space-y-2"
+                                        >
+                                            <button
+                                                type="button"
+                                                onClick={() => setQuickAddAction('tarea')}
+                                                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-800 transition-all text-left group"
                                             >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-black flex items-center justify-center font-semibold shrink-0">
+                                                        <CheckSquare className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white">Nueva Tarea</h4>
+                                                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Crear una tarea para este proyecto</p>
+                                                    </div>
+                                                </div>
+                                                <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setQuickAddAction('gasto')}
+                                                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-800 transition-all text-left group"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white flex items-center justify-center font-semibold shrink-0 border border-zinc-200 dark:border-zinc-700">
+                                                        <DollarSign className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white">Registrar Gasto</h4>
+                                                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Añadir un presupuesto o costo</p>
+                                                    </div>
+                                                </div>
+                                                <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setQuickAddAction('tiempo')}
+                                                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-800 transition-all text-left group"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white flex items-center justify-center font-semibold shrink-0 border border-zinc-200 dark:border-zinc-700">
+                                                        <Clock className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white">Registrar Tiempo</h4>
+                                                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Horas invertidas en el proyecto</p>
+                                                    </div>
+                                                </div>
+                                                <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setQuickAddAction('nota')}
+                                                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-800 transition-all text-left group"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white flex items-center justify-center font-semibold shrink-0 border border-zinc-200 dark:border-zinc-700">
+                                                        <FileText className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white">Nueva Nota</h4>
+                                                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Crear apuntes o documentación</p>
+                                                    </div>
+                                                </div>
+                                                <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform" />
+                                            </button>
+                                        </motion.div>
+                                    )}
+
+                                    {/* FORM TAREA */}
+                                    {quickAddAction === 'tarea' && (
+                                        <motion.form 
+                                            key="form-tarea"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            transition={{ duration: 0.15 }}
+                                            onSubmit={async (e) => {
+                                                e.preventDefault();
+                                                if (!activeProject || !quickTaskTitle.trim()) return;
+                                                await addTodo(quickTaskTitle.trim(), {
+                                                    projectId: activeProject.id,
+                                                    priority: quickTaskPriority,
+                                                    dueDate: quickTaskDueDate
+                                                });
+                                                setQuickTaskTitle('');
+                                                setIsQuickAddOpen(false);
+                                                setQuickAddAction(null);
+                                            }}
+                                            className="space-y-4"
+                                        >
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                    Título de la Tarea
+                                                </label>
+                                                <input 
+                                                    type="text"
+                                                    required
+                                                    autoFocus
+                                                    value={quickTaskTitle}
+                                                    onChange={e => setQuickTaskTitle(e.target.value)}
+                                                    placeholder="Ej. Revisar entregable, Diseñar pantalla..."
+                                                    className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                        Título de la Tarea
+                                                        Prioridad
+                                                    </label>
+                                                    <select
+                                                        value={quickTaskPriority}
+                                                        onChange={e => setQuickTaskPriority(e.target.value as Priority)}
+                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+                                                    >
+                                                        <option value="low">Baja</option>
+                                                        <option value="medium">Media</option>
+                                                        <option value="high">Alta</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                        Fecha Límite
                                                     </label>
                                                     <input 
-                                                        type="text"
+                                                        type="date"
+                                                        value={quickTaskDueDate}
+                                                        onChange={e => setQuickTaskDueDate(e.target.value)}
+                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-2 flex justify-end gap-2">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setQuickAddAction(null)} 
+                                                    className="px-3.5 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button 
+                                                    type="submit" 
+                                                    className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold rounded-xl text-xs hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm"
+                                                >
+                                                    Crear Tarea
+                                                </button>
+                                            </div>
+                                        </motion.form>
+                                    )}
+
+                                    {/* FORM GASTO */}
+                                    {quickAddAction === 'gasto' && (
+                                        <motion.form 
+                                            key="form-gasto"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            transition={{ duration: 0.15 }}
+                                            onSubmit={(e) => {
+                                                e.preventDefault();
+                                                if (!activeProject || !quickExpenseDesc || !quickExpenseAmount) return;
+                                                const newExp: ProjectExpense = {
+                                                    id: crypto.randomUUID(),
+                                                    project_id: activeProject.id,
+                                                    description: quickExpenseDesc,
+                                                    amount: Number(quickExpenseAmount),
+                                                    date: quickExpenseDate || new Date().toISOString().split('T')[0],
+                                                    category: (quickExpenseCategory || 'Other') as any,
+                                                    created_at: new Date().toISOString(),
+                                                    created_by: currentUserEmail || 'usuario@local.com',
+                                                    created_by_name: currentUserName
+                                                };
+                                                onUpdateProject(activeProject.id, { expenses: [newExp, ...(activeProject.expenses || [])] });
+                                                setQuickExpenseDesc('');
+                                                setQuickExpenseAmount('');
+                                                setIsQuickAddOpen(false);
+                                                setQuickAddAction(null);
+                                            }}
+                                            className="space-y-4"
+                                        >
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                    Descripción del gasto
+                                                </label>
+                                                <input 
+                                                    type="text"
+                                                    required
+                                                    autoFocus
+                                                    value={quickExpenseDesc}
+                                                    onChange={e => setQuickExpenseDesc(e.target.value)}
+                                                    placeholder="Ej. Licencia de Software, Vuelo a Madrid..."
+                                                    className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                        Monto ($)
+                                                    </label>
+                                                    <input 
+                                                        type="number"
+                                                        step="0.01"
                                                         required
-                                                        autoFocus
-                                                        value={quickTaskTitle}
-                                                        onChange={e => setQuickTaskTitle(e.target.value)}
-                                                        placeholder="Ej. Revisar entregable, Diseñar pantalla..."
-                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                        value={quickExpenseAmount}
+                                                        onChange={e => setQuickExpenseAmount(e.target.value)}
+                                                        placeholder="0.00"
+                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
                                                     />
                                                 </div>
 
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                            Prioridad
-                                                        </label>
-                                                        <select
-                                                            value={quickTaskPriority}
-                                                            onChange={e => setQuickTaskPriority(e.target.value as Priority)}
-                                                            className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                        >
-                                                            <option value="low">Baja</option>
-                                                            <option value="medium">Media</option>
-                                                            <option value="high">Alta</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                            Fecha Límite
-                                                        </label>
-                                                        <input 
-                                                            type="date"
-                                                            value={quickTaskDueDate}
-                                                            onChange={e => setQuickTaskDueDate(e.target.value)}
-                                                            className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="pt-2 flex justify-end gap-2">
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={() => setIsQuickAddOpen(false)} 
-                                                        className="px-3.5 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                        Categoría
+                                                    </label>
+                                                    <select
+                                                        value={quickExpenseCategory}
+                                                        onChange={e => setQuickExpenseCategory(e.target.value)}
+                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
                                                     >
-                                                        Cancelar
-                                                    </button>
-                                                    <button 
-                                                        type="submit" 
-                                                        className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl text-xs hover:bg-blue-700 transition-colors shadow-sm"
-                                                    >
-                                                        Crear Tarea
-                                                    </button>
+                                                        <option value="Software">Software</option>
+                                                        <option value="Hardware">Hardware</option>
+                                                        <option value="Marketing">Marketing</option>
+                                                        <option value="Services">Servicios</option>
+                                                        <option value="Travel">Viajes</option>
+                                                        <option value="Other">Otro</option>
+                                                    </select>
                                                 </div>
-                                            </form>
-                                        )}
+                                            </div>
 
-                                        {/* 2. FORM GASTO */}
-                                        {quickAddType === 'gasto' && (
-                                            <form 
-                                                onSubmit={(e) => {
-                                                    e.preventDefault();
-                                                    if (!activeProject || !quickExpenseDesc || !quickExpenseAmount) return;
-                                                    const newExp: ProjectExpense = {
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                    Fecha
+                                                </label>
+                                                <input 
+                                                    type="date"
+                                                    value={quickExpenseDate}
+                                                    onChange={e => setQuickExpenseDate(e.target.value)}
+                                                    className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+                                                />
+                                            </div>
+
+                                            <div className="pt-2 flex justify-end gap-2">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setQuickAddAction(null)} 
+                                                    className="px-3.5 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button 
+                                                    type="submit" 
+                                                    className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold rounded-xl text-xs hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm"
+                                                >
+                                                    Registrar Gasto
+                                                </button>
+                                            </div>
+                                        </motion.form>
+                                    )}
+
+                                    {/* FORM NOTA */}
+                                    {quickAddAction === 'nota' && (
+                                        <motion.form 
+                                            key="form-nota"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            transition={{ duration: 0.15 }}
+                                            onSubmit={(e) => {
+                                                e.preventDefault();
+                                                if (!quickNoteTitle.trim()) return;
+                                                handleCreateProjectNote(quickNoteTitle.trim());
+                                                setQuickNoteTitle('');
+                                                setIsQuickAddOpen(false);
+                                                setQuickAddAction(null);
+                                            }}
+                                            className="space-y-4"
+                                        >
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                    Título de la Nota
+                                                </label>
+                                                <input 
+                                                    type="text"
+                                                    required
+                                                    autoFocus
+                                                    value={quickNoteTitle}
+                                                    onChange={e => setQuickNoteTitle(e.target.value)}
+                                                    placeholder="Ej. Notas de la reunión, Especificaciones..."
+                                                    className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+                                                />
+                                            </div>
+
+                                            <div className="pt-2 flex justify-end gap-2">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setQuickAddAction(null)} 
+                                                    className="px-3.5 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button 
+                                                    type="submit" 
+                                                    className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold rounded-xl text-xs hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm"
+                                                >
+                                                    Guardar Nota
+                                                </button>
+                                            </div>
+                                        </motion.form>
+                                    )}
+
+                                    {/* FORM TIEMPO */}
+                                    {quickAddAction === 'tiempo' && (
+                                        <motion.form 
+                                            key="form-tiempo"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            transition={{ duration: 0.15 }}
+                                            onSubmit={(e) => {
+                                                e.preventDefault();
+                                                if (!activeProject) return;
+                                                const hours = parseInt(quickTimeHours) || 0;
+                                                const mins = parseInt(quickTimeMins) || 0;
+                                                const totalMinutes = (hours * 60) + mins;
+                                                if (totalMinutes > 0) {
+                                                    const newTime = {
                                                         id: crypto.randomUUID(),
                                                         project_id: activeProject.id,
-                                                        description: quickExpenseDesc,
-                                                        amount: Number(quickExpenseAmount),
-                                                        date: quickExpenseDate || new Date().toISOString().split('T')[0],
-                                                        category: (quickExpenseCategory || 'Other') as any,
-                                                        created_at: new Date().toISOString(),
-                                                        created_by: currentUserEmail || 'usuario@local.com',
-                                                        created_by_name: currentUserName
+                                                        user_email: currentUserEmail,
+                                                        user_name: currentUserName,
+                                                        duration_minutes: totalMinutes,
+                                                        date: quickTimeDate || new Date().toISOString().split('T')[0],
+                                                        description: quickTimeDesc || 'Trabajo general',
+                                                        created_at: new Date().toISOString()
                                                     };
-                                                    onUpdateProject(activeProject.id, { expenses: [newExp, ...(activeProject.expenses || [])] });
-                                                    setQuickExpenseDesc('');
-                                                    setQuickExpenseAmount('');
+                                                    onUpdateProject(activeProject.id, { time_entries: [newTime, ...(activeProject.time_entries || [])] });
+                                                    setQuickTimeDesc('');
+                                                    setQuickTimeHours('');
+                                                    setQuickTimeMins('');
                                                     setIsQuickAddOpen(false);
-                                                }}
-                                                className="space-y-4"
-                                            >
+                                                    setQuickAddAction(null);
+                                                }
+                                            }}
+                                            className="space-y-4"
+                                        >
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                    Descripción / Actividad
+                                                </label>
+                                                <input 
+                                                    type="text"
+                                                    required
+                                                    autoFocus
+                                                    value={quickTimeDesc}
+                                                    onChange={e => setQuickTimeDesc(e.target.value)}
+                                                    placeholder="Ej. Desarrollo de API, Sesión de diseño..."
+                                                    className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                        Descripción del gasto
+                                                        Horas
                                                     </label>
                                                     <input 
-                                                        type="text"
-                                                        required
-                                                        autoFocus
-                                                        value={quickExpenseDesc}
-                                                        onChange={e => setQuickExpenseDesc(e.target.value)}
-                                                        placeholder="Ej. Licencia de Software, Vuelo a Madrid..."
-                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                        type="number"
+                                                        min="0"
+                                                        value={quickTimeHours}
+                                                        onChange={e => setQuickTimeHours(e.target.value)}
+                                                        placeholder="0"
+                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
                                                     />
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                            Monto ($)
-                                                        </label>
-                                                        <input 
-                                                            type="number"
-                                                            step="0.01"
-                                                            required
-                                                            value={quickExpenseAmount}
-                                                            onChange={e => setQuickExpenseAmount(e.target.value)}
-                                                            placeholder="0.00"
-                                                            className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                            Categoría
-                                                        </label>
-                                                        <select
-                                                            value={quickExpenseCategory}
-                                                            onChange={e => setQuickExpenseCategory(e.target.value)}
-                                                            className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                        >
-                                                            <option value="Software">Software</option>
-                                                            <option value="Hardware">Hardware</option>
-                                                            <option value="Marketing">Marketing</option>
-                                                            <option value="Services">Servicios</option>
-                                                            <option value="Travel">Viajes</option>
-                                                            <option value="Other">Otro</option>
-                                                        </select>
-                                                    </div>
                                                 </div>
 
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                        Fecha
+                                                        Minutos
                                                     </label>
                                                     <input 
-                                                        type="date"
-                                                        value={quickExpenseDate}
-                                                        onChange={e => setQuickExpenseDate(e.target.value)}
-                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                        type="number"
+                                                        min="0"
+                                                        max="59"
+                                                        value={quickTimeMins}
+                                                        onChange={e => setQuickTimeMins(e.target.value)}
+                                                        placeholder="0"
+                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
                                                     />
                                                 </div>
+                                            </div>
 
-                                                <div className="pt-2 flex justify-end gap-2">
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={() => setIsQuickAddOpen(false)} 
-                                                        className="px-3.5 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
-                                                    >
-                                                        Cancelar
-                                                    </button>
-                                                    <button 
-                                                        type="submit" 
-                                                        className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-xl text-xs hover:bg-emerald-700 transition-colors shadow-sm"
-                                                    >
-                                                        Registrar Gasto
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        )}
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                                    Fecha
+                                                </label>
+                                                <input 
+                                                    type="date"
+                                                    value={quickTimeDate}
+                                                    onChange={e => setQuickTimeDate(e.target.value)}
+                                                    className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-zinc-400/20"
+                                                />
+                                            </div>
 
-                                        {/* 3. FORM NOTA */}
-                                        {quickAddType === 'nota' && (
-                                            <form 
-                                                onSubmit={(e) => {
-                                                    e.preventDefault();
-                                                    if (!quickNoteTitle.trim()) return;
-                                                    handleCreateProjectNote(quickNoteTitle.trim());
-                                                    setQuickNoteTitle('');
-                                                    setIsQuickAddOpen(false);
-                                                }}
-                                                className="space-y-4"
-                                            >
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                        Título de la Nota
-                                                    </label>
-                                                    <input 
-                                                        type="text"
-                                                        required
-                                                        autoFocus
-                                                        value={quickNoteTitle}
-                                                        onChange={e => setQuickNoteTitle(e.target.value)}
-                                                        placeholder="Ej. Notas de la reunión, Especificaciones..."
-                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                    />
-                                                </div>
-
-                                                <div className="pt-2 flex justify-end gap-2">
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={() => setIsQuickAddOpen(false)} 
-                                                        className="px-3.5 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
-                                                    >
-                                                        Cancelar
-                                                    </button>
-                                                    <button 
-                                                        type="submit" 
-                                                        className="px-4 py-2 bg-purple-600 text-white font-semibold rounded-xl text-xs hover:bg-purple-700 transition-colors shadow-sm"
-                                                    >
-                                                        Guardar Nota
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        )}
-
-                                        {/* 4. FORM TIEMPO */}
-                                        {quickAddType === 'tiempo' && (
-                                            <form 
-                                                onSubmit={(e) => {
-                                                    e.preventDefault();
-                                                    if (!activeProject) return;
-                                                    const hours = parseInt(quickTimeHours) || 0;
-                                                    const mins = parseInt(quickTimeMins) || 0;
-                                                    const totalMinutes = (hours * 60) + mins;
-                                                    if (totalMinutes > 0) {
-                                                        const newTime = {
-                                                            id: crypto.randomUUID(),
-                                                            project_id: activeProject.id,
-                                                            user_email: currentUserEmail,
-                                                            user_name: currentUserName,
-                                                            duration_minutes: totalMinutes,
-                                                            date: quickTimeDate || new Date().toISOString().split('T')[0],
-                                                            description: quickTimeDesc || 'Trabajo general',
-                                                            created_at: new Date().toISOString()
-                                                        };
-                                                        onUpdateProject(activeProject.id, { time_entries: [newTime, ...(activeProject.time_entries || [])] });
-                                                        setQuickTimeDesc('');
-                                                        setQuickTimeHours('');
-                                                        setQuickTimeMins('');
-                                                        setIsQuickAddOpen(false);
-                                                    }
-                                                }}
-                                                className="space-y-4"
-                                            >
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                        Descripción / Actividad
-                                                    </label>
-                                                    <input 
-                                                        type="text"
-                                                        required
-                                                        autoFocus
-                                                        value={quickTimeDesc}
-                                                        onChange={e => setQuickTimeDesc(e.target.value)}
-                                                        placeholder="Ej. Desarrollo de API, Sesión de diseño..."
-                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2.5 px-3.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                    />
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                            Horas
-                                                        </label>
-                                                        <input 
-                                                            type="number"
-                                                            min="0"
-                                                            value={quickTimeHours}
-                                                            onChange={e => setQuickTimeHours(e.target.value)}
-                                                            placeholder="0"
-                                                            className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                            Minutos
-                                                        </label>
-                                                        <input 
-                                                            type="number"
-                                                            min="0"
-                                                            max="59"
-                                                            value={quickTimeMins}
-                                                            onChange={e => setQuickTimeMins(e.target.value)}
-                                                            placeholder="0"
-                                                            className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                                                        Fecha
-                                                    </label>
-                                                    <input 
-                                                        type="date"
-                                                        value={quickTimeDate}
-                                                        onChange={e => setQuickTimeDate(e.target.value)}
-                                                        className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                    />
-                                                </div>
-
-                                                <div className="pt-2 flex justify-end gap-2">
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={() => setIsQuickAddOpen(false)} 
-                                                        className="px-3.5 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
-                                                    >
-                                                        Cancelar
-                                                    </button>
-                                                    <button 
-                                                        type="submit" 
-                                                        className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-xs hover:bg-indigo-700 transition-colors shadow-sm"
-                                                    >
-                                                        Registrar Tiempo
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        )}
-                                    </motion.div>
+                                            <div className="pt-2 flex justify-end gap-2">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setQuickAddAction(null)} 
+                                                    className="px-3.5 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button 
+                                                    type="submit" 
+                                                    className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold rounded-xl text-xs hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm"
+                                                >
+                                                    Registrar Tiempo
+                                                </button>
+                                            </div>
+                                        </motion.form>
+                                    )}
                                 </AnimatePresence>
-                            </div>
+                            </motion.div>
                         </motion.div>
                     </div>
                 )}

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Todo, Project, Priority, Subtask, RecurrenceRule, CalendarProvider } from '../types';
 import MobileTaskDrawer from './MobileTaskDrawer';
 import { NotionService } from '../services/notionService';
+import { formatTime12h, formatDateRangeSafe } from '../src/utils/dateFormatter';
 import { 
     CheckCircle2, 
     Circle, 
@@ -1587,19 +1588,19 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                     
                                     {/* Badges / Tags */}
                                     <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] font-medium">
-                                        {/* Multi-day Range Badge */}
-                                        {isRange && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold">
-                                                <CalendarRange className="w-3 h-3" />
-                                                <span>Rango: {format(new Date(task.due_date! + 'T00:00:00'), 'd MMM', { locale: es })} - {format(new Date(task.end_date! + 'T00:00:00'), 'd MMM', { locale: es })}</span>
+                                        {/* Date / Date Range Badge */}
+                                        {task.due_date && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
+                                                <CalendarIcon className="w-3 h-3 text-zinc-400" />
+                                                <span>{formatDateRangeSafe(task.due_date, task.end_date)}</span>
                                             </span>
                                         )}
 
                                         {/* Time Badge */}
                                         {task.start_time && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
                                                 <Clock className="w-3 h-3 text-zinc-400" />
-                                                <span>{task.start_time}{task.end_time ? ` - ${task.end_time}` : ''}</span>
+                                                <span>{formatTime12h(task.start_time)}{task.end_time ? ` - ${formatTime12h(task.end_time)}` : ''}</span>
                                             </span>
                                         )}
 
