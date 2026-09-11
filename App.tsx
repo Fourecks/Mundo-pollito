@@ -2322,7 +2322,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 )}
             </div>
 
-            <main className={`flex-grow ${activeTab === 'projects' && viewingProjectId ? 'overflow-hidden pb-28 landscape:pb-16' : 'overflow-y-auto pb-28 landscape:pb-16'} custom-scrollbar mobile-minimalist-override`}>
+            <main className={`flex-grow ${activeTab === 'projects' && viewingProjectId ? 'overflow-hidden pb-20 landscape:pb-16' : 'overflow-y-auto pb-20 landscape:pb-16'} custom-scrollbar mobile-minimalist-override`}>
                 {renderContent()}
             </main>
 

@@ -40,6 +40,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtaskText, setNewSubtaskText] = useState('');
   const [projectId, setProjectId] = useState<number | null>(null);
+  const [assignee, setAssignee] = useState<string | null>(null);
 
   // Advanced section toggle
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -103,6 +104,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
       setSubtasks(todo.subtasks || []);
       setDueDate(todo.due_date || null);
       setProjectId(todo.project_id || null);
+      setAssignee(todo.assignee || null);
       setIsUndated(!todo.due_date);
 
       setHasTime(!!todo.start_time);
@@ -294,6 +296,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     updatedTodoPayload.priority = priority;
     updatedTodoPayload.subtasks = currentSubtasks;
     updatedTodoPayload.project_id = projectId;
+    updatedTodoPayload.assignee = assignee;
 
     updatedTodoPayload.due_date = due_date;
     updatedTodoPayload.end_date = hasEndDate && !isUndated ? (end_date || undefined) : undefined;
@@ -376,14 +379,26 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   Detalles de la Tarea
                 </h3>
               </div>
-              <button 
-                type="button" 
-                onClick={onClose} 
-                className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                aria-label="Cerrar modal"
-              >
-                <CloseIcon />
-              </button>
+              <div className="flex items-center gap-2">
+                {todo && onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmDeleteOpen(true)}
+                    className="p-1.5 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    title="Eliminar tarea"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  onClick={onClose} 
+                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  aria-label="Cerrar modal"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
             </header>
 
             {/* Form Body */}
@@ -406,7 +421,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                   />
                 </div>
 
-                {/* Project & Priority (BÁSICAS) */}
+                {/* Project, Assignee & Priority (BÁSICAS) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
@@ -414,7 +429,14 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                     </label>
                     <select 
                       value={projectId === null ? '' : projectId} 
-                      onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)} 
+                      onChange={(e) => {
+                        const pid = e.target.value ? Number(e.target.value) : null;
+                        setProjectId(pid);
+                        const proj = projects.find(p => p.id === pid);
+                        if (proj?.project_mode !== 'advanced') {
+                          setAssignee(null);
+                        }
+                      }} 
                       className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/10"
                     >
                       <option value="">Sin proyecto</option>
@@ -423,6 +445,24 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                       ))}
                     </select>
                   </div>
+
+                  {projectId !== null && projects.find(p => p.id === projectId)?.project_mode === 'advanced' && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                        Asignar a
+                      </label>
+                      <select 
+                        value={assignee || ''} 
+                        onChange={(e) => setAssignee(e.target.value || null)} 
+                        className="w-full bg-zinc-50 dark:bg-black/30 border border-gray-200 dark:border-zinc-800 rounded-xl py-2 px-3 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/10"
+                      >
+                        <option value="">Sin asignar</option>
+                        {projects.find(p => p.id === projectId)?.members?.map(m => (
+                          <option key={m.email} value={m.email}>{m.name || m.email}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
@@ -766,126 +806,22 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         />
                       </div>
 
-                      {/* Calendar Integration Section */}
-                      <div className="p-3.5 bg-zinc-50/50 dark:bg-zinc-900/20 rounded-2xl border border-zinc-100/80 dark:border-zinc-800/40 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                            <CalendarIcon className="w-3.5 h-3.5 text-zinc-400" />
-                            Sincronización de Calendario
-                          </span>
-                          {(todo.gcal_event_id || todo.calendar_provider) && calendarSyncStatus !== 'removed' ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              Sincronizado
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-zinc-400">
-                              {calendarSyncStatus === 'removed' ? 'Desvinculado' : 'No sincronizado'}
-                            </span>
-                          )}
-                        </div>
-
-                        {(todo.gcal_event_id || todo.calendar_provider) && calendarSyncStatus !== 'removed' ? (
-                          <div className="bg-white dark:bg-zinc-850 p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 space-y-2.5">
-                            <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-300">
-                              <div className="flex items-center gap-2">
-                                {todo.calendar_provider === 'outlook' ? (
-                                  <OutlookIcon className="w-4 h-4" />
-                                ) : (
-                                  <GoogleIcon className="w-4 h-4" />
-                                )}
-                                <span>
-                                  Evento en {todo.calendar_provider === 'outlook' ? 'Outlook Calendar' : 'Google Calendar'}
-                                </span>
-                              </div>
-                              {todo.calendar_event_link && (
-                                <a
-                                  href={todo.calendar_event_link}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-zinc-700 dark:text-zinc-300 hover:underline text-[11px] font-medium"
-                                >
-                                  Abrir ↗
-                                </a>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                              <p className="text-[11px] text-zinc-400">
-                                Desvincular del calendario sin borrar de la app.
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => setIsConfirmRemoveCalOpen(true)}
-                                disabled={isRemovingCalendar}
-                                className="px-2.5 py-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg transition-colors whitespace-nowrap"
-                              >
-                                Desvincular
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between p-2.5 bg-white dark:bg-zinc-850 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
-                              <span className="text-[11px] text-zinc-400">
-                                {calendarSyncStatus === 'removed' 
-                                  ? '✓ Evento desvinculado con éxito.'
-                                  : 'Esta tarea no está sincronizada con ningún calendario.'}
-                              </span>
-                              {onSyncToCalendar && !isUndated && (
-                                <button
-                                  type="button"
-                                  onClick={handleInitiateSync}
-                                  disabled={isSyncingCalendar}
-                                  className="px-3 py-1.5 text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-all"
-                                >
-                                  Sincronizar
-                                </button>
-                              )}
-                            </div>
-                            {syncNotice && (
-                              <div className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] text-zinc-700 dark:text-zinc-300">
-                                {syncNotice}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      {/* Notes */}
+                      <div className="space-y-1.5 pt-1">
                     </motion.div>
                   )}
                 </AnimatePresence>
 
               </main>
 
-              <footer className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t border-gray-50 dark:border-zinc-900/60 bg-white/90 dark:bg-[#0c0c0c]/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
-                <div />
-
-                <div className="flex items-center gap-2">
-                  {todo && onDelete && (
-                    <button
-                      type="button"
-                      onClick={() => setIsConfirmDeleteOpen(true)}
-                      className="px-4 py-2.5 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors flex items-center gap-1.5 active:scale-95"
-                    >
-                      <TrashIcon className="w-3.5 h-3.5" />
-                      Eliminar
-                    </button>
-                  )}
-                  <button 
-                    type="button" 
-                    onClick={onClose} 
-                    className="px-4 py-2.5 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors active:scale-95"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit" 
-                    disabled={!text.trim()} 
-                    className="px-5 py-2.5 text-xs font-bold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl transition-all shadow-xs disabled:opacity-40 active:scale-95"
-                  >
-                    Guardar Cambios
-                  </button>
-                </div>
+              <footer className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t border-gray-50 dark:border-zinc-900/60 bg-white/90 dark:bg-[#0c0c0c]/90 backdrop-blur-md flex items-center justify-end gap-3 shrink-0">
+                <button 
+                  type="submit" 
+                  disabled={!text.trim()} 
+                  className="px-8 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-bold rounded-2xl shadow-lg shadow-zinc-200 dark:shadow-none active:scale-95 transition-all"
+                >
+                  Guardar Cambios
+                </button>
               </footer>
             </form>
           </motion.div>

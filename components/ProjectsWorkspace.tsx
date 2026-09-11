@@ -4636,7 +4636,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
 
         return (
-            <div className={`flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden ${isMobile && !isChatInputFocused ? 'pb-14' : ''}`}>
+            <div className={`flex h-full bg-gray-50 dark:bg-[#050505] overflow-hidden`}>
                 {/* SELECTOR MÓVIL DE CANALES (BOTTOM SHEET) */}
                 {isMobileChannelDrawerOpen && (
                     <div className="fixed inset-0 z-[10000] flex flex-col justify-end md:hidden animate-in fade-in duration-200">
@@ -5544,7 +5544,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     isOpen={isCreateChannelOpen} 
                     onClose={() => setIsCreateChannelOpen(false)} 
                     title="Crear Nuevo Canal"
-                    showBackButton={true}
+                    showBackButton={isMobile}
+                    onBack={() => {
+                        setIsCreateChannelOpen(false);
+                        setIsMobileChannelDrawerOpen(true);
+                    }}
                 >
                     <form onSubmit={handleCreateChannel} className="space-y-4">
                         <div>
@@ -5622,7 +5626,11 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     isOpen={!!editingChannel}
                     onClose={() => setEditingChannel(null)}
                     title="Editar Canal"
-                    showBackButton={true}
+                    showBackButton={isMobile}
+                    onBack={() => {
+                        setEditingChannel(null);
+                        setIsMobileChannelDrawerOpen(true);
+                    }}
                 >
                     {editingChannel && (
                         <form onSubmit={handleEditChannelSubmit} className="space-y-4">

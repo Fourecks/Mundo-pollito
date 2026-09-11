@@ -880,59 +880,59 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                     </div>
                                 )}
                             </div>
+
+                            {/* Subtareas */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Subtareas</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text"
+                                        value={newSubtaskInput}
+                                        onChange={e => setNewSubtaskInput(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtaskCreate(); } }}
+                                        placeholder="Añadir paso o subtarea..."
+                                        className="flex-1 box-border px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAddSubtaskCreate}
+                                        className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95 shrink-0"
+                                    >
+                                        Añadir
+                                    </button>
+                                </div>
+
+                                {newSubtasks.length > 0 && (
+                                    <div className="space-y-1.5 pt-1">
+                                        {newSubtasks.map(st => (
+                                            <div key={st.id} className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 text-xs">
+                                                <span className="text-zinc-700 dark:text-zinc-300 font-medium truncate">{st.text}</span>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleRemoveSubtaskCreate(st.id)}
+                                                    className="text-zinc-400 hover:text-rose-500 p-1"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Notas */}
+                            <div className="space-y-1.5 pb-6">
+                                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas Adicionales</label>
+                                <textarea 
+                                    value={newNotes}
+                                    onChange={e => setNewNotes(e.target.value)}
+                                    placeholder="Detalles, enlaces o notas..."
+                                    rows={3}
+                                    className="w-full box-border px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
+                                />
+                            </div>
                         </motion.div>
                     )}
-
-                    {/* Subtareas */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Subtareas</label>
-                        <div className="flex gap-2">
-                            <input 
-                                type="text"
-                                value={newSubtaskInput}
-                                onChange={e => setNewSubtaskInput(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtaskCreate(); } }}
-                                placeholder="Añadir paso o subtarea..."
-                                className="flex-1 box-border px-3.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
-                            />
-                            <button
-                                type="button"
-                                onClick={handleAddSubtaskCreate}
-                                className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-200 active:scale-95 shrink-0"
-                            >
-                                Añadir
-                            </button>
-                        </div>
-
-                        {newSubtasks.length > 0 && (
-                            <div className="space-y-1.5 pt-1">
-                                {newSubtasks.map(st => (
-                                    <div key={st.id} className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 text-xs">
-                                        <span className="text-zinc-700 dark:text-zinc-300 font-medium truncate">{st.text}</span>
-                                        <button 
-                                            type="button"
-                                            onClick={() => handleRemoveSubtaskCreate(st.id)}
-                                            className="text-zinc-400 hover:text-rose-500 p-1"
-                                        >
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Notas */}
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas Adicionales</label>
-                        <textarea 
-                            value={newNotes}
-                            onChange={e => setNewNotes(e.target.value)}
-                            placeholder="Detalles, enlaces o notas..."
-                            rows={3}
-                            className="w-full box-border px-3.5 py-2.5 text-xs rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden"
-                        />
-                    </div>
                 </div>
             </div>
         );
@@ -943,10 +943,11 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
     // ==========================================
     const renderEditForm = () => {
         if (!activeEditingTask) return null;
+
         return (
-            <div className="flex flex-col w-full bg-white dark:bg-[#0c0c0c] text-zinc-900 dark:text-zinc-50 pb-20">
-                {/* Sticky Top Header */}
-                <div className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <div className="flex flex-col min-h-full bg-white dark:bg-black w-full overflow-hidden">
+                {/* Header with Back, Title, Delete and Save */}
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 dark:border-zinc-900/60 sticky top-0 bg-white/90 dark:bg-black/90 backdrop-blur-md z-10">
                     <button 
                         type="button"
                         onClick={handleBackToList}
@@ -977,7 +978,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                 </div>
 
                 {/* Form Content */}
-                <div className="flex-1 px-4 sm:px-6 pt-5 space-y-4 max-w-lg mx-auto w-full box-border">
+                <div className="flex-1 px-4 sm:px-6 pt-5 space-y-4 max-w-lg mx-auto w-full box-border pb-24">
                     {/* Status Toggle & Title */}
                     <div className="flex items-start gap-3">
                         <button
@@ -998,43 +999,44 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                                 onChange={e => setEditTitle(e.target.value)}
                                 rows={2}
                                 className={`w-full box-border px-3.5 py-2.5 text-sm font-semibold rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 resize-none focus:outline-hidden ${
-                                    editCompleted ? 'line-through text-zinc-400' : ''
+                                    editCompleted ? 'line-through opacity-50' : ''
                                 }`}
+                                placeholder="¿Qué hay que hacer?"
                             />
                         </div>
                     </div>
 
-                    {/* Fecha y Rango de Días */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-2.5 box-border w-full overflow-hidden">
+                    {/* Fecha (BÁSICA) */}
+                    <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                                <CalendarIcon className="w-3.5 h-3.5 text-zinc-500" />
-                                <span>Fecha</span>
-                            </div>
-                            <label className="flex items-center gap-1.5 text-xs cursor-pointer text-zinc-500">
-                                <input 
-                                    type="checkbox" 
-                                    checked={editIsUndated} 
-                                    onChange={e => setEditIsUndated(e.target.checked)}
-                                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 focus:ring-0 w-3.5 h-3.5"
-                                />
-                                <span>Sin fecha</span>
-                            </label>
+                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Fecha</label>
+                            <button 
+                                type="button"
+                                onClick={() => setEditIsUndated(!editIsUndated)}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all ${
+                                    editIsUndated ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                                }`}
+                            >
+                                Sin fecha
+                            </button>
                         </div>
-
+                        
                         {!editIsUndated && (
-                            <div className="space-y-2.5 pt-1">
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="text-zinc-500 text-[11px]">Tipo de asignación</span>
-                                    <div className="flex bg-zinc-200/60 dark:bg-zinc-800 p-0.5 rounded-xl">
-                                        <button
+                            <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-3 box-border w-full">
+                                <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2 mb-1">
+                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                                        <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                                        <span>Seleccionar fechas</span>
+                                    </span>
+                                    <div className="flex gap-1">
+                                        <button 
                                             type="button"
                                             onClick={() => setEditHasEndDate(false)}
                                             className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${!editHasEndDate ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'}`}
                                         >
-                                            Día único
+                                            Un día
                                         </button>
-                                        <button
+                                        <button 
                                             type="button"
                                             onClick={() => {
                                                 setEditHasEndDate(true);
@@ -1390,7 +1392,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                             </div>
 
                             {/* Notas */}
-                            <div className="space-y-1.5 pb-6">
+                            <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Notas</label>
                                     {activeEditingTask?.notion_page_id && (
