@@ -68,6 +68,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   if (!isOpen) return null;
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
+  console.log("Debugging selectedProject:", selectedProject);
   // Robust detection: check mode OR existence of members
   const isAdvancedProject = selectedProject?.project_mode === 'advanced' || (selectedProject?.members && selectedProject.members.length > 0);
 
