@@ -29,6 +29,9 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(fixedProjectId || taskToEdit?.project_id || null);
   const [assignee, setAssignee] = useState<string | null>(taskToEdit?.assignee || null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [timeEnabled, setTimeEnabled] = useState(!!taskToEdit?.time);
+  const [repeatEnabled, setRepeatEnabled] = useState(taskToEdit?.repeat !== 'none' && !!taskToEdit?.repeat);
+  const [reminderEnabled, setReminderEnabled] = useState(taskToEdit?.reminder !== 'none' && !!taskToEdit?.reminder);
 
   // Advanced options state
   const [hasEndDate, setHasEndDate] = useState(false);
@@ -62,6 +65,9 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         setRepeat('none');
         setCustomRepeatDays([]);
         setSubtasks([]);
+        setTimeEnabled(false);
+        setRepeatEnabled(false);
+        setReminderEnabled(false);
       }
       setShowAdvanced(false);
       setHasEndDate(false);
@@ -73,11 +79,11 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
     const options = {
         dueDate: hasDueDate ? dueDate : null,
         endDate: hasEndDate ? endDate : null,
-        time: time || null,
-        endTime: endTime || null,
-        repeat,
-        customRepeatDays: repeat === 'custom' ? customRepeatDays : null,
-        reminder,
+        time: timeEnabled && time ? time : null,
+        endTime: timeEnabled && endTime ? endTime : null,
+        repeat: repeatEnabled ? repeat : 'none',
+        customRepeatDays: (repeatEnabled && repeat === 'custom') ? customRepeatDays : null,
+        reminder: reminderEnabled ? reminder : 'none',
         description: notes,
         subtasks,
         priority,
@@ -107,6 +113,11 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        drag="y"
+        dragConstraints={{ top: 0 }}
+        onDragEnd={(_, info) => {
+            if (info.offset.y > 100) onClose();
+        }}
         className="bg-white dark:bg-[#0c0c0c] w-full max-w-xl rounded-t-[28px] border-t border-gray-200 dark:border-zinc-800 shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
@@ -212,108 +223,91 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                         <div className="h-px bg-zinc-200 dark:bg-zinc-700/50 w-full" />
 
                         {/* HORA */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Hora inicio</label>
-                                <input 
-                                    type="time"
-                                    value={time}
-                                    onChange={e => setTime(e.target.value)}
-                                    className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white"
-                                />
+                        <div className="space-y-2">
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Hora</span>
+                                <input type="checkbox" checked={timeEnabled} onChange={() => setTimeEnabled(!timeEnabled)} className="w-4 h-4 rounded text-zinc-900 border-zinc-300" />
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Hora fin</label>
-                                <input 
-                                    type="time"
-                                    value={endTime}
-                                    onChange={e => setEndTime(e.target.value)}
-                                    className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white"
-                                />
-                            </div>
-                        </div>
-
-                        {/* REPETICION */}
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Repetición</label>
-                            <select value={repeat} onChange={e => setRepeat(e.target.value)} className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white">
-                                <option value="none">No repetir</option>
-                                <option value="daily">Diariamente</option>
-                                <option value="weekly">Semanalmente</option>
-                                <option value="monthly">Mensualmente</option>
-                                <option value="custom">Personalizada</option>
-                            </select>
-                            {repeat === 'custom' && (
-                                <div className="flex justify-between mt-2">
-                                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
-                                        <button
-                                            key={day}
-                                            type="button"
-                                            onClick={() => {
-                                                setCustomRepeatDays(prev => 
-                                                    prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-                                                );
-                                            }}
-                                            className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${
-                                                customRepeatDays.includes(day) 
-                                                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' 
-                                                : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
-                                            }`}
-                                        >
-                                            {day}
-                                        </button>
-                                    ))}
+                            {timeEnabled && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Inicio</label>
+                                        <input 
+                                            type="time"
+                                            value={time}
+                                            onChange={e => setTime(e.target.value)}
+                                            className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Fin</label>
+                                        <input 
+                                            type="time"
+                                            value={endTime}
+                                            onChange={e => setEndTime(e.target.value)}
+                                            className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white"
+                                        />
+                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* SUBTAREAS */}
+                        {/* REPETICION */}
                         <div className="space-y-2">
-                            <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Subtareas</label>
-                            <div className="space-y-2">
-                                {subtasks.map(st => (
-                                    <div key={st.id} className="flex items-center gap-2">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={st.completed}
-                                            onChange={() => {
-                                                setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, completed: !s.completed } : s));
-                                            }}
-                                            className="w-4 h-4 rounded text-zinc-900 border-zinc-300"
-                                        />
-                                        <input 
-                                            value={st.title}
-                                            onChange={e => {
-                                                setSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, title: e.target.value } : s));
-                                            }}
-                                            placeholder="Título de subtarea..."
-                                            className="flex-1 bg-transparent border-b border-zinc-200 dark:border-zinc-700 outline-none text-sm px-1 py-0.5 dark:text-white"
-                                        />
-                                        <button type="button" onClick={() => setSubtasks(prev => prev.filter(s => s.id !== st.id))} className="text-zinc-400 hover:text-red-500">
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ))}
-                                <button 
-                                    type="button"
-                                    onClick={() => setSubtasks(prev => [...prev, { id: Math.random().toString(36).substring(7), title: '', completed: false }])}
-                                    className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1"
-                                >
-                                    + Añadir subtarea
-                                </button>
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Repetición</span>
+                                <input type="checkbox" checked={repeatEnabled} onChange={() => setRepeatEnabled(!repeatEnabled)} className="w-4 h-4 rounded text-zinc-900 border-zinc-300" />
                             </div>
+                            {repeatEnabled && (
+                                <>
+                                    <select value={repeat} onChange={e => setRepeat(e.target.value)} className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white">
+                                        <option value="none">No repetir</option>
+                                        <option value="daily">Diariamente</option>
+                                        <option value="weekly">Semanalmente</option>
+                                        <option value="monthly">Mensualmente</option>
+                                        <option value="custom">Personalizada</option>
+                                    </select>
+                                    {repeat === 'custom' && (
+                                        <div className="flex justify-between mt-2">
+                                            {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
+                                                <button
+                                                    key={day}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setCustomRepeatDays(prev => 
+                                                            prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+                                                        );
+                                                    }}
+                                                    className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${
+                                                        customRepeatDays.includes(day) 
+                                                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' 
+                                                        : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                                                    }`}
+                                                >
+                                                    {day}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
 
                         {/* RECORDATORIO */}
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1">Recordatorio</label>
-                            <select value={reminder} onChange={e => setReminder(e.target.value)} className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white">
-                                <option value="none">Sin recordatorio</option>
-                                <option value="5m">5 min antes</option>
-                                <option value="15m">15 min antes</option>
-                                <option value="1h">1 hora antes</option>
-                                <option value="1d">1 día antes</option>
-                            </select>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Recordatorio</span>
+                                <input type="checkbox" checked={reminderEnabled} onChange={() => setReminderEnabled(!reminderEnabled)} className="w-4 h-4 rounded text-zinc-900 border-zinc-300" />
+                            </div>
+                            {reminderEnabled && (
+                                <select value={reminder} onChange={e => setReminder(e.target.value)} className="w-full p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 outline-none text-sm dark:text-white">
+                                    <option value="none">Sin recordatorio</option>
+                                    <option value="5m">5 min antes</option>
+                                    <option value="15m">15 min antes</option>
+                                    <option value="1h">1 hora antes</option>
+                                    <option value="1d">1 día antes</option>
+                                </select>
+                            )}
                         </div>
 
                         {/* NOTAS */}
