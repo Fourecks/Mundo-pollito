@@ -806,9 +806,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
                         />
                       </div>
 
-                      {/* Notes */}
-                      <div className="space-y-1.5 pt-1">
-                    </motion.div>
+                      </motion.div>
                   )}
                 </AnimatePresence>
 

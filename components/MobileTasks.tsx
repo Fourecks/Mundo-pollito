@@ -1027,7 +1027,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                             <div className="p-3.5 rounded-2xl bg-zinc-50/80 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/70 space-y-3 box-border w-full">
                                 <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2 mb-1">
                                     <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                                        <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                                        <CalendarIcon className="w-3.5 h-3.5 text-zinc-400" />
                                         <span>Seleccionar fechas</span>
                                     </span>
                                     <div className="flex gap-1">
