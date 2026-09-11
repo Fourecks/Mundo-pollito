@@ -112,12 +112,17 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
     if (!text.trim()) return;
     const options = {
         dueDate: hasDueDate ? dueDate : null,
+        due_date: hasDueDate ? dueDate : null,
         endDate: hasEndDate ? endDate : undefined,
+        end_date: hasEndDate ? endDate : undefined,
         startTime: timeEnabled && time ? time : null,
+        start_time: timeEnabled && time ? time : null,
         endTime: timeEnabled && endTime ? endTime : null,
+        end_time: timeEnabled && endTime ? endTime : null,
         recurrence: repeatEnabled && repeat !== 'none' ? { frequency: repeat, customDays: repeat === 'custom' ? customRepeatDays : undefined } : { frequency: 'none' },
         reminder_offset: reminderEnabled && reminder !== 'none' ? reminder : null,
         notes: notes,
+        description: notes,
         subtasks: subtasks.map(st => ({ 
             id: parseInt(st.id) || Date.now() + Math.random(), 
             text: st.title, 
@@ -125,6 +130,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         })),
         priority,
         projectId: fixedProjectId ?? selectedProjectId,
+        project_id: fixedProjectId ?? selectedProjectId,
         assignee
     };
     

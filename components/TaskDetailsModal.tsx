@@ -350,7 +350,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     onClose();
   };
 
-  if (!isOpen || !todo) return null;
+  if (!todo) return null;
 
   const modalContent = (
     <AnimatePresence>

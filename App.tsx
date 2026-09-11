@@ -3978,10 +3978,11 @@ const App: React.FC = () => {
 
   const getUpdatedTodosState = (current: { [key: string]: Todo[] }, todoToUpdate: Todo): { [key: string]: Todo[] } => {
     const newAllTodos = JSON.parse(JSON.stringify(current));
+    const targetIdStr = String(todoToUpdate.id);
     
     // Find and remove the original task
     for (const key in newAllTodos) {
-        const index = newAllTodos[key].findIndex(t => t.id === todoToUpdate.id);
+        const index = newAllTodos[key].findIndex((t: Todo) => String(t.id) === targetIdStr);
         if (index !== -1) {
             newAllTodos[key].splice(index, 1);
             if (newAllTodos[key].length === 0 && key !== 'undated') {
@@ -4008,29 +4009,47 @@ const App: React.FC = () => {
     return newAllTodos;
 }
 
-  const findTodoById = (id: number): Todo | null => {
+  const findTodoById = (id: number | string): Todo | null => {
+    const idStr = String(id);
     for (const key in allTodos) {
-      const found = allTodos[key].find(t => t.id === id);
+      const found = allTodos[key].find(t => String(t.id) === idStr);
       if (found) return found;
     }
     return null;
   };
   
-  const handleUpdateTodo = async (todoOrId: Todo | number, maybeUpdates?: Partial<Todo>) => {
+  const handleUpdateTodo = async (todoOrId: Todo | number | string, maybeUpdates?: Partial<Todo>) => {
     let updatedTodo: Todo;
-    if (typeof todoOrId === 'number') {
+    if (typeof todoOrId === 'number' || typeof todoOrId === 'string') {
       const original = findTodoById(todoOrId);
       if (!original) {
         console.warn(`[handleUpdateTodo] Task with id ${todoOrId} not found`);
         return;
       }
-      updatedTodo = { ...original, ...maybeUpdates };
+      updatedTodo = { ...original, ...(maybeUpdates || {}) };
     } else {
       const original = findTodoById(todoOrId.id);
-      updatedTodo = { ...(original || {}), ...todoOrId };
+      updatedTodo = { ...(original || {}), ...todoOrId, ...(maybeUpdates || {}) };
       if (!todoOrId.subtasks && original?.subtasks) {
         updatedTodo.subtasks = original.subtasks;
       }
+    }
+
+    // Standardize camelCase and snake_case alias fields
+    if ((updatedTodo as any).dueDate !== undefined) {
+      updatedTodo.due_date = (updatedTodo as any).dueDate;
+    }
+    if ((updatedTodo as any).projectId !== undefined) {
+      updatedTodo.project_id = (updatedTodo as any).projectId;
+    }
+    if ((updatedTodo as any).startTime !== undefined) {
+      updatedTodo.start_time = (updatedTodo as any).startTime;
+    }
+    if ((updatedTodo as any).endTime !== undefined) {
+      updatedTodo.end_time = (updatedTodo as any).endTime;
+    }
+    if ((updatedTodo as any).endDate !== undefined) {
+      updatedTodo.end_date = (updatedTodo as any).endDate;
     }
 
     // Normalize empty strings to null for database compatibility
