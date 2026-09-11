@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+const content = `import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { Priority, Project, Todo } from '../types';
@@ -37,21 +38,21 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
   
   const [showAdvanced, setShowAdvanced] = useState(false);
   
-  const [timeEnabled, setTimeEnabled] = useState(!!taskToEdit?.time || !!taskToEdit?.start_time);
-  const [time, setTime] = useState(taskToEdit?.time || taskToEdit?.start_time || '');
+  const [timeEnabled, setTimeEnabled] = useState(!!taskToEdit?.time);
+  const [time, setTime] = useState(taskToEdit?.start_time || '');
   const [endTime, setEndTime] = useState(taskToEdit?.end_time || '');
   
   const [repeatEnabled, setRepeatEnabled] = useState(taskToEdit?.repeat !== 'none' && !!taskToEdit?.repeat);
-  const [repeat, setRepeat] = useState(taskToEdit?.recurrence?.frequency || taskToEdit?.repeat || 'none');
+  const [repeat, setRepeat] = useState(taskToEdit?.recurrence?.frequency || 'none');
   const [customRepeatDays, setCustomRepeatDays] = useState<string[]>(taskToEdit?.recurrence?.customDays?.map(d => d.toString()) || []);
   
   const [reminderEnabled, setReminderEnabled] = useState(taskToEdit?.reminder !== 'none' && !!taskToEdit?.reminder);
-  const [reminder, setReminder] = useState(taskToEdit?.reminder_at ? '30m' : (taskToEdit?.reminder || 'none'));
+  const [reminder, setReminder] = useState(taskToEdit?.reminder_at ? '30m' : 'none'); // Simplified
   
   const [notes, setNotes] = useState(taskToEdit?.notes || taskToEdit?.description || '');
   const [subtasks, setSubtasks] = useState<{ id: string, title: string, completed: boolean }[]>((taskToEdit?.subtasks || []).map(st => ({ 
       id: st.id.toString(), 
-      title: st.text || st.title, 
+      title: st.text, 
       completed: st.completed 
   })));
 
@@ -66,17 +67,16 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         setNotes(taskToEdit.notes || taskToEdit.description || '');
         setSubtasks((taskToEdit.subtasks || []).map(st => ({ 
             id: st.id.toString(), 
-            title: st.text || st.title, 
+            title: st.text, 
             completed: st.completed 
         })));
-        setTime(taskToEdit.time || taskToEdit.start_time || '');
+        setTime(taskToEdit.start_time || '');
         setEndTime(taskToEdit.end_time || '');
-        setRepeat(taskToEdit.recurrence?.frequency || taskToEdit.repeat || 'none');
+        setRepeat(taskToEdit.recurrence?.frequency || 'none');
         setCustomRepeatDays(taskToEdit.recurrence?.customDays?.map(d => d.toString()) || []);
-        setTimeEnabled(!!taskToEdit.time || !!taskToEdit.start_time);
-        setRepeatEnabled((!!taskToEdit.recurrence && taskToEdit.recurrence.frequency !== 'none') || (taskToEdit.repeat && taskToEdit.repeat !== 'none'));
-        setReminderEnabled(!!taskToEdit.reminder_at || (taskToEdit.reminder && taskToEdit.reminder !== 'none'));
-        setReminder(taskToEdit.reminder_at ? '30m' : (taskToEdit.reminder || 'none'));
+        setTimeEnabled(!!taskToEdit.start_time);
+        setRepeatEnabled(!!taskToEdit.recurrence && taskToEdit.recurrence.frequency !== 'none');
+        setReminderEnabled(!!taskToEdit.reminder_at);
       } else {
         setText('');
         setDueDate(new Date().toISOString().split('T')[0]);
@@ -93,7 +93,6 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         setTimeEnabled(false);
         setRepeatEnabled(false);
         setReminderEnabled(false);
-        setReminder('none');
       }
       setShowAdvanced(false);
       setHasEndDate(false);
@@ -113,7 +112,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
         reminder: reminderEnabled ? reminder : 'none',
         description: notes,
         subtasks: subtasks.map(st => ({ 
-            id: parseInt(st.id) || Date.now() + Math.random(), 
+            id: parseInt(st.id) || Date.now(), 
             text: st.title, 
             completed: st.completed 
         })),
@@ -160,7 +159,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                </div>
                <div className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-sm font-medium dark:text-white flex items-center justify-between">
                    <span className={!hasDueDate ? 'opacity-50' : ''}>
-                       {hasDueDate ? (hasEndDate ? `${new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})} - ${new Date(endDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})}` : new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})) : 'Sin fecha'}
+                       {hasDueDate ? (hasEndDate ? \`\${new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})} - \${new Date(endDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})}\` : new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})) : 'Sin fecha'}
                    </span>
                </div>
            </div>
@@ -199,7 +198,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
             <div className="flex flex-wrap gap-2 pt-2 pb-1">
                 {timeEnabled && time && (
                     <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                        {time} {endTime ? `- ${endTime}` : ''}
+                        {time} {endTime ? \`- \${endTime}\` : ''}
                     </span>
                 )}
                 {reminderEnabled && reminder !== 'none' && (
@@ -244,7 +243,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                       <button onClick={() => setActiveSheet('time')} className="flex items-center justify-between w-full py-3">
                          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Hora</span>
                          <div className="flex items-center text-sm text-zinc-500 gap-1">
-                             {timeEnabled && time ? `${time}${endTime ? ' - '+endTime : ''}` : 'Añadir'}
+                             {timeEnabled && time ? \`\${time}\${endTime ? ' - '+endTime : ''}\` : 'Añadir'}
                              <ChevronRight className="w-4 h-4" />
                          </div>
                       </button>
@@ -260,7 +259,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                       <button onClick={() => setActiveSheet('reminder')} className="flex items-center justify-between w-full py-3 border-t border-zinc-100 dark:border-zinc-800">
                          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Recordatorio</span>
                          <div className="flex items-center text-sm text-zinc-500 gap-1">
-                             {reminderEnabled && reminder !== 'none' ? (reminder === '5m' ? '5 min antes' : reminder === '15m' ? '15 min antes' : reminder === '1h' ? '1 hora antes' : reminder === '1d' ? '1 día antes' : 'Ninguno') : 'Ninguno'}
+                             {reminderEnabled && reminder !== 'none' ? (reminder === '5m' ? '5 min' : reminder === '15m' ? '15 min' : reminder === '1h' ? '1 hora' : '1 día') : 'Ninguno'}
                              <ChevronRight className="w-4 h-4" />
                          </div>
                       </button>
@@ -400,7 +399,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
            {repeatEnabled && repeat === 'custom' && (
                <div className="flex justify-between mt-4 ml-7 w-[calc(100%-28px)]">
                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
-                       <button key={day} type="button" onClick={() => setCustomRepeatDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${customRepeatDays.includes(day) ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                       <button key={day} type="button" onClick={() => setCustomRepeatDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} className={\`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors \${customRepeatDays.includes(day) ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}\`}>
                            {day}
                        </button>
                    ))}
@@ -523,7 +522,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -20, opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex-1 overflow-hidden flex flex-col min-h-0"
+                className="flex-1 overflow-hidden"
             >
                 {activeSheet === 'main' && renderMainSheet()}
                 {activeSheet === 'date' && renderDateSheet()}
@@ -540,3 +539,5 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
 };
 
 export default MobileTaskDrawer;
+`
+fs.writeFileSync('components/MobileTaskDrawer.tsx', content);

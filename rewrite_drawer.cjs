@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+const content = `import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { Priority, Project, Todo } from '../types';
@@ -160,7 +161,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                </div>
                <div className="w-full min-w-0 p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-sm font-medium dark:text-white flex items-center justify-between">
                    <span className={!hasDueDate ? 'opacity-50' : ''}>
-                       {hasDueDate ? (hasEndDate ? `${new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})} - ${new Date(endDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})}` : new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})) : 'Sin fecha'}
+                       {hasDueDate ? (hasEndDate ? \`\${new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})} - \${new Date(endDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})}\` : new Date(dueDate).toLocaleDateString('es-ES', {day:'numeric', month:'short'})) : 'Sin fecha'}
                    </span>
                </div>
            </div>
@@ -199,7 +200,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
             <div className="flex flex-wrap gap-2 pt-2 pb-1">
                 {timeEnabled && time && (
                     <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                        {time} {endTime ? `- ${endTime}` : ''}
+                        {time} {endTime ? \`- \${endTime}\` : ''}
                     </span>
                 )}
                 {reminderEnabled && reminder !== 'none' && (
@@ -244,7 +245,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                       <button onClick={() => setActiveSheet('time')} className="flex items-center justify-between w-full py-3">
                          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Hora</span>
                          <div className="flex items-center text-sm text-zinc-500 gap-1">
-                             {timeEnabled && time ? `${time}${endTime ? ' - '+endTime : ''}` : 'Añadir'}
+                             {timeEnabled && time ? \`\${time}\${endTime ? ' - '+endTime : ''}\` : 'Añadir'}
                              <ChevronRight className="w-4 h-4" />
                          </div>
                       </button>
@@ -400,7 +401,7 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
            {repeatEnabled && repeat === 'custom' && (
                <div className="flex justify-between mt-4 ml-7 w-[calc(100%-28px)]">
                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
-                       <button key={day} type="button" onClick={() => setCustomRepeatDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${customRepeatDays.includes(day) ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                       <button key={day} type="button" onClick={() => setCustomRepeatDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} className={\`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition-colors \${customRepeatDays.includes(day) ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}\`}>
                            {day}
                        </button>
                    ))}
@@ -540,3 +541,5 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
 };
 
 export default MobileTaskDrawer;
+`
+fs.writeFileSync('components/MobileTaskDrawer.tsx', content);
