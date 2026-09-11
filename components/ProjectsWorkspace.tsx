@@ -7,7 +7,7 @@ import PersonalProjectSettings from './PersonalProjectSettings';
 import MobileTaskDrawer from './MobileTaskDrawer';
 import AddTaskModal from './AddTaskModal';
 import { 
-  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal, DollarSign
+  Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, FolderInput, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal, DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO, isPast, isToday, isThisWeek, isThisMonth, isThisYear, isTomorrow, isYesterday } from 'date-fns';
@@ -776,25 +776,67 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
 
     const projectTodos = useMemo(() => activeProject ? allTodos.filter(t => t.project_id === activeProject.id) : [], [allTodos, activeProject]);
 
-    // Helper: File Download
-    const handleDownloadFile = (doc: ProjectDoc) => {
-        if (doc.file_url) {
-            const a = document.createElement('a');
-            a.href = doc.file_url;
-            a.download = doc.file_name || doc.title;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } else {
-            const blob = new Blob([doc.content], { type: 'text/markdown;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${doc.title.toLowerCase().replace(/\s+/g, '_')}.md`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+    // Helper: File Download (Optimized for desktop and mobile)
+    const handleDownloadFile = async (doc: ProjectDoc) => {
+        try {
+            const fileName = doc.file_name || (doc.title.endsWith('.md') ? doc.title : `${doc.title.replace(/\s+/g, '_')}.md`);
+            if (doc.file_url) {
+                if (doc.file_url.startsWith('http://') || doc.file_url.startsWith('https://')) {
+                    try {
+                        const response = await fetch(doc.file_url);
+                        const blob = await response.blob();
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = blobUrl;
+                        a.download = fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(blobUrl);
+                        }, 800);
+                        return;
+                    } catch (e) {
+                        // Fallback: direct anchor with target _blank
+                        const a = document.createElement('a');
+                        a.href = doc.file_url;
+                        a.download = fileName;
+                        a.target = '_blank';
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => document.body.removeChild(a), 800);
+                        return;
+                    }
+                } else {
+                    // Data URL or object URL
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = doc.file_url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => document.body.removeChild(a), 800);
+                }
+            } else {
+                const blob = new Blob([doc.content || ''], { type: 'text/markdown;charset=utf-8;' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 800);
+            }
+        } catch (err) {
+            console.error('Error al descargar archivo:', err);
+            if (doc.file_url) {
+                window.open(doc.file_url, '_blank');
+            }
         }
     };
 
@@ -3435,39 +3477,123 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </div>
                         </div>
 
-                        {/* Menu Acciones archivo (Overlay) */}
+                        {/* Menu Acciones archivo (Overlay Móvil - z-[100010] por encima del dock inferior) */}
                         <AnimatePresence>
                             {selectedDoc && (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40 backdrop-blur-sm"
-                                    onClick={() => setSelectedDoc(null)}
-                                >
+                                <div className="fixed inset-0 z-[100010] flex items-end justify-center">
                                     <motion.div 
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+                                        onClick={() => setSelectedDoc(null)}
+                                    />
+                                    <motion.div 
+                                        layout
                                         initial={{ y: "100%" }}
                                         animate={{ y: 0 }}
                                         exit={{ y: "100%" }}
-                                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                                        className="w-full bg-white dark:bg-zinc-950 rounded-t-3xl p-4"
+                                        transition={{ type: "spring", damping: 28, stiffness: 350 }}
+                                        drag="y"
+                                        dragConstraints={{ top: 0 }}
+                                        dragElastic={0.2}
+                                        onDragEnd={(_, info) => {
+                                            if (info.offset.y > 80 || info.velocity.y > 400) setSelectedDoc(null);
+                                        }}
+                                        className="relative w-full max-w-lg bg-white dark:bg-[#0c0c0e] rounded-t-[28px] border-t border-zinc-200 dark:border-zinc-800 shadow-2xl p-5 z-10"
                                         onClick={e => e.stopPropagation()}
                                     >
-                                        <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full mx-auto mb-4" />
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h4 className="font-bold text-zinc-950 dark:text-zinc-50 truncate">{selectedDoc.title}</h4>
-                                            <button onClick={() => setSelectedDoc(null)} className="p-1 text-zinc-500"><X className="w-5 h-5" /></button>
+                                        <div className="w-12 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setSelectedDoc(null)} />
+                                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800/80">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                {getFileIcon(selectedDoc.file_type, selectedDoc.file_name)}
+                                                <div className="min-w-0">
+                                                    <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{selectedDoc.title}</h4>
+                                                    <p className="text-[11px] text-zinc-400">
+                                                        {selectedDoc.file_size ? `${(selectedDoc.file_size / 1024).toFixed(0)} KB` : 'Nota o Documento'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => setSelectedDoc(null)} 
+                                                className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
                                         </div>
                                         <div className="space-y-1">
-                                            <button onClick={() => { /* Implementar vista previa */ setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Vista previa</button>
-                                            <button onClick={() => { handleOpenShareDoc(selectedDoc); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Compartir en canal</button>
-                                            <button onClick={() => { handleDownloadFile(selectedDoc); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Descargar</button>
-                                            <button onClick={() => { /* Implementar mover */ setMoveDocModal({ isOpen: true, doc: selectedDoc }); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Mover a carpeta</button>
-                                            <button onClick={() => { /* Implementar renombrar */ setRenameDocModal({ isOpen: true, doc: selectedDoc, newTitle: selectedDoc.title }); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl">Renombrar</button>
-                                            <button onClick={() => { handleDeleteDoc(selectedDoc.id); setSelectedDoc(null); }} className="w-full text-left px-3 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl">Eliminar</button>
+                                            <button 
+                                                onClick={() => { 
+                                                    const doc = selectedDoc;
+                                                    setSelectedDoc(null); 
+                                                    setPreviewDocModal(doc); 
+                                                }} 
+                                                className="w-full flex items-center gap-3 px-3.5 py-3 text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-colors"
+                                            >
+                                                <Eye className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                                <span>Vista previa</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => { 
+                                                    const doc = selectedDoc;
+                                                    setSelectedDoc(null); 
+                                                    handleOpenShareDoc(doc); 
+                                                }} 
+                                                className="w-full flex items-center gap-3 px-3.5 py-3 text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-colors"
+                                            >
+                                                <MessageSquare className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                                <span>Compartir en canal</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => { 
+                                                    const doc = selectedDoc;
+                                                    setSelectedDoc(null); 
+                                                    handleDownloadFile(doc); 
+                                                }} 
+                                                className="w-full flex items-center gap-3 px-3.5 py-3 text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-colors"
+                                            >
+                                                <Download className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                                <span>Descargar</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => { 
+                                                    const doc = selectedDoc;
+                                                    setSelectedDoc(null); 
+                                                    setTargetFolderIdForMove(doc.folder_id || null);
+                                                    setMoveDocModal({ isOpen: true, doc }); 
+                                                }} 
+                                                className="w-full flex items-center gap-3 px-3.5 py-3 text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-colors"
+                                            >
+                                                <FolderInput className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                                <span>Mover a carpeta</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => { 
+                                                    const doc = selectedDoc;
+                                                    setSelectedDoc(null); 
+                                                    setRenameDocModal({ isOpen: true, doc, newTitle: doc.title }); 
+                                                }} 
+                                                className="w-full flex items-center gap-3 px-3.5 py-3 text-xs font-medium text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-colors"
+                                            >
+                                                <Edit2 className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                                <span>Renombrar</span>
+                                            </button>
+                                            <div className="pt-1 mt-1 border-t border-zinc-100 dark:border-zinc-800/80">
+                                                <button 
+                                                    onClick={() => { 
+                                                        const id = selectedDoc.id;
+                                                        setSelectedDoc(null); 
+                                                        handleDeleteDoc(id); 
+                                                    }} 
+                                                    className="w-full flex items-center gap-3 px-3.5 py-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                                                    <span>Eliminar</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </motion.div>
-                                </motion.div>
+                                </div>
                             )}
                         </AnimatePresence>
                     </div>
@@ -3481,7 +3607,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 className="md:hidden px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 text-xs font-semibold"
                                 title="Ver carpetas"
                             >
-                                <FolderOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                                <FolderOpen className="w-4 h-4 text-zinc-800 dark:text-zinc-200 shrink-0" />
                                 <span className="truncate max-w-[110px]">{activeFolderObj ? activeFolderObj.name : 'Carpetas'}</span>
                                 <ChevronDown className="w-3 h-3 text-zinc-400 shrink-0" />
                             </button>
@@ -3585,106 +3711,117 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 {/* CONTENIDO PRINCIPAL: VISTA DE ARCHIVOS E IMÁGENES */}
                 <div className="w-full flex-1 flex overflow-hidden">
                     {/* DESPLEGABLE LATERAL MÓVIL PARA CARPETAS */}
-                    {isMobileFolderDrawerOpen && (
-                        <div className="fixed inset-0 z-[10000] flex md:hidden animate-in fade-in duration-200">
-                            <div 
-                                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-                                onClick={() => setIsMobileFolderDrawerOpen(false)} 
-                            />
-                            <div className="relative w-4/5 max-w-xs h-full bg-white dark:bg-[#0c0c0e] border-r border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
-                                <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <FolderOpen className="w-4 h-4 text-amber-500" />
-                                        <span className="text-sm font-bold text-zinc-900 dark:text-white">Carpetas</span>
+                    <AnimatePresence>
+                        {isMobileFolderDrawerOpen && (
+                            <div className="fixed inset-0 z-[100010] flex md:hidden">
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+                                    onClick={() => setIsMobileFolderDrawerOpen(false)} 
+                                />
+                                <motion.div 
+                                    initial={{ x: "-100%" }}
+                                    animate={{ x: 0 }}
+                                    exit={{ x: "-100%" }}
+                                    transition={{ type: "spring", damping: 28, stiffness: 350 }}
+                                    className="relative w-4/5 max-w-xs h-full bg-white dark:bg-[#0c0c0e] border-r border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col z-10"
+                                >
+                                    <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <FolderOpen className="w-4 h-4 text-zinc-900 dark:text-white" />
+                                            <span className="text-sm font-bold text-zinc-900 dark:text-white">Carpetas</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsMobileFolderDrawerOpen(false);
+                                                    setFolderModal({ isOpen: true, folder: null });
+                                                }}
+                                                className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                title="Nueva Carpeta"
+                                            >
+                                                <FolderPlus className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsMobileFolderDrawerOpen(false)}
+                                                className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex-1 overflow-y-auto p-3 space-y-1">
                                         <button
                                             type="button"
                                             onClick={() => {
+                                                setSelectedFolderId(null);
                                                 setIsMobileFolderDrawerOpen(false);
-                                                setFolderModal({ isOpen: true, folder: null });
                                             }}
-                                            className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                                            title="Nueva Carpeta"
+                                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors ${
+                                                selectedFolderId === null
+                                                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold shadow-xs'
+                                                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                                            }`}
                                         >
-                                            <FolderPlus className="w-4 h-4" />
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <FolderOpen className="w-4 h-4 shrink-0" />
+                                                <span className="truncate">Todos los Archivos</span>
+                                            </div>
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 font-medium">
+                                                {allProjectDocs.length}
+                                            </span>
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsMobileFolderDrawerOpen(false)}
-                                            className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedFolderId(null);
-                                            setIsMobileFolderDrawerOpen(false);
-                                        }}
-                                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors ${
-                                            selectedFolderId === null
-                                                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold shadow-xs'
-                                                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <FolderOpen className="w-4 h-4 shrink-0" />
-                                            <span className="truncate">Todos los Archivos</span>
-                                        </div>
-                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 font-medium">
-                                            {allProjectDocs.length}
-                                        </span>
-                                    </button>
 
-                                    {projectFolders.map(folder => {
-                                        const count = allProjectDocs.filter(d => d.folder_id === folder.id).length;
-                                        const isSelected = selectedFolderId === folder.id;
-                                        return (
-                                            <div
-                                                key={folder.id}
-                                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
-                                                    isSelected
-                                                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold shadow-xs'
-                                                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
-                                                }`}
-                                            >
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setSelectedFolderId(folder.id);
-                                                        setIsMobileFolderDrawerOpen(false);
-                                                    }}
-                                                    className="flex items-center gap-2 min-w-0 flex-1 text-left py-1"
+                                        {projectFolders.map(folder => {
+                                            const count = allProjectDocs.filter(d => d.folder_id === folder.id).length;
+                                            const isSelected = selectedFolderId === folder.id;
+                                            return (
+                                                <div
+                                                    key={folder.id}
+                                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                                                        isSelected
+                                                            ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold shadow-xs'
+                                                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                                                    }`}
                                                 >
-                                                    <FolderIcon className="w-4 h-4 shrink-0 text-amber-500" />
-                                                    <span className="truncate">{folder.name}</span>
-                                                </button>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 font-medium">
-                                                        {count}
-                                                    </span>
                                                     <button
                                                         type="button"
                                                         onClick={() => {
+                                                            setSelectedFolderId(folder.id);
                                                             setIsMobileFolderDrawerOpen(false);
-                                                            handleDeleteDocFolder(folder.id);
                                                         }}
-                                                        className="p-1 text-zinc-400 hover:text-red-500 rounded"
+                                                        className="flex items-center gap-2 min-w-0 flex-1 text-left py-1"
                                                     >
-                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                        <FolderIcon className="w-4 h-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                                                        <span className="truncate">{folder.name}</span>
                                                     </button>
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-200/60 dark:bg-zinc-800 font-medium">
+                                                            {count}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setIsMobileFolderDrawerOpen(false);
+                                                                handleDeleteDocFolder(folder.id);
+                                                            }}
+                                                            className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </motion.div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </AnimatePresence>
 
                     {/* BARRA LATERAL MINIMALISTA DE CARPETAS (ESCRITORIO) */}
                     <div className="hidden md:flex w-52 sm:w-60 bg-white dark:bg-[#0d0d0f] border-r border-zinc-200/80 dark:border-zinc-800/80 flex-col shrink-0">
@@ -3964,6 +4101,31 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
+                                                                    setTargetFolderIdForMove(doc.folder_id || null);
+                                                                    setMoveDocModal({ isOpen: true, doc });
+                                                                }}
+                                                                className="p-1 rounded text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                title="Mover a Carpeta"
+                                                            >
+                                                                <FolderInput className="w-3 h-3" />
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setRenameDocModal({ isOpen: true, doc, newTitle: doc.title });
+                                                                }}
+                                                                className="p-1 rounded text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                title="Renombrar"
+                                                            >
+                                                                <Edit2 className="w-3 h-3" />
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
                                                                     handleDownloadFile(doc);
                                                                 }}
                                                                 className="p-1 rounded text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -4055,6 +4217,25 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                                                         title="Compartir en Canal"
                                                                     >
                                                                         <MessageSquare className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setTargetFolderIdForMove(doc.folder_id || null);
+                                                                            setMoveDocModal({ isOpen: true, doc });
+                                                                        }}
+                                                                        className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                        title="Mover a Carpeta"
+                                                                    >
+                                                                        <FolderInput className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setRenameDocModal({ isOpen: true, doc, newTitle: doc.title })}
+                                                                        className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                                        title="Renombrar"
+                                                                    >
+                                                                        <Edit2 className="w-3.5 h-3.5" />
                                                                     </button>
                                                                     <button
                                                                         type="button"
@@ -7679,13 +7860,14 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </form>
             </Modal>
 
-            {/* FOLDER MODAL */}
-            <Modal isOpen={folderModal.isOpen} onClose={() => setFolderModal({ isOpen: false, folder: null })} title="Nueva Carpeta de Documentos">
+            {/* FOLDER MODAL - MINIMALISTA ELEGANTE MONOCROMÁTICO */}
+            <Modal isOpen={folderModal.isOpen} onClose={() => setFolderModal({ isOpen: false, folder: null })} title="Nueva Carpeta">
                 <form onSubmit={e => {
                     e.preventDefault();
                     if (!activeProject) return;
                     const formData = new FormData(e.currentTarget);
-                    const name = formData.get('name') as string;
+                    const name = (formData.get('name') as string)?.trim();
+                    if (!name) return;
 
                     const newFolder: ProjectDocFolder = {
                         id: crypto.randomUUID(),
@@ -7698,12 +7880,32 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     setFolderModal({ isOpen: false, folder: null });
                 }} className="space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Nombre de la Carpeta</label>
-                        <input name="name" required placeholder="Diseño, Requerimientos, Especificaciones..." className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white" />
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Nombre de la carpeta</label>
+                        <div className="relative">
+                            <FolderIcon className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input 
+                                name="name" 
+                                required 
+                                autoFocus
+                                placeholder="Ej. Documentación, Especificaciones..." 
+                                className="w-full pl-10 pr-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 transition-all" 
+                            />
+                        </div>
                     </div>
-                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
-                        <button type="button" onClick={() => setFolderModal({ isOpen: false, folder: null })} className="px-3 py-1.5 text-xs text-gray-500">Cancelar</button>
-                        <button type="submit" className="px-4 py-1.5 text-xs bg-amber-500 text-white font-semibold rounded-lg">Crear Carpeta</button>
+                    <div className="pt-3 flex justify-end gap-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                        <button 
+                            type="button" 
+                            onClick={() => setFolderModal({ isOpen: false, folder: null })} 
+                            className="px-3.5 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit" 
+                            className="px-4 py-2 text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-black dark:hover:bg-zinc-200 rounded-xl transition-colors shadow-xs"
+                        >
+                            Crear Carpeta
+                        </button>
                     </div>
                 </form>
             </Modal>
@@ -8025,27 +8227,29 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                 </form>
             </Modal>
 
-            {/* SHARE DOCUMENT MODAL */}
+            {/* SHARE DOCUMENT MODAL - MINIMALISTA ELEGANTE MONOCROMÁTICO */}
             <Modal 
                 isOpen={shareDocModal.isOpen} 
                 onClose={() => setShareDocModal({ isOpen: false, doc: null })} 
-                title="Compartir Documento en Canal"
+                title="Compartir en Canal"
             >
                 <div className="space-y-4">
                     {shareDocModal.doc && (
-                        <div className="p-3 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg flex items-center gap-3">
-                            {getFileIcon(shareDocModal.doc.file_type, shareDocModal.doc.file_name)}
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center gap-3">
+                            <div className="shrink-0">
+                                {getFileIcon(shareDocModal.doc.file_type, shareDocModal.doc.file_name)}
+                            </div>
                             <div className="min-w-0 flex-1">
-                                <h4 className="text-xs font-bold text-gray-900 dark:text-white truncate">{shareDocModal.doc.title}</h4>
-                                <p className="text-[10px] text-gray-400 font-mono">
-                                    {shareDocModal.doc.file_size ? `${(shareDocModal.doc.file_size / 1024).toFixed(0)} KB` : 'Nota'}
+                                <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">{shareDocModal.doc.title}</h4>
+                                <p className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                                    {shareDocModal.doc.file_size ? `${(shareDocModal.doc.file_size / 1024).toFixed(0)} KB` : 'Documento / Nota'}
                                 </p>
                             </div>
                         </div>
                     )}
 
                     <div>
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Seleccionar Canal Destino</label>
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Canal destino</label>
                         <select
                             value={shareTargetChannelId}
                             onChange={e => {
@@ -8053,7 +8257,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                 setShareError(null);
                                 setShareChannelPassword('');
                             }}
-                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 transition-all"
                         >
                             {activeChannels.map(ch => (
                                 <option key={ch.id} value={ch.id}>
@@ -8064,13 +8268,13 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Comentario Opcional</label>
+                        <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Mensaje o comentario (opcional)</label>
                         <input
                             type="text"
                             placeholder="Añade un mensaje para el equipo..."
                             value={shareComment}
                             onChange={e => setShareComment(e.target.value)}
-                            className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 transition-all"
                         />
                     </div>
 
@@ -8080,8 +8284,9 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                         if (!targetChan?.is_private) return null;
                         return (
                             <div>
-                                <label className="block text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1.5">
-                                    <Lock className="w-3 h-3" /> Contraseña del Canal Privado *
+                                <label className="block text-xs font-semibold text-zinc-800 dark:text-zinc-200 mb-1.5 flex items-center gap-1.5">
+                                    <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                                    <span>Contraseña del canal privado</span>
                                 </label>
                                 <input
                                     type="password"
@@ -8091,36 +8296,36 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                         setShareChannelPassword(e.target.value);
                                         setShareError(null);
                                     }}
-                                    className="w-full bg-gray-50 dark:bg-black border border-amber-300 dark:border-amber-700 rounded-lg px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-amber-500"
+                                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 transition-all"
                                 />
                             </div>
                         );
                     })()}
 
                     {shareError && (
-                        <p className="text-xs text-red-500 font-medium">{shareError}</p>
+                        <p className="text-xs text-zinc-800 dark:text-zinc-200 font-medium py-1 px-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg">{shareError}</p>
                     )}
 
-                    <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                    <div className="pt-3 flex justify-end gap-2 border-t border-zinc-100 dark:border-zinc-800/80">
                         <button 
                             type="button" 
                             onClick={() => setShareDocModal({ isOpen: false, doc: null })} 
-                            className="px-3.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            className="px-3.5 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                         >
                             Cancelar
                         </button>
                         <button 
                             type="button" 
                             onClick={handleConfirmShareDoc}
-                            className="px-4 py-1.5 text-xs bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                            className="px-4 py-2 text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-black dark:hover:bg-zinc-200 rounded-xl transition-colors shadow-xs"
                         >
-                            Enviar al Canal
+                            Compartir en Canal
                         </button>
                     </div>
                 </div>
             </Modal>
 
-            {/* PREVIEW DOCUMENT MODAL */}
+            {/* PREVIEW DOCUMENT MODAL - MINIMALISTA ELEGANTE MONOCROMÁTICO */}
             <Modal
                 isOpen={!!previewDocModal}
                 onClose={() => setPreviewDocModal(null)}
@@ -8128,34 +8333,47 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             >
                 {previewDocModal && (
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between text-xs text-gray-400 pb-2 border-b border-gray-100 dark:border-gray-800">
-                            <span>Tipo: {previewDocModal.file_name?.split('.').pop()?.toUpperCase() || 'Nota'}</span>
+                        <div className="flex items-center justify-between text-xs text-zinc-400 pb-2 border-b border-zinc-100 dark:border-zinc-800/80 font-mono">
+                            <span>Formato: {previewDocModal.file_name?.split('.').pop()?.toUpperCase() || 'Nota / Markdown'}</span>
                             <span>{previewDocModal.file_size ? `${(previewDocModal.file_size / 1024).toFixed(0)} KB` : 'Texto'}</span>
                         </div>
 
                         {previewDocModal.file_url ? (
                             <div className="space-y-3">
                                 {previewDocModal.file_type?.startsWith('image/') || previewDocModal.file_url.startsWith('data:image/') ? (
-                                    <div className="max-h-80 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 flex items-center justify-center bg-gray-50 dark:bg-black">
-                                        <img src={previewDocModal.file_url} alt={previewDocModal.title} className="max-h-80 object-contain" />
+                                    <div className="max-h-96 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900/60 p-2">
+                                        <img src={previewDocModal.file_url} alt={previewDocModal.title} className="max-h-88 object-contain rounded-lg" />
                                     </div>
                                 ) : (
-                                    <div className="p-4 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg text-center">
-                                        <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                        <p className="text-xs text-gray-600 dark:text-gray-300 mb-1 font-semibold">{previewDocModal.file_name || previewDocModal.title}</p>
-                                        <p className="text-[10px] text-gray-400">Archivo listo para descargar o compartir</p>
+                                    <div className="p-6 bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl text-center">
+                                        <FileText className="w-10 h-10 text-zinc-400 mx-auto mb-2" />
+                                        <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{previewDocModal.file_name || previewDocModal.title}</p>
+                                        <p className="text-[11px] text-zinc-400">Archivo listo para descargar o compartir en el canal del proyecto</p>
                                     </div>
                                 )}
                             </div>
                         ) : null}
 
                         {previewDocModal.content && (
-                            <div className="bg-gray-50 dark:bg-black/50 p-4 rounded-lg border border-gray-200 dark:border-gray-800 max-h-60 overflow-y-auto font-sans text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+                            <div className="bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 max-h-72 overflow-y-auto font-sans text-xs text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed">
                                 {previewDocModal.content}
                             </div>
                         )}
 
-                        <div className="pt-3 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
+                        <div className="pt-3 flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const doc = previewDocModal;
+                                    setPreviewDocModal(null);
+                                    setTargetFolderIdForMove(doc.folder_id || null);
+                                    setMoveDocModal({ isOpen: true, doc });
+                                }}
+                                className="px-3.5 py-2 text-xs font-medium border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-1.5 transition-colors"
+                            >
+                                <FolderInput className="w-3.5 h-3.5 text-zinc-500" />
+                                <span>Mover</span>
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -8163,19 +8381,160 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     setPreviewDocModal(null);
                                     handleOpenShareDoc(doc);
                                 }}
-                                className="px-3.5 py-1.5 text-xs border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors"
+                                className="px-3.5 py-2 text-xs font-medium border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-1.5 transition-colors"
                             >
-                                <MessageSquare className="w-3.5 h-3.5 text-blue-500" /> Compartir en Canal
+                                <MessageSquare className="w-3.5 h-3.5 text-zinc-500" />
+                                <span>Compartir</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleDownloadFile(previewDocModal)}
-                                className="px-3.5 py-1.5 text-xs bg-gray-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 flex items-center gap-1.5 transition-colors shadow-xs"
+                                className="px-4 py-2 text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-black dark:hover:bg-zinc-200 rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
                             >
-                                <Download className="w-3.5 h-3.5" /> Descargar
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Descargar</span>
                             </button>
                         </div>
                     </div>
+                )}
+            </Modal>
+
+            {/* MOVE DOCUMENT TO FOLDER MODAL - MINIMALISTA ELEGANTE MONOCROMÁTICO */}
+            <Modal
+                isOpen={moveDocModal.isOpen}
+                onClose={() => setMoveDocModal({ isOpen: false, doc: null })}
+                title="Mover a Carpeta"
+            >
+                {moveDocModal.doc && (
+                    <div className="space-y-4">
+                        <div className="p-3 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center gap-3">
+                            <div className="shrink-0">
+                                {getFileIcon(moveDocModal.doc.file_type, moveDocModal.doc.file_name)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">{moveDocModal.doc.title}</h4>
+                                <p className="text-[11px] text-zinc-400">
+                                    Carpeta actual: {(activeProject?.doc_folders || []).find(f => f.id === moveDocModal.doc?.folder_id)?.name || 'Todos los Archivos (Raíz)'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Selecciona la carpeta de destino</label>
+                            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                                {/* Raíz */}
+                                <button
+                                    type="button"
+                                    onClick={() => setTargetFolderIdForMove(null)}
+                                    className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs text-left transition-all ${
+                                        targetFolderIdForMove === null
+                                            ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-100 dark:bg-zinc-800/80 font-semibold text-zinc-900 dark:text-white'
+                                            : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <FolderOpen className="w-4 h-4 text-zinc-500" />
+                                        <span>Sin carpeta (Carpeta principal / Raíz)</span>
+                                    </div>
+                                    {targetFolderIdForMove === null && (
+                                        <Check className="w-4 h-4 text-zinc-900 dark:text-zinc-100 shrink-0" />
+                                    )}
+                                </button>
+
+                                {/* Carpetas del proyecto */}
+                                {(activeProject?.doc_folders || []).map(folder => {
+                                    const isSelected = targetFolderIdForMove === folder.id;
+                                    const count = (activeProject?.docs || []).filter(d => d.folder_id === folder.id).length;
+                                    return (
+                                        <button
+                                            key={folder.id}
+                                            type="button"
+                                            onClick={() => setTargetFolderIdForMove(folder.id)}
+                                            className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs text-left transition-all ${
+                                                isSelected
+                                                    ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-100 dark:bg-zinc-800/80 font-semibold text-zinc-900 dark:text-white'
+                                                    : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <FolderIcon className="w-4 h-4 text-zinc-500 shrink-0" />
+                                                <span className="truncate">{folder.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-[10px] text-zinc-400 font-mono">({count} archivos)</span>
+                                                {isSelected && (
+                                                    <Check className="w-4 h-4 text-zinc-900 dark:text-zinc-100 shrink-0" />
+                                                )}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="pt-3 flex justify-end gap-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                            <button
+                                type="button"
+                                onClick={() => setMoveDocModal({ isOpen: false, doc: null })}
+                                className="px-3.5 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleConfirmMoveDoc(targetFolderIdForMove)}
+                                className="px-4 py-2 text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-black dark:hover:bg-zinc-200 rounded-xl transition-colors shadow-xs"
+                            >
+                                Mover Aquí
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* RENAME DOCUMENT MODAL - MINIMALISTA ELEGANTE MONOCROMÁTICO */}
+            <Modal
+                isOpen={renameDocModal.isOpen}
+                onClose={() => setRenameDocModal({ isOpen: false, doc: null, newTitle: '' })}
+                title="Renombrar Archivo"
+            >
+                {renameDocModal.doc && (
+                    <form onSubmit={e => {
+                        e.preventDefault();
+                        handleConfirmRenameDoc();
+                    }} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Nuevo nombre del archivo</label>
+                            <div className="relative">
+                                <Edit2 className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    required
+                                    autoFocus
+                                    value={renameDocModal.newTitle}
+                                    onChange={e => setRenameDocModal({ ...renameDocModal, newTitle: e.target.value })}
+                                    className="w-full pl-10 pr-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 transition-all"
+                                    placeholder="Nombre del archivo o documento..."
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-3 flex justify-end gap-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                            <button
+                                type="button"
+                                onClick={() => setRenameDocModal({ isOpen: false, doc: null, newTitle: '' })}
+                                className="px-3.5 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-black dark:hover:bg-zinc-200 rounded-xl transition-colors shadow-xs"
+                            >
+                                Guardar Nombre
+                            </button>
+                        </div>
+                    </form>
                 )}
             </Modal>
 

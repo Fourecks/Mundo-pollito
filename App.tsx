@@ -134,7 +134,9 @@ const generateRecurringTasks = async (sourceTodo: Todo): Promise<Todo[]> => {
         default: limitDate.setDate(now.getDate() + 30);
     }
 
-    const recurrenceEndDate = ends_on ? new Date(ends_on + 'T00:00:00Z') : null;
+    const recurrenceEndDate = ends_on 
+        ? new Date(ends_on + 'T00:00:00Z') 
+        : (sourceTodo.end_date ? new Date(sourceTodo.end_date + 'T00:00:00Z') : null);
     // If recurrence end date is sooner than our limit, stop there.
     const finalLimitDate = (recurrenceEndDate && recurrenceEndDate < limitDate) ? recurrenceEndDate : limitDate;
 
@@ -217,6 +219,7 @@ const generateRecurringTasks = async (sourceTodo: Todo): Promise<Todo[]> => {
             completed: false,
             notification_sent: false,
             due_date: dateStr,
+            end_date: null,
             user_id: sourceTodo.user_id,
             recurrence: { ...sourceTodo.recurrence, sourceId: sourceTodo.id },
             subtasks: newSubtasks,
@@ -4054,6 +4057,7 @@ const App: React.FC = () => {
 
     // Normalize empty strings to null for database compatibility
     if (updatedTodo.due_date === '') updatedTodo.due_date = null;
+    if (updatedTodo.end_date === undefined || updatedTodo.end_date === '') updatedTodo.end_date = null;
     if (updatedTodo.sprint_id === '') updatedTodo.sprint_id = null;
     if (updatedTodo.milestone_id === '') updatedTodo.milestone_id = null;
     if (updatedTodo.list_id === '') updatedTodo.list_id = null;
@@ -4061,20 +4065,16 @@ const App: React.FC = () => {
 
     const originalTodo = findTodoById(updatedTodo.id);
     
-    const wasRecurring = originalTodo?.recurrence?.frequency && originalTodo.recurrence.frequency !== 'none';
-    const isNowRecurring = updatedTodo.recurrence?.frequency && updatedTodo.recurrence.frequency !== 'none';
+    const wasRecurring = !!(originalTodo?.recurrence?.frequency && originalTodo.recurrence.frequency !== 'none') || !!originalTodo?.recurrence?.id || !!originalTodo?.recurrence?.sourceId;
+    const isNowRecurring = !!(updatedTodo.recurrence?.frequency && updatedTodo.recurrence.frequency !== 'none');
     
-    // Check if recurrence rules actually changed
+    // Check if recurrence rules OR dates actually changed on a recurring task
     const recurrenceRuleChanged = JSON.stringify(originalTodo?.recurrence) !== JSON.stringify(updatedTodo.recurrence);
+    const datesChanged = originalTodo?.due_date !== updatedTodo.due_date || (originalTodo?.end_date || null) !== (updatedTodo.end_date || null);
 
-    if (recurrenceRuleChanged && (wasRecurring || isNowRecurring)) {
-        // If it WAS recurring, we need to ask user what to do with future tasks
-        // OR if we are changing from one recurring type to another (or to none)
-        if (wasRecurring) {
-             setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
-             return;
-        }
-        // If it wasn't recurring but is now, just save and generate future tasks
+    if (wasRecurring && (recurrenceRuleChanged || datesChanged)) {
+         setUpdateOptions({ isOpen: true, original: originalTodo, updated: updatedTodo });
+         return;
     } 
 
     // Standard update (no recurrence change prompt needed)
@@ -4139,11 +4139,11 @@ const App: React.FC = () => {
   
   const handleUpdateThisOccurrenceOnly = async (updatedTodo: Todo) => {
     // The user chose "This task only". This implies breaking the recurrence chain for THIS specific task.
-    // We set its frequency to 'none' so it stops generating, but we keep the recurrence ID on the *others* implicitly by not touching them.
-    // Ideally, we should remove the recurrence ID from this task to detach it completely.
-    const newTodo = { 
+    // Detach from chain completely, clear recurrence id and sourceId, set frequency to 'none'.
+    const newTodo: Todo = { 
         ...updatedTodo, 
-        recurrence: { frequency: 'none' as const } // Detach from chain
+        end_date: updatedTodo.end_date ?? null,
+        recurrence: { frequency: 'none' } // Detach from chain
     };
     
     setAllTodos(current => getUpdatedTodosState(current, newTodo));
@@ -4154,14 +4154,7 @@ const App: React.FC = () => {
   const handleUpdateFutureOccurrences = async (updatedTodo: Todo) => {
     const originalTodo = updateOptions.original;
     const oldRecurrenceId = originalTodo?.recurrence?.id;
-    
-    // If we don't have an original recurrence ID, we can't find the chain. 
-    // Just perform a normal update.
-    if (!oldRecurrenceId) {
-        setUpdateOptions({ isOpen: false, original: null, updated: null });
-        await handleUpdateTodo(updatedTodo); // Fallback to normal update
-        return;
-    }
+    const oldSourceId = originalTodo?.recurrence?.sourceId || originalTodo?.id;
     
     setUpdateOptions({ isOpen: false, original: null, updated: null });
 
@@ -4172,12 +4165,14 @@ const App: React.FC = () => {
     let newAllTodos = JSON.parse(JSON.stringify(allTodos)); // Deep copy
 
     for (const dateKey in newAllTodos) {
-        if(dateKey >= deleteFromDate) {
+        if (dateKey >= deleteFromDate) {
             const initialLength = newAllTodos[dateKey].length;
-            newAllTodos[dateKey] = newAllTodos[dateKey].filter(t => {
+            newAllTodos[dateKey] = newAllTodos[dateKey].filter((t: Todo) => {
                 // Don't delete the task we are currently editing (updatedTodo.id)
                 // even if it has the old ID, because we are about to update it.
-                if (t.recurrence?.id === oldRecurrenceId && t.id !== updatedTodo.id) {
+                const matchesChain = (oldRecurrenceId && t.recurrence?.id === oldRecurrenceId) ||
+                                     (oldSourceId && (t.recurrence?.sourceId === oldSourceId || (t.id === oldSourceId && t.id !== updatedTodo.id)));
+                if (matchesChain && t.id !== updatedTodo.id) {
                     idsToDelete.push(t.id);
                     return false;
                 }
@@ -4191,12 +4186,12 @@ const App: React.FC = () => {
     }
 
     // 2. Update the current task
-    let finalUpdatedTodo = { ...updatedTodo };
-    const isNowRecurring = finalUpdatedTodo.recurrence && finalUpdatedTodo.recurrence.frequency !== 'none';
+    let finalUpdatedTodo: Todo = { ...updatedTodo };
+    finalUpdatedTodo.end_date = finalUpdatedTodo.end_date ?? null;
+    const isNowRecurring = !!(finalUpdatedTodo.recurrence && finalUpdatedTodo.recurrence.frequency !== 'none');
 
     if (isNowRecurring) {
          // Generate a NEW recurrence ID for this new series to separate it from the old chain history.
-         // This prevents future edits from accidentally affecting the old chain (or what's left of it).
         const newSeriesId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `rec-${Date.now()}-${Math.random()}`;
         finalUpdatedTodo.recurrence = {
             ...finalUpdatedTodo.recurrence!,
@@ -4204,8 +4199,7 @@ const App: React.FC = () => {
             sourceId: finalUpdatedTodo.id
         };
     } else {
-        // CRITICAL: Explicitly ensure recurrence is cleared and ID removed if setting to None.
-        // We set it to a clean object to avoid any lingering IDs.
+        // Explicitly ensure recurrence is cleared if setting to None.
         finalUpdatedTodo.recurrence = { frequency: 'none' }; 
     }
 
@@ -4218,11 +4212,11 @@ const App: React.FC = () => {
         await syncableDeleteMultiple('todos', idsToDelete);
     }
     
-    // Save the updated task (which now has either a NEW ID or NO ID)
+    // Save the updated task
     const savedTodo = await syncableUpdate('todos', finalUpdatedTodo);
     
     // 4. Generate NEW future tasks if applicable
-    if (isNowRecurring) {
+    if (isNowRecurring && savedTodo) {
         const newRecurringTodos = await generateRecurringTasks(savedTodo);
         setAllTodos(current => {
             const newState = { ...current };

@@ -299,7 +299,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ isOpen, onClose, on
     updatedTodoPayload.assignee = assignee;
 
     updatedTodoPayload.due_date = due_date;
-    updatedTodoPayload.end_date = hasEndDate && !isUndated ? (end_date || undefined) : undefined;
+    updatedTodoPayload.end_date = hasEndDate && !isUndated && end_date ? end_date : null;
     updatedTodoPayload.start_time = hasTime && !isUndated ? (start_time || undefined) : undefined;
     updatedTodoPayload.end_time = hasTime && !isUndated ? (end_time || undefined) : undefined;
     updatedTodoPayload.notes = notes.trim() ? notes.trim() : undefined;

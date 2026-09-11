@@ -114,8 +114,8 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
     const options = {
         dueDate: hasDueDate ? dueDate : null,
         due_date: hasDueDate ? dueDate : null,
-        endDate: hasEndDate ? endDate : undefined,
-        end_date: hasEndDate ? endDate : undefined,
+        endDate: hasEndDate && endDate ? endDate : null,
+        end_date: hasEndDate && endDate ? endDate : null,
         startTime: timeEnabled && time ? time : null,
         start_time: timeEnabled && time ? time : null,
         endTime: timeEnabled && endTime ? endTime : null,

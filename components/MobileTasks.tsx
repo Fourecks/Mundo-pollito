@@ -402,7 +402,7 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
             assignee: isEditAdv ? (editAssignee.trim() || null) : null,
             assigned_to: isEditAdv ? (editAssignee.trim() || null) : null,
             due_date: editIsUndated ? null : (editDueDate || null),
-            end_date: editIsUndated || !editHasEndDate ? undefined : editEndDate,
+            end_date: editIsUndated || !editHasEndDate ? null : (editEndDate || null),
             start_time: editHasTime && !editIsUndated ? editStartTime : undefined,
             end_time: editHasTime && !editIsUndated ? editEndTime : undefined,
             notes: editNotes.trim() ? editNotes.trim() : undefined,
@@ -1449,7 +1449,12 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                     onAddTask={onAddTodo}
                     onEditTask={(_, text, options) => {
                         if (activeEditingTask && onUpdateTodo) {
-                             const updatedTask = { ...activeEditingTask, text, ...options };
+                             const updatedTask: Todo = { 
+                                 ...activeEditingTask, 
+                                 text, 
+                                 ...options,
+                                 end_date: options?.end_date !== undefined ? options.end_date : (options?.endDate !== undefined ? options.endDate : null)
+                             };
                              onUpdateTodo(updatedTask);
                         }
                     }}
