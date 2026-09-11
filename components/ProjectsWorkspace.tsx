@@ -319,6 +319,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
     const [isMobileChannelDrawerOpen, setIsMobileChannelDrawerOpen] = useState(false);
     const [isMobileFolderDrawerOpen, setIsMobileFolderDrawerOpen] = useState(false);
     const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
+    const [selectedDoc, setSelectedDoc] = useState<ProjectDoc | null>(null);
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [quickAddAction, setQuickAddAction] = useState<'tarea' | 'gasto' | 'nota' | 'tiempo' | null>(null);
     const [quickAddType, setQuickAddType] = useState<'tarea' | 'gasto' | 'nota' | 'tiempo'>('tarea');
@@ -3301,8 +3302,8 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
         const activeFolderObj = projectFolders.find(f => f.id === selectedFolderId);
 
         return (
-            <div className="w-full h-full flex flex-col bg-zinc-50/60 dark:bg-[#08080a] overflow-hidden text-zinc-900 dark:text-zinc-100">
-                {/* Hidden File Input for uploading files & images */}
+            <div className="w-full h-full flex flex-col bg-white dark:bg-[#08080a] text-zinc-900 dark:text-zinc-100">
+                {/* Hidden File Input */}
                 <input
                     type="file"
                     ref={fileInputRef}
@@ -3311,97 +3312,146 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.zip"
                 />
 
-                {/* HEADER MINIMALISTA Y ELEGANTE */}
                 {isMobile ? (
-                    <div className="px-4 py-3 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between gap-3 shrink-0">
-                        {/* Folder Toggle */}
-                        <button
-                            type="button"
-                            onClick={() => setIsMobileFolderDrawerOpen(true)}
-                            className="px-2.5 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 flex items-center gap-1 text-[11px] font-bold shrink-0"
-                            title="Ver carpetas"
-                        >
-                            <FolderOpen className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span className="truncate max-w-[70px]">{activeFolderObj ? activeFolderObj.name : 'Carpetas'}</span>
-                            <ChevronDown className="w-3 h-3 text-zinc-400 shrink-0" />
-                        </button>
-
-                        {/* Search Input */}
-                        <div className="relative flex-1">
-                            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                            <input
-                                type="text"
-                                placeholder="Buscar archivos..."
-                                value={docSearchText}
-                                onChange={e => setDocSearchText(e.target.value)}
-                                className="w-full pl-8 pr-7 py-1.5 text-xs bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none transition-colors"
-                            />
-                            {docSearchText && (
-                                <button
-                                    type="button"
-                                    onClick={() => setDocSearchText('')}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Plus (+) Action Button with Popover */}
-                        <div className="relative shrink-0">
+                    /* REDISEÑO MÓVIL */
+                    <div className="flex flex-col h-full overflow-hidden">
+                        {/* Header Minimalista */}
+                        <div className="px-4 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
+                            <h2 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">Documentos</h2>
                             <button
                                 type="button"
                                 onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
-                                className="p-2 bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-white rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-sm"
-                                title="Acciones"
+                                className="p-2 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"
                             >
-                                <Plus className="w-4 h-4" />
+                                <Plus className="w-5 h-5" />
                             </button>
-
+                            
+                            {/* Menu Plus */}
                             {isPlusMenuOpen && (
-                                <>
-                                    <div 
-                                        className="fixed inset-0 z-40 bg-transparent" 
-                                        onClick={() => setIsPlusMenuOpen(false)}
-                                    />
-                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#111] border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-xl z-50 py-1 animate-in fade-in slide-in-from-top-2 duration-100">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIsPlusMenuOpen(false);
-                                                fileInputRef.current?.click();
-                                            }}
-                                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-left font-semibold"
-                                        >
-                                            <Upload className="w-4 h-4 text-zinc-500" />
-                                            <span>Subir archivo</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIsPlusMenuOpen(false);
-                                                setFolderModal({ isOpen: true, folder: null });
-                                            }}
-                                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-left font-semibold border-t border-zinc-100 dark:border-zinc-900"
-                                        >
-                                            <FolderPlus className="w-4 h-4 text-zinc-500" />
-                                            <span>Crear carpeta</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIsPlusMenuOpen(false);
-                                                handleCreateProjectNote();
-                                            }}
-                                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-left font-semibold border-t border-zinc-100 dark:border-zinc-900"
-                                        >
-                                            <FilePlus className="w-4 h-4 text-zinc-500" />
-                                            <span>Crear texto/nota</span>
-                                        </button>
-                                    </div>
-                                </>
+                                <div className="absolute right-4 top-16 z-50 w-48 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-1">
+                                    <button
+                                        onClick={() => { fileInputRef.current?.click(); setIsPlusMenuOpen(false); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
+                                    >
+                                        <Upload className="w-4 h-4" /> Subir archivo
+                                    </button>
+                                    <button
+                                        onClick={() => { setFolderModal({ isOpen: true, folder: null }); setIsPlusMenuOpen(false); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
+                                    >
+                                        <FolderPlus className="w-4 h-4" /> Crear carpeta
+                                    </button>
+                                    <button
+                                        onClick={() => { handleCreateProjectNote(); setIsPlusMenuOpen(false); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
+                                    >
+                                        <FilePlus className="w-4 h-4" /> Crear nota
+                                    </button>
+                                </div>
                             )}
                         </div>
+                        
+                        {/* Search */}
+                        <div className="px-4 py-3 shrink-0">
+                            <div className="relative">
+                                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                <input
+                                    type="text"
+                                    placeholder={selectedFolderId ? `Buscar en ${activeFolderObj?.name || 'Carpeta'}...` : "Buscar archivos..."}
+                                    value={docSearchText}
+                                    onChange={e => setDocSearchText(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-900 rounded-xl border-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-700 transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Contenido Principal */}
+                        <div className="flex-1 overflow-y-auto px-4 pb-20">
+                            {/* Si estamos en una subcarpeta, mostrar botón volver */}
+                            {selectedFolderId && (
+                                <button
+                                    onClick={() => setSelectedFolderId(null)}
+                                    className="flex items-center gap-1 text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-4"
+                                >
+                                    <ChevronLeft className="w-4 h-4" /> Volver a Documentos
+                                </button>
+                            )}
+
+                            {/* Carpetas (solo en raíz) */}
+                            {!selectedFolderId && (
+                                <div className="mb-6">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Carpetas</h3>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {projectFolders.map(folder => {
+                                            const count = allProjectDocs.filter(d => d.folder_id === folder.id).length;
+                                            return (
+                                                <button
+                                                    key={folder.id}
+                                                    onClick={() => setSelectedFolderId(folder.id)}
+                                                    className="w-full flex items-center justify-between px-3 py-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl text-sm"
+                                                >
+                                                    <div className="flex items-center gap-3 font-medium">
+                                                        <FolderIcon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                                                        {folder.name}
+                                                    </div>
+                                                    <span className="text-xs text-zinc-500">{count}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Lista de archivos */}
+                            <div>
+                                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">
+                                    {selectedFolderId ? `${allProjectDocs.filter(d => d.folder_id === selectedFolderId).length} elementos` : 'Archivos recientes'}
+                                </h3>
+                                <div className="space-y-1">
+                                    {filteredDocs.map(doc => (
+                                        <div key={doc.id} className="flex items-center gap-3 p-3 bg-white dark:bg-zinc-950 rounded-lg">
+                                            <div className="p-2 bg-zinc-100 dark:bg-zinc-900 rounded-lg">
+                                                {doc.file_url ? <FileText className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{doc.title}</div>
+                                                <div className="text-xs text-zinc-500 truncate">
+                                                    {doc.file_url ? `${doc.file_name || 'Archivo'} · ${doc.updated_at ? new Date(doc.updated_at).toLocaleDateString() : ''}` : 'Nota · editado'}
+                                                </div>
+                                            </div>
+                                            <button 
+                                                className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                                onClick={() => setSelectedDoc(doc)}
+                                            >
+                                                <MoreVertical className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Menu Acciones archivo (Bottom sheet) */}
+                        {selectedDoc && (
+                            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-xs">
+                                <div className="w-full bg-white dark:bg-zinc-900 rounded-t-2xl p-4 animate-in slide-in-from-bottom duration-200">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="font-bold text-zinc-950 dark:text-zinc-50 truncate">{selectedDoc.title}</h4>
+                                        <button onClick={() => setSelectedDoc(null)} className="p-1 text-zinc-500"><X className="w-5 h-5" /></button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Vista previa</button>
+                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Compartir en canal</button>
+                                        <button onClick={() => { handleDownloadFile(selectedDoc); setSelectedDoc(null); }} className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Descargar</button>
+                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Mover a carpeta</button>
+                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">Renombrar</button>
+                                        <button className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg">Eliminar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="px-4 sm:px-6 py-3 bg-white dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
@@ -3448,15 +3498,6 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                                     onChange={e => setDocSearchText(e.target.value)}
                                     className="pl-8 pr-3 py-1.5 text-xs bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-52 transition-colors"
                                 />
-                                {docSearchText && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setDocSearchText('')}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-                                    >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                )}
                             </div>
 
                             {/* Conmutador de vista Grid / Table */}
@@ -3520,6 +3561,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                             </button>
                         </div>
                     </div>
+
                 )}
 
                 {/* CONTENIDO PRINCIPAL: VISTA DE ARCHIVOS E IMÁGENES */}
