@@ -956,14 +956,24 @@ const MobileTasks: React.FC<MobileTasksProps> = ({
                         <span>Atrás</span>
                     </button>
                     <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Detalles de Tarea</h2>
-                    <button 
-                        type="button"
-                        onClick={handleSaveEditTask}
-                        disabled={!editTitle.trim()}
-                        className="text-xs font-bold px-4 py-1.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-all shadow-xs"
-                    >
-                        Guardar
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors"
+                            title="Eliminar tarea"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={handleSaveEditTask}
+                            disabled={!editTitle.trim()}
+                            className="text-xs font-bold px-4 py-1.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:opacity-40 active:scale-95 transition-all shadow-xs"
+                        >
+                            Guardar
+                        </button>
+                    </div>
                 </div>
 
                 {/* Form Content */}
