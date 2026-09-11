@@ -4,6 +4,7 @@ import { Project, Todo, Sprint, Milestone, ProjectDoc, ProjectDocFolder, Project
 import { sendPushNotification } from '../services/pushNotificationService';
 import ProjectNoteEditorModal from './ProjectNoteEditorModal';
 import PersonalProjectSettings from './PersonalProjectSettings';
+import MobileTaskDrawer from './MobileTaskDrawer';
 import AddTaskModal from './AddTaskModal';
 import { 
   Plus, Settings, Calendar as CalendarIcon, FileText, Activity, Inbox, Target, AlertCircle, CheckCircle2, Circle, AlignLeft, X, Edit2, Trash2, Clock, Check, MoreVertical, ArrowLeft, BarChart2, GripVertical, Tag, CheckSquare, Sparkles, Layers, ArrowRight, Users, MessageSquare, Video, Search, FolderPlus, Folder as FolderIcon, FolderOpen, Download, Send, Paperclip, Smile, Pin, ExternalLink, Shield, FileSpreadsheet, FileCode, FileImage, FileArchive, File as FileIcon, Share2, HelpCircle, AlertTriangle, RefreshCw, ThumbsUp, Heart, Flame, Eye, Lightbulb, Megaphone, Flag, Filter, Hash, Lock, Volume2, Mic, MicOff, Camera, CameraOff, Monitor, Maximize2, Minimize2, Grid, List, ListOrdered, CheckSquare as CheckSquareIcon, Bell, BellOff, MessageCircle, SlidersHorizontal, PieChart, BarChart3, ChevronLeft, ChevronDown, LayoutGrid, Upload, BookOpen, FilePlus, ChevronRight, MoreHorizontal, DollarSign
@@ -9181,7 +9182,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
             )}
 
             {/* UNIFIED ADD TASK MODAL FOR BOTH PERSONAL AND ADVANCED PROJECTS */}
-            <AddTaskModal
+            <MobileTaskDrawer
                 isOpen={showQuickAddTaskModal}
                 onClose={() => {
                     setShowQuickAddTaskModal(false);
@@ -9200,10 +9201,7 @@ export const ProjectsWorkspace: React.FC<ProjectsWorkspaceProps> = ({
                     setSprintIdForAddTask(null);
                 }}
                 projects={projects}
-                activeProject={activeProject}
                 fixedProjectId={activeProject?.id}
-                defaultSprintId={sprintIdForAddTask || undefined}
-                defaultKanbanColumn={kanbanAddModalCol || 'Por hacer'}
             />
 
             {/* MODAL EDITOR ENRIQUECIDO DE NOTAS DEL PROYECTO */}
