@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar as CalendarIcon, Flag, ChevronDown, ChevronUp, User, Clock, Repeat, Bell, ListChecks, FileText } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Flag, ChevronDown, ChevronUp, User, Clock, Repeat, Bell, ListChecks, FileText, ChevronRight } from 'lucide-react';
 import { Priority, Project, Todo } from '../types';
 
 interface MobileTaskDrawerProps {
@@ -146,12 +146,21 @@ const MobileTaskDrawer: React.FC<MobileTaskDrawerProps> = ({
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                 >
-                    <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-2xl text-xs space-y-4">
-                        <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100"><Clock className="w-4 h-4"/> Hora</div>
-                        <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100"><Repeat className="w-4 h-4"/> Repetición</div>
-                        <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100"><Bell className="w-4 h-4"/> Recordatorio</div>
-                        <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100"><ListChecks className="w-4 h-4"/> Subtareas</div>
-                        <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100"><FileText className="w-4 h-4"/> Notas</div>
+                    <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-2xl text-xs space-y-1">
+                        {[
+                            { icon: Clock, label: 'Hora' },
+                            { icon: Repeat, label: 'Repetición' },
+                            { icon: Bell, label: 'Recordatorio' },
+                            { icon: ListChecks, label: 'Subtareas' },
+                            { icon: FileText, label: 'Notas' },
+                        ].map((item, idx) => (
+                            <button key={idx} className="w-full flex items-center justify-between p-3 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-zinc-900 dark:text-zinc-100 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <item.icon className="w-4 h-4"/> {item.label}
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-zinc-400"/>
+                            </button>
+                        ))}
                     </div>
                 </motion.div>
             )}
