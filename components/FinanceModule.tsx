@@ -662,6 +662,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const [isLoading, setIsLoading] = useState(false);
   const [debtSubTab, setDebtSubTab] = useState<"cards" | "loans" | "installments">("cards");
   const [showAddDebtInline, setShowAddDebtInline] = useState(false);
+  const [statsPeriod, setStatsPeriod] = useState<"THIS_MONTH" | "LAST_MONTH" | "LAST_3_MONTHS" | "LAST_6_MONTHS" | "THIS_YEAR">("THIS_MONTH");
+  const [showAllCategoriesModal, setShowAllCategoriesModal] = useState(false);
+  const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
+  const [trendSeries, setTrendSeries] = useState({ ingresos: true, gastos: true, ahorro: false });
 
   // --- Data State ---
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
@@ -8743,9 +8747,621 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     </div>
                   )}
 
+                  {/* MOBILE STATS RENDERER */}
+                  {(() => {
+                    (window as any).renderMobileStats = () => {
+                      // 1. Filtered Transactions
+                      const now = new Date();
+                      const currentYear = now.getFullYear();
+                      const currentMonth = now.getMonth();
+
+                      const filteredTx = transactions.filter(t => {
+                        const tDate = new Date(t.date + "T12:00:00");
+                        if (isNaN(tDate.getTime())) return false;
+
+                        if (statsPeriod === "THIS_MONTH") {
+                          return tDate.getFullYear() === currentYear && tDate.getMonth() === currentMonth;
+                        }
+                        if (statsPeriod === "LAST_MONTH") {
+                          let targetYear = currentYear;
+                          let targetMonth = currentMonth - 1;
+                          if (targetMonth < 0) {
+                            targetMonth = 11;
+                            targetYear -= 1;
+                          }
+                          return tDate.getFullYear() === targetYear && tDate.getMonth() === targetMonth;
+                        }
+                        if (statsPeriod === "LAST_3_MONTHS") {
+                          const boundary = new Date(currentYear, currentMonth - 3, 1);
+                          return tDate >= boundary && tDate <= now;
+                        }
+                        if (statsPeriod === "LAST_6_MONTHS") {
+                          const boundary = new Date(currentYear, currentMonth - 6, 1);
+                          return tDate >= boundary && tDate <= now;
+                        }
+                        if (statsPeriod === "THIS_YEAR") {
+                          return tDate.getFullYear() === currentYear;
+                        }
+                        return true;
+                      });
+
+                      // 2. Days Elapsed
+                      const periodDays = (() => {
+                        if (statsPeriod === "THIS_MONTH") {
+                          return Math.max(1, now.getDate());
+                        }
+                        if (statsPeriod === "LAST_MONTH") {
+                          return new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+                        }
+                        if (statsPeriod === "LAST_3_MONTHS") {
+                          return 90;
+                        }
+                        if (statsPeriod === "LAST_6_MONTHS") {
+                          return 180;
+                        }
+                        if (statsPeriod === "THIS_YEAR") {
+                          const startOfYear = new Date(now.getFullYear(), 0, 1);
+                          const diffTime = Math.abs(now.getTime() - startOfYear.getTime());
+                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                          return Math.max(1, diffDays);
+                        }
+                        return 30;
+                      })();
+
+                      // 3. Metrics Calculations
+                      const periodIncome = filteredTx.filter(t => t.type === "INCOME").reduce((sum, t) => sum + t.amount_cents, 0) / 100;
+                      const periodExpenses = filteredTx.filter(t => t.type === "EXPENSE").reduce((sum, t) => sum + t.amount_cents, 0) / 100;
+                      const periodNet = periodIncome - periodExpenses;
+                      const periodSavingsRate = periodIncome > 0 ? Math.round((periodNet / periodIncome) * 100) : (periodExpenses > 0 ? -100 : 0);
+                      const periodDailyAvg = periodDays > 0 ? Math.round(periodExpenses / periodDays) : 0;
+
+                      // Monthly projection based on current month
+                      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                      const currentDay = Math.max(1, now.getDate());
+                      const dailyAverageExpense = Math.round((expensesThisMonth / 100) / currentDay);
+                      const projectedMonthlyExpense = dailyAverageExpense * daysInMonth;
+
+                      // Credit limits & usage
+                      const creditAccounts = accounts.filter((a) => a.type === "credit");
+                      const totalCreditLimit = creditAccounts.reduce((sum, a) => sum + (a.credit_limit_cents || 0), 0);
+                      const totalCreditUsed = creditAccounts.reduce((sum, a) => sum + a.balance_cents, 0);
+                      const creditUtilization = totalCreditLimit > 0 ? Math.min(100, Math.round((totalCreditUsed / totalCreditLimit) * 100)) : 0;
+
+                      // 4. Flow Data for selected period
+                      const flowData = (() => {
+                        if (statsPeriod === "THIS_MONTH" || statsPeriod === "LAST_MONTH") {
+                          const targetYear = statsPeriod === "THIS_MONTH" ? currentYear : (currentMonth === 0 ? currentYear - 1 : currentYear);
+                          const targetMonth = statsPeriod === "THIS_MONTH" ? currentMonth : (currentMonth === 0 ? 11 : currentMonth - 1);
+                          const days = new Date(targetYear, targetMonth + 1, 0).getDate();
+                          const prefix = `${targetYear}-${(targetMonth + 1).toString().padStart(2, "0")}`;
+
+                          return Array.from({ length: days }).map((_, i) => {
+                            const dayNum = i + 1;
+                            const dayStr = `${prefix}-${dayNum.toString().padStart(2, "0")}`;
+                            const dayTx = transactions.filter((t) => t.date === dayStr);
+                            const exp = dayTx.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + t.amount_cents / 100, 0);
+                            const inc = dayTx.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + t.amount_cents / 100, 0);
+                            return {
+                              label: `${dayNum}`,
+                              Gastos: exp,
+                              Ingresos: inc,
+                            };
+                          });
+                        } else if (statsPeriod === "LAST_3_MONTHS" || statsPeriod === "LAST_6_MONTHS") {
+                          const count = statsPeriod === "LAST_3_MONTHS" ? 3 : 6;
+                          return Array.from({ length: count }).map((_, i) => {
+                            const d = new Date();
+                            d.setMonth(d.getMonth() - ((count - 1) - i));
+                            const prefix = d.toISOString().substring(0, 7);
+                            const mTx = transactions.filter((t) => t.date.startsWith(prefix));
+                            const inc = mTx.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + t.amount_cents / 100, 0);
+                            const exp = mTx.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + t.amount_cents / 100, 0);
+                            return {
+                              label: d.toLocaleString("es-ES", { month: "short" }),
+                              Gastos: exp,
+                              Ingresos: inc,
+                            };
+                          });
+                        } else {
+                          // THIS_YEAR
+                          return Array.from({ length: 12 }).map((_, i) => {
+                            const prefix = `${currentYear}-${(i + 1).toString().padStart(2, "0")}`;
+                            const mTx = transactions.filter((t) => t.date.startsWith(prefix));
+                            const inc = mTx.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + t.amount_cents / 100, 0);
+                            const exp = mTx.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + t.amount_cents / 100, 0);
+                            return {
+                              label: new Date(currentYear, i, 1).toLocaleString("es-ES", { month: "narrow" }),
+                              Gastos: exp,
+                              Ingresos: inc,
+                            };
+                          });
+                        }
+                      })();
+
+                      // 5. Historical trend (6 months)
+                      const sixMonthsData = Array.from({ length: 6 }).map((_, i) => {
+                        const d = new Date();
+                        d.setMonth(d.getMonth() - (5 - i));
+                        const prefix = d.toISOString().substring(0, 7);
+                        const mTx = transactions.filter((t) => t.date.startsWith(prefix));
+                        const inc = mTx.filter((t) => t.type === "INCOME").reduce((sum, t) => sum + t.amount_cents / 100, 0);
+                        const exp = mTx.filter((t) => t.type === "EXPENSE").reduce((sum, t) => sum + t.amount_cents / 100, 0);
+                        return {
+                          month: d.toLocaleString("es-ES", { month: "short" }),
+                          Ingresos: inc,
+                          Gastos: exp,
+                          Ahorro: inc - exp,
+                        };
+                      });
+
+                      // 6. Category Breakdown
+                      const catExpenseMap: Record<string, { amount: number; emoji: string; id: number }> = {};
+                      filteredTx
+                        .filter((t) => t.type === "EXPENSE")
+                        .forEach((t) => {
+                          const cat = categories.find((c) => c.id === t.category_id);
+                          const catName = cat?.name || "Sin Categoría";
+                          const catEmoji = cat?.emoji || "📦";
+                          const catId = cat?.id || -1;
+                          if (!catExpenseMap[catName]) {
+                            catExpenseMap[catName] = {
+                              amount: 0,
+                              emoji: catEmoji,
+                              id: catId,
+                            };
+                          }
+                          catExpenseMap[catName].amount += t.amount_cents / 100;
+                        });
+
+                      const sortedCategoryBreakdown = Object.entries(catExpenseMap)
+                        .map(([name, data]) => ({ name, ...data }))
+                        .sort((a, b) => b.amount - a.amount);
+
+                      const totalCatExpense = sortedCategoryBreakdown.reduce((sum, c) => sum + c.amount, 0);
+
+                      // 7. Previous month comparison metrics
+                      let prevMonth = currentMonth - 1;
+                      let prevYear = currentYear;
+                      if (prevMonth < 0) {
+                        prevMonth = 11;
+                        prevYear -= 1;
+                      }
+                      const prevMonthName = new Date(prevYear, prevMonth, 1).toLocaleString("es-ES", { month: "long" });
+
+                      const prevMonthTx = transactions.filter(t => {
+                        const tDate = new Date(t.date + "T12:00:00");
+                        if (isNaN(tDate.getTime())) return false;
+                        return tDate.getFullYear() === prevYear && tDate.getMonth() === prevMonth;
+                      });
+
+                      const prevMonthIncome = prevMonthTx.filter(t => t.type === "INCOME").reduce((sum, t) => sum + t.amount_cents, 0) / 100;
+                      const prevMonthExpenses = prevMonthTx.filter(t => t.type === "EXPENSE").reduce((sum, t) => sum + t.amount_cents, 0) / 100;
+                      const prevMonthSavings = prevMonthIncome - prevMonthExpenses;
+                      const prevSavingsRate = prevMonthIncome > 0 ? Math.round((prevMonthSavings / prevMonthIncome) * 100) : 0;
+
+                      const savingsRateDiff = periodSavingsRate - prevSavingsRate;
+                      const gastosDiff = prevMonthExpenses > 0 ? Math.round(((periodExpenses - prevMonthExpenses) / prevMonthExpenses) * 100) : 0;
+                      const ingresosDiff = prevMonthIncome > 0 ? Math.round(((periodIncome - prevMonthIncome) / prevMonthIncome) * 100) : 0;
+                      const ahorroDiff = periodNet - prevMonthSavings;
+
+                      const hasSuffData = flowData.some(d => d.Gastos > 0 || d.Ingresos > 0);
+
+                      // Category transactions inside modal
+                      const categoryTxs = (() => {
+                        if (!selectedCategoryName) return [];
+                        return filteredTx.filter((t) => {
+                          const cat = categories.find((c) => c.id === t.category_id);
+                          return (cat?.name || "Sin Categoría") === selectedCategoryName;
+                        });
+                      })();
+
+                      return (
+                        <div className="space-y-5 pb-10">
+                          {/* Period Selector Box */}
+                          <div className="flex items-center justify-between border-b border-gray-150 dark:border-zinc-800 pb-2.5">
+                            <span className="text-xs text-gray-500 font-medium">Filtro de período:</span>
+                            <div className="relative">
+                              <select
+                                value={statsPeriod}
+                                onChange={(e) => setStatsPeriod(e.target.value as any)}
+                                className="appearance-none bg-gray-100 dark:bg-zinc-850 hover:bg-gray-200/80 dark:hover:bg-zinc-800 text-xs font-bold py-1.5 pl-3 pr-8 rounded-lg border-none cursor-pointer focus:outline-none focus:ring-0 text-gray-900 dark:text-white"
+                              >
+                                <option value="THIS_MONTH">Este mes</option>
+                                <option value="LAST_MONTH">Mes anterior</option>
+                                <option value="LAST_3_MONTHS">Últimos 3 meses</option>
+                                <option value="LAST_6_MONTHS">Últimos 6 meses</option>
+                                <option value="THIS_YEAR">Este año</option>
+                              </select>
+                              <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* 2x2 Grid of Key Metrics */}
+                          <div className="grid grid-cols-2 gap-3.5">
+                            {/* Tasa de Ahorro */}
+                            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-4 rounded-2xl space-y-1 shadow-2xs">
+                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-bold uppercase tracking-wider block">
+                                Tasa de ahorro
+                              </span>
+                              <span className={`text-lg font-black block ${periodSavingsRate >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                                {periodSavingsRate}%
+                              </span>
+                              <span className="text-[10px] text-gray-500 dark:text-zinc-400 block font-semibold leading-tight">
+                                {periodSavingsRate >= 0 ? "Ahorro de " : "Déficit de "}{formatCurrency(Math.abs(periodNet * 100))}
+                              </span>
+                            </div>
+
+                            {/* Promedio Diario */}
+                            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-4 rounded-2xl space-y-1 shadow-2xs">
+                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-bold uppercase tracking-wider block">
+                                Promedio diario
+                              </span>
+                              <span className="text-lg font-black text-gray-900 dark:text-white block">
+                                {formatCurrency(periodDailyAvg * 100)}
+                              </span>
+                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 block leading-tight">
+                                Gasto por día
+                              </span>
+                            </div>
+
+                            {/* Proyección Fin de Mes */}
+                            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-4 rounded-2xl space-y-1 shadow-2xs">
+                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-bold uppercase tracking-wider block">
+                                Proyección mes
+                              </span>
+                              <span className="text-lg font-black text-gray-900 dark:text-white block">
+                                {formatCurrency(projectedMonthlyExpense)}
+                              </span>
+                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 block leading-tight">
+                                Estimación mensual
+                              </span>
+                            </div>
+
+                            {/* Uso de Crédito */}
+                            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-4 rounded-2xl space-y-1 shadow-2xs">
+                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-bold uppercase tracking-wider block">
+                                Uso de crédito
+                              </span>
+                              <span className={`text-lg font-black block ${creditUtilization > 70 ? "text-rose-500" : "text-gray-900 dark:text-white"}`}>
+                                {creditUtilization}%
+                              </span>
+                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 block leading-tight">
+                                Límite {formatCurrency(totalCreditLimit)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Dynamic Charts or Empty State */}
+                          {!hasSuffData ? (
+                            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-6 rounded-2xl text-center space-y-3">
+                              <div className="w-10 h-10 bg-gray-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mx-auto text-gray-400">
+                                <Calendar className="w-5 h-5" />
+                              </div>
+                              <div className="space-y-1">
+                                <h4 className="text-xs font-bold text-gray-900 dark:text-white">
+                                  Todavía no hay suficientes movimientos para analizar
+                                </h4>
+                                <p className="text-[10px] text-gray-400 max-w-[240px] mx-auto">
+                                  No existen registros de ingresos o gastos para el período seleccionado.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setMobileMainTab("transactions")}
+                                className="bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-[10px] font-bold py-1.5 px-3.5 rounded-lg transition-all"
+                              >
+                                Ver movimientos
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-5">
+                              {/* Flujo de dinero Evolution Chart */}
+                              <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-4 rounded-2xl space-y-3">
+                                <div>
+                                  <h3 className="text-xs font-bold text-gray-900 dark:text-white">
+                                    Flujo de Dinero
+                                  </h3>
+                                  <p className="text-[10px] text-gray-400">
+                                    Evolución temporal de ingresos y gastos
+                                  </p>
+                                </div>
+                                <div className="h-[210px] w-full">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={flowData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                                      <defs>
+                                        <linearGradient id="incomeColor" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.15}/>
+                                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                        </linearGradient>
+                                        <linearGradient id="expenseColor" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.15}/>
+                                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                                        </linearGradient>
+                                      </defs>
+                                      <XAxis dataKey="label" stroke="#888888" fontSize={9} tickLine={false} axisLine={false} />
+                                      <YAxis stroke="#888888" fontSize={9} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
+                                      <Tooltip 
+                                        formatter={(value: any) => [`$${Math.round(value)}`, undefined]}
+                                        contentStyle={{ background: '#000', borderRadius: '8px', color: '#fff', fontSize: '11px', border: 'none' }}
+                                      />
+                                      <Area type="monotone" dataKey="Ingresos" stroke="#10b981" fillOpacity={1} fill="url(#incomeColor)" strokeWidth={2} />
+                                      <Area type="monotone" dataKey="Gastos" stroke="#f43f5e" fillOpacity={1} fill="url(#expenseColor)" strokeWidth={2} />
+                                    </AreaChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </div>
+
+                              {/* Gastos por categoría Horizontal Progress Bars */}
+                              <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-4 rounded-2xl space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <h3 className="text-xs font-bold text-gray-900 dark:text-white">
+                                      Distribución por Categorías
+                                    </h3>
+                                    <p className="text-[10px] text-gray-400">
+                                      Principales focos de consumo
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAllCategoriesModal(true)}
+                                    className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 bg-gray-50 dark:bg-zinc-900 px-2.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                  >
+                                    Ver todas
+                                  </button>
+                                </div>
+
+                                {sortedCategoryBreakdown.length === 0 ? (
+                                  <p className="text-[11px] text-gray-400 text-center py-4">
+                                    No hay gastos registrados en este período.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {sortedCategoryBreakdown.slice(0, 3).map((cat, idx) => {
+                                      const pct = totalCatExpense > 0 ? Math.round((cat.amount / totalCatExpense) * 100) : 0;
+                                      return (
+                                        <div key={idx} className="space-y-1">
+                                          <div className="flex justify-between items-center text-[11px]">
+                                            <span className="font-semibold flex items-center gap-1.5 text-gray-900 dark:text-white">
+                                              <span>{cat.emoji}</span>
+                                              <span>{cat.name}</span>
+                                            </span>
+                                            <span className="font-bold text-gray-900 dark:text-white">
+                                              {formatCurrency(Math.round(cat.amount * 100))}
+                                              <span className="text-gray-400 font-normal ml-1">
+                                                ({pct}%)
+                                              </span>
+                                            </span>
+                                          </div>
+                                          <div className="h-2 bg-gray-150 dark:bg-zinc-900 rounded-full overflow-hidden">
+                                            <div
+                                              className="h-full rounded-full bg-zinc-800 dark:bg-zinc-200 transition-all duration-500"
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Tendencia Histórica 6 Meses with interactive Legend toggles */}
+                              <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-4 rounded-2xl space-y-3">
+                                <div>
+                                  <h3 className="text-xs font-bold text-gray-900 dark:text-white">
+                                    Tendencia Histórica (6 Meses)
+                                  </h3>
+                                  <p className="text-[10px] text-gray-400">
+                                    Haz clic para activar/desactivar series
+                                  </p>
+                                </div>
+
+                                <div className="h-[210px] w-full">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={sixMonthsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                                      <XAxis dataKey="month" stroke="#888888" fontSize={9} tickLine={false} axisLine={false} />
+                                      <YAxis stroke="#888888" fontSize={9} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
+                                      <Tooltip 
+                                        formatter={(value: any) => [`$${Math.round(value)}`, undefined]}
+                                        contentStyle={{ background: '#000', borderRadius: '8px', color: '#fff', fontSize: '11px', border: 'none' }}
+                                      />
+                                      {trendSeries.ingresos && (
+                                        <Line type="monotone" dataKey="Ingresos" stroke="#10b981" strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+                                      )}
+                                      {trendSeries.gastos && (
+                                        <Line type="monotone" dataKey="Gastos" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+                                      )}
+                                      {trendSeries.ahorro && (
+                                        <Line type="monotone" dataKey="Ahorro" stroke="#6366f1" strokeWidth={1.5} strokeDasharray="3 3" dot={{ r: 1.5 }} />
+                                      )}
+                                    </LineChart>
+                                  </ResponsiveContainer>
+                                </div>
+
+                                {/* Multi-series interactive Legend */}
+                                <div className="flex gap-2.5 justify-center text-[10px] font-bold pt-1 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => setTrendSeries(prev => ({ ...prev, ingresos: !prev.ingresos }))}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all ${
+                                      trendSeries.ingresos
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800/40"
+                                        : "bg-gray-50 text-gray-400 border-gray-200 dark:bg-zinc-900/40 dark:border-zinc-800"
+                                    }`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    Ingresos
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setTrendSeries(prev => ({ ...prev, gastos: !prev.gastos }))}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all ${
+                                      trendSeries.gastos
+                                        ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-800/40"
+                                        : "bg-gray-50 text-gray-400 border-gray-200 dark:bg-zinc-900/40 dark:border-zinc-800"
+                                    }`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                    Gastos
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setTrendSeries(prev => ({ ...prev, ahorro: !prev.ahorro }))}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all ${
+                                      trendSeries.ahorro
+                                        ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-800/40"
+                                        : "bg-gray-50 text-gray-400 border-gray-200 dark:bg-zinc-900/40 dark:border-zinc-800"
+                                    }`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                    Ahorro
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Previous Period Comparison Summary */}
+                              <div className="bg-white dark:bg-[#0a0a0a] border border-gray-250/85 dark:border-zinc-850 p-4 rounded-2xl space-y-3">
+                                <span className="text-[9px] text-gray-400 dark:text-zinc-500 font-bold uppercase tracking-wider block">
+                                  Comparado con {prevMonthName}
+                                </span>
+                                <div className="grid grid-cols-3 gap-1.5 text-center">
+                                  <div className="space-y-1">
+                                    <span className="text-[10px] text-gray-400 block font-semibold uppercase">Gastos</span>
+                                    <span className={`text-xs font-black flex items-center justify-center gap-0.5 ${gastosDiff > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                      {gastosDiff > 0 ? "↑" : "↓"} {Math.abs(gastosDiff)}%
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1 border-l border-gray-100 dark:border-zinc-850/80">
+                                    <span className="text-[10px] text-gray-400 block font-semibold uppercase">Ingresos</span>
+                                    <span className={`text-xs font-black flex items-center justify-center gap-0.5 ${ingresosDiff >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                                      {ingresosDiff >= 0 ? "↑" : "↓"} {Math.abs(ingresosDiff)}%
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1 border-l border-gray-100 dark:border-zinc-850/80">
+                                    <span className="text-[10px] text-gray-400 block font-semibold uppercase">Ahorro</span>
+                                    <span className={`text-xs font-black flex items-center justify-center gap-0.5 ${ahorroDiff >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                                      {ahorroDiff >= 0 ? "↑" : "↓"} {formatCurrency(Math.abs(ahorroDiff * 100))}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Modal Category Detail */}
+                          {showAllCategoriesModal && (
+                            <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-end justify-center z-50">
+                              <div className="bg-white dark:bg-[#09090b] w-full max-w-md rounded-t-3xl p-5 space-y-4 animate-slide-up max-h-[85vh] overflow-y-auto">
+                                {/* Modal Header */}
+                                <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-2.5">
+                                  <div>
+                                    <h3 className="text-sm font-black text-gray-900 dark:text-white">
+                                      Gastos por Categoría
+                                    </h3>
+                                    <p className="text-[10px] text-gray-500">
+                                      Desglose detallado del período seleccionado
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setShowAllCategoriesModal(false);
+                                      setSelectedCategoryName(null);
+                                    }}
+                                    className="p-1.5 rounded-full bg-gray-50 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400"
+                                  >
+                                    <XIcon className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                {/* Categories list in modal */}
+                                <div className="space-y-3">
+                                  {sortedCategoryBreakdown.map((cat, idx) => {
+                                    const pct = totalCatExpense > 0 ? Math.round((cat.amount / totalCatExpense) * 100) : 0;
+                                    const isSelected = selectedCategoryName === cat.name;
+
+                                    return (
+                                      <div key={cat.name} className="space-y-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedCategoryName(isSelected ? null : cat.name)}
+                                          className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-center justify-between ${
+                                            isSelected
+                                              ? "bg-zinc-50 border-zinc-900 dark:bg-zinc-900 dark:border-white"
+                                              : "bg-white border-gray-100 hover:bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-850"
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-base">{cat.emoji}</span>
+                                            <div>
+                                              <span className="text-xs font-bold text-gray-900 dark:text-white block">
+                                                {idx + 1}. {cat.name}
+                                              </span>
+                                              <span className="text-[9px] text-gray-400">
+                                                {pct}% del total
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="text-right flex items-center gap-1">
+                                            <span className="text-xs font-black text-gray-900 dark:text-white">
+                                              {formatCurrency(Math.round(cat.amount * 100))}
+                                            </span>
+                                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isSelected ? "rotate-180" : ""}`} />
+                                          </div>
+                                        </button>
+
+                                        {/* Expanded transaction logs */}
+                                        {isSelected && (
+                                          <div className="bg-gray-50/50 dark:bg-zinc-900/30 rounded-xl p-3 border border-dashed border-gray-200 dark:border-zinc-800 space-y-2.5 mx-0.5 animate-fade-in">
+                                            <div className="text-[9px] uppercase tracking-wider font-bold text-gray-400">
+                                              Movimientos asociados
+                                            </div>
+                                            {categoryTxs.length > 0 ? (
+                                              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                                {categoryTxs.map((t) => (
+                                                  <div key={t.id} className="flex justify-between items-center text-[11px]">
+                                                    <div>
+                                                      <span className="font-semibold text-gray-800 dark:text-zinc-200 block truncate max-w-[180px]">
+                                                        {t.concept || "Sin concepto"}
+                                                      </span>
+                                                      <span className="text-[9px] text-gray-400">
+                                                        {t.date} · {accounts.find(a => a.id === t.account_id)?.name || "Cuenta"}
+                                                      </span>
+                                                    </div>
+                                                    <span className="font-bold text-rose-600 dark:text-rose-400 shrink-0">
+                                                      -{formatCurrency(t.amount_cents)}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <div className="text-[10px] text-gray-400 text-center py-1">
+                                                No hay transacciones registradas.
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
+
+                    return null;
+                  })()}
+
                   {/* STATS TAB */}
                   {effectiveTab === "stats" &&
                     (() => {
+                      if (isMobile && (window as any).renderMobileStats) {
+                        return (window as any).renderMobileStats();
+                      }
+
                       // Calculate analytics metrics
                       const totalIncome = transactions
                         .filter((t) => t.type === "INCOME")
