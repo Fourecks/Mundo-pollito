@@ -667,6 +667,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
   const [trendSeries, setTrendSeries] = useState({ ingresos: true, gastos: true, ahorro: false });
 
+  // Mobile FASE 7 Sub-routing States
+  const [mobileNavigationSource, setMobileNavigationSource] = useState<"more" | "settings">("more");
+  const [selectedHistoricalMonth, setSelectedHistoricalMonth] = useState<string | null>(null);
+  const [activeCategoryTab, setActiveCategoryTab] = useState<"EXPENSE" | "INCOME">("EXPENSE");
+  const [showHistoricalTxList, setShowHistoricalTxList] = useState(false);
+  const [showHistoricalOptionsSheet, setShowHistoricalOptionsSheet] = useState(false);
+  const [selectedMobileAccount, setSelectedMobileAccount] = useState<FinanceAccount | null>(null);
+  const [showAccountOptionsSheet, setShowAccountOptionsSheet] = useState(false);
+  const [showAccountTxList, setShowAccountTxList] = useState(false);
+  const [selectedMobileCategory, setSelectedMobileCategory] = useState<FinanceCategory | null>(null);
+  const [mobileCategoryEditName, setMobileCategoryEditName] = useState("");
+  const [mobileCategoryEditEmoji, setMobileCategoryEditEmoji] = useState("");
+  const [mobileCategoryEditBudget, setMobileCategoryEditBudget] = useState("");
+  const [showConfirmCloseMonth, setShowConfirmCloseMonth] = useState(false);
+  const [monthIsClosedStatus, setMonthIsClosedStatus] = useState<Record<string, boolean>>({});
+
   // --- Data State ---
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
@@ -5615,7 +5631,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   )}
 
                   {/* Mobile Hierarchical Back Header: Más */}
-                  {isMobile && mobileMainTab === "more" && mobileMoreSubView && (
+                  {isMobile && mobileMainTab === "more" && mobileMoreSubView && !["accounts", "categories", "security", "settings", "closing"].includes(mobileMoreSubView) && (
                     <div className="mb-4">
                       <button
                         type="button"
@@ -5802,7 +5818,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             <button
                               key={item.id}
                               type="button"
-                              onClick={() => setMobileMoreSubView(item.id as any)}
+                              onClick={() => {
+                                setMobileNavigationSource("more");
+                                setMobileMoreSubView(item.id as any);
+                              }}
                               className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left"
                             >
                               <div className="flex items-center gap-3">
@@ -5834,7 +5853,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             <button
                               key={item.id}
                               type="button"
-                              onClick={() => setMobileMoreSubView(item.id as any)}
+                              onClick={() => {
+                                setMobileNavigationSource("more");
+                                setMobileMoreSubView(item.id as any);
+                              }}
                               className="w-full flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] hover:bg-gray-50 dark:hover:bg-zinc-900/60 border border-gray-200/90 dark:border-zinc-800 rounded-2xl transition-all text-left"
                             >
                               <div className="flex items-center gap-3">
@@ -9926,620 +9948,1411 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                   {/* CLOSING TAB */}
                   {effectiveTab === "closing" && (
-                    <div className="space-y-6 max-w-4xl mx-auto">
-                      <div className="flex justify-between items-center border-b border-gray-200 dark:border-zinc-800 pb-3">
-                        <div>
-                          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                            Cierre de Mes y Reportes
-                          </h2>
-                          <p className="text-xs text-gray-500">
-                            Resumen mensual de flujos y exportación de datos
-                          </p>
-                        </div>
-                      </div>
+                    isMobile ? (
+                      <div className="space-y-6">
+                        {selectedHistoricalMonth ? (
+                          // 7.1 DETALLE DE MES
+                          (() => {
+                            const monthKey = selectedHistoricalMonth;
+                            const [yr, mn] = monthKey.split("-");
+                            const monthsList = [
+                              "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                              "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                            ];
+                            const monthName = `${monthsList[parseInt(mn) - 1]} ${yr}`;
+                            
+                            const monthTx = transactions.filter(t => t.date.startsWith(monthKey));
+                            const inc = monthTx.filter(t => t.type === "INCOME").reduce((acc, t) => acc + t.amount_cents, 0);
+                            const exp = monthTx.filter(t => t.type === "EXPENSE").reduce((acc, t) => acc + t.amount_cents, 0);
+                            const net = inc - exp;
+                            
+                            const expTx = monthTx.filter(t => t.type === "EXPENSE");
+                            const totalExp = expTx.reduce((acc, t) => acc + t.amount_cents, 0);
+                            const catMap = new Map<string, number>();
+                            expTx.forEach(t => {
+                              catMap.set(t.category_id, (catMap.get(t.category_id) || 0) + t.amount_cents);
+                            });
+                            const catList = Array.from(catMap.entries()).map(([catId, amount]) => {
+                              const cat = categories.find(c => c.id === catId);
+                              return {
+                                id: catId,
+                                name: cat?.name || "Otros",
+                                emoji: cat?.emoji || "🛒",
+                                amount,
+                                percent: totalExp > 0 ? Math.round((amount / totalExp) * 100) : 0,
+                              };
+                            }).sort((a, b) => b.amount - a.amount);
 
-                      {/* Current Month Box */}
-                      <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 p-5 rounded-xl space-y-4 shadow-2xs">
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-zinc-800/80 pb-3">
-                          <div>
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">
-                              Mes Actual en Curso
-                            </span>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
-                              {new Date()
-                                .toLocaleString("es-ES", {
-                                  month: "long",
-                                  year: "numeric",
-                                })
-                                .replace(/^\w/, (c) => c.toUpperCase())}
-                            </h3>
-                          </div>
-                          <button
-                            onClick={exportToCSV}
-                            className="bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            Exportar CSV
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-lg border border-gray-200/70 dark:border-zinc-800/80">
-                            <p className="text-[11px] text-gray-400 font-medium mb-0.5">
-                              Ingresos
-                            </p>
-                            <p className="text-base font-bold text-gray-900 dark:text-white">
-                              {formatCurrency(incomeThisMonth)}
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-lg border border-gray-200/70 dark:border-zinc-800/80">
-                            <p className="text-[11px] text-gray-400 font-medium mb-0.5">
-                              Gastos
-                            </p>
-                            <p className="text-base font-bold text-gray-900 dark:text-white">
-                              {formatCurrency(expensesThisMonth)}
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-lg border border-gray-200/70 dark:border-zinc-800/80">
-                            <p className="text-[11px] text-gray-400 font-medium mb-0.5">
-                              Flujo Neto
-                            </p>
-                            <p className="text-base font-bold text-gray-900 dark:text-white">
-                              {incomeThisMonth - expensesThisMonth >= 0
-                                ? "+"
-                                : ""}
-                              {formatCurrency(
-                                incomeThisMonth - expensesThisMonth,
-                              )}
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-lg border border-gray-200/70 dark:border-zinc-800/80">
-                            <p className="text-[11px] text-gray-400 font-medium mb-0.5">
-                              Movimientos
-                            </p>
-                            <p className="text-base font-bold text-gray-900 dark:text-white">
-                              {
-                                transactions.filter((t) =>
-                                  t.date.startsWith(
-                                    new Date().toISOString().substring(0, 7),
-                                  ),
-                                ).length
-                              }
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Previous Months List */}
-                      <div className="space-y-3">
-                        <h3 className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
-                          Historial de Meses Anteriores
-                        </h3>
-
-                        {(() => {
-                          const monthsMap = new Map<
-                            string,
-                            {
-                              monthKey: string;
-                              monthName: string;
-                              income: number;
-                              expenses: number;
-                              txs: FinanceTransaction[];
-                            }
-                          >();
-
-                          transactions.forEach((tx) => {
-                            const prefix = tx.date.substring(0, 7);
-                            if (!monthsMap.has(prefix)) {
-                              const [y, m] = prefix.split("-");
-                              const dateObj = new Date(
-                                parseInt(y),
-                                parseInt(m) - 1,
-                                1,
-                              );
-                              const mName = dateObj.toLocaleString("es-ES", {
-                                month: "long",
-                                year: "numeric",
-                              });
-                              monthsMap.set(prefix, {
-                                monthKey: prefix,
-                                monthName: mName.replace(/^\w/, (c) =>
-                                  c.toUpperCase(),
-                                ),
-                                income: 0,
-                                expenses: 0,
-                                txs: [],
-                              });
-                            }
-                            const data = monthsMap.get(prefix)!;
-                            data.txs.push(tx);
-                            if (tx.type === "INCOME")
-                              data.income += tx.amount_cents;
-                            if (tx.type === "EXPENSE")
-                              data.expenses += tx.amount_cents;
-                          });
-
-                          const historical = Array.from(
-                            monthsMap.values(),
-                          ).sort((a, b) =>
-                            b.monthKey.localeCompare(a.monthKey),
-                          );
-
-                          if (historical.length === 0) {
                             return (
-                              <p className="text-xs text-gray-400 bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 p-4 rounded-xl text-center">
-                                No hay registros de meses anteriores.
-                              </p>
+                              <div className="space-y-6 animate-fade-in">
+                                {/* Header */}
+                                <div className="flex items-center justify-between">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedHistoricalMonth(null)}
+                                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850"
+                                  >
+                                    <ChevronLeft className="w-4 h-4" />
+                                    <span>Cierre y reportes</span>
+                                  </button>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowHistoricalOptionsSheet(true)}
+                                    className="p-2 text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850 transition-colors"
+                                  >
+                                    <MoreHorizontal className="w-5 h-5" />
+                                  </button>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                    {monthName}
+                                  </h2>
+                                  <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                    Reporte detallado del mes
+                                  </p>
+                                </div>
+
+                                {/* Metrics Summary */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl">
+                                    <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 font-bold">
+                                      Ingresos
+                                    </span>
+                                    <div className="text-lg font-bold text-emerald-600 dark:text-emerald-500 mt-0.5">
+                                      {formatCurrency(inc)}
+                                    </div>
+                                  </div>
+
+                                  <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl">
+                                    <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 font-bold">
+                                      Gastos
+                                    </span>
+                                    <div className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
+                                      {formatCurrency(exp)}
+                                    </div>
+                                  </div>
+
+                                  <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl">
+                                    <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 font-bold">
+                                      Flujo Neto
+                                    </span>
+                                    <div className={`text-lg font-bold mt-0.5 ${net >= 0 ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
+                                      {net >= 0 ? "+" : ""}
+                                      {formatCurrency(net)}
+                                    </div>
+                                  </div>
+
+                                  <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl">
+                                    <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 font-bold">
+                                      Movimientos
+                                    </span>
+                                    <div className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
+                                      {monthTx.length}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Gastos por categoría */}
+                                <div className="space-y-3">
+                                  <h3 className="text-xs font-bold tracking-wider text-gray-400 dark:text-zinc-500 uppercase px-1">
+                                    Gastos por categoría
+                                  </h3>
+                                  
+                                  {catList.length === 0 ? (
+                                    <div className="p-6 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl text-center text-xs text-gray-400">
+                                      Sin gastos registrados en este período.
+                                    </div>
+                                  ) : (
+                                    <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl space-y-4">
+                                      {catList.map(item => (
+                                        <div key={item.id} className="space-y-1.5">
+                                          <div className="flex justify-between items-center text-xs">
+                                            <span className="font-semibold text-gray-800 dark:text-zinc-200 flex items-center gap-1.5">
+                                              <span>{item.emoji}</span>
+                                              <span>{item.name}</span>
+                                            </span>
+                                            <div className="text-right">
+                                              <span className="font-bold text-gray-900 dark:text-white">
+                                                {formatCurrency(item.amount)}
+                                              </span>
+                                              <span className="text-gray-400 dark:text-zinc-500 ml-1.5 text-[10px]">
+                                                {item.percent}%
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="w-full h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                            <div
+                                              className="h-full bg-gray-800 dark:bg-zinc-200 rounded-full transition-all duration-500"
+                                              style={{ width: `${item.percent}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Ver movimientos button */}
+                                <div className="pt-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowHistoricalTxList(true)}
+                                    className="w-full py-3.5 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800/80 border border-gray-200 dark:border-zinc-800 rounded-2xl text-sm font-semibold text-gray-900 dark:text-white transition-all flex items-center justify-center gap-2"
+                                  >
+                                    <ListOrdered className="w-4 h-4" />
+                                    <span>Ver movimientos del mes</span>
+                                  </button>
+                                </div>
+
+                                {/* Historical Drawer/Sheet for Transactions */}
+                                <AnimatePresence>
+                                  {showHistoricalTxList && (
+                                    <>
+                                      <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        onClick={() => setShowHistoricalTxList(false)}
+                                        className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+                                      />
+                                      <motion.div
+                                        initial={{ y: "100%" }}
+                                        animate={{ y: 0 }}
+                                        exit={{ y: "100%" }}
+                                        transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                                        className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-200 dark:border-zinc-800 rounded-t-[28px] max-h-[80vh] z-50 flex flex-col overflow-hidden pb-safe animate-fade-in"
+                                      >
+                                        <div className="w-12 h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
+                                        
+                                        <div className="px-5 pb-3 border-b border-gray-100 dark:border-zinc-900 flex justify-between items-center shrink-0">
+                                          <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                                            Movimientos: {monthName}
+                                          </h3>
+                                          <button
+                                            type="button"
+                                            onClick={() => setShowHistoricalTxList(false)}
+                                            className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white"
+                                          >
+                                            Cerrar
+                                          </button>
+                                        </div>
+
+                                        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                                          {monthTx.length === 0 ? (
+                                            <p className="text-center text-xs text-gray-400 my-8">
+                                              No hay movimientos en este mes.
+                                            </p>
+                                          ) : (
+                                            monthTx.map(tx => {
+                                              const cat = categories.find(c => c.id === tx.category_id);
+                                              return (
+                                                <div key={tx.id} className="flex items-center justify-between p-3.5 bg-gray-50/50 dark:bg-zinc-900/40 rounded-xl border border-gray-100/60 dark:border-zinc-800/40">
+                                                  <div className="flex items-center gap-3">
+                                                    <span className="text-lg">{cat?.emoji || "🏷️"}</span>
+                                                    <div>
+                                                      <span className="text-xs font-semibold text-gray-900 dark:text-white block">
+                                                        {tx.description || cat?.name || "Sin descripción"}
+                                                      </span>
+                                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500 block">
+                                                        {tx.date}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                  <span className={`text-xs font-bold ${tx.type === "INCOME" ? "text-emerald-600 dark:text-emerald-500" : "text-gray-900 dark:text-white"}`}>
+                                                    {tx.type === "INCOME" ? "+" : "-"}
+                                                    {formatCurrency(tx.amount_cents)}
+                                                  </span>
+                                                </div>
+                                              );
+                                            })
+                                          )}
+                                        </div>
+                                      </motion.div>
+                                    </>
+                                  )}
+                                </AnimatePresence>
+
+                                {/* Historical Options Drawer/Sheet (•••) */}
+                                <AnimatePresence>
+                                  {showHistoricalOptionsSheet && (
+                                    <>
+                                      <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        onClick={() => setShowHistoricalOptionsSheet(false)}
+                                        className="fixed inset-0 bg-black/45 z-50 transition-opacity"
+                                      />
+                                      <motion.div
+                                        initial={{ y: "100%" }}
+                                        animate={{ y: 0 }}
+                                        exit={{ y: "100%" }}
+                                        transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                                        className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0d0d0d] border-t border-gray-200 dark:border-zinc-800 rounded-t-[28px] z-50 overflow-hidden pb-6"
+                                      >
+                                        <div className="w-12 h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
+                                        
+                                        <div className="p-4 border-b border-gray-100 dark:border-zinc-900 text-center">
+                                          <h4 className="text-xs font-bold tracking-wider text-gray-400 dark:text-zinc-500 uppercase">
+                                            Opciones de reporte
+                                          </h4>
+                                        </div>
+
+                                        <div className="p-4 space-y-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowHistoricalOptionsSheet(false);
+                                              const rows = monthTx.map((tx) => {
+                                                const catName = categories.find((c) => c.id === tx.category_id)?.name || "";
+                                                const accName = accounts.find((a) => a.id === tx.account_id)?.name || "";
+                                                const amount = (tx.amount_cents / 100).toFixed(2);
+                                                return [tx.date, tx.type, amount, tx.description || "", catName, accName];
+                                              });
+                                              const csvContent = [
+                                                ["Fecha", "Tipo", "Monto", "Descripción", "Categoría", "Cuenta"].join(","),
+                                                ...rows.map((e) => e.map((field) => `"${field}"`).join(",")),
+                                              ].join("\n");
+                                              const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                                              const link = document.createElement("a");
+                                              link.setAttribute("href", URL.createObjectURL(blob));
+                                              link.setAttribute("download", `finanzas_cierre_${monthKey}.csv`);
+                                              link.style.visibility = "hidden";
+                                              document.body.appendChild(link);
+                                              link.click();
+                                              document.body.removeChild(link);
+                                            }}
+                                            className="w-full py-4 px-5 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 text-left rounded-xl transition-colors flex items-center gap-3"
+                                          >
+                                            <Download className="w-4 h-4 text-gray-500" />
+                                            <span>Exportar CSV</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowHistoricalOptionsSheet(false);
+                                              handlePromptDeleteMonth(monthKey, monthName, monthTx.length);
+                                            }}
+                                            className="w-full py-4 px-5 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-left rounded-xl transition-colors flex items-center gap-3"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span>Eliminar cierre</span>
+                                          </button>
+                                          
+                                          <button
+                                            type="button"
+                                            onClick={() => setShowHistoricalOptionsSheet(false)}
+                                            className="w-full py-3.5 text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 rounded-xl transition-colors shrink-0"
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </div>
+                                      </motion.div>
+                                    </>
+                                  )}
+                                </AnimatePresence>
+                              </div>
                             );
-                          }
+                          })()
+                        ) : (
+                          // 7.1 MAIN SCREEN OF CLOSING (Mes actual + Historial)
+                          <div className="space-y-6">
+                            <div className="space-y-1">
+                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Cierre y Reportes
+                              </h2>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                Gestiona tu cierre mensual y consulta historiales de flujo.
+                              </p>
+                            </div>
 
-                          return (
-                            <div className="space-y-2">
-                              {historical.map((item) => {
-                                const net = item.income - item.expenses;
+                            {/* MES ACTUAL */}
+                            <div className="space-y-3">
+                              <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 font-bold px-1">
+                                MES ACTUAL
+                              </span>
+                              
+                              <div className="p-5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl space-y-4">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                                      {(() => {
+                                        const monthsList = [
+                                          "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                          "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                                        ];
+                                        const [yr, mn] = currentMonthPrefix.split("-");
+                                        return `${monthsList[parseInt(mn) - 1]} ${yr}`;
+                                      })()}
+                                    </h3>
+                                    <span className="text-[10px] font-semibold py-0.5 px-2 bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 rounded-full mt-1 inline-block">
+                                      {monthIsClosedStatus[currentMonthPrefix] ? "Mes cerrado" : "En curso"}
+                                    </span>
+                                  </div>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={exportToCSV}
+                                    className="p-2 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-gray-200/60 dark:border-zinc-800 rounded-xl text-gray-700 dark:text-zinc-300 transition-colors"
+                                    title="Exportar CSV"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </button>
+                                </div>
 
-                                const exportMonthCSV = () => {
-                                  const headers = [
-                                    "ID",
-                                    "Fecha",
-                                    "Tipo",
-                                    "Monto ($)",
-                                    "Categoría",
-                                    "Cuenta",
-                                    "Descripción",
-                                  ];
-                                  const rows = item.txs.map((t) => [
-                                    t.id,
-                                    t.date,
-                                    t.type,
-                                    (t.amount_cents / 100).toFixed(2),
-                                    categories.find(
-                                      (c) => c.id === t.category_id,
-                                    )?.name || "Sin categoría",
-                                    accounts.find((a) => a.id === t.account_id)
-                                      ?.name || "Sin cuenta",
-                                    `"${t.description || ""}"`,
-                                  ]);
-                                  const csvContent =
-                                    "data:text/csv;charset=utf-8," +
-                                    [
-                                      headers.join(","),
-                                      ...rows.map((e) => e.join(",")),
-                                    ].join("\n");
-                                  const encodedUri = encodeURI(csvContent);
-                                  const link = document.createElement("a");
-                                  link.setAttribute("href", encodedUri);
-                                  link.setAttribute(
-                                    "download",
-                                    `cierre_finanzas_${item.monthKey}.csv`,
+                                <div className="grid grid-cols-2 gap-4 border-t border-gray-100 dark:border-zinc-900 pt-4">
+                                  <div>
+                                    <span className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase block font-bold">
+                                      Ingresos
+                                    </span>
+                                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-500">
+                                      {formatCurrency(incomeThisMonth)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase block font-bold">
+                                      Gastos
+                                    </span>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                      {formatCurrency(expensesThisMonth)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase block font-bold">
+                                      Flujo Neto
+                                    </span>
+                                    <span className={`text-sm font-bold ${(incomeThisMonth - expensesThisMonth) >= 0 ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
+                                      {(incomeThisMonth - expensesThisMonth) >= 0 ? "+" : ""}
+                                      {formatCurrency(incomeThisMonth - expensesThisMonth)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase block font-bold">
+                                      Movimientos
+                                    </span>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                      {thisMonthTransactions.length}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-gray-100 dark:border-zinc-900">
+                                  {monthIsClosedStatus[currentMonthPrefix] ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setMonthIsClosedStatus(prev => ({ ...prev, [currentMonthPrefix]: false }))}
+                                      className="w-full py-3 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all"
+                                    >
+                                      Reabrir mes para movimientos
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowConfirmCloseMonth(true)}
+                                      className="w-full py-3 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 rounded-xl text-xs font-bold transition-all text-center"
+                                    >
+                                      Cerrar {(() => {
+                                        const monthsList = [
+                                          "enero", "febrero", "marzo", "abril", "mayo", "junio",
+                                          "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+                                        ];
+                                        const [, mn] = currentMonthPrefix.split("-");
+                                        return monthsList[parseInt(mn) - 1];
+                                      })()}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* HISTORIAL */}
+                            <div className="space-y-3">
+                              <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 font-bold px-1">
+                                HISTORIAL DE MESES
+                              </span>
+
+                              {(() => {
+                                const monthlyGroups: { [key: string]: FinanceTransaction[] } = {};
+                                transactions.forEach((tx) => {
+                                  const prefix = tx.date.substring(0, 7);
+                                  if (prefix !== currentMonthPrefix) {
+                                    if (!monthlyGroups[prefix]) monthlyGroups[prefix] = [];
+                                    monthlyGroups[prefix].push(tx);
+                                  }
+                                });
+
+                                const historicalList = Object.keys(monthlyGroups)
+                                  .sort()
+                                  .reverse()
+                                  .map((prefix) => {
+                                    const txs = monthlyGroups[prefix];
+                                    const inc = txs.filter((t) => t.type === "INCOME").reduce((acc, t) => acc + t.amount_cents, 0);
+                                    const exp = txs.filter((t) => t.type === "EXPENSE").reduce((acc, t) => acc + t.amount_cents, 0);
+                                    
+                                    const [yr, mn] = prefix.split("-");
+                                    const monthsList = [
+                                      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                                    ];
+                                    const monthName = `${monthsList[parseInt(mn) - 1]} ${yr}`;
+
+                                    return {
+                                      monthKey: prefix,
+                                      monthName,
+                                      txs,
+                                      income: inc,
+                                      expenses: exp,
+                                    };
+                                  });
+
+                                if (historicalList.length === 0) {
+                                  return (
+                                    <div className="p-8 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl text-center text-xs text-gray-400 dark:text-zinc-500">
+                                      No hay meses cerrados ni datos históricos anteriores.
+                                    </div>
                                   );
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                };
+                                }
 
                                 return (
-                                  <div
-                                    key={item.monthKey}
-                                    className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                                  <div className="divide-y divide-gray-100 dark:divide-zinc-900 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                                    {historicalList.map((item) => {
+                                      const net = item.income - item.expenses;
+                                      return (
+                                        <button
+                                          key={item.monthKey}
+                                          type="button"
+                                          onClick={() => setSelectedHistoricalMonth(item.monthKey)}
+                                          className="w-full flex items-center justify-between p-4 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40 text-left transition-all"
+                                        >
+                                          <div>
+                                            <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                              {item.monthName}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400 dark:text-zinc-500">
+                                              Ingresos {formatCurrency(item.income)} · Gastos {formatCurrency(item.expenses)}
+                                            </span>
+                                          </div>
+                                          
+                                          <div className="flex items-center gap-1.5">
+                                            <span className={`text-xs font-semibold ${net >= 0 ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
+                                              {net >= 0 ? "+" : ""}
+                                              {formatCurrency(net)}
+                                            </span>
+                                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Cerrar Mes Confirmation Dialog */}
+                            <AnimatePresence>
+                              {showConfirmCloseMonth && (
+                                <>
+                                  <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => setShowConfirmCloseMonth(false)}
+                                    className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+                                  />
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                                    transition={{ duration: 0.2, ease: "easeOut" }}
+                                    className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-6 rounded-2xl shadow-xl z-50 text-center space-y-4"
                                   >
-                                    <div>
-                                      <h4 className="font-semibold text-xs text-gray-900 dark:text-white">
-                                        {item.monthName}
-                                      </h4>
-                                      <p className="text-[11px] text-gray-400">
-                                        {item.txs.length} movimientos
+                                    <div className="space-y-1">
+                                      <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                                        Cerrar {(() => {
+                                          const monthsList = [
+                                            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                                          ];
+                                          const [, mn] = currentMonthPrefix.split("-");
+                                          return monthsList[parseInt(mn) - 1];
+                                        })()} {currentMonthPrefix.split("-")[0]}
+                                      </h3>
+                                      <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                        Se guardará un resumen del mes para consultas y reportes. Los movimientos originales no se eliminarán.
                                       </p>
                                     </div>
 
-                                    <div className="flex items-center gap-4 text-right">
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowConfirmCloseMonth(false)}
+                                        className="flex-1 py-3 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all"
+                                      >
+                                        Cancelar
+                                      </button>
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMonthIsClosedStatus(prev => ({ ...prev, [currentMonthPrefix]: true }));
+                                          setShowConfirmCloseMonth(false);
+                                        }}
+                                        className="flex-1 py-3 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 rounded-xl text-xs font-bold transition-all"
+                                      >
+                                        Cerrar mes
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      // Original Desktop View of CLOSING tab (perfectly kept for desktop as requested!)
+                      <div className="space-y-6 max-w-4xl mx-auto">
+                        <div className="flex justify-between items-center border-b border-gray-200 dark:border-zinc-800 pb-3">
+                          <div>
+                            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                              Cierre de Mes y Reportes
+                            </h2>
+                            <p className="text-xs text-gray-500">
+                              Resumen mensual de flujos y exportación de datos
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Current Month Box */}
+                        <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 p-5 rounded-xl space-y-4 shadow-2xs">
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-zinc-800/80 pb-3">
+                            <div>
+                              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">
+                                Mes Actual en Curso
+                              </span>
+                              <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
+                                {new Date()
+                                  .toLocaleString("es-ES", {
+                                    month: "long",
+                                    year: "numeric",
+                                  })
+                                  .replace(/^\w/, (c) => c.toUpperCase())}
+                              </h3>
+                            </div>
+                            <button
+                              onClick={exportToCSV}
+                              className="bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Exportar CSV
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-lg border border-gray-200/70 dark:border-zinc-800/80">
+                              <p className="text-[11px] text-gray-400 font-medium mb-0.5">
+                                Ingresos
+                              </p>
+                              <p className="text-base font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(incomeThisMonth)}
+                              </p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-lg border border-gray-200/70 dark:border-zinc-800/80">
+                              <p className="text-[11px] text-gray-400 font-medium mb-0.5">
+                                Gastos
+                              </p>
+                              <p className="text-base font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(expensesThisMonth)}
+                              </p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-lg border border-gray-200/70 dark:border-zinc-800/80">
+                              <p className="text-[11px] text-gray-400 font-medium mb-0.5">
+                                Flujo Neto
+                              </p>
+                              <p className="text-base font-bold text-gray-900 dark:text-white">
+                                {incomeThisMonth - expensesThisMonth >= 0
+                                  ? "+"
+                                  : ""}
+                                {formatCurrency(
+                                  incomeThisMonth - expensesThisMonth,
+                                )}
+                              </p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-[#121212] p-3 rounded-lg border border-gray-200/70 dark:border-zinc-800/80">
+                              <p className="text-[11px] text-gray-400 font-medium mb-0.5">
+                                Movimientos
+                              </p>
+                              <p className="text-base font-bold text-gray-900 dark:text-white">
+                                {
+                                  transactions.filter((t) =>
+                                    t.date.startsWith(
+                                      new Date().toISOString().substring(0, 7),
+                                    ),
+                                  ).length
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* HISTORIAL */}
+                        <div className="space-y-4">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-zinc-500">
+                            Historial de Meses Cerrados
+                          </h3>
+
+                          {(() => {
+                            const monthsMap = new Map<
+                              string,
+                              {
+                                monthKey: string;
+                                monthName: string;
+                                income: number;
+                                expenses: number;
+                                txs: FinanceTransaction[];
+                              }
+                            >();
+
+                            transactions.forEach((tx) => {
+                              const prefix = tx.date.substring(0, 7);
+                              if (!monthsMap.has(prefix)) {
+                                const [y, m] = prefix.split("-");
+                                const dateObj = new Date(
+                                  parseInt(y),
+                                  parseInt(m) - 1,
+                                  1,
+                                );
+                                const mName = dateObj.toLocaleString("es-ES", {
+                                  month: "long",
+                                  year: "numeric",
+                                });
+                                monthsMap.set(prefix, {
+                                  monthKey: prefix,
+                                  monthName: mName.replace(/^\w/, (c) =>
+                                    c.toUpperCase(),
+                                  ),
+                                  income: 0,
+                                  expenses: 0,
+                                  txs: [],
+                                });
+                              }
+                              const data = monthsMap.get(prefix)!;
+                              data.txs.push(tx);
+                              if (tx.type === "INCOME")
+                                data.income += tx.amount_cents;
+                              if (tx.type === "EXPENSE")
+                                data.expenses += tx.amount_cents;
+                            });
+
+                            const historical = Array.from(
+                              monthsMap.values(),
+                            ).sort((a, b) =>
+                              b.monthKey.localeCompare(a.monthKey),
+                            );
+
+                            if (historical.length === 0) {
+                              return (
+                                <p className="text-xs text-gray-500 py-4 text-center border border-dashed border-gray-200 dark:border-zinc-800 rounded-lg">
+                                  No hay meses anteriores guardados en el historial
+                                </p>
+                              );
+                            }
+
+                            return (
+                              <div className="space-y-2">
+                                {historical.map((item) => {
+                                  const net = item.income - item.expenses;
+
+                                  const exportMonthCSV = () => {
+                                    const headers = [
+                                      "ID",
+                                      "Fecha",
+                                      "Tipo",
+                                      "Monto ($)",
+                                      "Categoría",
+                                      "Cuenta",
+                                      "Descripción",
+                                    ];
+                                    const rows = item.txs.map((t) => [
+                                      t.id,
+                                      t.date,
+                                      t.type,
+                                      (t.amount_cents / 100).toFixed(2),
+                                      categories.find(
+                                        (c) => c.id === t.category_id,
+                                      )?.name || "Sin categoría",
+                                      accounts.find((a) => a.id === t.account_id)
+                                        ?.name || "Sin cuenta",
+                                      `"${t.description || ""}"`,
+                                    ]);
+                                    const csvContent =
+                                      "data:text/csv;charset=utf-8," +
+                                      [
+                                        headers.join(","),
+                                        ...rows.map((e) => e.join(",")),
+                                      ].join("\n");
+                                    const encodedUri = encodeURI(csvContent);
+                                    const link = document.createElement("a");
+                                    link.setAttribute("href", encodedUri);
+                                    link.setAttribute(
+                                      "download",
+                                      `cierre_finanzas_${item.monthKey}.csv`,
+                                    );
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  };
+
+                                  return (
+                                    <div
+                                      key={item.monthKey}
+                                      className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs"
+                                    >
                                       <div>
-                                        <span className="text-[10px] text-gray-400 block uppercase">
-                                          Ingresos
-                                        </span>
-                                        <span className="font-semibold text-gray-900 dark:text-white">
-                                          {formatCurrency(item.income)}
-                                        </span>
+                                        <h4 className="font-semibold text-xs text-gray-900 dark:text-white">
+                                          {item.monthName}
+                                        </h4>
+                                        <p className="text-[11px] text-gray-400">
+                                          {item.txs.length} movimientos
+                                        </p>
                                       </div>
-                                      <div>
-                                        <span className="text-[10px] text-gray-400 block uppercase">
-                                          Gastos
-                                        </span>
-                                        <span className="font-semibold text-gray-900 dark:text-white">
-                                          {formatCurrency(item.expenses)}
-                                        </span>
-                                      </div>
-                                      <div>
-                                        <span className="text-[10px] text-gray-400 block uppercase">
-                                          Neto
-                                        </span>
-                                        <span className="font-semibold text-gray-900 dark:text-white">
-                                          {net >= 0 ? "+" : ""}
-                                          {formatCurrency(net)}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-1 ml-1">
-                                        <button
-                                          onClick={exportMonthCSV}
-                                          className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-gray-200 dark:border-zinc-800"
-                                          title="Exportar CSV"
-                                        >
-                                          <Download className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={() =>
-                                            handlePromptDeleteMonth(
-                                              item.monthKey,
-                                              item.monthName,
-                                              item.txs.length,
-                                            )
-                                          }
-                                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors border border-gray-200 dark:border-zinc-800"
-                                          title="Eliminar datos de este mes"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+
+                                      <div className="flex items-center gap-4 text-right">
+                                        <div>
+                                          <span className="text-[10px] text-gray-400 block uppercase">
+                                            Ingresos
+                                          </span>
+                                          <span className="font-semibold text-gray-900 dark:text-white">
+                                            {formatCurrency(item.income)}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <span className="text-[10px] text-gray-400 block uppercase">
+                                            Gastos
+                                          </span>
+                                          <span className="font-semibold text-gray-900 dark:text-white">
+                                            {formatCurrency(item.expenses)}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <span className="text-[10px] text-gray-400 block uppercase">
+                                            Neto
+                                          </span>
+                                          <span className={`font-semibold ${net >= 0 ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
+                                            {net >= 0 ? "+" : ""}
+                                            {formatCurrency(net)}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1 ml-1">
+                                          <button
+                                            onClick={exportMonthCSV}
+                                            className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors border border-gray-200 dark:border-zinc-800"
+                                            title="Exportar CSV"
+                                          >
+                                            <Download className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handlePromptDeleteMonth(
+                                                item.monthKey,
+                                                item.monthName,
+                                                item.txs.length,
+                                              )
+                                            }
+                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors border border-gray-200 dark:border-zinc-800"
+                                            title="Eliminar datos de este mes"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })()}
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
-                    </div>
+                    )
                   )}
 
                   {/* SETTINGS TAB */}
                   {effectiveTab === "settings" && (
-                    <div className="space-y-8 max-w-4xl mx-auto">
-                      {(!isMobile || mobileMoreSubView === "settings") && (
-                        <div className="border-b border-gray-200 dark:border-zinc-800 pb-4">
-                          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                            Configuración del Sistema
-                          </h2>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Gestiona tus cuentas financieras, categorías de
-                            presupuesto y opciones de seguridad
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="space-y-8">
-                        {/* SECTION 1: ACCOUNTS */}
-                        {(!isMobile || mobileMoreSubView === "accounts" || mobileMoreSubView === "settings") && (
-                        <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-zinc-800 pb-3">
-                            <div>
-                              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                Cuentas y Tarjetas de Crédito
-                              </h3>
-                              <p className="text-xs text-gray-500">
-                                Cuentas registradas para tus movimientos y
-                                saldos
+                    isMobile ? (
+                      <div className="space-y-6">
+                        {/* 1. MAIN SETTINGS LIST */}
+                        {mobileMoreSubView === "settings" && (
+                          <div className="space-y-6 animate-fade-in">
+                            <div className="space-y-1">
+                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Configuración
+                              </h2>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                Personaliza tus preferencias y gestiona tus recursos financieros.
                               </p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setShowCreateAccountModal(true)}
-                              className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shrink-0 self-start sm:self-auto"
-                            >
-                              <PlusIcon className="w-3.5 h-3.5" />
-                              Nueva Cuenta
-                            </button>
-                          </div>
 
-                          <div className="grid grid-cols-1 gap-2.5">
-                            {accounts.map((acc) => (
-                              <div
-                                key={acc.id}
-                                className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200/80 dark:border-zinc-800/80 gap-3"
+                            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-900 overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileMoreSubView("accounts");
+                                  setMobileNavigationSource("settings");
+                                }}
+                                className="w-full flex items-center justify-between p-4.5 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40 text-left transition-all active:bg-gray-50 dark:active:bg-zinc-900"
                               >
-                                <div className="flex items-center gap-3">
-                                  <div className="p-2 bg-white dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-700 dark:text-gray-300">
-                                    {getAccountIcon(acc.type)}
+                                <div className="flex items-center gap-3.5">
+                                  <div className="p-2.5 bg-gray-50 dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 rounded-xl border border-gray-100 dark:border-zinc-800">
+                                    <Wallet className="w-4 h-4" />
                                   </div>
                                   <div>
-                                    <p className="font-semibold text-xs text-gray-900 dark:text-white">
-                                      {acc.name}
-                                    </p>
-                                    <p className="text-[10px] text-gray-400 uppercase font-semibold">
-                                      {acc.type === "credit"
-                                        ? `Tarjeta de Crédito ${acc.card_number_last4 ? `•••• ${acc.card_number_last4}` : ""}`
-                                        : acc.type === "wallet"
-                                          ? "Wallet digital"
-                                          : acc.type}
-                                    </p>
-                                    {["bank", "credit", "debit"].includes(
-                                      acc.type,
-                                    ) &&
-                                      (acc.maintenance_fee_type !== "none" ||
-                                        acc.transfer_fee_type !== "none") && (
-                                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                          {acc.maintenance_fee_type !==
-                                            "none" && (
-                                            <span className="text-[9px] font-medium px-2 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
-                                              Mantenimiento:{" "}
-                                              {acc.maintenance_fee_type ===
-                                              "fixed"
-                                                ? `$${acc.maintenance_fee_value}`
-                                                : `${acc.maintenance_fee_value}%`}{" "}
-                                              (
-                                              {acc.maintenance_fee_freq ===
-                                              "yearly"
-                                                ? "Anual"
-                                                : "Mensual"}
-                                              )
-                                            </span>
-                                          )}
-                                          {acc.transfer_fee_type !== "none" && (
-                                            <span className="text-[9px] font-medium px-2 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
-                                              Comisión:{" "}
-                                              {acc.transfer_fee_type === "fixed"
-                                                ? `$${acc.transfer_fee_value}`
-                                                : `${acc.transfer_fee_value}%`}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                      Cuentas y Tarjetas
+                                    </span>
+                                    <span className="text-[11px] text-gray-400 dark:text-zinc-500">
+                                      {accounts.length} {accounts.length === 1 ? "cuenta registrada" : "cuentas registradas"}
+                                    </span>
                                   </div>
                                 </div>
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                              </button>
 
-                                <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-200 dark:border-zinc-800">
-                                  <span className="font-bold text-xs text-gray-900 dark:text-white">
-                                    {formatCurrency(acc.balance_cents)}
-                                  </span>
-                                  <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileMoreSubView("categories");
+                                  setMobileNavigationSource("settings");
+                                }}
+                                className="w-full flex items-center justify-between p-4.5 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40 text-left transition-all active:bg-gray-50 dark:active:bg-zinc-900"
+                              >
+                                <div className="flex items-center gap-3.5">
+                                  <div className="p-2.5 bg-gray-50 dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 rounded-xl border border-gray-100 dark:border-zinc-800">
+                                    <Tag className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                      Categorías y Presupuestos
+                                    </span>
+                                    <span className="text-[11px] text-gray-400 dark:text-zinc-500">
+                                      {categories.length} categorías de flujo
+                                    </span>
+                                  </div>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileMoreSubView("security");
+                                  setMobileNavigationSource("settings");
+                                }}
+                                className="w-full flex items-center justify-between p-4.5 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40 text-left transition-all active:bg-gray-50 dark:active:bg-zinc-900"
+                              >
+                                <div className="flex items-center gap-3.5">
+                                  <div className="p-2.5 bg-gray-50 dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 rounded-xl border border-gray-100 dark:border-zinc-800">
+                                    <Lock className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                      Seguridad y Código PIN
+                                    </span>
+                                    <span className="text-[11px] text-gray-400 dark:text-zinc-500">
+                                      {securityConfig?.pin_hash ? "Protección Activa" : "PIN no configurado"}
+                                    </span>
+                                  </div>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. DEDICATED ACCOUNTS VIEW */}
+                        {mobileMoreSubView === "accounts" && (
+                          <div className="space-y-6 animate-fade-in">
+                            <div className="flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileMoreSubView(mobileNavigationSource === "settings" ? "settings" : null);
+                                }}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                                <span>{mobileNavigationSource === "settings" ? "Configuración" : "Más"}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setShowCreateAccountModal(true)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shrink-0"
+                              >
+                                <PlusIcon className="w-3.5 h-3.5" />
+                                <span>Nueva Cuenta</span>
+                              </button>
+                            </div>
+
+                            <div className="space-y-1">
+                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Cuentas Financieras
+                              </h2>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                Cuentas de banco, efectivo o tarjetas de crédito registradas.
+                              </p>
+                            </div>
+
+                            <div className="divide-y divide-gray-100 dark:divide-zinc-900 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                              {accounts.map((acc) => (
+                                <button
+                                  key={acc.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedMobileAccount(acc);
+                                    setShowAccountOptionsSheet(true);
+                                  }}
+                                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40 text-left transition-all active:bg-gray-50 dark:active:bg-zinc-900"
+                                >
+                                  <div className="flex items-center gap-3.5">
+                                    <div className="p-2 bg-gray-50 dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 rounded-xl border border-gray-100 dark:border-zinc-800">
+                                      {getAccountIcon(acc.type)}
+                                    </div>
+                                    <div>
+                                      <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                        {acc.name}
+                                      </span>
+                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase font-bold tracking-wider block mt-0.5">
+                                        {acc.type === "credit"
+                                          ? `Tarjeta •••• ${acc.card_number_last4 || ""}`
+                                          : acc.type === "wallet"
+                                            ? "Efectivo"
+                                            : "Banco"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                      {formatCurrency(acc.balance_cents)}
+                                    </span>
+                                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Account Bottom Options Sheet */}
+                            <AnimatePresence>
+                              {showAccountOptionsSheet && selectedMobileAccount && (
+                                <>
+                                  <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => {
+                                      setShowAccountOptionsSheet(false);
+                                      setSelectedMobileAccount(null);
+                                    }}
+                                    className="fixed inset-0 bg-black/45 z-50 transition-opacity"
+                                  />
+                                  <motion.div
+                                    initial={{ y: "100%" }}
+                                    animate={{ y: 0 }}
+                                    exit={{ y: "100%" }}
+                                    transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                                    className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0d0d0d] border-t border-gray-200 dark:border-zinc-800 rounded-t-[28px] z-50 overflow-hidden pb-6"
+                                  >
+                                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
+                                    
+                                    <div className="p-4 border-b border-gray-100 dark:border-zinc-900 text-center">
+                                      <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                        {selectedMobileAccount.name}
+                                      </h3>
+                                      <span className="text-[11px] text-gray-400 dark:text-zinc-500 block mt-0.5">
+                                        Balance actual: {formatCurrency(selectedMobileAccount.balance_cents)}
+                                      </span>
+                                    </div>
+
+                                    <div className="p-4 space-y-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowAccountOptionsSheet(false);
+                                          setShowAccountTxList(true);
+                                        }}
+                                        className="w-full py-4 px-5 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 text-left rounded-xl transition-colors flex items-center gap-3"
+                                      >
+                                        <ListOrdered className="w-4 h-4 text-gray-500" />
+                                        <span>Ver movimientos de esta cuenta</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const acc = selectedMobileAccount;
+                                          setShowAccountOptionsSheet(false);
+                                          setSelectedMobileAccount(null);
+                                          
+                                          // Set all account edit states as in original
+                                          setEditingAccount(acc);
+                                          setEditAccountName(acc.name);
+                                          setEditAccountType(acc.type);
+                                          setEditAccountBalance((acc.balance_cents / 100).toString());
+                                          setEditAccountCardColor(acc.card_color || "slate");
+                                          setEditAccountCreditLimit(((acc.credit_limit_cents || 0) / 100).toString());
+                                          setEditAccountCutoffDay((acc.cutoff_day || "").toString());
+                                          setEditAccountDueDay((acc.due_day || "").toString());
+                                          setEditAccountCardNumberLast4(acc.card_number_last4 || "");
+                                          setEditAccountMaintFeeType(acc.maintenance_fee_type || "none");
+                                          setEditAccountMaintFeeValue((acc.maintenance_fee_value || 0).toString());
+                                          setEditAccountMaintFeeFreq(acc.maintenance_fee_freq || "monthly");
+                                          setEditAccountTransferFeeType(acc.transfer_fee_type || "none");
+                                          setEditAccountTransferFeeValue((acc.transfer_fee_value || 0).toString());
+                                          setShowEditAccountExtras(
+                                            (acc.maintenance_fee_type && acc.maintenance_fee_type !== "none") ||
+                                            (acc.transfer_fee_type && acc.transfer_fee_type !== "none")
+                                          );
+                                        }}
+                                        className="w-full py-4 px-5 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 text-left rounded-xl transition-colors flex items-center gap-3"
+                                      >
+                                        <Pencil className="w-4 h-4 text-gray-500" />
+                                        <span>Editar cuenta</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const accId = selectedMobileAccount.id;
+                                          setShowAccountOptionsSheet(false);
+                                          setSelectedMobileAccount(null);
+                                          handleDeleteAccount(accId);
+                                        }}
+                                        className="w-full py-4 px-5 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-left rounded-xl transition-colors flex items-center gap-3"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                        <span>Eliminar cuenta</span>
+                                      </button>
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowAccountOptionsSheet(false);
+                                          setSelectedMobileAccount(null);
+                                        }}
+                                        className="w-full py-3.5 text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 rounded-xl transition-colors shrink-0"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+
+                            {/* Account Transactions Bottom Sheet */}
+                            <AnimatePresence>
+                              {showAccountTxList && selectedMobileAccount && (
+                                <>
+                                  <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => {
+                                      setShowAccountTxList(false);
+                                      setSelectedMobileAccount(null);
+                                    }}
+                                    className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+                                  />
+                                  <motion.div
+                                    initial={{ y: "100%" }}
+                                    animate={{ y: 0 }}
+                                    exit={{ y: "100%" }}
+                                    transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                                    className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-200 dark:border-zinc-800 rounded-t-[28px] max-h-[80vh] z-50 flex flex-col overflow-hidden pb-safe animate-fade-in"
+                                  >
+                                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
+                                    
+                                    <div className="px-5 pb-3 border-b border-gray-100 dark:border-zinc-900 flex justify-between items-center shrink-0">
+                                      <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                                        Movimientos: {selectedMobileAccount.name}
+                                      </h3>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowAccountTxList(false);
+                                          setSelectedMobileAccount(null);
+                                        }}
+                                        className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400"
+                                      >
+                                        Cerrar
+                                      </button>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                                      {(() => {
+                                        const accTx = transactions.filter(t => t.account_id === selectedMobileAccount.id);
+                                        if (accTx.length === 0) {
+                                          return (
+                                            <p className="text-center text-xs text-gray-400 my-8">
+                                              No hay movimientos registrados en esta cuenta.
+                                            </p>
+                                          );
+                                        }
+                                        return accTx.map(tx => {
+                                          const cat = categories.find(c => c.id === tx.category_id);
+                                          return (
+                                            <div key={tx.id} className="flex items-center justify-between p-3.5 bg-gray-50/50 dark:bg-zinc-900/40 rounded-xl border border-gray-100/60 dark:border-zinc-800/40">
+                                              <div className="flex items-center gap-3">
+                                                <span className="text-lg">{cat?.emoji || "🏷️"}</span>
+                                                <div>
+                                                  <span className="text-xs font-semibold text-gray-900 dark:text-white block">
+                                                    {tx.description || cat?.name || "Sin descripción"}
+                                                  </span>
+                                                  <span className="text-[10px] text-gray-400 dark:text-zinc-500 block">
+                                                    {tx.date}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                              <span className={`text-xs font-bold ${tx.type === "INCOME" ? "text-emerald-600 dark:text-emerald-500" : "text-gray-900 dark:text-white"}`}>
+                                                {tx.type === "INCOME" ? "+" : "-"}
+                                                {formatCurrency(tx.amount_cents)}
+                                              </span>
+                                            </div>
+                                          );
+                                        });
+                                      })()}
+                                    </div>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        )}
+
+                        {/* 3. DEDICATED CATEGORIES VIEW */}
+                        {mobileMoreSubView === "categories" && (
+                          <div className="space-y-6 animate-fade-in">
+                            <div className="flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileMoreSubView(mobileNavigationSource === "settings" ? "settings" : null);
+                                }}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                                <span>{mobileNavigationSource === "settings" ? "Configuración" : "Más"}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => openNewCategoryModal(activeCategoryTab)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shrink-0"
+                              >
+                                <PlusIcon className="w-3.5 h-3.5" />
+                                <span>Nueva Categoría</span>
+                              </button>
+                            </div>
+
+                            <div className="space-y-1">
+                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Categorías de Flujo
+                              </h2>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                Clasificación de movimientos y topes presupuestarios mensuales.
+                              </p>
+                            </div>
+
+                            {/* Custom Category Segment Tab */}
+                            <div className="bg-gray-100 dark:bg-zinc-900 p-1 rounded-xl flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setActiveCategoryTab("EXPENSE")}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg text-center transition-all ${activeCategoryTab === "EXPENSE" ? "bg-white dark:bg-zinc-800 text-gray-950 dark:text-white shadow-xs" : "text-gray-500"}`}
+                              >
+                                Gastos / Presupuestos
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveCategoryTab("INCOME")}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg text-center transition-all ${activeCategoryTab === "INCOME" ? "bg-white dark:bg-zinc-800 text-gray-950 dark:text-white shadow-xs" : "text-gray-500"}`}
+                              >
+                                Ingresos
+                              </button>
+                            </div>
+
+                            {/* Category items list */}
+                            {(() => {
+                              const filteredCats = categories.filter(c => {
+                                if (activeCategoryTab === "EXPENSE") {
+                                  return !c.type || c.type.toUpperCase() === "EXPENSE" || c.type.toUpperCase() === "GASTO";
+                                } else {
+                                  return c.type && (c.type.toUpperCase() === "INCOME" || c.type.toUpperCase() === "INGRESO");
+                                }
+                              });
+
+                              if (filteredCats.length === 0) {
+                                return (
+                                  <div className="p-8 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl text-center text-xs text-gray-400">
+                                    No hay categorías en esta sección.
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="divide-y divide-gray-100 dark:divide-zinc-900 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                                  {filteredCats.map((cat) => (
                                     <button
+                                      key={cat.id}
                                       type="button"
                                       onClick={() => {
-                                        setEditingAccount(acc);
-                                        setEditAccountName(acc.name);
-                                        setEditAccountType(acc.type);
-                                        setEditAccountBalance(
-                                          (acc.balance_cents / 100).toString(),
-                                        );
-                                        setEditAccountCardColor(
-                                          acc.card_color || "slate",
-                                        );
-                                        setEditAccountCreditLimit(
-                                          (
-                                            (acc.credit_limit_cents || 0) / 100
-                                          ).toString(),
-                                        );
-                                        setEditAccountCutoffDay(
-                                          (acc.cutoff_day || "").toString(),
-                                        );
-                                        setEditAccountDueDay(
-                                          (acc.due_day || "").toString(),
-                                        );
-                                        setEditAccountCardNumberLast4(
-                                          acc.card_number_last4 || "",
-                                        );
-                                        setEditAccountMaintFeeType(
-                                          acc.maintenance_fee_type || "none",
-                                        );
-                                        setEditAccountMaintFeeValue(
-                                          (
-                                            acc.maintenance_fee_value || 0
-                                          ).toString(),
-                                        );
-                                        setEditAccountMaintFeeFreq(
-                                          acc.maintenance_fee_freq || "monthly",
-                                        );
-                                        setEditAccountTransferFeeType(
-                                          acc.transfer_fee_type || "none",
-                                        );
-                                        setEditAccountTransferFeeValue(
-                                          (
-                                            acc.transfer_fee_value || 0
-                                          ).toString(),
-                                        );
-                                        setShowEditAccountExtras(
-                                          (acc.maintenance_fee_type &&
-                                            acc.maintenance_fee_type !==
-                                              "none") ||
-                                            (acc.transfer_fee_type &&
-                                              acc.transfer_fee_type !== "none"),
-                                        );
+                                        setSelectedMobileCategory(cat);
                                       }}
-                                      className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
-                                      title="Editar cuenta"
+                                      className="w-full flex items-center justify-between p-4.5 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40 text-left transition-all"
                                     >
-                                      <Pencil className="w-3.5 h-3.5" />
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-xl w-8 h-8 rounded-lg bg-gray-50 dark:bg-zinc-900 flex items-center justify-center border border-gray-100 dark:border-zinc-800 shrink-0">
+                                          {cat.emoji || "🏷️"}
+                                        </span>
+                                        <div>
+                                          <span className="text-xs font-bold text-gray-900 dark:text-white block">
+                                            {cat.name}
+                                          </span>
+                                          {cat.budget_limit_cents && cat.budget_limit_cents > 0 ? (
+                                            <span className="text-[10px] font-semibold text-gray-400 dark:text-zinc-500 block mt-0.5">
+                                              Presupuesto: {formatCurrency(cat.budget_limit_cents)}/mes
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="flex items-center gap-1.5">
+                                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                                      </div>
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleDeleteAccount(acc.id)
-                                      }
-                                      className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
-                                      title="Eliminar cuenta"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
+                                  ))}
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        )}
+                              );
+                            })()}
 
-                        {/* SECTION 2: CATEGORIES & BUDGETS */}
-                        {(!isMobile || mobileMoreSubView === "categories" || mobileMoreSubView === "settings") && (
-                        <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-6">
-                          <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
-                            <div>
-                              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                Categorías y Presupuestos
-                              </h3>
-                              <p className="text-xs text-gray-500">
-                                Clasificación de movimientos y topes mensuales
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => openNewCategoryModal("EXPENSE")}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
-                            >
-                              <PlusIcon className="w-3.5 h-3.5" />
-                              Nueva Categoría
-                            </button>
-                          </div>
-
-                          {/* Expenses Section */}
-                          <div className="space-y-2.5">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                              Categorías de Gasto / Presupuesto
-                            </span>
-                            <div className="flex flex-wrap gap-2">
-                              {categories
-                                .filter(
-                                  (c) =>
-                                    !c.type ||
-                                    c.type.toUpperCase() === "EXPENSE" ||
-                                    c.type.toUpperCase() === "GASTO",
-                                )
-                                .map((cat) => (
-                                  <div
-                                    key={cat.id}
-                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-900 dark:text-gray-100"
+                            {/* Category Bottom Sheet (•••) */}
+                            <AnimatePresence>
+                              {selectedMobileCategory && (
+                                <>
+                                  <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => setSelectedMobileCategory(null)}
+                                    className="fixed inset-0 bg-black/45 z-50 transition-opacity"
+                                  />
+                                  <motion.div
+                                    initial={{ y: "100%" }}
+                                    animate={{ y: 0 }}
+                                    exit={{ y: "100%" }}
+                                    transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                                    className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0d0d0d] border-t border-gray-200 dark:border-zinc-800 rounded-t-[28px] z-50 overflow-hidden pb-6"
                                   >
-                                    <span>{cat.emoji || "🛒"}</span>
-                                    <span className="font-medium">
-                                      {cat.name}
-                                    </span>
-                                    {cat.budget_limit_cents &&
-                                    cat.budget_limit_cents > 0 ? (
-                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
-                                        $
-                                        {(cat.budget_limit_cents / 100).toFixed(
-                                          2,
-                                        )}
-                                        /mes
+                                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
+                                    
+                                    <div className="p-4 border-b border-gray-100 dark:border-zinc-900 text-center">
+                                      <span className="text-lg block mb-1">{selectedMobileCategory.emoji}</span>
+                                      <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                        {selectedMobileCategory.name}
+                                      </h3>
+                                      <span className="text-[11px] text-gray-400 dark:text-zinc-500 uppercase block tracking-wider mt-0.5">
+                                        Categoría de {activeCategoryTab === "EXPENSE" ? "Gasto" : "Ingreso"}
                                       </span>
-                                    ) : null}
-                                    <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          openEditCategoryModal(cat)
-                                        }
-                                        className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-0.5 rounded transition-colors"
-                                        title="Editar"
-                                      >
-                                        <Pencil className="w-3 h-3" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleDeleteCategory(cat.id)
-                                        }
-                                        className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
-                                        title="Eliminar"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
                                     </div>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
 
-                          {/* Income Section */}
-                          <div className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800/80">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                              Categorías de Ingreso
-                            </span>
-                            <div className="flex flex-wrap gap-2">
-                              {categories
-                                .filter(
-                                  (c) =>
-                                    c.type &&
-                                    (c.type.toUpperCase() === "INCOME" ||
-                                      c.type.toUpperCase() === "INGRESO"),
-                                )
-                                .map((cat) => (
-                                  <div
-                                    key={cat.id}
-                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100/70 dark:bg-zinc-800/60 border border-gray-200 dark:border-zinc-700/80 rounded-xl text-xs text-gray-900 dark:text-gray-100"
-                                  >
-                                    <span>{cat.emoji || "💼"}</span>
-                                    <span className="font-medium">
-                                      {cat.name}
-                                    </span>
-                                    <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
+                                    <div className="p-4 space-y-2">
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          openEditCategoryModal(cat)
-                                        }
-                                        className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-0.5 rounded transition-colors"
-                                        title="Editar"
+                                        onClick={() => {
+                                          const cat = selectedMobileCategory;
+                                          setSelectedMobileCategory(null);
+                                          openEditCategoryModal(cat);
+                                        }}
+                                        className="w-full py-4 px-5 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 text-left rounded-xl transition-colors flex items-center gap-3"
                                       >
-                                        <Pencil className="w-3 h-3" />
+                                        <Pencil className="w-4 h-4 text-gray-500" />
+                                        <span>Editar categoría</span>
                                       </button>
+
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          handleDeleteCategory(cat.id)
-                                        }
-                                        className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
-                                        title="Eliminar"
+                                        onClick={() => {
+                                          const catId = selectedMobileCategory.id;
+                                          setSelectedMobileCategory(null);
+                                          handleDeleteCategory(catId);
+                                        }}
+                                        className="w-full py-4 px-5 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-left rounded-xl transition-colors flex items-center gap-3"
                                       >
-                                        <Trash2 className="w-3 h-3" />
+                                        <Trash2 className="w-4 h-4" />
+                                        <span>Eliminar categoría</span>
+                                      </button>
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedMobileCategory(null)}
+                                        className="w-full py-3.5 text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 rounded-xl transition-colors shrink-0"
+                                      >
+                                        Cancelar
                                       </button>
                                     </div>
-                                  </div>
-                                ))}
-                            </div>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
                           </div>
-                        </div>
                         )}
 
-                        {/* SECTION 3: SECURITY & PIN */}
-                        {(!isMobile || mobileMoreSubView === "security" || mobileMoreSubView === "settings") && (
-                        <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
-                          <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
-                            <div>
-                              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                Seguridad y Código PIN
-                              </h3>
-                              <p className="text-xs text-gray-500">
-                                Protección del módulo financiero y
-                                confirmaciones requeridas
+                        {/* 4. DEDICATED SECURITY VIEW */}
+                        {mobileMoreSubView === "security" && (
+                          <div className="space-y-6 animate-fade-in">
+                            <div className="flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileMoreSubView(mobileNavigationSource === "settings" ? "settings" : null);
+                                }}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                                <span>{mobileNavigationSource === "settings" ? "Configuración" : "Más"}</span>
+                              </button>
+                            </div>
+
+                            <div className="space-y-1">
+                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                Seguridad y PIN
+                              </h2>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                Asegura el acceso a tus datos financieros con un código de seguridad.
                               </p>
                             </div>
-                            <span
-                              className={`text-[10px] font-semibold px-2.5 py-1 rounded-md ${
-                                securityConfig?.pin_hash
-                                  ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
-                                  : "bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400"
-                              }`}
-                            >
-                              {securityConfig?.pin_hash
-                                ? "Protección Activa"
-                                : "Sin PIN"}
-                            </span>
-                          </div>
 
-                          <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-gray-200/80 dark:border-zinc-800/80 space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                              <div>
-                                <div className="text-xs font-semibold text-gray-900 dark:text-white">
-                                  {securityConfig?.pin_hash
-                                    ? "PIN de 4 dígitos configurado"
-                                    : "Sin PIN de seguridad activo"}
+                            {/* Protection Status Block */}
+                            <div className="p-5 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl space-y-4">
+                              <div className="flex justify-between items-center">
+                                <div className="space-y-0.5">
+                                  <span className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase tracking-wider block font-bold">
+                                    ESTADO DE PROTECCIÓN
+                                  </span>
+                                  <span className="text-sm font-bold text-gray-900 dark:text-white block mt-0.5">
+                                    {securityConfig?.pin_hash ? "Bloqueo por PIN Activo" : "Bloqueo por PIN Inactivo"}
+                                  </span>
                                 </div>
-                                <div className="text-[11px] text-gray-500 mt-0.5">
-                                  {securityConfig?.pin_hash
-                                    ? "Puedes actualizar tu código actual o modificar las reglas de bloqueo."
-                                    : "Configura un PIN numérico de 4 dígitos para proteger tu información."}
-                                </div>
+                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${securityConfig?.pin_hash ? "bg-gray-950 text-white dark:bg-white dark:text-gray-900" : "bg-gray-100 text-gray-500 dark:bg-zinc-850 dark:text-zinc-400"}`}>
+                                  {securityConfig?.pin_hash ? "Protegido" : "Inactivo"}
+                                </span>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
+
+                              <div className="flex gap-2">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -10548,13 +11361,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                     setSetPinError("");
                                     setShowSetPinModal(true);
                                   }}
-                                  className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
+                                  className="flex-1 py-3 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                                 >
                                   <KeyRound className="w-3.5 h-3.5" />
-                                  {securityConfig?.pin_hash
-                                    ? "Cambiar PIN"
-                                    : "Crear PIN"}
+                                  <span>{securityConfig?.pin_hash ? "Cambiar PIN" : "Crear PIN"}</span>
                                 </button>
+                                
                                 {securityConfig?.pin_hash && (
                                   <button
                                     type="button"
@@ -10563,7 +11375,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                       setDisablePinError("");
                                       setShowDisablePinModal(true);
                                     }}
-                                    className="px-3.5 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-xl border border-gray-300 dark:border-zinc-700 transition-all"
+                                    className="flex-1 py-3 bg-white dark:bg-transparent border border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-900 rounded-xl text-xs font-semibold transition-all"
                                   >
                                     Eliminar PIN
                                   </button>
@@ -10571,96 +11383,538 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                               </div>
                             </div>
 
+                            {/* Security Requirements Switches */}
                             {securityConfig?.pin_hash && (
-                              <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-800">
-                                <div className="flex items-center justify-between py-1">
-                                  <div className="space-y-0.5 pr-4">
-                                    <label
-                                      htmlFor="toggle-lock-on-enter"
-                                      className="text-xs font-semibold text-gray-900 dark:text-white cursor-pointer"
+                              <div className="space-y-3">
+                                <span className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase tracking-wider block font-bold px-1">
+                                  REGLAS DE REQUERIMIENTO
+                                </span>
+                                
+                                <div className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-900 overflow-hidden">
+                                  <div className="flex items-center justify-between p-4.5 text-xs">
+                                    <div className="space-y-0.5 pr-4 flex-1">
+                                      <label
+                                        htmlFor="toggle-lock-on-enter-mob"
+                                        className="font-bold text-gray-900 dark:text-white cursor-pointer"
+                                      >
+                                        Solicitar PIN al ingresar
+                                      </label>
+                                      <p className="text-[10px] text-gray-500 dark:text-zinc-400 mt-0.5">
+                                        Exige introducir el PIN al iniciar o reanudar el panel financiero.
+                                      </p>
+                                    </div>
+                                    <button
+                                      id="toggle-lock-on-enter-mob"
+                                      type="button"
+                                      role="switch"
+                                      aria-checked={securityConfig.require_on_enter}
+                                      onClick={() => handleToggleRequireOnEnter(!securityConfig.require_on_enter)}
+                                      className={`w-10 h-5.5 flex items-center rounded-full p-0.5 transition-colors ${securityConfig.require_on_enter ? "bg-gray-900 dark:bg-white" : "bg-gray-200 dark:bg-zinc-800"}`}
                                     >
-                                      Solicitar PIN al ingresar
-                                    </label>
-                                    <p className="text-[11px] text-gray-500">
-                                      Bloquea las vistas financieras hasta
-                                      introducir el PIN de 4 dígitos.
-                                    </p>
+                                      <div className={`w-4.5 h-4.5 rounded-full transition-transform ${securityConfig.require_on_enter ? "translate-x-4.5 bg-white dark:bg-gray-900" : "translate-x-0 bg-white dark:bg-zinc-300"}`} />
+                                    </button>
                                   </div>
-                                  <button
-                                    id="toggle-lock-on-enter"
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={
-                                      securityConfig.require_on_enter
-                                    }
-                                    onClick={() =>
-                                      handleToggleRequireOnEnter(
-                                        !securityConfig.require_on_enter,
-                                      )
-                                    }
-                                    className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors ${
-                                      securityConfig.require_on_enter
-                                        ? "bg-gray-900 dark:bg-white"
-                                        : "bg-gray-300 dark:bg-zinc-700"
-                                    }`}
-                                  >
-                                    <div
-                                      className={`w-4 h-4 rounded-full transition-transform ${
-                                        securityConfig.require_on_enter
-                                          ? "translate-x-5 bg-white dark:bg-gray-900"
-                                          : "translate-x-0 bg-white dark:bg-zinc-300"
-                                      }`}
-                                    />
-                                  </button>
-                                </div>
 
-                                <div className="flex items-center justify-between py-1">
-                                  <div className="space-y-0.5 pr-4">
-                                    <label
-                                      htmlFor="toggle-lock-on-delete"
-                                      className="text-xs font-semibold text-gray-900 dark:text-white cursor-pointer"
+                                  <div className="flex items-center justify-between p-4.5 text-xs">
+                                    <div className="space-y-0.5 pr-4 flex-1">
+                                      <label
+                                        htmlFor="toggle-lock-on-delete-mob"
+                                        className="font-bold text-gray-900 dark:text-white cursor-pointer"
+                                      >
+                                        Proteger eliminación de cuentas
+                                      </label>
+                                      <p className="text-[10px] text-gray-500 dark:text-zinc-400 mt-0.5">
+                                        Exige validar tu PIN para confirmar el borrado de cualquier cuenta o tarjeta.
+                                      </p>
+                                    </div>
+                                    <button
+                                      id="toggle-lock-on-delete-mob"
+                                      type="button"
+                                      role="switch"
+                                      aria-checked={securityConfig.require_on_delete}
+                                      onClick={() => handleToggleRequireOnDelete(!securityConfig.require_on_delete)}
+                                      className={`w-10 h-5.5 flex items-center rounded-full p-0.5 transition-colors ${securityConfig.require_on_delete ? "bg-gray-900 dark:bg-white" : "bg-gray-200 dark:bg-zinc-800"}`}
                                     >
-                                      Proteger eliminación de cuentas
-                                    </label>
-                                    <p className="text-[11px] text-gray-500">
-                                      Exige la validación del PIN antes de
-                                      borrar cuentas o tarjetas.
-                                    </p>
+                                      <div className={`w-4.5 h-4.5 rounded-full transition-transform ${securityConfig.require_on_delete ? "translate-x-4.5 bg-white dark:bg-gray-900" : "translate-x-0 bg-white dark:bg-zinc-300"}`} />
+                                    </button>
                                   </div>
-                                  <button
-                                    id="toggle-lock-on-delete"
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={
-                                      securityConfig.require_on_delete
-                                    }
-                                    onClick={() =>
-                                      handleToggleRequireOnDelete(
-                                        !securityConfig.require_on_delete,
-                                      )
-                                    }
-                                    className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors ${
-                                      securityConfig.require_on_delete
-                                        ? "bg-gray-900 dark:bg-white"
-                                        : "bg-gray-300 dark:bg-zinc-700"
-                                    }`}
-                                  >
-                                    <div
-                                      className={`w-4 h-4 rounded-full transition-transform ${
-                                        securityConfig.require_on_delete
-                                          ? "translate-x-5 bg-white dark:bg-gray-900"
-                                          : "translate-x-0 bg-white dark:bg-zinc-300"
-                                      }`}
-                                    />
-                                  </button>
                                 </div>
                               </div>
                             )}
                           </div>
-                        </div>
                         )}
                       </div>
-                    </div>
+                    ) : (
+                      // Original Desktop View of SETTINGS tab (perfectly kept for desktop as requested!)
+                      <div className="space-y-8 max-w-4xl mx-auto">
+                        {(!isMobile || mobileMoreSubView === "settings") && (
+                          <div className="border-b border-gray-200 dark:border-zinc-800 pb-4">
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                              Configuración del Sistema
+                            </h2>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Gestiona tus cuentas financieras, categorías de
+                              presupuesto y opciones de seguridad
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="space-y-8">
+                          {/* SECTION 1: ACCOUNTS */}
+                          {(!isMobile || mobileMoreSubView === "accounts" || mobileMoreSubView === "settings") && (
+                          <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-zinc-800 pb-3">
+                              <div>
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                  Cuentas y Tarjetas de Crédito
+                                </h3>
+                                <p className="text-xs text-gray-500">
+                                  Cuentas registradas para tus movimientos y
+                                  saldos
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setShowCreateAccountModal(true)}
+                                className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shrink-0 self-start sm:self-auto"
+                              >
+                                <PlusIcon className="w-3.5 h-3.5" />
+                                Nueva Cuenta
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2.5">
+                              {accounts.map((acc) => (
+                                <div
+                                  key={acc.id}
+                                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200/80 dark:border-zinc-800/80 gap-3"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-700 dark:text-gray-300">
+                                      {getAccountIcon(acc.type)}
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-xs text-gray-900 dark:text-white">
+                                        {acc.name}
+                                      </p>
+                                      <p className="text-[10px] text-gray-400 uppercase font-semibold">
+                                        {acc.type === "credit"
+                                          ? `Tarjeta de Crédito ${acc.card_number_last4 ? `•••• ${acc.card_number_last4}` : ""}`
+                                          : acc.type === "wallet"
+                                            ? "Wallet digital"
+                                            : acc.type}
+                                      </p>
+                                      {["bank", "credit", "debit"].includes(
+                                        acc.type,
+                                      ) &&
+                                        (acc.maintenance_fee_type !== "none" ||
+                                          acc.transfer_fee_type !== "none") && (
+                                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                            {acc.maintenance_fee_type !==
+                                              "none" && (
+                                              <span className="text-[9px] font-medium px-2 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
+                                                Mantenimiento:{" "}
+                                                {acc.maintenance_fee_type ===
+                                                "fixed"
+                                                  ? `$${acc.maintenance_fee_value}`
+                                                  : `${acc.maintenance_fee_value}%`}{" "}
+                                                (
+                                                {acc.maintenance_fee_freq ===
+                                                "yearly"
+                                                  ? "Anual"
+                                                  : "Mensual"}
+                                                )
+                                              </span>
+                                            )}
+                                            {acc.transfer_fee_type !== "none" && (
+                                              <span className="text-[9px] font-medium px-2 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
+                                                Comisión:{" "}
+                                                {acc.transfer_fee_type === "fixed"
+                                                  ? `$${acc.transfer_fee_value}`
+                                                  : `${acc.transfer_fee_value}%`}
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-200 dark:border-zinc-800">
+                                    <span className="font-bold text-xs text-gray-900 dark:text-white">
+                                      {formatCurrency(acc.balance_cents)}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingAccount(acc);
+                                          setEditAccountName(acc.name);
+                                          setEditAccountType(acc.type);
+                                          setEditAccountBalance(
+                                            (acc.balance_cents / 100).toString(),
+                                          );
+                                          setEditAccountCardColor(
+                                            acc.card_color || "slate",
+                                          );
+                                          setEditAccountCreditLimit(
+                                            (
+                                              (acc.credit_limit_cents || 0) / 100
+                                            ).toString(),
+                                          );
+                                          setEditAccountCutoffDay(
+                                            (acc.cutoff_day || "").toString(),
+                                          );
+                                          setEditAccountDueDay(
+                                            (acc.due_day || "").toString(),
+                                          );
+                                          setEditAccountCardNumberLast4(
+                                            acc.card_number_last4 || "",
+                                          );
+                                          setEditAccountMaintFeeType(
+                                            acc.maintenance_fee_type || "none",
+                                          );
+                                          setEditAccountMaintFeeValue(
+                                            (
+                                              acc.maintenance_fee_value || 0
+                                            ).toString(),
+                                          );
+                                          setEditAccountMaintFeeFreq(
+                                            acc.maintenance_fee_freq || "monthly",
+                                          );
+                                          setEditAccountTransferFeeType(
+                                            acc.transfer_fee_type || "none",
+                                          );
+                                          setEditAccountTransferFeeValue(
+                                            (
+                                              acc.transfer_fee_value || 0
+                                            ).toString(),
+                                          );
+                                          setShowEditAccountExtras(
+                                            (acc.maintenance_fee_type &&
+                                              acc.maintenance_fee_type !==
+                                                "none") ||
+                                              (acc.transfer_fee_type &&
+                                                acc.transfer_fee_type !== "none"),
+                                          );
+                                        }}
+                                        className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
+                                        title="Editar cuenta"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleDeleteAccount(acc.id)
+                                        }
+                                        className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
+                                        title="Eliminar cuenta"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          )}
+
+                          {/* SECTION 2: CATEGORIES & BUDGETS */}
+                          {(!isMobile || mobileMoreSubView === "categories" || mobileMoreSubView === "settings") && (
+                          <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-6">
+                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
+                              <div>
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                  Categorías y Presupuestos
+                                </h3>
+                                <p className="text-xs text-gray-500">
+                                  Clasificación de movimientos y topes mensuales
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => openNewCategoryModal("EXPENSE")}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
+                              >
+                                <PlusIcon className="w-3.5 h-3.5" />
+                                Nueva Categoría
+                              </button>
+                            </div>
+
+                            {/* Expenses Section */}
+                            <div className="space-y-2.5">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                                Categorías de Gasto / Presupuesto
+                              </span>
+                              <div className="flex flex-wrap gap-2">
+                                {categories
+                                  .filter(
+                                    (c) =>
+                                      !c.type ||
+                                      c.type.toUpperCase() === "EXPENSE" ||
+                                      c.type.toUpperCase() === "GASTO",
+                                  )
+                                  .map((cat) => (
+                                    <div
+                                      key={cat.id}
+                                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-900 dark:text-gray-100"
+                                    >
+                                      <span>{cat.emoji || "🛒"}</span>
+                                      <span className="font-medium">
+                                        {cat.name}
+                                      </span>
+                                      {cat.budget_limit_cents &&
+                                      cat.budget_limit_cents > 0 ? (
+                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
+                                          $
+                                          {(cat.budget_limit_cents / 100).toFixed(
+                                            2,
+                                          )}
+                                          /mes
+                                        </span>
+                                      ) : null}
+                                      <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            openEditCategoryModal(cat)
+                                          }
+                                          className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-0.5 rounded transition-colors"
+                                          title="Editar"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleDeleteCategory(cat.id)
+                                          }
+                                          className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
+                                          title="Eliminar"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+
+                            {/* Income Section */}
+                            <div className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800/80">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                                Categorías de Ingreso
+                              </span>
+                              <div className="flex flex-wrap gap-2">
+                                {categories
+                                  .filter(
+                                    (c) =>
+                                      c.type &&
+                                      (c.type.toUpperCase() === "INCOME" ||
+                                        c.type.toUpperCase() === "INGRESO"),
+                                  )
+                                  .map((cat) => (
+                                    <div
+                                      key={cat.id}
+                                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100/70 dark:bg-zinc-800/60 border border-gray-200 dark:border-zinc-700/80 rounded-xl text-xs text-gray-900 dark:text-gray-100"
+                                    >
+                                      <span>{cat.emoji || "💼"}</span>
+                                      <span className="font-medium">
+                                        {cat.name}
+                                      </span>
+                                      <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            openEditCategoryModal(cat)
+                                          }
+                                          className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-0.5 rounded transition-colors"
+                                          title="Editar"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleDeleteCategory(cat.id)
+                                          }
+                                          className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
+                                          title="Eliminar"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          </div>
+                          )}
+
+                          {/* SECTION 3: SECURITY & PIN */}
+                          {(!isMobile || mobileMoreSubView === "security" || mobileMoreSubView === "settings") && (
+                          <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
+                            <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
+                              <div>
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                  Seguridad y Código PIN
+                                </h3>
+                                <p className="text-xs text-gray-500">
+                                  Protección del módulo financiero y
+                                  confirmaciones requeridas
+                                </p>
+                              </div>
+                              <span
+                                className={`text-[10px] font-semibold px-2.5 py-1 rounded-md ${
+                                  securityConfig?.pin_hash
+                                    ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                                    : "bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400"
+                                }`}
+                              >
+                                {securityConfig?.pin_hash
+                                  ? "Protección Activa"
+                                  : "Sin PIN"}
+                              </span>
+                            </div>
+
+                            <div className="bg-gray-50 dark:bg-[#121212] p-4 rounded-xl border border-gray-200/80 dark:border-zinc-800/80 space-y-4">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-xs font-semibold text-gray-900 dark:text-white">
+                                    {securityConfig?.pin_hash
+                                      ? "PIN de 4 dígitos configurado"
+                                      : "Sin PIN de seguridad activo"}
+                                  </div>
+                                  <div className="text-[11px] text-gray-500 mt-0.5">
+                                    {securityConfig?.pin_hash
+                                      ? "Puedes actualizar tu código actual o modificar las reglas de bloqueo."
+                                      : "Configura un PIN numérico de 4 dígitos para proteger tu información."}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNewPinValue("");
+                                      setConfirmPinValue("");
+                                      setSetPinError("");
+                                      setShowSetPinModal(true);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all"
+                                  >
+                                    <KeyRound className="w-3.5 h-3.5" />
+                                    {securityConfig?.pin_hash
+                                      ? "Cambiar PIN"
+                                      : "Crear PIN"}
+                                  </button>
+                                  {securityConfig?.pin_hash && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDisablePinInput("");
+                                        setDisablePinError("");
+                                        setShowDisablePinModal(true);
+                                      }}
+                                      className="px-3.5 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded-xl border border-gray-300 dark:border-zinc-700 transition-all"
+                                    >
+                                      Eliminar PIN
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {securityConfig?.pin_hash && (
+                                <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-800">
+                                  <div className="flex items-center justify-between py-1">
+                                    <div className="space-y-0.5 pr-4">
+                                      <label
+                                        htmlFor="toggle-lock-on-enter"
+                                        className="text-xs font-semibold text-gray-900 dark:text-white cursor-pointer"
+                                      >
+                                        Solicitar PIN al ingresar
+                                      </label>
+                                      <p className="text-[11px] text-gray-500">
+                                        Bloquea las vistas financieras hasta
+                                        introducir el PIN de 4 dígitos.
+                                      </p>
+                                    </div>
+                                    <button
+                                      id="toggle-lock-on-enter"
+                                      type="button"
+                                      role="switch"
+                                      aria-checked={
+                                        securityConfig.require_on_enter
+                                      }
+                                      onClick={() =>
+                                        handleToggleRequireOnEnter(
+                                          !securityConfig.require_on_enter,
+                                        )
+                                      }
+                                      className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors ${
+                                        securityConfig.require_on_enter
+                                          ? "bg-gray-900 dark:bg-white"
+                                          : "bg-gray-300 dark:bg-zinc-700"
+                                      }`}
+                                    >
+                                      <div
+                                        className={`w-4 h-4 rounded-full transition-transform ${
+                                          securityConfig.require_on_enter
+                                            ? "translate-x-5 bg-white dark:bg-gray-900"
+                                            : "translate-x-0 bg-white dark:bg-zinc-300"
+                                        }`}
+                                      />
+                                    </button>
+                                  </div>
+
+                                  <div className="flex items-center justify-between py-1">
+                                    <div className="space-y-0.5 pr-4">
+                                      <label
+                                        htmlFor="toggle-lock-on-delete"
+                                        className="text-xs font-semibold text-gray-900 dark:text-white cursor-pointer"
+                                      >
+                                        Proteger eliminación de cuentas
+                                      </label>
+                                      <p className="text-[11px] text-gray-500">
+                                        Exige la validación del PIN antes de
+                                        borrar cuentas o tarjetas.
+                                      </p>
+                                    </div>
+                                    <button
+                                      id="toggle-lock-on-delete"
+                                      type="button"
+                                      role="switch"
+                                      aria-checked={
+                                        securityConfig.require_on_delete
+                                      }
+                                      onClick={() =>
+                                        handleToggleRequireOnDelete(
+                                          !securityConfig.require_on_delete,
+                                        )
+                                      }
+                                      className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors ${
+                                        securityConfig.require_on_delete
+                                          ? "bg-gray-900 dark:bg-white"
+                                          : "bg-gray-300 dark:bg-zinc-700"
+                                      }`}
+                                    >
+                                      <div
+                                        className={`w-4 h-4 rounded-full transition-transform ${
+                                          securityConfig.require_on_delete
+                                            ? "translate-x-5 bg-white dark:bg-gray-900"
+                                            : "translate-x-0 bg-white dark:bg-zinc-300"
+                                        }`}
+                                      />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          )}
+                        </div>
+                      </div>
+                    )
                   )}
                 </motion.div>
               </AnimatePresence>
