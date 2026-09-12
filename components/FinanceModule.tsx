@@ -997,6 +997,81 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const [loadExpenseDescription, setLoadExpenseDescription] = useState("");
   const [loadExpenseDate, setLoadExpenseDate] = useState("");
 
+  const getPlanSubViewOnPlus = (sub: string | null) => {
+    switch (sub) {
+      case "budgets":
+        return () => {
+          setEditingBudgetItem(null);
+          setBudgetItemName("");
+          setBudgetItemAmount("");
+          setBudgetItemIcon("🏷️");
+          setBudgetItemColor("#27272a");
+          setBudgetItemCategoryId("");
+          setShowBudgetItemModal(true);
+        };
+      case "subscriptions":
+        return () => {
+          setRecDesc("");
+          setRecAmount("");
+          setRecFrequency("monthly");
+          setRecNextDate(getTodayStr());
+          setRecAccountId(accounts.length > 0 ? accounts[0].id : "");
+          setRecCategoryId("");
+          setShowNewSubscriptionModal(true);
+        };
+      case "installments":
+        return () => {
+          setShowInstallmentModal(true);
+        };
+      case "savings":
+        return () => {
+          setGoalName("");
+          setGoalTargetAmount("");
+          setGoalTargetDate("");
+          setGoalFrequency("MONTHLY");
+          setGoalCustomContribution("");
+          setShowNewSavingsGoalModal(true);
+        };
+      case "shopping":
+        return () => {
+          setNewListName("");
+          setShowCreateShoppingListModal(true);
+        };
+      default:
+        return undefined;
+    }
+  };
+
+  const getMoreSubViewOnPlus = (sub: string | null) => {
+    switch (sub) {
+      case "debts":
+        return () => {
+          if (debtSubTab === "cards") {
+            setNewAccountType("credit");
+            setShowCreateAccountModal(true);
+          } else if (debtSubTab === "loans") {
+            setDebtType("OWE");
+            setDebtName("");
+            setDebtAmount("");
+            setDebtDueDate("");
+            setShowAddDebtInline(true);
+          } else if (debtSubTab === "installments") {
+            setShowInstallmentModal(true);
+          }
+        };
+      case "accounts":
+        return () => {
+          setShowCreateAccountModal(true);
+        };
+      case "categories":
+        return () => {
+          openNewCategoryModal(activeCategoryTab);
+        };
+      default:
+        return undefined;
+    }
+  };
+
   useEffect(() => {
     // Immediate local cache restore for instant rendering of summary and module data
     try {
@@ -5615,34 +5690,92 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                 >
                   {/* Mobile Hierarchical Back Header: Planificar */}
                   {isMobile && mobileMainTab === "planning" && mobilePlanSubView && (
-                    <div className="mb-4">
-                      <button
-                        type="button"
-                        onClick={() => setMobilePlanSubView(null)}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors mb-1.5 py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        <span>Planificar</span>
-                      </button>
-                      <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                    <div className="mb-6 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => setMobilePlanSubView(null)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1.5 px-2.5 -ml-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800/80"
+                        >
+                          <ChevronLeft className="w-4 h-4 text-gray-400 dark:text-zinc-500" />
+                          <span>Planificar</span>
+                        </button>
+                        
+                        {getPlanSubViewOnPlus(mobilePlanSubView) && (
+                          <button
+                            type="button"
+                            onClick={getPlanSubViewOnPlus(mobilePlanSubView)}
+                            className="p-2 -mr-2 text-gray-900 dark:text-white rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800/80 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all active:scale-95"
+                            aria-label="Agregar"
+                          >
+                            <PlusIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                      <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                         {getPlanSubViewTitle(mobilePlanSubView)}
                       </h2>
                     </div>
                   )}
 
                   {/* Mobile Hierarchical Back Header: Más */}
-                  {isMobile && mobileMainTab === "more" && mobileMoreSubView && !["accounts", "categories", "security", "settings", "closing"].includes(mobileMoreSubView) && (
-                    <div className="mb-4">
-                      <button
-                        type="button"
-                        onClick={() => setMobileMoreSubView(null)}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors mb-1.5 py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        <span>Más</span>
-                      </button>
-                      <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                        {getMoreSubViewTitle(mobileMoreSubView)}
+                  {isMobile && mobileMainTab === "more" && mobileMoreSubView && (
+                    <div className="mb-6 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (mobileMoreSubView === "closing" && selectedHistoricalMonth) {
+                              setSelectedHistoricalMonth(null);
+                            } else if (["accounts", "categories", "security"].includes(mobileMoreSubView)) {
+                              setMobileMoreSubView(mobileNavigationSource === "settings" ? "settings" : null);
+                            } else {
+                              setMobileMoreSubView(null);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1.5 px-2.5 -ml-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800/80"
+                        >
+                          <ChevronLeft className="w-4 h-4 text-gray-400 dark:text-zinc-500" />
+                          <span>
+                            {mobileMoreSubView === "closing" && selectedHistoricalMonth
+                              ? "Cierre y reportes"
+                              : ["accounts", "categories", "security"].includes(mobileMoreSubView) && mobileNavigationSource === "settings"
+                              ? "Configuración"
+                              : "Más"}
+                          </span>
+                        </button>
+                        
+                        {mobileMoreSubView === "closing" && selectedHistoricalMonth ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowHistoricalOptionsSheet(true)}
+                            className="p-2 -mr-2 text-gray-900 dark:text-white rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800/80 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all active:scale-95"
+                            aria-label="Opciones"
+                          >
+                            <MoreHorizontal className="w-5 h-5 text-gray-600 dark:text-zinc-300" />
+                          </button>
+                        ) : getMoreSubViewOnPlus(mobileMoreSubView) ? (
+                          <button
+                            type="button"
+                            onClick={getMoreSubViewOnPlus(mobileMoreSubView)}
+                            className="p-2 -mr-2 text-gray-900 dark:text-white rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800/80 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all active:scale-95"
+                            aria-label="Agregar"
+                          >
+                            <PlusIcon className="w-5 h-5" />
+                          </button>
+                        ) : null}
+                      </div>
+                      <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                        {mobileMoreSubView === "closing" && selectedHistoricalMonth
+                          ? (() => {
+                              const [yr, mn] = selectedHistoricalMonth.split("-");
+                              const monthsList = [
+                                "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                              ];
+                              return `${monthsList[parseInt(mn) - 1]} ${yr}`;
+                            })()
+                          : getMoreSubViewTitle(mobileMoreSubView)}
                       </h2>
                     </div>
                   )}
@@ -8554,7 +8687,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             {debts.length === 0 ? (
                               <div className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl p-10 text-center text-gray-400 text-xs">
                                 No hay registro de préstamos ni deudas
-                                personales. Crea uno a la derecha.
+                                personales. Crea uno para comenzar.
                               </div>
                             ) : (
                               debts.map((debt) => {
@@ -9985,34 +10118,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                             return (
                               <div className="space-y-6 animate-fade-in">
-                                {/* Header */}
-                                <div className="flex items-center justify-between">
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedHistoricalMonth(null)}
-                                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850"
-                                  >
-                                    <ChevronLeft className="w-4 h-4" />
-                                    <span>Cierre y reportes</span>
-                                  </button>
-                                  
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowHistoricalOptionsSheet(true)}
-                                    className="p-2 text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850 transition-colors"
-                                  >
-                                    <MoreHorizontal className="w-5 h-5" />
-                                  </button>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                    {monthName}
-                                  </h2>
-                                  <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                    Reporte detallado del mes
-                                  </p>
-                                </div>
+                                <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-2">
+                                  Reporte detallado del mes, incluyendo balances, egresos por categoría e historial completo.
+                                </p>
 
                                 {/* Metrics Summary */}
                                 <div className="grid grid-cols-2 gap-3">
@@ -10260,14 +10368,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         ) : (
                           // 7.1 MAIN SCREEN OF CLOSING (Mes actual + Historial)
                           <div className="space-y-6">
-                            <div className="space-y-1">
-                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Cierre y Reportes
-                              </h2>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                Gestiona tu cierre mensual y consulta historiales de flujo.
-                              </p>
-                            </div>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-2">
+                              Gestiona tu cierre mensual y consulta historiales de flujo.
+                            </p>
 
                             {/* MES ACTUAL */}
                             <div className="space-y-3">
@@ -10787,14 +10890,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         {/* 1. MAIN SETTINGS LIST */}
                         {mobileMoreSubView === "settings" && (
                           <div className="space-y-6 animate-fade-in">
-                            <div className="space-y-1">
-                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Configuración
-                              </h2>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                Personaliza tus preferencias y gestiona tus recursos financieros.
-                              </p>
-                            </div>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-2">
+                              Personaliza tus preferencias y gestiona tus recursos financieros.
+                            </p>
 
                             <div className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-900 overflow-hidden">
                               <button
@@ -10875,36 +10973,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         {/* 2. DEDICATED ACCOUNTS VIEW */}
                         {mobileMoreSubView === "accounts" && (
                           <div className="space-y-6 animate-fade-in">
-                            <div className="flex items-center justify-between">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMobileMoreSubView(mobileNavigationSource === "settings" ? "settings" : null);
-                                }}
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850"
-                              >
-                                <ChevronLeft className="w-4 h-4" />
-                                <span>{mobileNavigationSource === "settings" ? "Configuración" : "Más"}</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => setShowCreateAccountModal(true)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shrink-0"
-                              >
-                                <PlusIcon className="w-3.5 h-3.5" />
-                                <span>Nueva Cuenta</span>
-                              </button>
-                            </div>
-
-                            <div className="space-y-1">
-                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Cuentas Financieras
-                              </h2>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                Cuentas de banco, efectivo o tarjetas de crédito registradas.
-                              </p>
-                            </div>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-2">
+                              Cuentas de banco, efectivo o tarjetas de crédito registradas.
+                            </p>
 
                             <div className="divide-y divide-gray-100 dark:divide-zinc-900 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl overflow-hidden">
                               {accounts.map((acc) => (
@@ -11136,36 +11207,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         {/* 3. DEDICATED CATEGORIES VIEW */}
                         {mobileMoreSubView === "categories" && (
                           <div className="space-y-6 animate-fade-in">
-                            <div className="flex items-center justify-between">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMobileMoreSubView(mobileNavigationSource === "settings" ? "settings" : null);
-                                }}
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850"
-                              >
-                                <ChevronLeft className="w-4 h-4" />
-                                <span>{mobileNavigationSource === "settings" ? "Configuración" : "Más"}</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => openNewCategoryModal(activeCategoryTab)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shrink-0"
-                              >
-                                <PlusIcon className="w-3.5 h-3.5" />
-                                <span>Nueva Categoría</span>
-                              </button>
-                            </div>
-
-                            <div className="space-y-1">
-                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Categorías de Flujo
-                              </h2>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                Clasificación de movimientos y topes presupuestarios mensuales.
-                              </p>
-                            </div>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-2">
+                              Clasificación de movimientos y topes presupuestarios mensuales.
+                            </p>
 
                             {/* Custom Category Segment Tab */}
                             <div className="bg-gray-100 dark:bg-zinc-900 p-1 rounded-xl flex gap-1">
@@ -11314,27 +11358,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         {/* 4. DEDICATED SECURITY VIEW */}
                         {mobileMoreSubView === "security" && (
                           <div className="space-y-6 animate-fade-in">
-                            <div className="flex items-center justify-between">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMobileMoreSubView(mobileNavigationSource === "settings" ? "settings" : null);
-                                }}
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1 px-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-850"
-                              >
-                                <ChevronLeft className="w-4 h-4" />
-                                <span>{mobileNavigationSource === "settings" ? "Configuración" : "Más"}</span>
-                              </button>
-                            </div>
-
-                            <div className="space-y-1">
-                              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                Seguridad y PIN
-                              </h2>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                Asegura el acceso a tus datos financieros con un código de seguridad.
-                              </p>
-                            </div>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-2">
+                              Asegura el acceso a tus datos financieros con un código de seguridad.
+                            </p>
 
                             {/* Protection Status Block */}
                             <div className="p-5 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800/80 rounded-2xl space-y-4">
