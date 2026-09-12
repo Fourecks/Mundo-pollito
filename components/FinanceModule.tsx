@@ -660,6 +660,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
   const [showMobileTransferMenu, setShowMobileTransferMenu] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [debtSubTab, setDebtSubTab] = useState<"cards" | "loans" | "installments">("cards");
+  const [showAddDebtInline, setShowAddDebtInline] = useState(false);
 
   // --- Data State ---
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
@@ -4305,6 +4307,876 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     return finalItems.slice(0, 3);
   }, [recurring, installments, debts, categories]);
 
+  // REDESIGNED DEBTS MEMOS (Fase 5)
+  const totalDebtsCents = useMemo(() => {
+    const cardDebts = accounts
+      .filter((a) => a.type === "credit")
+      .reduce((acc, a) => acc + Math.max(0, a.balance_cents), 0);
+    const loanDebts = debts
+      .filter((d) => d.type === "OWE" && !d.is_archived)
+      .reduce((acc, d) => acc + d.remaining_cents, 0);
+    const instDebts = installments
+      .filter((i) => i.status === "ACTIVE")
+      .reduce((acc, i) => acc + Math.max(0, (i.total_installments - i.paid_installments) * i.installment_amount_cents), 0);
+    return cardDebts + loanDebts + instDebts;
+  }, [accounts, debts, installments]);
+
+  const totalOwedToMeCents = useMemo(() => {
+    return debts
+      .filter((d) => d.type === "OWED" && !d.is_archived)
+      .reduce((acc, d) => acc + d.remaining_cents, 0);
+  }, [debts]);
+
+  const totalPaidCents = useMemo(() => {
+    const loanPaid = debts
+      .filter((d) => d.type === "OWE" && !d.is_archived)
+      .reduce((acc, d) => acc + (d.amount_cents - d.remaining_cents), 0);
+    const instPaid = installments
+      .reduce((acc, i) => acc + (i.paid_installments * i.installment_amount_cents), 0);
+    return loanPaid + instPaid;
+  }, [debts, installments]);
+
+  const nextDebtPayment = useMemo(() => {
+    const list: Array<{
+      name: string;
+      amount_cents: number;
+      dateStr: string;
+      type: "installment" | "debt" | "card_due";
+    }> = [];
+
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const todayDay = now.getDate();
+    const todayMonth = now.getMonth();
+    const todayYear = now.getFullYear();
+
+    // Installments
+    installments.forEach((inst) => {
+      if (inst.status !== "ACTIVE" || inst.paid_installments >= inst.total_installments) return;
+      const pDay = inst.payment_day || 15;
+      let targetDate: string;
+      if (pDay >= todayDay) {
+        const mm = String(todayMonth + 1).padStart(2, "0");
+        const dd = String(pDay).padStart(2, "0");
+        targetDate = `${todayYear}-${mm}-${dd}`;
+      } else {
+        const nextMonthDate = new Date(todayYear, todayMonth + 1, pDay);
+        targetDate = nextMonthDate.toISOString().split("T")[0];
+      }
+      list.push({
+        name: inst.name,
+        amount_cents: inst.installment_amount_cents,
+        dateStr: targetDate,
+        type: "installment",
+      });
+    });
+
+    // Loans/Debts we owe
+    debts.forEach((d) => {
+      if (d.type === "OWE" && !d.is_archived && d.remaining_cents > 0 && d.due_date) {
+        list.push({
+          name: d.name,
+          amount_cents: d.remaining_cents,
+          dateStr: d.due_date,
+          type: "debt",
+        });
+      }
+    });
+
+    // Credit cards payment dates
+    accounts.forEach((a) => {
+      if (a.type === "credit" && a.balance_cents > 0 && a.due_day) {
+        let targetDate: string;
+        if (a.due_day >= todayDay) {
+          const mm = String(todayMonth + 1).padStart(2, "0");
+          const dd = String(a.due_day).padStart(2, "0");
+          targetDate = `${todayYear}-${mm}-${dd}`;
+        } else {
+          const nextMonthDate = new Date(todayYear, todayMonth + 1, a.due_day);
+          targetDate = nextMonthDate.toISOString().split("T")[0];
+        }
+        list.push({
+          name: `Pago ${a.name}`,
+          amount_cents: a.balance_cents,
+          dateStr: targetDate,
+          type: "card_due",
+        });
+      }
+    });
+
+    if (list.length === 0) return null;
+    list.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+    return list[0];
+  }, [installments, debts, accounts]);
+
+  const renderMobileDebts = () => {
+    // 1. Compile active creditors for "¿A quién debo?"
+    const creditors: string[] = [];
+    accounts.forEach(a => {
+      if (a.type === "credit" && a.balance_cents > 0) {
+        creditors.push(a.name);
+      }
+    });
+    debts.forEach(d => {
+      if (d.type === "OWE" && !d.is_archived && d.remaining_cents > 0) {
+        creditors.push(d.name);
+      }
+    });
+    installments.forEach(i => {
+      if (i.status === "ACTIVE" && (i.total_installments - i.paid_installments) > 0) {
+        creditors.push(i.name);
+      }
+    });
+
+    const totalOriginallyOwed = totalDebtsCents + totalPaidCents;
+    const paidPercentage = totalOriginallyOwed > 0 ? Math.round((totalPaidCents / totalOriginallyOwed) * 100) : 0;
+
+    return (
+      <div className="space-y-6 pb-32 animate-in fade-in duration-200">
+        {/* QUESTION: ¿Cuánto debo? & ¿Cuánto he pagado? & ¿Cuánto me falta? */}
+        <div className="bg-zinc-950 dark:bg-[#121212] text-white border border-transparent rounded-3xl p-6 shadow-xl relative overflow-hidden">
+          {/* Subtle background visual touch */}
+          <div className="absolute right-0 top-0 -mt-4 -mr-4 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none" />
+          
+          <div className="flex justify-between items-center mb-2.5">
+            <span className="text-[10px] tracking-widest font-black uppercase text-zinc-400">
+              Deuda Total Pendiente
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsPrivacyMode(!isPrivacyMode)}
+              className="p-2 -mr-2 text-zinc-400 hover:text-white rounded-full transition-colors flex items-center justify-center min-w-[44px] min-h-[44px]"
+              title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+            >
+              {isPrivacyMode ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+            </button>
+          </div>
+
+          <div className="text-4xl font-black tracking-tight text-white mb-6">
+            {isPrivacyMode ? "••••" : formatCurrency(totalDebtsCents)}
+          </div>
+
+          {/* PROGRESS: ¿Cuánto he pagado? & ¿Cuánto me falta? */}
+          <div className="space-y-2 pt-4 border-t border-white/10">
+            <div className="flex justify-between items-center text-[11px] font-bold text-zinc-300">
+              <span>Progreso de Liquidación</span>
+              <span>{paidPercentage}%</span>
+            </div>
+            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-white rounded-full transition-all duration-500"
+                style={{ width: `${paidPercentage}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-400 pt-1">
+              <div>
+                <span className="block text-zinc-500 uppercase font-bold text-[8px] tracking-wider">Total pagado</span>
+                <span className="font-bold text-emerald-400">
+                  {isPrivacyMode ? "••••" : formatCurrency(totalPaidCents)}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="block text-zinc-500 uppercase font-bold text-[8px] tracking-wider">Total restante</span>
+                <span className="font-bold text-white">
+                  {isPrivacyMode ? "••••" : formatCurrency(totalDebtsCents)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* METRICS ROW (Me deben & Disponible) */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800/80 rounded-2xl p-4 shadow-2xs">
+            <span className="text-[9px] text-gray-400 dark:text-zinc-500 block uppercase font-bold tracking-wider mb-1">
+              Me deben (Préstamos)
+            </span>
+            <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+              {isPrivacyMode ? "••••" : formatCurrency(totalOwedToMeCents)}
+            </span>
+          </div>
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800/80 rounded-2xl p-4 shadow-2xs">
+            <span className="text-[9px] text-gray-400 dark:text-zinc-500 block uppercase font-bold tracking-wider mb-1">
+              Capacidad Libre Crédito
+            </span>
+            <span className="text-base font-extrabold text-zinc-800 dark:text-zinc-200">
+              {(() => {
+                const totalCreditLimit = accounts
+                  .filter((a) => a.type === "credit")
+                  .reduce((acc, a) => acc + (a.credit_limit_cents || 0), 0);
+                const totalCreditDebt = accounts
+                  .filter((a) => a.type === "credit")
+                  .reduce((acc, a) => acc + Math.max(0, a.balance_cents), 0);
+                const freeCredit = totalCreditLimit - totalCreditDebt;
+                return isPrivacyMode ? "••••" : formatCurrency(Math.max(0, freeCredit));
+              })()}
+            </span>
+          </div>
+        </div>
+
+        {/* QUESTION: ¿A quién debo? */}
+        <div className="bg-gray-50 dark:bg-zinc-900/40 border border-gray-200/60 dark:border-zinc-800/50 rounded-2xl p-4 space-y-2.5">
+          <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest">
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>¿A quién le debo actualmente?</span>
+          </div>
+          {creditors.length === 0 ? (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+              🎉 ¡A nadie! Estás al corriente con todas tus cuentas y deudas.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {Array.from(new Set(creditors)).map((c, idx) => (
+                <span
+                  key={idx}
+                  className="text-xs font-semibold px-2.5 py-1 bg-white dark:bg-zinc-950 text-gray-800 dark:text-zinc-250 border border-gray-200/60 dark:border-zinc-800 rounded-xl shadow-3xs flex items-center gap-1"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* QUESTION: ¿Cuál es mi próximo pago? */}
+        <div className="space-y-3">
+          <span className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest px-1 block">
+            Próximo vencimiento
+          </span>
+          {nextDebtPayment ? (
+            <div className="bg-zinc-900 dark:bg-zinc-950 text-white border border-transparent rounded-2xl p-5 shadow-lg space-y-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-3 text-white/5 pointer-events-none">
+                <CalendarDays className="w-16 h-16" />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-white/10 rounded-xl">
+                    {nextDebtPayment.type === "card_due" ? (
+                      <CreditCard className="w-4 h-4 text-white" />
+                    ) : nextDebtPayment.type === "installment" ? (
+                      <Layers className="w-4 h-4 text-white" />
+                    ) : (
+                      <Banknote className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-white truncate max-w-[160px]">
+                      {nextDebtPayment.name}
+                    </h4>
+                    <span className="text-[10px] text-zinc-400 capitalize">
+                      {nextDebtPayment.type === "card_due"
+                        ? "Pago Tarjeta"
+                        : nextDebtPayment.type === "installment"
+                        ? "Cuota Fina."
+                        : "Préstamo"}
+                    </span>
+                  </div>
+                </div>
+
+                <span className="text-[10px] font-extrabold bg-white/10 text-white px-2.5 py-1 rounded-full border border-white/5 shadow-2xs">
+                  {(() => {
+                    const diff = Math.ceil(
+                      (new Date(nextDebtPayment.dateStr + "T12:00:00").getTime() -
+                        new Date().getTime()) /
+                        (1000 * 60 * 60 * 24),
+                    );
+                    if (diff === 0) return "Hoy";
+                    if (diff === 1) return "Mañana";
+                    if (diff < 0) return "Vencido";
+                    return `En ${diff} días`;
+                  })()}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-end pt-2 border-t border-white/5">
+                <div>
+                  <p className="text-[9px] text-zinc-500 uppercase font-bold">Fecha de pago</p>
+                  <p className="text-xs font-bold text-zinc-200">
+                    {formatTxDateShort(nextDebtPayment.dateStr)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] text-zinc-500 uppercase font-bold">Importe de cuota</p>
+                  <p className="text-xl font-black text-white">
+                    {isPrivacyMode ? "••••" : formatCurrency(nextDebtPayment.amount_cents)}
+                  </p>
+                </div>
+              </div>
+
+              {/* ACTION: Pagar directo desde próximo vencimiento card */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (nextDebtPayment.type === "installment") {
+                    const inst = installments.find((i) => i.name === nextDebtPayment.name);
+                    if (inst) handlePayInstallment(inst);
+                  } else if (nextDebtPayment.type === "debt") {
+                    const d = debts.find((x) => x.name === nextDebtPayment.name);
+                    if (d) {
+                      setShowPayDebtModal(d);
+                      setPayDebtAmount("");
+                      setPayDebtAccountId("");
+                    }
+                  } else if (nextDebtPayment.type === "card_due") {
+                    const card = accounts.find(
+                      (a) => a.name === nextDebtPayment.name.replace("Pago ", ""),
+                    );
+                    if (card) {
+                      setShowPayCardModal(card);
+                    }
+                  }
+                }}
+                className="w-full min-h-[44px] flex items-center justify-center bg-white hover:bg-zinc-100 text-zinc-950 rounded-xl text-xs font-black transition-colors shadow-xs animate-in fade-in"
+              >
+                Registrar Pago de esta Cuota
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800/80 rounded-2xl p-5 text-center">
+              <p className="text-xs text-gray-500 dark:text-zinc-505 font-medium">
+                Sin compromisos de pago en agenda activa 🎉
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* CONVENIENT INTERACTIVE ACTION BAR (iOS/Android Native Style) */}
+        <div className="space-y-2.5">
+          <span className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest px-1 block">
+            Acciones rápidas
+          </span>
+          <div className="grid grid-cols-3 gap-2 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800/80 p-2.5 rounded-2xl shadow-3xs">
+            <button
+              onClick={() => {
+                setNewAccountType("credit");
+                setShowCreateAccountModal(true);
+              }}
+              className="flex flex-col items-center justify-center py-2 px-1 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-xl transition-all group min-h-[44px]"
+            >
+              <div className="p-2 bg-zinc-100 dark:bg-zinc-850 rounded-full group-hover:scale-105 transition-transform">
+                <CreditCard className="w-4 h-4 text-zinc-800 dark:text-zinc-200" />
+              </div>
+              <span className="text-[10px] font-extrabold text-zinc-700 dark:text-zinc-300 mt-1.5 text-center">
+                Nueva Tarjeta
+              </span>
+            </button>
+            
+            <button
+              onClick={() => {
+                setDebtType("OWE");
+                setDebtName("");
+                setDebtAmount("");
+                setDebtDueDate("");
+                setShowAddDebtInline(true);
+                setDebtSubTab("loans");
+              }}
+              className="flex flex-col items-center justify-center py-2 px-1 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-xl transition-all group min-h-[44px]"
+            >
+              <div className="p-2 bg-zinc-100 dark:bg-zinc-850 rounded-full group-hover:scale-105 transition-transform">
+                <Banknote className="w-4 h-4 text-zinc-800 dark:text-zinc-200" />
+              </div>
+              <span className="text-[10px] font-extrabold text-zinc-700 dark:text-zinc-300 mt-1.5 text-center">
+                Préstamo
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowInstallmentModal(true);
+                setDebtSubTab("installments");
+              }}
+              className="flex flex-col items-center justify-center py-2 px-1 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded-xl transition-all group min-h-[44px]"
+            >
+              <div className="p-2 bg-zinc-100 dark:bg-zinc-850 rounded-full group-hover:scale-105 transition-transform">
+                <Layers className="w-4 h-4 text-zinc-800 dark:text-zinc-200" />
+              </div>
+              <span className="text-[10px] font-extrabold text-zinc-700 dark:text-zinc-300 mt-1.5 text-center">
+                Compra Cuotas
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* SEGMENTED SUB-TABS (Pills) */}
+        <div className="flex p-1 bg-gray-150/80 dark:bg-[#121212] border border-gray-200/40 dark:border-zinc-800/60 rounded-2xl">
+          <button
+            type="button"
+            onClick={() => setDebtSubTab("cards")}
+            className={`flex-1 text-xs font-black py-2.5 rounded-xl transition-all ${
+              debtSubTab === "cards"
+                ? "bg-white dark:bg-zinc-800 shadow-sm text-gray-950 dark:text-white"
+                : "text-gray-400 dark:text-zinc-500 hover:text-gray-900"
+            }`}
+          >
+            Tarjetas
+          </button>
+          <button
+            type="button"
+            onClick={() => setDebtSubTab("loans")}
+            className={`flex-1 text-xs font-black py-2.5 rounded-xl transition-all ${
+              debtSubTab === "loans"
+                ? "bg-white dark:bg-zinc-800 shadow-sm text-gray-950 dark:text-white"
+                : "text-gray-400 dark:text-zinc-500 hover:text-gray-900"
+            }`}
+          >
+            Préstamos
+          </button>
+          <button
+            type="button"
+            onClick={() => setDebtSubTab("installments")}
+            className={`flex-1 text-xs font-black py-2.5 rounded-xl transition-all ${
+              debtSubTab === "installments"
+                ? "bg-white dark:bg-zinc-800 shadow-sm text-gray-950 dark:text-white"
+                : "text-gray-400 dark:text-zinc-500 hover:text-gray-900"
+            }`}
+          >
+            Cuotas
+          </button>
+        </div>
+
+        {/* 4. TAB CONTENTS */}
+        {debtSubTab === "cards" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center px-1">
+              <span className="text-xs font-bold text-gray-400 dark:text-zinc-500">
+                Límites y plásticos
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewAccountType("credit");
+                  setShowCreateAccountModal(true);
+                }}
+                className="text-[11px] font-bold text-gray-905 dark:text-white flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg"
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+                Agregar
+              </button>
+            </div>
+
+            {accounts.filter(a => a.type === "credit" || a.type === "debit").length === 0 ? (
+              <div className="p-8 text-center bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl space-y-2">
+                <CreditCard className="w-8 h-8 text-gray-300 mx-auto" />
+                <p className="text-xs font-semibold text-gray-500">No tienes tarjetas registradas</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {accounts
+                  .filter(a => a.type === "credit" || a.type === "debit")
+                  .map((card) => {
+                    const isCredit = card.type === "credit";
+                    const limit = card.credit_limit_cents || 0;
+                    const debtBalance = Math.abs(card.balance_cents);
+                    const availableCents = isCredit ? limit - debtBalance : card.balance_cents;
+                    const usedPct = isCredit && limit > 0 ? Math.min(100, Math.round((debtBalance / limit) * 100)) : 0;
+                    
+                    return (
+                      <div
+                        key={card.id}
+                        className="relative overflow-hidden bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-3.5"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[9px] tracking-wider font-bold uppercase text-gray-400 dark:text-zinc-500 block">
+                              {isCredit ? "Crédito" : "Débito"}
+                            </span>
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">
+                              {card.name}
+                            </h3>
+                          </div>
+                          <span className="font-mono text-[10px] text-gray-500 bg-gray-50 dark:bg-zinc-900 border border-gray-200/50 dark:border-zinc-800/80 px-2 py-0.5 rounded-md">
+                            •••• {card.card_number_last4 || "4242"}
+                          </span>
+                        </div>
+
+                        {isCredit ? (
+                          <div className="space-y-3 pt-2.5 border-t border-gray-100 dark:border-zinc-800/80">
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div className="bg-gray-50 dark:bg-zinc-900/40 p-2 rounded-xl">
+                                <span className="text-[9px] text-gray-400 dark:text-zinc-500 block uppercase font-semibold">
+                                  Deuda actual
+                                </span>
+                                <span className="font-bold text-gray-900 dark:text-white">
+                                  {formatCurrency(debtBalance)}
+                                </span>
+                              </div>
+                              <div className="bg-gray-50 dark:bg-zinc-900/40 p-2 rounded-xl">
+                                <span className="text-[9px] text-gray-400 dark:text-zinc-500 block uppercase font-semibold">
+                                  Cupo disponible
+                                </span>
+                                <span className="font-bold text-gray-900 dark:text-white">
+                                  {formatCurrency(availableCents)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[10px] text-gray-400 dark:text-zinc-500 font-semibold">
+                                <span>Límite utilizado</span>
+                                <span>{usedPct}%</span>
+                              </div>
+                              <div className="h-1.5 bg-gray-100 dark:bg-zinc-850 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                                  style={{ width: `${usedPct}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-between text-[10px] text-gray-500 dark:text-zinc-400 font-medium">
+                              <span>Corte: Día {card.cutoff_day || "N/A"}</span>
+                              <span>Pago: Día {card.due_day || "N/A"}</span>
+                            </div>
+
+                            {debtBalance > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setShowPayCardModal(card)}
+                                className="w-full flex items-center justify-center min-h-[44px] bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 rounded-xl text-xs font-bold transition-all shadow-sm mt-1"
+                              >
+                                Abonar a Tarjeta
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="pt-2 border-t border-gray-100 dark:border-zinc-800/80 flex justify-between items-center">
+                            <div>
+                              <span className="text-[9px] text-gray-400 dark:text-zinc-500 block uppercase font-semibold">
+                                Saldo disponible
+                              </span>
+                              <p className="text-base font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(card.balance_cents)}
+                              </p>
+                            </div>
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded-full">
+                              Líquido
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {debtSubTab === "loans" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center px-1">
+              <span className="text-xs font-bold text-gray-400 dark:text-zinc-500">
+                Yo debo / Me deben
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAddDebtInline(!showAddDebtInline)}
+                className="text-[11px] font-bold text-gray-905 dark:text-white flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg"
+              >
+                {showAddDebtInline ? "Cerrar" : "+ Registrar"}
+              </button>
+            </div>
+
+            {showAddDebtInline && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 p-4 rounded-2xl space-y-4 overflow-hidden"
+              >
+                <div className="flex gap-1.5 p-1 bg-gray-100 dark:bg-zinc-900 border border-gray-200/40 dark:border-zinc-850 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setDebtType("OWE")}
+                    className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg transition-colors ${debtType === "OWE" ? "bg-white dark:bg-zinc-800 shadow-sm text-gray-950 dark:text-white" : "text-gray-400"}`}
+                  >
+                    Yo debo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDebtType("OWED")}
+                    className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg transition-colors ${debtType === "OWED" ? "bg-white dark:bg-zinc-800 shadow-sm text-gray-950 dark:text-white" : "text-gray-400"}`}
+                  >
+                    Me deben
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Nombre / Persona
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={debtName}
+                    onChange={(e) => setDebtName(e.target.value)}
+                    placeholder="Ej. Juan Pérez"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Monto Total
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-400 text-sm">$</span>
+                    </div>
+                    <input
+                      required
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      onKeyDown={blockNegativeKeys}
+                      value={debtAmount}
+                      onChange={(e) => setDebtAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Fecha límite (Opcional)
+                  </label>
+                  <input
+                    type="date"
+                    value={debtDueDate}
+                    onChange={(e) => setDebtDueDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    await handleAddDebt(e);
+                    setShowAddDebtInline(false);
+                  }}
+                  className="w-full min-h-[44px] bg-gray-950 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-zinc-100 text-white py-2 rounded-xl text-xs font-bold transition-colors"
+                >
+                  Registrar Compromiso
+                </button>
+              </motion.div>
+            )}
+
+            {debts.length === 0 ? (
+              <div className="p-8 text-center bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl space-y-2">
+                <Banknote className="w-8 h-8 text-gray-300 mx-auto" />
+                <p className="text-xs font-semibold text-gray-500">No hay deudas personales registradas</p>
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                {debts.map((debt) => {
+                  const isOwed = debt.type === "OWED";
+                  const paidAmount = debt.amount_cents - debt.remaining_cents;
+                  const progress = Math.min(100, Math.round((paidAmount / debt.amount_cents) * 100));
+
+                  return (
+                    <div
+                      key={debt.id}
+                      className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-3"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${isOwed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" : "bg-gray-900 text-white dark:bg-white dark:text-gray-900"}`}>
+                              {isOwed ? "Me deben" : "Debo"}
+                            </span>
+                            <h3 className="font-bold text-sm text-gray-900 dark:text-white truncate max-w-[140px]">
+                              {debt.name}
+                            </h3>
+                          </div>
+                          {debt.due_date && (
+                            <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                              <span>Límite: {formatTxDateShort(debt.due_date)}</span>
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="text-right">
+                          <p className="text-[9px] text-gray-400 dark:text-zinc-500 uppercase font-semibold">Restante</p>
+                          <p className="font-black text-sm text-gray-900 dark:text-white">
+                            {formatCurrency(debt.remaining_cents)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="space-y-1">
+                        <div className="h-1 bg-gray-100 dark:bg-zinc-850 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-gray-400 dark:text-zinc-500">
+                          <span>Pagado: {formatCurrency(paidAmount)}</span>
+                          <span>{progress}%</span>
+                        </div>
+                      </div>
+
+                      {/* Actions row */}
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-100/50 dark:border-zinc-800/50">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingDebt(debt);
+                              setEditDebtName(debt.name);
+                              setEditDebtType(debt.type);
+                              setEditDebtAmount((debt.amount_cents / 100).toString());
+                              setEditDebtRemaining((debt.remaining_cents / 100).toString());
+                              setEditDebtDueDate(debt.due_date || "");
+                            }}
+                            className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1.5 hover:bg-gray-50 dark:hover:bg-zinc-850 rounded-lg transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDebt(debt.id)}
+                            className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-gray-50 dark:hover:bg-zinc-850 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {debt.remaining_cents > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowPayDebtModal(debt);
+                              setPayDebtAmount("");
+                              setPayDebtAccountId("");
+                            }}
+                            className="text-xs font-bold bg-gray-950 hover:bg-black dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Abonar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {debtSubTab === "installments" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center px-1">
+              <span className="text-xs font-bold text-gray-400 dark:text-zinc-500">
+                Compras Diferidas (Cuotas)
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowInstallmentModal(true)}
+                className="text-[11px] font-bold text-gray-905 dark:text-white flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg"
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+                Agregar
+              </button>
+            </div>
+
+            {installments.filter(i => i.status === "ACTIVE").length === 0 ? (
+              <div className="p-8 text-center bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl space-y-2">
+                <Layers className="w-8 h-8 text-gray-300 mx-auto" />
+                <p className="text-xs font-semibold text-gray-500">No tienes compras diferidas activas</p>
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                {installments
+                  .filter(i => i.status === "ACTIVE")
+                  .map((inst) => {
+                    const remainingInstallments = inst.total_installments - inst.paid_installments;
+                    const remainingCents = remainingInstallments * inst.installment_amount_cents;
+                    const paidCents = inst.paid_installments * inst.installment_amount_cents;
+                    const progress = Math.min(100, Math.round((inst.paid_installments / inst.total_installments) * 100));
+                    const backedAccount = accounts.find(a => a.id === inst.account_id);
+
+                    return (
+                      <div
+                        key={inst.id}
+                        className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-3"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate max-w-[150px]">
+                              {inst.name}
+                            </h4>
+                            <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-1">
+                              Respaldo: {backedAccount ? backedAccount.name : "Cuenta General"}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase font-semibold block">Próxima cuota</span>
+                            <span className="font-extrabold text-sm text-gray-950 dark:text-white">
+                              {formatCurrency(inst.installment_amount_cents)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-[10px] bg-gray-50/50 dark:bg-zinc-900/30 p-2 rounded-xl">
+                          <div>
+                            <span className="text-gray-400 block font-medium">Pagado</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(paidCents)}</span>
+                          </div>
+                          <div className="border-l border-gray-100 dark:border-zinc-800 pl-3">
+                            <span className="text-gray-400 block font-medium">Falta</span>
+                            <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(remainingCents)}</span>
+                          </div>
+                        </div>
+
+                        {/* Progress */}
+                        <div className="space-y-1">
+                          <div className="h-1 bg-gray-100 dark:bg-zinc-850 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[9px] text-gray-400 dark:text-zinc-500">
+                            <span>Cuotas pagadas: {inst.paid_installments}/{inst.total_installments}</span>
+                            <span>{progress}%</span>
+                          </div>
+                        </div>
+
+                        {/* Payment / Delete actions */}
+                        <div className="flex justify-between items-center pt-2.5 border-t border-gray-100/50 dark:border-zinc-800/50">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInstallment(inst.id)}
+                            className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-gray-50 dark:hover:bg-zinc-850 rounded-lg transition-colors"
+                            title="Eliminar registro"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {remainingInstallments > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handlePayInstallment(inst)}
+                              className="text-xs font-bold bg-gray-950 hover:bg-black dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 text-white px-3 py-1.5 rounded-lg transition-all"
+                            >
+                              Pagar Cuota
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderMobileOverview = () => {
     const netMonthCents = incomeThisMonth - expensesThisMonth;
 
@@ -7483,7 +8355,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   {/* DEBTS & CARDS TAB */}
                   {effectiveTab === "debts" && (
                     <div className="space-y-10">
-                      {/* Credit & Debit Cards Visual Section */}
+                      {isMobile ? renderMobileDebts() : (
+                        <>
+                          {/* Credit & Debit Cards Visual Section */}
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <div>
@@ -7864,6 +8738,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                           </div>
                         </div>
                       </div>
+                        </>
+                      )}
                     </div>
                   )}
 
