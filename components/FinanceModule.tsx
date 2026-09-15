@@ -5712,9 +5712,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                           </button>
                         )}
                       </div>
-                      <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                        {getPlanSubViewTitle(mobilePlanSubView)}
-                      </h2>
+                      {mobilePlanSubView !== "subscriptions" && (
+                        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                          {getPlanSubViewTitle(mobilePlanSubView)}
+                        </h2>
+                      )}
                     </div>
                   )}
 
@@ -5830,12 +5832,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         </span>
                         <div className="space-y-2">
                           {[
-                            {
-                              id: "calendar",
-                              label: "Calendario de pagos",
-                              subtitle: "Vencimientos y fechas clave del mes",
-                              icon: CalendarDays,
-                            },
                             {
                               id: "subscriptions",
                               label: "Suscripciones",
@@ -6734,18 +6730,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       return (
                         <div className="space-y-6 max-w-5xl mx-auto">
                           {/* Native Header Bar */}
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-150 dark:border-zinc-800">
-                            <div className="hidden sm:flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">
-                                  Presupuestos
-                                </h2>
-                                <span className="text-xs font-medium text-gray-400 dark:text-zinc-500 capitalize truncate">
-                                  • {monthDisplayTitle}
-                                </span>
-                              </div>
+                          <div className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-gray-150 dark:border-zinc-800 w-full">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
+                                Presupuestos
+                              </h2>
+                              <span className="hidden sm:inline text-xs font-medium text-gray-400 dark:text-zinc-500 capitalize truncate">
+                                • {monthDisplayTitle}
+                              </span>
 
-                              {/* Desktop Add Breakdown Action (Same line as title) */}
+                              {/* Desktop Add Breakdown Action */}
                               <button
                                 onClick={() => {
                                   setEditingBudgetItem(null);
@@ -6756,7 +6750,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   setBudgetItemCategoryId("");
                                   setShowBudgetItemModal(true);
                                 }}
-                                className="hidden sm:flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-1.5 rounded-xl font-medium text-xs shadow-xs transition-all shrink-0"
+                                className="hidden sm:flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3 py-1.5 rounded-xl font-medium text-xs shadow-xs transition-all shrink-0 ml-2"
                               >
                                 <PlusIcon className="w-3.5 h-3.5" />
                                 <span>Desglose</span>
@@ -6764,14 +6758,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             </div>
 
                             {/* Month Selector with 'Actual' Tag on exact same line */}
-                            <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                              <div className="flex items-center gap-1 bg-white dark:bg-[#0a0a0a] p-1 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-2xs">
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="flex items-center gap-0.5 sm:gap-1 bg-white dark:bg-[#0a0a0a] p-1 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-2xs">
                                 <button
                                   onClick={handlePrevMonth}
                                   className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
                                   title="Mes anterior"
                                 >
-                                  <ChevronLeft className="w-4 h-4" />
+                                  <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </button>
                                 <input
                                   type="month"
@@ -6780,30 +6774,31 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                     e.target.value &&
                                     setSelectedBudgetMonth(e.target.value)
                                   }
-                                  className="px-1.5 py-0.5 text-xs font-semibold bg-transparent text-gray-900 dark:text-white outline-none cursor-pointer"
+                                  className="px-1 py-0.5 text-xs font-semibold bg-transparent text-gray-900 dark:text-white outline-none cursor-pointer max-w-[105px] sm:max-w-none"
                                 />
                                 <button
                                   onClick={handleNextMonth}
                                   className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
                                   title="Mes siguiente"
                                 >
-                                  <ChevronRight className="w-4 h-4" />
+                                  <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </button>
-                                {selectedBudgetMonth === currentMonthPrefix ? (
-                                  <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-md shrink-0">
-                                    Actual
-                                  </span>
-                                ) : (
-                                  <button
-                                    onClick={() =>
-                                      setSelectedBudgetMonth(currentMonthPrefix)
-                                    }
-                                    className="px-2 py-0.5 text-[11px] font-medium text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
-                                  >
-                                    Hoy
-                                  </button>
-                                )}
                               </div>
+
+                              {selectedBudgetMonth === currentMonthPrefix ? (
+                                <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-md shrink-0">
+                                  Actual
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    setSelectedBudgetMonth(currentMonthPrefix)
+                                  }
+                                  className="px-2 py-1 text-[11px] font-medium text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
+                                >
+                                  Hoy
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -7438,34 +7433,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                         return (
                           <div className="space-y-5 max-w-5xl mx-auto">
-                            {/* Header & Action */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-150 dark:border-zinc-800">
-                              <div>
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                  <Calendar className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-                                  Suscripciones
-                                </h3>
-                                <p className="text-xs text-gray-500">
-                                  Servicios periódicos y pagos recurrentes programados
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRecDesc("");
-                                  setRecAmount("");
-                                  setRecFrequency("monthly");
-                                  setRecNextDate(getTodayStr());
-                                  setRecAccountId(accounts.length > 0 ? accounts[0].id : "");
-                                  setRecCategoryId("");
-                                  setShowNewSubscriptionModal(true);
-                                }}
-                                className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2.5 rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-95"
-                              >
-                                <PlusIcon className="w-4 h-4" />
-                                Nueva Suscripción
-                              </button>
+                            {/* Header */}
+                            <div className="pb-2 border-b border-gray-150 dark:border-zinc-800">
+                              <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Calendar className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                                Suscripciones
+                              </h3>
                             </div>
 
                             {/* Summary Card */}
@@ -14916,6 +14889,172 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
                   >
                     {editingBudgetItem ? "Guardar Cambios" : "Crear Desglose"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* New Subscription Bottom Sheet Modal */}
+      <AnimatePresence>
+        {showNewSubscriptionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+            onClick={() => setShowNewSubscriptionModal(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
+            >
+              {/* Mobile Drag Handle */}
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Nueva Suscripción
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">
+                    Registra un servicio o pago recurrente
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNewSubscriptionModal(false)}
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  await handleCreateRecurring(e);
+                  setShowNewSubscriptionModal(false);
+                }}
+                className="space-y-4"
+              >
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Nombre / Servicio
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={recDesc}
+                    onChange={(e) => setRecDesc(e.target.value)}
+                    placeholder="Ej. Netflix, Spotify, Gimnasio..."
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                      Monto ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={recAmount}
+                      onChange={(e) =>
+                        setRecAmount(e.target.value.replace(/-/g, ""))
+                      }
+                      placeholder="0.00"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                      Frecuencia
+                    </label>
+                    <select
+                      value={recFrequency}
+                      onChange={(e) => setRecFrequency(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
+                    >
+                      <option value="monthly">Mensual</option>
+                      <option value="yearly">Anual</option>
+                      <option value="weekly">Semanal</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                      Próximo Cobro
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={recNextDate}
+                      onChange={(e) => setRecNextDate(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                      Cuenta Cargo
+                    </label>
+                    <select
+                      value={recAccountId}
+                      onChange={(e) => setRecAccountId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
+                    >
+                      <option value="">Seleccionar cuenta...</option>
+                      {accounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Categoría (Opcional)
+                  </label>
+                  <select
+                    value={recCategoryId}
+                    onChange={(e) => setRecCategoryId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
+                  >
+                    <option value="">Sin categoría</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon || "🏷️"} {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewSubscriptionModal(false)}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
+                  >
+                    Guardar Suscripción
                   </button>
                 </div>
               </form>
