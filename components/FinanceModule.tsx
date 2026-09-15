@@ -4351,10 +4351,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         { id: "planning", icon: CalendarDays, label: "Planificación" },
         { id: "savings", icon: CheckCircle2, label: "Metas" },
         { id: "shopping", icon: ShoppingCart, label: "Compras" },
-        { id: "debts", icon: Banknote, label: "Deudas" },
+        { id: "debts", icon: CreditCard, label: "Tarjetas" },
         { id: "stats", icon: BarChart3, label: "Análisis" },
         { id: "closing", icon: Archive, label: "Cierre" },
-        { id: "settings", icon: Settings, label: "Ajustes" },
       ].map((tab) => (
         <button
           key={tab.id}
@@ -5349,7 +5348,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   return (
     <div className="relative flex flex-col h-full bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 overflow-hidden">
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-1 sm:pt-6 pb-28 sm:pb-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-0 sm:pt-4 pb-28 sm:pb-6">
         <div className="max-w-5xl mx-auto">
           {!isUnlocked ? (
             <div className="min-h-[60vh] flex items-center justify-center p-4">
@@ -8200,7 +8199,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             </p>
                             <p className="text-xs text-gray-500">
                               Agrega tus tarjetas de crédito o débito desde
-                              Ajustes para llevar control de deudas y fechas de
+                              la sección Cuentas para llevar control de deudas y fechas de
                               pago.
                             </p>
                           </div>
@@ -9832,9 +9831,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                             return (
                               <div className="space-y-6 animate-fade-in">
-                                <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-2">
-                                  Reporte detallado del mes, incluyendo balances, egresos por categoría e historial completo.
-                                </p>
 
                                 {/* Metrics Summary */}
                                 <div className="grid grid-cols-2 gap-3">
@@ -10270,67 +10266,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                               })()}
                             </div>
 
-                            {/* Cerrar Mes Confirmation Dialog */}
-                            <AnimatePresence>
-                              {showConfirmCloseMonth && (
-                                <motion.div
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
-                                  onClick={() => setShowConfirmCloseMonth(false)}
-                                >
-                                  <motion.div
-                                    initial={{ y: "100%" }}
-                                    animate={{ y: 0 }}
-                                    exit={{ y: "100%" }}
-                                    transition={{ type: "spring", damping: 25, stiffness: 280 }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-sm border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 shadow-2xl text-center"
-                                  >
-                                    {/* Mobile Drag Handle */}
-                                    <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
-
-                                    <div className="space-y-1.5">
-                                      <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                                        Cerrar {(() => {
-                                          const monthsList = [
-                                            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                                            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-                                          ];
-                                          const [, mn] = currentMonthPrefix.split("-");
-                                          return monthsList[parseInt(mn) - 1];
-                                        })()} {currentMonthPrefix.split("-")[0]}
-                                      </h3>
-                                      <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                        Se guardará un resumen del mes para consultas y reportes. Los movimientos originales no se eliminarán.
-                                      </p>
-                                    </div>
-
-                                    <div className="flex gap-2.5 pt-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowConfirmCloseMonth(false)}
-                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
-                                      >
-                                        Cancelar
-                                      </button>
-                                      
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setMonthIsClosedStatus(prev => ({ ...prev, [currentMonthPrefix]: true }));
-                                          setShowConfirmCloseMonth(false);
-                                        }}
-                                        className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
-                                      >
-                                        Cerrar mes
-                                      </button>
-                                    </div>
-                                  </motion.div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
+                            
                           </div>
                         )}
                       </div>
@@ -13345,17 +13281,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setEditingAccount(null)}
           >
             <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-t-[2rem] sm:rounded-3xl p-6 w-full max-w-lg shadow-2xl border border-gray-200 dark:border-zinc-800 max-h-[88vh] overflow-y-auto space-y-4"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
             >
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
               <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-3 cursor-grab" />
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
@@ -13726,14 +13663,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowCreateAccountModal(false)}
           >
             <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
               className="bg-white dark:bg-[#0a0a0a] rounded-t-[2rem] sm:rounded-3xl p-6 w-full max-w-lg shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[88vh] overflow-y-auto"
             >
@@ -14137,12 +14074,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowCreateCategoryModal(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
               onClick={(e) => e.stopPropagation()}
               className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[88vh] overflow-y-auto custom-scrollbar"
             >
@@ -15621,6 +15558,255 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
           </motion.div>
         )}
       </AnimatePresence>
+${closingFragment}
+
+      
+      
+      {/* Cerrar Mes Confirmation Dialog */}
+                            <AnimatePresence>
+                              {showConfirmCloseMonth && (
+                                <motion.div
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+                                  onClick={() => setShowConfirmCloseMonth(false)}
+                                >
+                                  <motion.div
+                                    initial={{ y: "100%" }}
+                                    animate={{ y: 0 }}
+                                    exit={{ y: "100%" }}
+                                    transition={{ type: "spring", damping: 25, stiffness: 280 }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-sm border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 shadow-2xl text-center"
+                                  >
+                                    {/* Mobile Drag Handle */}
+                                    <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
+                                    <div className="space-y-1.5">
+                                      <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                                        Cerrar {(() => {
+                                          const monthsList = [
+                                            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                                            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                                          ];
+                                          const [, mn] = currentMonthPrefix.split("-");
+                                          return monthsList[parseInt(mn) - 1];
+                                        })()} {currentMonthPrefix.split("-")[0]}
+                                      </h3>
+                                      <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                        Se guardará un resumen del mes para consultas y reportes. Los movimientos originales no se eliminarán.
+                                      </p>
+                                    </div>
+
+                                    <div className="flex gap-2.5 pt-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowConfirmCloseMonth(false)}
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
+                                      >
+                                        Cancelar
+                                      </button>
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMonthIsClosedStatus(prev => ({ ...prev, [currentMonthPrefix]: true }));
+                                          setShowConfirmCloseMonth(false);
+                                        }}
+                                        className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
+                                      >
+                                        Cerrar mes
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+      
+
+      {/* Modal / Bottom Sheet para Registrar Préstamo */}
+      <AnimatePresence>
+        {showAddDebtModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+            onClick={() => setShowAddDebtModal(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
+            >
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-900">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  Registrar Préstamo
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddDebtModal(false)}
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:text-zinc-500 dark:hover:text-white rounded-lg transition-colors"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <form onSubmit={handleAddDebt} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Tipo de Préstamo
+                  </label>
+                  <select
+                    value={debtType}
+                    onChange={(e) => setDebtType(e.target.value as "OWE" | "OWED")}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                  >
+                    <option value="OWE">Yo debo dinero (Tengo que pagar)</option>
+                    <option value="OWED">Me deben dinero (Me tienen que pagar)</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Nombre o Motivo
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={debtName}
+                    onChange={(e) => setDebtName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                    placeholder="Ej. Préstamo de Juan"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Monto
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={debtAmount}
+                    onChange={(e) => setDebtAmount(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Fecha Límite (Opcional)
+                  </label>
+                  <input
+                    type="date"
+                    value={debtDueDate}
+                    onChange={(e) => setDebtDueDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                  />
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-sm font-semibold transition-colors"
+                  >
+                    Registrar Préstamo
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Subscription Details Bottom Sheet */}
+      <AnimatePresence>
+        {selectedMobileSub && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+            onClick={() => setSelectedMobileSub(null)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
+            >
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-900">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  Detalles de Suscripción
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMobileSub(null)}
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:text-zinc-500 dark:hover:text-white rounded-lg transition-colors"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="text-center p-4 bg-gray-50 dark:bg-[#121212] rounded-2xl border border-gray-100 dark:border-zinc-800/80">
+                  <div className="text-sm font-semibold text-gray-600 dark:text-zinc-400 mb-1">
+                    {selectedMobileSub.name}
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatCurrency(selectedMobileSub.amount_cents)}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 border border-gray-100 dark:border-zinc-800/80 rounded-xl">
+                    <span className="text-xs text-gray-500 dark:text-zinc-400 font-medium">Ciclo de facturación</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white uppercase">
+                      {selectedMobileSub.billing_cycle === "MONTHLY" ? "Mensual" : "Anual"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border border-gray-100 dark:border-zinc-800/80 rounded-xl">
+                    <span className="text-xs text-gray-500 dark:text-zinc-400 font-medium">Día de facturación</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Día {selectedMobileSub.billing_day}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 border border-gray-100 dark:border-zinc-800/80 rounded-xl">
+                    <span className="text-xs text-gray-500 dark:text-zinc-400 font-medium">Categoría</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {(() => {
+                        const cat = categories.find((c) => c.id === selectedMobileSub.category_id);
+                        return cat ? `${cat.emoji} ${cat.name}` : "Sin Categoría";
+                      })()}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = selectedMobileSub.id;
+                    setSelectedMobileSub(null);
+                    handleDeleteSubscription(id);
+                  }}
+                  className="w-full py-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-semibold text-sm rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                >
+                  Cancelar Suscripción
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       </FinancePortal>
     </div>
   );
