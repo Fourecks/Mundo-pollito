@@ -997,6 +997,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const [loadExpenseDescription, setLoadExpenseDescription] = useState("");
   const [loadExpenseDate, setLoadExpenseDate] = useState("");
 
+  // Mobile Shopping List Drill-down & Bottom Sheet Product Modal
+  const [selectedShoppingListId, setSelectedShoppingListId] = useState<number | null>(null);
+  const [showAddShoppingItemModal, setShowAddShoppingItemModal] = useState<number | null>(null);
+  const [productItemName, setProductItemName] = useState("");
+  const [productItemQty, setProductItemQty] = useState("1");
+  const [productItemPrice, setProductItemPrice] = useState("");
+
+  // Collapsible Savings Goals State
+  const [expandedGoalIds, setExpandedGoalIds] = useState<number[]>([]);
+
   const getPlanSubViewOnPlus = (sub: string | null) => {
     switch (sub) {
       case "budgets":
@@ -1042,8 +1052,15 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         };
       case "shopping":
         return () => {
-          setNewListName("");
-          setShowCreateShoppingListModal(true);
+          if (isMobile && selectedShoppingListId !== null) {
+            setProductItemName("");
+            setProductItemQty("1");
+            setProductItemPrice("");
+            setShowAddShoppingItemModal(selectedShoppingListId);
+          } else {
+            setNewListName("");
+            setShowCreateShoppingListModal(true);
+          }
         };
       default:
         return undefined;
@@ -3883,6 +3900,64 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     fetchFinanceData();
   };
 
+  const handleAddProductItemModalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showAddShoppingItemModal || !productItemName.trim()) return;
+
+    const listId = showAddShoppingItemModal;
+    const qty = Math.max(1, parseInt(productItemQty || "1", 10) || 1);
+    const rawPrice = productItemPrice || "0";
+    const priceCents = Math.round(Math.max(0, parseFloat(rawPrice) || 0) * 100);
+    const tempId = Date.now();
+    const trimmedName = productItemName.trim();
+
+    const newItemObj: FinanceShoppingItem = {
+      id: tempId,
+      user_id: "local",
+      list_id: listId,
+      name: trimmedName,
+      quantity: qty,
+      price_cents: priceCents,
+      is_purchased: false,
+      created_at: new Date().toISOString(),
+    };
+
+    setShoppingItems((prev) => [...prev, newItemObj]);
+    setProductItemName("");
+    setProductItemQty("1");
+    setProductItemPrice("");
+    setShowAddShoppingItemModal(null);
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from("finance_shopping_items")
+          .insert([
+            {
+              user_id: user.id,
+              list_id: listId,
+              name: trimmedName,
+              quantity: qty,
+              price_cents: priceCents,
+              is_purchased: false,
+            },
+          ])
+          .select();
+        if (!error && data && data.length > 0) {
+          setShoppingItems((prev) =>
+            prev.map((i) => (i.id === tempId ? data[0] : i)),
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Error adding shopping item from sheet:", err);
+    }
+    fetchFinanceData();
+  };
+
   const handleDeleteShoppingItem = async (itemId: number) => {
     setShoppingItems((prev) => prev.filter((i) => i.id !== itemId));
     try {
@@ -3910,6 +3985,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
   const handleDeleteShoppingList = async (listId: number) => {
     if (!confirm("¿Eliminar esta lista?")) return;
+    if (selectedShoppingListId === listId) {
+      setSelectedShoppingListId(null);
+    }
     setShoppingLists((prev) => prev.filter((l) => l.id !== listId));
     setShoppingItems((prev) => prev.filter((i) => i.list_id !== listId));
     try {
@@ -5702,11 +5780,21 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       <div className="flex items-center justify-between">
                         <button
                           type="button"
-                          onClick={() => setMobilePlanSubView(null)}
+                          onClick={() => {
+                            if (mobilePlanSubView === "shopping" && selectedShoppingListId !== null) {
+                              setSelectedShoppingListId(null);
+                            } else {
+                              setMobilePlanSubView(null);
+                            }
+                          }}
                           className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors py-1.5 px-2.5 -ml-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800/80"
                         >
                           <ChevronLeft className="w-4 h-4 text-gray-400 dark:text-zinc-500" />
-                          <span>Planificar</span>
+                          <span>
+                            {mobilePlanSubView === "shopping" && selectedShoppingListId !== null
+                              ? "Listas"
+                              : "Planificar"}
+                          </span>
                         </button>
                         
                         {getPlanSubViewOnPlus(mobilePlanSubView) && (
@@ -7791,15 +7879,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   goal.custom_contribution_cents,
                                 );
                                 const projection = calculateEstimatedCompletionDate(goal);
+                                const isExpanded = expandedGoalIds.includes(goal.id);
 
                                 return (
                                   <div
                                     key={goal.id}
-                                    className="bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 p-4 rounded-2xl space-y-3 shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
+                                    className="bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 p-3.5 sm:p-4 rounded-2xl space-y-2.5 shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
                                   >
-                                    <div className="flex justify-between items-start">
-                                      <div className="min-w-0 pr-2">
-                                        <div className="flex items-center gap-2 flex-wrap">
+                                    {/* Fila Principal: Siempre visible sin desplegar */}
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="min-w-0 flex-1 pr-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
                                           <h3 className="font-bold text-sm text-gray-900 dark:text-white truncate">
                                             {goal.name}
                                           </h3>
@@ -7807,85 +7897,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                             {freqLabel}
                                           </span>
                                         </div>
-                                        {goal.target_date ? (
-                                          <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                            <Calendar className="w-3 h-3 text-gray-400" />
-                                            Meta para: {goal.target_date}
-                                          </p>
-                                        ) : (
-                                          <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                            <Calendar className="w-3 h-3 text-gray-400" />
-                                            Sin fecha límite (Indefinida)
-                                          </p>
-                                        )}
-                                      </div>
-
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        <div className="text-right">
-                                          <p className="font-bold text-sm text-gray-900 dark:text-white">
+                                        <div className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
+                                          <span className="font-bold text-gray-900 dark:text-white">
                                             {formatCurrency(goal.current_amount_cents)}
-                                          </p>
-                                          <p className="text-[10px] text-gray-400">
-                                            de {formatCurrency(goal.target_amount_cents)}
-                                          </p>
+                                          </span>{" "}
+                                          <span className="text-[10px] text-gray-400">
+                                            / {formatCurrency(goal.target_amount_cents)}
+                                          </span>
                                         </div>
+                                      </div>
+
+                                      {/* Esquina derecha: Botón Aportar y Flechita para desplegar */}
+                                      <div className="flex items-center gap-1.5 shrink-0">
                                         <button
                                           type="button"
-                                          onClick={() => handleDeleteGoal(goal.id)}
-                                          className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                                          title="Eliminar meta"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                    {/* Badges */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                      {cuotaInfo.cuota !== null && cuotaInfo.cuota > 0 && (
-                                        <div className="p-2 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800 flex items-center justify-between">
-                                          <div>
-                                            <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">
-                                              Abono sugerido
-                                            </span>
-                                            <span className="font-bold text-gray-900 dark:text-white text-xs">
-                                              ${cuotaInfo.cuota.toFixed(2)}
-                                            </span>
-                                          </div>
-                                          <span className="text-[10px] text-gray-500 bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-zinc-700">
-                                            ~{cuotaInfo.periods} abonos
-                                          </span>
-                                        </div>
-                                      )}
-                                      {projection && (
-                                        <div className="p-2 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
-                                          <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider flex items-center gap-1">
-                                            <Target className="w-3 h-3 text-gray-500" /> Proyección
-                                          </span>
-                                          <span className="font-medium text-gray-700 dark:text-gray-300 text-xs">
-                                            {projection.isCompleted
-                                              ? projection.text
-                                              : `Estimado: ${projection.dateFormatted}`}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Progress Bar & Actions */}
-                                    <div className="space-y-1.5 pt-1">
-                                      <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                        <div
-                                          className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
-                                          style={{ width: `${progress}%` }}
-                                        />
-                                      </div>
-                                      <div className="flex justify-between items-center pt-0.5">
-                                        <span className="text-[11px] text-gray-400 font-medium">
-                                          {progress}% completado
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
+                                          onClick={(e) => {
+                                            e.stopPropagation();
                                             setShowContributeModal(goal.id);
                                             if (
                                               goal.custom_contribution_cents &&
@@ -7902,8 +7929,107 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         >
                                           Aportar
                                         </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setExpandedGoalIds((prev) =>
+                                              prev.includes(goal.id)
+                                                ? prev.filter((id) => id !== goal.id)
+                                                : [...prev, goal.id],
+                                            );
+                                          }}
+                                          className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                          title={isExpanded ? "Contraer detalles" : "Desplegar detalles"}
+                                          aria-label={isExpanded ? "Contraer detalles" : "Desplegar detalles"}
+                                        >
+                                          {isExpanded ? (
+                                            <ChevronUp className="w-4 h-4" />
+                                          ) : (
+                                            <ChevronDown className="w-4 h-4" />
+                                          )}
+                                        </button>
                                       </div>
                                     </div>
+
+                                    {/* Barra de Progreso: Siempre visible */}
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                                          style={{ width: `${progress}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-[10px] text-gray-400 font-medium shrink-0">
+                                        {progress}%
+                                      </span>
+                                    </div>
+
+                                    {/* Sección Desplegable con Flechita: Abono sugerido + Proyección en una misma fila y más */}
+                                    <AnimatePresence>
+                                      {isExpanded && (
+                                        <motion.div
+                                          initial={{ opacity: 0, height: 0 }}
+                                          animate={{ opacity: 1, height: "auto" }}
+                                          exit={{ opacity: 0, height: 0 }}
+                                          transition={{ duration: 0.2 }}
+                                          className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800/80 overflow-hidden"
+                                        >
+                                          {/* En una misma fila: Abono sugerido y Proyección */}
+                                          <div className="grid grid-cols-2 gap-2 text-xs">
+                                            <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
+                                              <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider truncate">
+                                                Abono sugerido
+                                              </span>
+                                              <span className="font-bold text-gray-900 dark:text-white text-xs truncate block mt-0.5">
+                                                {cuotaInfo.cuota !== null && cuotaInfo.cuota > 0
+                                                  ? `$${cuotaInfo.cuota.toFixed(2)}`
+                                                  : "N/A"}
+                                              </span>
+                                              {cuotaInfo.periods !== null && cuotaInfo.periods > 0 && (
+                                                <span className="text-[10px] text-gray-400 block truncate">
+                                                  ~{cuotaInfo.periods} abonos
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
+                                              <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider flex items-center gap-1 truncate">
+                                                <Target className="w-3 h-3 text-gray-500 shrink-0" /> Proyección
+                                              </span>
+                                              <span className="font-medium text-gray-700 dark:text-gray-300 text-xs truncate block mt-0.5">
+                                                {projection
+                                                  ? projection.isCompleted
+                                                    ? projection.text
+                                                    : projection.dateFormatted
+                                                  : "Indefinida"}
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          {/* Fecha límite y Botón Eliminar */}
+                                          <div className="flex items-center justify-between text-xs text-gray-400 pt-0.5">
+                                            <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                                              <Calendar className="w-3 h-3 text-gray-400 shrink-0" />
+                                              <span>
+                                                {goal.target_date
+                                                  ? `Meta para: ${goal.target_date}`
+                                                  : "Sin fecha límite (Indefinida)"}
+                                              </span>
+                                            </p>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteGoal(goal.id)}
+                                              className="text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs"
+                                              title="Eliminar meta"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                              <span>Eliminar</span>
+                                            </button>
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
                                   </div>
                                 );
                               })}
@@ -7937,373 +8063,383 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                     return (
                       <div className="space-y-5 max-w-4xl mx-auto">
-                        {/* Header & Actions */}
-                        <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-150 dark:border-zinc-800">
-                          <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
-                            Listas de Compras
-                          </h3>
+                        {(() => {
+                          const selectedList = selectedShoppingListId !== null
+                            ? shoppingLists.find((l) => l.id === selectedShoppingListId)
+                            : null;
 
-                          <div className="flex bg-gray-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-gray-200 dark:border-zinc-700/60 text-xs font-medium">
-                            <button
-                              type="button"
-                              onClick={() => setShoppingFilter("active")}
-                              className={`px-2.5 py-1.5 rounded-lg transition-all ${
-                                shoppingFilter === "active"
-                                  ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-2xs font-semibold"
-                                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                              }`}
-                            >
-                              Activas ({activeLists.length})
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShoppingFilter("archived")}
-                              className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
-                                shoppingFilter === "archived"
-                                  ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-2xs font-semibold"
-                                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                              }`}
-                            >
-                              <Archive className="w-3 h-3" /> Archivadas ({archivedLists.length})
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Summary Metrics */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800">
-                          <div>
-                            <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
-                              Total Estimado
-                            </span>
-                            <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
-                              {formatCurrency(totalActiveEstCents)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
-                              Total Comprado
-                            </span>
-                            <span className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                              {formatCurrency(totalActiveBoughtCents)}
-                            </span>
-                          </div>
-                          <div className="col-span-2 sm:col-span-1">
-                            <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
-                              Listas Activas
-                            </span>
-                            <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
-                              {activeLists.length} {activeLists.length === 1 ? "lista" : "listas"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Lists Content */}
-                        <div className="space-y-4">
-                          {displayedLists.length === 0 ? (
-                            <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center">
-                              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-zinc-400">
-                                {shoppingFilter === "archived"
-                                  ? "No hay listas archivadas"
-                                  : "No tienes listas de compras registradas"}
-                              </p>
-                            </div>
-                          ) : (
-                            displayedLists.map((list) => {
-                              const listItems = shoppingItems.filter((i) => i.list_id === list.id);
-                              const completed = listItems.filter((i) => i.is_purchased).length;
-                              const totalItems = listItems.length;
-                              const progress =
-                                totalItems === 0 ? 0 : Math.round((completed / totalItems) * 100);
-
-                              const totalEstCents = listItems.reduce(
-                                (acc, item) =>
-                                  acc + (item.quantity || 1) * (item.price_cents || 0),
+                          // Vista interior de una lista de compras específica
+                          if (selectedList) {
+                            const listItems = shoppingItems.filter((i) => i.list_id === selectedList.id);
+                            const completed = listItems.filter((i) => i.is_purchased).length;
+                            const totalItems = listItems.length;
+                            const progress =
+                              totalItems === 0 ? 0 : Math.round((completed / totalItems) * 100);
+                            const totalEstCents = listItems.reduce(
+                              (acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0),
+                              0,
+                            );
+                            const totalBoughtCents = listItems
+                              .filter((i) => i.is_purchased)
+                              .reduce(
+                                (acc, item) => acc + (item.quantity || 1) * (item.price_cents || 0),
                                 0,
                               );
-                              const totalBoughtCents = listItems
-                                .filter((i) => i.is_purchased)
-                                .reduce(
-                                  (acc, item) =>
-                                    acc + (item.quantity || 1) * (item.price_cents || 0),
-                                  0,
-                                );
-                              const totalPendingCents = Math.max(0, totalEstCents - totalBoughtCents);
+                            const totalPendingCents = Math.max(0, totalEstCents - totalBoughtCents);
 
-                              return (
-                                <div
-                                  key={list.id}
-                                  className="bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 p-4 sm:p-5 rounded-2xl shadow-2xs space-y-3.5"
-                                >
-                                  {/* List Header */}
-                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-2.5 border-b border-gray-100 dark:border-zinc-800/80 gap-2">
-                                    <div>
-                                      <h3 className="font-bold text-sm sm:text-base text-gray-900 dark:text-white flex items-center gap-2">
-                                        <span>{list.name}</span>
-                                        {list.is_archived && (
-                                          <span className="text-[10px] font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-500 px-2 py-0.5 rounded-md">
-                                            Archivada
-                                          </span>
-                                        )}
-                                      </h3>
-                                      <p className="text-[11px] text-gray-400 mt-0.5">
-                                        {completed} de {totalItems} artículos marcados ({progress}%)
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleResetShoppingList(list.id)}
-                                        className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all flex items-center gap-1 text-xs font-medium"
-                                        title="Restablecer lista"
-                                      >
-                                        <RefreshCw className="w-3.5 h-3.5" />
-                                        <span className="hidden sm:inline">Restablecer</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => handleToggleArchiveShoppingList(list)}
-                                        className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all flex items-center gap-1 text-xs font-medium"
-                                        title={list.is_archived ? "Desarchivar lista" : "Archivar lista"}
-                                      >
-                                        <Archive className="w-3.5 h-3.5" />
-                                        <span className="hidden sm:inline">
-                                          {list.is_archived ? "Desarchivar" : "Archivar"}
-                                        </span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteShoppingList(list.id)}
-                                        className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
-                                        title="Eliminar lista"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
+                            return (
+                              <div className="space-y-4">
+                                {/* Encabezado Nativo de la Lista */}
+                                <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-gray-150 dark:border-zinc-800">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedShoppingListId(null)}
+                                      className="p-1 -ml-1 text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white rounded-lg transition-colors shrink-0"
+                                      title="Volver a listas"
+                                      aria-label="Volver a listas"
+                                    >
+                                      <ChevronLeft className="w-5 h-5" />
+                                    </button>
+                                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate">
+                                      {selectedList.name}
+                                    </h3>
+                                    {selectedList.is_archived && (
+                                      <span className="text-[10px] font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-500 px-1.5 py-0.5 rounded-md shrink-0">
+                                        Archivada
+                                      </span>
+                                    )}
                                   </div>
 
-                                  {/* Progress bar */}
-                                  <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
-                                      style={{ width: `${progress}%` }}
-                                    />
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResetShoppingList(selectedList.id)}
+                                      className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                      title="Restablecer lista"
+                                    >
+                                      <RefreshCw className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleArchiveShoppingList(selectedList)}
+                                      className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                      title={selectedList.is_archived ? "Desarchivar" : "Archivar"}
+                                    >
+                                      <Archive className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleDeleteShoppingList(selectedList.id);
+                                        setSelectedShoppingListId(null);
+                                      }}
+                                      className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                      title="Eliminar lista"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
                                   </div>
+                                </div>
 
-                                  {/* Financial summary banner */}
-                                  <div className="grid grid-cols-3 gap-2 p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800 text-center">
+                                {/* Tarjeta compacta de métricas financieras */}
+                                <div className="bg-gray-50 dark:bg-[#121212] p-3.5 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-2.5">
+                                  <div className="grid grid-cols-3 gap-2 text-center">
                                     <div>
-                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block">
+                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block truncate">
                                         Estimado
                                       </span>
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate block">
                                         {formatCurrency(totalEstCents)}
                                       </span>
                                     </div>
                                     <div>
-                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block">
+                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block truncate">
                                         Comprado
                                       </span>
-                                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 truncate block">
                                         {formatCurrency(totalBoughtCents)}
                                       </span>
                                     </div>
                                     <div>
-                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block">
+                                      <span className="text-[10px] uppercase font-semibold text-gray-400 block truncate">
                                         Pendiente
                                       </span>
-                                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 truncate block">
                                         {formatCurrency(totalPendingCents)}
                                       </span>
                                     </div>
                                   </div>
 
-                                  {/* Load to expense trigger */}
-                                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl">
-                                    <div className="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                      <Banknote className="w-4 h-4 text-gray-500 shrink-0" />
-                                      <span>
-                                        Listo para cargar:{" "}
-                                        <strong className="text-gray-900 dark:text-white font-semibold">
-                                          {formatCurrency(totalBoughtCents)}
-                                        </strong>
-                                      </span>
+                                  <div className="space-y-1 pt-1.5 border-t border-gray-200 dark:border-zinc-800/80">
+                                    <div className="flex justify-between items-center text-[10px] text-gray-400 font-medium">
+                                      <span>{completed} de {totalItems} artículos marcados</span>
+                                      <span>{progress}%</span>
                                     </div>
-                                    <button
-                                      type="button"
-                                      disabled={completed === 0 || totalBoughtCents <= 0}
-                                      onClick={() => handleOpenLoadExpenseModal(list)}
-                                      className={`w-full sm:w-auto px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                                        completed === 0 || totalBoughtCents <= 0
-                                          ? "bg-gray-100 dark:bg-zinc-800 text-gray-400 border border-gray-200 dark:border-zinc-700 cursor-not-allowed"
-                                          : "bg-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 text-white cursor-pointer shadow-2xs active:scale-95"
-                                      }`}
-                                      title={
-                                        completed === 0
-                                          ? "Marca artículos con el check para habilitar"
-                                          : "Cargar costo a tu cuenta"
-                                      }
-                                    >
-                                      <CreditCard className="w-3.5 h-3.5" />
-                                      Cargar a Gasto
-                                    </button>
+                                    <div className="h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                                        style={{ width: `${progress}%` }}
+                                      />
+                                    </div>
                                   </div>
+                                </div>
 
-                                  {/* Items list */}
-                                  <div className="space-y-1.5 max-h-[170px] overflow-y-auto no-scrollbar pr-0.5">
-                                    {listItems.length === 0 ? (
-                                      <p className="text-xs text-gray-400 italic py-2 text-center">
-                                        No hay artículos en esta lista aún.
+                                {/* Lista de artículos */}
+                                <div className="space-y-2">
+                                  {listItems.length === 0 ? (
+                                    <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-6 text-center">
+                                      <p className="text-xs font-medium text-gray-500 dark:text-zinc-400">
+                                        No hay artículos en esta lista aún
                                       </p>
-                                    ) : (
-                                      listItems.map((item) => {
-                                        const itemTotalCents =
-                                          (item.quantity || 1) * (item.price_cents || 0);
-                                        return (
-                                          <div
-                                            key={item.id}
-                                            className="flex items-center justify-between p-2.5 bg-gray-50/70 dark:bg-[#121212] rounded-xl border border-gray-100 dark:border-zinc-800/80 group hover:border-gray-200 dark:hover:border-zinc-700 transition-all"
-                                          >
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                              <button
-                                                type="button"
-                                                onClick={() => handleToggleShoppingItem(item)}
-                                                className={`w-4 h-4 rounded border ${
-                                                  item.is_purchased
-                                                    ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900"
-                                                    : "border-gray-300 dark:border-zinc-700 hover:border-gray-400"
-                                                } flex items-center justify-center transition-all shrink-0`}
-                                              >
-                                                {item.is_purchased && (
-                                                  <CheckCircle2 className="w-3 h-3" />
-                                                )}
-                                              </button>
-                                              <div className="truncate">
-                                                <span
-                                                  className={`text-xs font-medium ${
-                                                    item.is_purchased
-                                                      ? "line-through text-gray-400"
-                                                      : "text-gray-900 dark:text-white"
-                                                  }`}
-                                                >
-                                                  {item.name}
-                                                </span>
-                                                {((item.quantity && item.quantity > 1) ||
-                                                  (item.price_cents && item.price_cents > 0)) && (
-                                                  <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                                                    {item.quantity && item.quantity > 1 && (
-                                                      <span className="font-medium text-gray-500 dark:text-gray-400">
-                                                        {item.quantity} ud.
-                                                      </span>
-                                                    )}
-                                                    {item.price_cents && item.price_cents > 0 && (
-                                                      <span>
-                                                        c/u: {formatCurrency(item.price_cents)}
-                                                      </span>
-                                                    )}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                              {itemTotalCents > 0 && (
-                                                <span
-                                                  className={`text-xs font-semibold ${
-                                                    item.is_purchased
-                                                      ? "text-gray-400 line-through"
-                                                      : "text-gray-900 dark:text-white"
-                                                  }`}
-                                                >
-                                                  {formatCurrency(itemTotalCents)}
-                                                </span>
+                                    </div>
+                                  ) : (
+                                    listItems.map((item) => {
+                                      const itemTotalCents = (item.quantity || 1) * (item.price_cents || 0);
+                                      return (
+                                        <div
+                                          key={item.id}
+                                          className="flex items-center justify-between p-3 bg-white dark:bg-[#0a0a0a] rounded-2xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs gap-2"
+                                        >
+                                          <div className="flex items-center gap-2.5 min-w-0">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleShoppingItem(item)}
+                                              className={`w-5 h-5 rounded-lg border ${
+                                                item.is_purchased
+                                                  ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900"
+                                                  : "border-gray-300 dark:border-zinc-700 hover:border-gray-400"
+                                              } flex items-center justify-center transition-all shrink-0`}
+                                            >
+                                              {item.is_purchased && (
+                                                <CheckCircle2 className="w-3.5 h-3.5" />
                                               )}
-                                              <button
-                                                type="button"
-                                                onClick={() => handleDeleteShoppingItem(item.id)}
-                                                className="text-gray-400 hover:text-red-500 p-1 opacity-60 group-hover:opacity-100 transition-opacity"
-                                                title="Eliminar artículo"
+                                            </button>
+                                            <div className="truncate">
+                                              <span
+                                                className={`text-xs font-medium ${
+                                                  item.is_purchased
+                                                    ? "line-through text-gray-400"
+                                                    : "text-gray-900 dark:text-white"
+                                                }`}
                                               >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                              </button>
+                                                {item.name}
+                                              </span>
+                                              {((item.quantity && item.quantity > 1) ||
+                                                (item.price_cents && item.price_cents > 0)) && (
+                                                <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                                                  {item.quantity && item.quantity > 1 && (
+                                                    <span className="font-medium text-gray-500 dark:text-gray-400">
+                                                      {item.quantity} ud.
+                                                    </span>
+                                                  )}
+                                                  {item.price_cents && item.price_cents > 0 && (
+                                                    <span>
+                                                      c/u: {formatCurrency(item.price_cents)}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              )}
                                             </div>
                                           </div>
-                                        );
-                                      })
-                                    )}
-                                  </div>
 
-                                  {/* Formulario para añadir artículo inline a esta lista específica */}
-                                  <form
-                                    onSubmit={(e) => handleAddShoppingItem(e, list.id)}
-                                    className="pt-2.5 border-t border-gray-100 dark:border-zinc-800 space-y-2"
-                                  >
-                                    <div className="flex flex-col sm:flex-row gap-2">
-                                      <input
-                                        type="text"
-                                        required
-                                        value={newItemNames[list.id] || ""}
-                                        onChange={(e) =>
-                                          setNewItemNames((prev) => ({
-                                            ...prev,
-                                            [list.id]: e.target.value,
-                                          }))
-                                        }
-                                        placeholder="Nombre del artículo"
-                                        className="flex-1 px-3 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none text-gray-900 dark:text-white focus:border-gray-400"
-                                      />
-                                      <div className="flex gap-2">
-                                        <input
-                                          type="number"
-                                          min="1"
-                                          step="1"
-                                          value={newItemQuantities[list.id] || "1"}
-                                          onChange={(e) =>
-                                            setNewItemQuantities((prev) => ({
-                                              ...prev,
-                                              [list.id]: e.target.value,
-                                            }))
-                                          }
-                                          placeholder="Cant."
-                                          title="Cantidad"
-                                          className="w-16 px-2 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none text-center font-medium text-gray-900 dark:text-white"
-                                        />
-                                        <div className="relative w-24">
-                                          <span className="absolute left-2.5 top-2 text-xs text-gray-400 font-bold">
-                                            $
-                                          </span>
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            onKeyDown={blockNegativeKeys}
-                                            value={newItemPrices[list.id] || ""}
-                                            onChange={(e) =>
-                                              setNewItemPrices((prev) => ({
-                                                ...prev,
-                                                [list.id]: e.target.value.replace(/-/g, ""),
-                                              }))
-                                            }
-                                            placeholder="Precio"
-                                            title="Precio unitario"
-                                            className="w-full pl-6 pr-2 py-2 text-xs bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl outline-none font-medium text-gray-900 dark:text-white"
-                                          />
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            {itemTotalCents > 0 && (
+                                              <span
+                                                className={`text-xs font-semibold ${
+                                                  item.is_purchased
+                                                    ? "text-gray-400 line-through"
+                                                    : "text-gray-900 dark:text-white"
+                                                }`}
+                                              >
+                                                {formatCurrency(itemTotalCents)}
+                                              </span>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteShoppingItem(item.id)}
+                                              className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                                              title="Eliminar artículo"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
                                         </div>
-                                        <button
-                                          type="submit"
-                                          className="px-3.5 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shrink-0 flex items-center gap-1 shadow-2xs"
-                                        >
-                                          <PlusIcon className="w-3.5 h-3.5" />
-                                          Añadir
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </form>
+                                      );
+                                    })
+                                  )}
                                 </div>
-                              );
-                            })
-                          )}
-                        </div>
+
+                                {/* Botones de acción: Agregar producto y Cargar a gasto */}
+                                <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setProductItemName("");
+                                      setProductItemQty("1");
+                                      setProductItemPrice("");
+                                      setShowAddShoppingItemModal(selectedList.id);
+                                    }}
+                                    className="flex-1 py-2.5 px-4 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5"
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Agregar producto</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={completed === 0 || totalBoughtCents <= 0}
+                                    onClick={() => handleOpenLoadExpenseModal(selectedList)}
+                                    className={`py-2.5 px-4 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                                      completed === 0 || totalBoughtCents <= 0
+                                        ? "bg-gray-100 dark:bg-zinc-800 text-gray-400 border border-gray-200 dark:border-zinc-700 cursor-not-allowed"
+                                        : "bg-white dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 shadow-2xs active:scale-95"
+                                    }`}
+                                  >
+                                    <CreditCard className="w-4 h-4" />
+                                    <span>Cargar a gasto</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Vista de Lista de Listas (elementos clicables)
+                          return (
+                            <>
+                              {/* Header & Actions */}
+                              <div className="flex items-center justify-between gap-3 pb-2 border-b border-gray-150 dark:border-zinc-800">
+                                <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
+                                  Listas de Compras
+                                </h3>
+
+                                <div className="flex bg-gray-100 dark:bg-zinc-800/80 p-1 rounded-xl border border-gray-200 dark:border-zinc-700/60 text-xs font-medium">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShoppingFilter("active")}
+                                    className={`px-2.5 py-1.5 rounded-lg transition-all ${
+                                      shoppingFilter === "active"
+                                        ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-2xs font-semibold"
+                                        : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                    }`}
+                                  >
+                                    Activas ({activeLists.length})
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShoppingFilter("archived")}
+                                    className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                                      shoppingFilter === "archived"
+                                        ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-2xs font-semibold"
+                                        : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                    }`}
+                                  >
+                                    <Archive className="w-3 h-3" /> Archivadas ({archivedLists.length})
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Summary Metrics */}
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 dark:bg-[#121212] p-4 rounded-2xl border border-gray-200 dark:border-zinc-800">
+                                <div>
+                                  <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                    Total Estimado
+                                  </span>
+                                  <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                                    {formatCurrency(totalActiveEstCents)}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                    Total Comprado
+                                  </span>
+                                  <span className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                    {formatCurrency(totalActiveBoughtCents)}
+                                  </span>
+                                </div>
+                                <div className="col-span-2 sm:col-span-1">
+                                  <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                                    Listas Activas
+                                  </span>
+                                  <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                                    {activeLists.length} {activeLists.length === 1 ? "lista" : "listas"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Lists as Simple Clickable Elements */}
+                              <div className="space-y-2.5">
+                                {displayedLists.length === 0 ? (
+                                  <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center">
+                                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-zinc-400">
+                                      {shoppingFilter === "archived"
+                                        ? "No hay listas archivadas"
+                                        : "No tienes listas de compras registradas"}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  displayedLists.map((list) => {
+                                    const listItems = shoppingItems.filter((i) => i.list_id === list.id);
+                                    const completed = listItems.filter((i) => i.is_purchased).length;
+                                    const totalItems = listItems.length;
+                                    const progress =
+                                      totalItems === 0 ? 0 : Math.round((completed / totalItems) * 100);
+
+                                    const totalEstCents = listItems.reduce(
+                                      (acc, item) =>
+                                        acc + (item.quantity || 1) * (item.price_cents || 0),
+                                      0,
+                                    );
+
+                                    return (
+                                      <div
+                                        key={list.id}
+                                        onClick={() => setSelectedShoppingListId(list.id)}
+                                        className="bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 p-3.5 sm:p-4 rounded-2xl shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all cursor-pointer active:scale-[0.99] flex items-center justify-between gap-3 group"
+                                      >
+                                        <div className="min-w-0 flex-1 space-y-1.5">
+                                          <div className="flex items-center gap-2">
+                                            <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                                              {list.name}
+                                            </h4>
+                                            {list.is_archived && (
+                                              <span className="text-[10px] font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-500 px-1.5 py-0.5 rounded-md shrink-0">
+                                                Archivada
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 flex-wrap">
+                                            <span>{totalItems} artículos</span>
+                                            <span>•</span>
+                                            <span>{completed} marcados</span>
+                                            {totalEstCents > 0 && (
+                                              <>
+                                                <span>•</span>
+                                                <span className="font-semibold text-gray-900 dark:text-white">
+                                                  {formatCurrency(totalEstCents)}
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+                                          <div className="h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden w-full max-w-[200px]">
+                                            <div
+                                              className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                                              style={{ width: `${progress}%` }}
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1 shrink-0 text-gray-400 group-hover:text-gray-700 dark:group-hover:text-zinc-200 transition-colors">
+                                          <ChevronRight className="w-4 h-4" />
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     );
                   })()}
@@ -15266,40 +15402,41 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
             onClick={() => setShowLoadExpenseModal(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0c0c0c] rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-zinc-800 space-y-4"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
             >
+              {/* Mobile Drag Handle */}
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Banknote className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-                    Cargar Gasto de Compras
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Cargar a Gasto
                   </h3>
-                  <p className="text-xs text-gray-500">
-                    Registra los artículos marcados como un gasto real
-                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowLoadExpenseModal(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-full"
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
                 >
-                  <XIcon className="w-5 h-5" />
+                  <XIcon className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="p-3.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl flex items-center justify-between">
+              <div className="p-3.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-2xl flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold text-gray-900 dark:text-white block">
-                    Lista: {showLoadExpenseModal.name}
+                    {showLoadExpenseModal.name}
                   </span>
-                  <span className="text-[10px] text-gray-500">
+                  <span className="text-[10px] text-gray-500 dark:text-zinc-400">
                     {
                       shoppingItems.filter(
                         (i) =>
@@ -15312,9 +15449,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] text-gray-400 uppercase font-medium block">
-                    Monto a descontar
+                    Total
                   </span>
-                  <span className="text-base font-bold text-gray-900 dark:text-white">
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
                     {formatCurrency(
                       shoppingItems
                         .filter(
@@ -15334,17 +15471,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
               </div>
 
               <form onSubmit={handleConfirmLoadExpense} className="space-y-3.5">
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Cuenta para aplicar el gasto *
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Cuenta de Pago *
                   </label>
                   <select
                     required
                     value={loadExpenseAccountId}
                     onChange={(e) => setLoadExpenseAccountId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
                   >
-                    <option value="">-- Seleccionar Cuenta --</option>
+                    <option value="">Seleccionar cuenta...</option>
                     {accounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
                         {acc.name} ({formatCurrency(acc.balance_cents)})
@@ -15353,14 +15490,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Categoría del Gasto
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Categoría
                   </label>
                   <select
                     value={loadExpenseCategoryId}
                     onChange={(e) => setLoadExpenseCategoryId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
                   >
                     <option value="">Sin Categoría</option>
                     {categories
@@ -15373,22 +15510,22 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Descripción de la transacción
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Descripción
                   </label>
                   <input
                     type="text"
                     required
                     value={loadExpenseDescription}
                     onChange={(e) => setLoadExpenseDescription(e.target.value)}
-                    placeholder="Ej. Compra de supermercado semanal"
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
+                    placeholder="Ej. Compra de supermercado"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                     Fecha
                   </label>
                   <input
@@ -15396,30 +15533,131 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     required
                     value={loadExpenseDate}
                     onChange={(e) => setLoadExpenseDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-400 transition-colors"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
                   />
                 </div>
 
-                <p className="text-[11px] text-gray-500 bg-gray-50 dark:bg-[#141414] p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800">
-                  Al confirmar, se registrará el gasto en la cuenta seleccionada
-                  y los artículos comprados se restablecerán para su
-                  reutilización.
-                </p>
-
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2.5 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowLoadExpenseModal(null)}
-                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-medium transition-colors"
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 rounded-xl text-xs font-medium transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-xs flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs active:scale-95 flex items-center justify-center gap-1.5"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Registrar Gasto
+                    <span>Confirmar Gasto</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Desplegable desde abajo: Agregar Producto a Lista de Compras */}
+      <AnimatePresence>
+        {showAddShoppingItemModal !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
+            onClick={() => setShowAddShoppingItemModal(null)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
+            >
+              {/* Mobile Drag Handle */}
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Agregar Producto
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddShoppingItemModal(null)}
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddProductItemModalSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Nombre del Producto *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={productItemName}
+                    onChange={(e) => setProductItemName(e.target.value)}
+                    placeholder="Ej. Leche, Frutas, Detergente..."
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                      Cantidad
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={productItemQty}
+                      onChange={(e) => setProductItemQty(e.target.value)}
+                      placeholder="1"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white text-center focus:border-gray-900 dark:focus:border-white transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                      Precio Unitario ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      onKeyDown={blockNegativeKeys}
+                      value={productItemPrice}
+                      onChange={(e) => setProductItemPrice(e.target.value.replace(/-/g, ""))}
+                      placeholder="0.00"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white text-center focus:border-gray-900 dark:focus:border-white transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddShoppingItemModal(null)}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 rounded-xl text-xs font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Agregar</span>
                   </button>
                 </div>
               </form>
