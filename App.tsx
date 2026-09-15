@@ -2224,7 +2224,7 @@ const MobileApp: React.FC<AppComponentProps> = (props) => {
                 </div>
 
                 <div className={activeTab === 'finance' ? 'h-full flex flex-col' : 'hidden'}>
-                    <div className="h-full pt-8 landscape:pt-2">
+                    <div className="h-full">
                         <FinanceModule />
                     </div>
                 </div>

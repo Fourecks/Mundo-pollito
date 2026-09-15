@@ -168,14 +168,19 @@ CREATE TABLE IF NOT EXISTS public.finance_installments (
     paid_installments INT NOT NULL DEFAULT 0,
     installment_amount_cents BIGINT NOT NULL,
     account_id BIGINT REFERENCES public.finance_accounts(id) ON DELETE SET NULL,
+    category_id BIGINT REFERENCES public.finance_categories(id) ON DELETE SET NULL,
+    payment_day INT DEFAULT 15,
     start_date DATE NOT NULL,
-    start_month TEXT NOT NULL,
+    start_month TEXT,
     status TEXT NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'COMPLETED', 'CANCELLED'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Asegurar que la columna 'start_month' existe si la tabla ya había sido creada anteriormente
+-- Asegurar que las columnas existen si la tabla ya había sido creada anteriormente
 ALTER TABLE public.finance_installments ADD COLUMN IF NOT EXISTS start_month TEXT;
+ALTER TABLE public.finance_installments ADD COLUMN IF NOT EXISTS category_id BIGINT;
+ALTER TABLE public.finance_installments ADD COLUMN IF NOT EXISTS payment_day INT DEFAULT 15;
+ALTER TABLE public.finance_installments ADD COLUMN IF NOT EXISTS notes TEXT;
 
 -- Rellenar valores nulos para filas existentes basados en la fecha de inicio
 UPDATE public.finance_installments 
