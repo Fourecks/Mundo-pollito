@@ -6733,33 +6733,42 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                       return (
                         <div className="space-y-6 max-w-5xl mx-auto">
-                          {/* Header & Controls in one sleek bar */}
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-gray-150 dark:border-zinc-800">
-                            <div className="flex items-center gap-3">
-                              <div className="space-y-0.5">
-                                <div className="flex items-center gap-2">
-                                  <h2 className="text-xl font-bold capitalize text-gray-900 dark:text-white">
-                                    {monthDisplayTitle}
-                                  </h2>
-                                  {selectedBudgetMonth ===
-                                    currentMonthPrefix && (
-                                    <span className="text-[10px] uppercase tracking-wider font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-md">
-                                      Actual
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                  Planificación y desglose de gastos
-                                </p>
+                          {/* Native Header Bar */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-150 dark:border-zinc-800">
+                            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">
+                                  Presupuestos
+                                </h2>
+                                <span className="text-xs font-medium text-gray-400 dark:text-zinc-500 capitalize truncate">
+                                  • {monthDisplayTitle}
+                                </span>
                               </div>
+
+                              {/* Desktop Add Breakdown Action (Same line as title) */}
+                              <button
+                                onClick={() => {
+                                  setEditingBudgetItem(null);
+                                  setBudgetItemName("");
+                                  setBudgetItemAmount("");
+                                  setBudgetItemIcon("🏷️");
+                                  setBudgetItemColor("#27272a");
+                                  setBudgetItemCategoryId("");
+                                  setShowBudgetItemModal(true);
+                                }}
+                                className="hidden sm:flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-1.5 rounded-xl font-medium text-xs shadow-xs transition-all shrink-0"
+                              >
+                                <PlusIcon className="w-3.5 h-3.5" />
+                                <span>Desglose</span>
+                              </button>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2.5">
-                              {/* Month Navigation */}
-                              <div className="flex items-center gap-1 bg-gray-50 dark:bg-[#121212] p-1 rounded-xl border border-gray-200 dark:border-zinc-800">
+                            {/* Month Selector with 'Actual' Tag on exact same line */}
+                            <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                              <div className="flex items-center gap-1 bg-white dark:bg-[#0a0a0a] p-1 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-2xs">
                                 <button
                                   onClick={handlePrevMonth}
-                                  className="p-1 rounded-lg hover:bg-white dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
+                                  className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
                                   title="Mes anterior"
                                 >
                                   <ChevronLeft className="w-4 h-4" />
@@ -6771,41 +6780,30 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                     e.target.value &&
                                     setSelectedBudgetMonth(e.target.value)
                                   }
-                                  className="px-2 py-0.5 text-xs font-medium bg-transparent text-gray-900 dark:text-white outline-none cursor-pointer"
+                                  className="px-1.5 py-0.5 text-xs font-semibold bg-transparent text-gray-900 dark:text-white outline-none cursor-pointer"
                                 />
                                 <button
                                   onClick={handleNextMonth}
-                                  className="p-1 rounded-lg hover:bg-white dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
+                                  className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
                                   title="Mes siguiente"
                                 >
                                   <ChevronRight className="w-4 h-4" />
                                 </button>
-                                <button
-                                  onClick={() =>
-                                    setSelectedBudgetMonth(currentMonthPrefix)
-                                  }
-                                  className="px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-white dark:hover:bg-zinc-800 transition-colors"
-                                >
-                                  Hoy
-                                </button>
+                                {selectedBudgetMonth === currentMonthPrefix ? (
+                                  <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-md shrink-0">
+                                    Actual
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      setSelectedBudgetMonth(currentMonthPrefix)
+                                    }
+                                    className="px-2 py-0.5 text-[11px] font-medium text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
+                                  >
+                                    Hoy
+                                  </button>
+                                )}
                               </div>
-
-                              {/* Add Breakdown Action */}
-                              <button
-                                onClick={() => {
-                                  setEditingBudgetItem(null);
-                                  setBudgetItemName("");
-                                  setBudgetItemAmount("");
-                                  setBudgetItemIcon("🏷️");
-                                  setBudgetItemColor("#27272a");
-                                  setBudgetItemCategoryId("");
-                                  setShowBudgetItemModal(true);
-                                }}
-                                className="flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2 rounded-xl font-medium text-xs shadow-sm transition-all"
-                              >
-                                <PlusIcon className="w-3.5 h-3.5" />
-                                Añadir Desglose
-                              </button>
                             </div>
                           </div>
 
@@ -11990,58 +11988,58 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   <button
                     type="button"
                     onClick={() => openNewTransactionModal("EXPENSE")}
-                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-rose-50/60 hover:bg-rose-50 dark:bg-rose-950/20 dark:hover:bg-rose-950/30 border border-rose-200/70 dark:border-rose-900/40 text-left transition-all active:scale-[0.99]"
+                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900/80 dark:hover:bg-zinc-850 border border-gray-200/80 dark:border-zinc-800 text-left transition-all active:scale-[0.99] group"
                   >
-                    <div className="w-11 h-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-rose-500/20">
-                      <ArrowDownRight className="w-6 h-6" />
+                    <div className="w-10 h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center shrink-0 shadow-xs">
+                      <ArrowDownRight className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-rose-950 dark:text-rose-200">
+                      <div className="text-sm font-bold text-gray-900 dark:text-white">
                         Registrar Gasto
                       </div>
-                      <div className="text-xs text-rose-800/70 dark:text-rose-300/70 truncate">
+                      <div className="text-xs text-gray-500 dark:text-zinc-400 truncate">
                         Compras, pagos de servicios, consumos
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-rose-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-gray-900 dark:group-hover:text-white transition-colors shrink-0" />
                   </button>
 
                   <button
                     type="button"
                     onClick={() => openNewTransactionModal("INCOME")}
-                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-emerald-50/60 hover:bg-emerald-50 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40 text-left transition-all active:scale-[0.99]"
+                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900/80 dark:hover:bg-zinc-850 border border-gray-200/80 dark:border-zinc-800 text-left transition-all active:scale-[0.99] group"
                   >
-                    <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/20">
-                      <ArrowUpRight className="w-6 h-6" />
+                    <div className="w-10 h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center shrink-0 shadow-xs">
+                      <ArrowUpRight className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
+                      <div className="text-sm font-bold text-gray-900 dark:text-white">
                         Registrar Ingreso
                       </div>
-                      <div className="text-xs text-emerald-800/70 dark:text-emerald-300/70 truncate">
+                      <div className="text-xs text-gray-500 dark:text-zinc-400 truncate">
                         Salarios, cobros, transferencias recibidas
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-gray-900 dark:group-hover:text-white transition-colors shrink-0" />
                   </button>
 
                   <button
                     type="button"
                     onClick={() => openNewTransactionModal("TRANSFER_OUT")}
-                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-blue-50/60 hover:bg-blue-50 dark:bg-blue-950/20 dark:hover:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 text-left transition-all active:scale-[0.99]"
+                    className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900/80 dark:hover:bg-zinc-850 border border-gray-200/80 dark:border-zinc-800 text-left transition-all active:scale-[0.99] group"
                   >
-                    <div className="w-11 h-11 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                    <div className="w-10 h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center shrink-0 shadow-xs">
                       <ArrowRightLeft className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-blue-950 dark:text-blue-200">
+                      <div className="text-sm font-bold text-gray-900 dark:text-white">
                         Transferencia entre cuentas
                       </div>
-                      <div className="text-xs text-blue-800/70 dark:text-blue-300/70 truncate">
+                      <div className="text-xs text-gray-500 dark:text-zinc-400 truncate">
                         Mover saldo propio de una cuenta a otra
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-gray-900 dark:group-hover:text-white transition-colors shrink-0" />
                   </button>
                 </div>
               </motion.div>
@@ -12448,7 +12446,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     onClick={() => setTxType("EXPENSE")}
                     className={`py-2 text-xs font-bold rounded-xl transition-all ${
                       txType === "EXPENSE"
-                        ? "bg-rose-500 text-white shadow-sm"
+                        ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs"
                         : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                     }`}
                   >
@@ -12459,7 +12457,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     onClick={() => setTxType("INCOME")}
                     className={`py-2 text-xs font-bold rounded-xl transition-all ${
                       txType === "INCOME"
-                        ? "bg-emerald-500 text-white shadow-sm"
+                        ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs"
                         : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                     }`}
                   >
@@ -12470,7 +12468,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     onClick={() => setTxType("TRANSFER_OUT")}
                     className={`py-2 text-xs font-bold rounded-xl transition-all ${
                       txType === "TRANSFER_OUT"
-                        ? "bg-blue-500 text-white shadow-sm"
+                        ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs"
                         : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                     }`}
                   >
@@ -12812,7 +12810,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
               className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
               <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-3">
-                <h3 className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                   Recargar / Recibir Fondos
                 </h3>
                 <button
@@ -14283,8 +14281,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
               className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4"
             >
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
-                <h3 className="text-base font-bold flex items-center gap-2">
-                  <HelpCircle className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <HelpCircle className="w-5 h-5 text-gray-500 dark:text-zinc-400" />
                   ¿Cómo se calcula el Balance Total?
                 </h3>
                 <button
