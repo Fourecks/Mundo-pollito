@@ -6735,7 +6735,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         <div className="space-y-6 max-w-5xl mx-auto">
                           {/* Native Header Bar */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-150 dark:border-zinc-800">
-                            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+                            <div className="hidden sm:flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
                               <div className="flex items-center gap-2 min-w-0">
                                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">
                                   Presupuestos
@@ -6902,7 +6902,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   setBudgetItemCategoryId("");
                                   setShowBudgetItemModal(true);
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-all shadow-2xs"
+                                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-all shadow-2xs"
                               >
                                 <PlusIcon className="w-3.5 h-3.5" />
                                 <span>Nuevo Desglose</span>
@@ -7029,7 +7029,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                                 );
                                                 setTxDescription("");
                                               }}
-                                              className="px-2 py-1 text-[10px] font-medium bg-gray-50 hover:bg-gray-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded-lg transition-colors border border-gray-200 dark:border-zinc-700"
+                                              className="hidden sm:inline-flex px-2 py-1 text-[10px] font-medium bg-gray-50 hover:bg-gray-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded-lg transition-colors border border-gray-200 dark:border-zinc-700"
                                               title="Registrar gasto rápido"
                                             >
                                               + Gasto
@@ -14715,43 +14715,48 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         )}
       </AnimatePresence>
 
-      {/* Set Global Total Budget Modal */}
+      {/* Set Global Total Budget Bottom Sheet */}
       <AnimatePresence>
         {showSetTotalBudgetModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowSetTotalBudgetModal(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0c0c0c] rounded-2xl p-5 w-full max-w-sm border border-gray-200 dark:border-zinc-800 space-y-4"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 shadow-2xl"
             >
+              {/* Drag Handle for Mobile */}
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
                     Meta Global del Mes
                   </h3>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">
                     Establece el tope máximo de gastos para el mes seleccionado
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowSetTotalBudgetModal(false)}
-                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg"
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
                 >
                   <XIcon className="w-4 h-4" />
                 </button>
               </div>
 
               <form onSubmit={handleSetBudget} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                     Monto Total Presupuestado ($)
                   </label>
                   <input
@@ -14766,24 +14771,24 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       setBudgetAmount(e.target.value.replace(/-/g, ""))
                     }
                     placeholder="Ej. 1500.00"
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-base font-bold outline-none text-gray-900 dark:text-white"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-lg font-bold outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                   />
-                  <p className="text-[11px] text-gray-400">
+                  <p className="text-[11px] text-gray-400 dark:text-zinc-500">
                     Este monto actúa como el techo general para comparar contra tus gastos totales del mes.
                   </p>
                 </div>
 
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2.5 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowSetTotalBudgetModal(false)}
-                    className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold transition-colors"
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
+                    className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
                   >
                     Guardar Meta
                   </button>
@@ -14794,43 +14799,48 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         )}
       </AnimatePresence>
 
-      {/* Custom Budget Breakdown Item Modal */}
+      {/* Custom Budget Breakdown Item Bottom Sheet */}
       <AnimatePresence>
         {showBudgetItemModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowBudgetItemModal(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0c0c0c] rounded-2xl p-5 w-full max-w-sm border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[85vh] overflow-y-auto"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
             >
+              {/* Drag Handle for Mobile */}
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
                     {editingBudgetItem ? "Editar Desglose" : "Añadir Desglose"}
                   </h3>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">
                     Asigna un límite a una categoría de gasto
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowBudgetItemModal(false)}
-                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg"
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
                 >
                   <XIcon className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveBudgetItem} className="space-y-3.5">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400">
+              <form onSubmit={handleSaveBudgetItem} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                     Nombre del Desglose
                   </label>
                   <div className="flex gap-2 items-center">
@@ -14845,13 +14855,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       value={budgetItemName}
                       onChange={(e) => setBudgetItemName(e.target.value)}
                       placeholder="Ej. Supermercado, Alquiler, Salidas..."
-                      className="flex-1 px-3 py-2 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white"
+                      className="flex-1 px-3.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                     Presupuesto Asignado ($)
                   </label>
                   <input
@@ -14865,12 +14875,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       setBudgetItemAmount(e.target.value.replace(/-/g, ""))
                     }
                     placeholder="0.00"
-                    className="w-full px-3 py-1.5 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-semibold outline-none text-gray-900 dark:text-white"
+                    className="w-full px-3.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-semibold outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                     Vincular con Categoría (Opcional)
                   </label>
                   <select
@@ -14880,7 +14890,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         e.target.value ? Number(e.target.value) : "",
                       )
                     }
-                    className="w-full px-3 py-1.5 bg-gray-50 dark:bg-[#141414] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs outline-none text-gray-900 dark:text-white"
+                    className="w-full px-3.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                   >
                     <option value="">
                       Sin vincular (por nombre o etiqueta)
@@ -14893,17 +14903,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   </select>
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2.5 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowBudgetItemModal(false)}
-                    className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors"
+                    className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
                   >
                     {editingBudgetItem ? "Guardar Cambios" : "Crear Desglose"}
                   </button>
