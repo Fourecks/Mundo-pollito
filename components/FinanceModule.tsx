@@ -5335,139 +5335,90 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     return (
       <div className="space-y-4 pb-32 animate-in fade-in duration-200">
         {/* 1. BALANCE PRINCIPAL */}
-        <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
-              Balance total
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsPrivacyMode(!isPrivacyMode)}
-              className="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-xl transition-colors cursor-pointer"
-              title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
-              aria-label={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
-            >
-              {isPrivacyMode ? (
-                <EyeOffIcon className="w-4 h-4" />
-              ) : (
-                <EyeIcon className="w-4 h-4" />
-              )}
-            </button>
+        <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+                Balance total
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsPrivacyMode(!isPrivacyMode)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg transition-colors cursor-pointer"
+                title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+                aria-label={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+              >
+                {isPrivacyMode ? (
+                  <EyeOffIcon className="w-3.5 h-3.5" />
+                ) : (
+                  <EyeIcon className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-1 truncate">
+              {formatCurrency(totalBalanceCents)}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+              Disponible entre tus cuentas
+            </p>
           </div>
-          <div className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-1.5">
-            {formatCurrency(totalBalanceCents)}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-zinc-400">
-            Disponible entre tus cuentas
-          </p>
+
+          <button
+            type="button"
+            onClick={() => setShowNewTxTypeSheet(true)}
+            className="shrink-0 flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2.5 rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
+            aria-label="Nuevo movimiento"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo</span>
+          </button>
         </div>
 
-        {/* 2. RESUMEN DEL MES */}
+        {/* 2. RESUMEN DEL MES (3 COLUMNAS: INGRESOS, GASTOS, DISPONIBLE) */}
         <div className="space-y-1.5">
           <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400 px-1">
             Este mes
           </span>
-          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-sm space-y-3">
-            {/* Ingresos & Gastos */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-3.5 shadow-sm">
+            <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-zinc-800/80">
+              {/* Ingresos */}
+              <div className="space-y-1 pr-2.5">
                 <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
                   <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>Ingresos</span>
+                  <span className="truncate">Ingresos</span>
                 </div>
-                <div className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+                <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white tracking-tight truncate">
                   {formatCurrency(incomeThisMonth)}
                 </div>
               </div>
 
-              <div className="space-y-1 border-l border-gray-100 dark:border-zinc-800/80 pl-4">
+              {/* Gastos */}
+              <div className="space-y-1 px-2.5">
                 <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
                   <ArrowDownRight className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                  <span>Gastos</span>
+                  <span className="truncate">Gastos</span>
                 </div>
-                <div className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+                <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white tracking-tight truncate">
                   {formatCurrency(expensesThisMonth)}
                 </div>
               </div>
-            </div>
 
-            {/* Disponible del período */}
-            <div className="border-t border-gray-100 dark:border-zinc-800/80 pt-2.5 flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">
-                Disponible
-              </span>
-              <span
-                className={`text-sm font-bold tracking-tight ${
-                  netMonthCents >= 0
-                    ? "text-gray-900 dark:text-white"
-                    : "text-red-500 dark:text-red-400"
-                }`}
-              >
-                {formatCurrency(netMonthCents)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. ACCIONES RÁPIDAS */}
-        <div className="flex items-center gap-2 relative">
-          <button
-            type="button"
-            onClick={() => {
-              setTxType("EXPENSE");
-              setShowTxModal(true);
-            }}
-            className="flex-1 min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-          >
-            <ArrowDownRight className="w-4 h-4 text-red-400 dark:text-red-500 shrink-0" />
-            <span>Gasto</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setTxType("INCOME");
-              setShowTxModal(true);
-            }}
-            className="flex-1 min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 text-gray-900 dark:text-white rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-          >
-            <ArrowUpRight className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span>Ingreso</span>
-          </button>
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowMobileTransferMenu(!showMobileTransferMenu)}
-              className="w-11 min-h-[44px] flex items-center justify-center bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 text-gray-600 dark:text-zinc-300 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-900 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-              title="Más acciones"
-              aria-label="Más acciones rápidas"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-
-            {showMobileTransferMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-30"
-                  onClick={() => setShowMobileTransferMenu(false)}
-                />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-48 bg-white dark:bg-[#0d0d0d] border border-gray-200 dark:border-zinc-800 rounded-xl shadow-lg p-1.5 animate-in fade-in zoom-in-95 duration-150">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowMobileTransferMenu(false);
-                      setTxType("TRANSFER_OUT");
-                      setShowTxModal(true);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-800 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800/80 rounded-lg transition-colors text-left cursor-pointer"
-                  >
-                    <ArrowRightLeft className="w-4 h-4 text-gray-500 dark:text-zinc-400 shrink-0" />
-                    <span>Transferencia</span>
-                  </button>
+              {/* Disponible */}
+              <div className="space-y-1 pl-2.5">
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
+                  <span className="truncate">Disponible</span>
                 </div>
-              </>
-            )}
+                <div
+                  className={`text-xs sm:text-sm font-bold tracking-tight truncate ${
+                    netMonthCents >= 0
+                      ? "text-gray-900 dark:text-white"
+                      : "text-red-500 dark:text-red-400"
+                  }`}
+                >
+                  {formatCurrency(netMonthCents)}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
