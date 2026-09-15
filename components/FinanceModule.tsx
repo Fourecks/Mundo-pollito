@@ -2404,44 +2404,58 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         }
       }
 
-      let { error } = await supabase.from("finance_installments").insert([
-        {
-          user_id: user.id,
-          name: instName,
-          total_amount_cents: totalCents,
-          total_installments: totalInst,
-          paid_installments: 0,
-          installment_amount_cents: instAmountCents,
-          account_id: instAccountId ? Number(instAccountId) : null,
-          category_id: catIdNum,
-          start_date: startDate,
-          start_month: startMonth,
-          payment_day: pDay,
-          status: "ACTIVE",
-        },
-      ]);
+      const payload: Record<string, any> = {
+        user_id: user.id,
+        name: instName,
+        total_amount_cents: totalCents,
+        total_installments: totalInst,
+        paid_installments: 0,
+        installment_amount_cents: instAmountCents,
+        account_id: instAccountId ? Number(instAccountId) : null,
+        start_date: startDate,
+        status: "ACTIVE",
+      };
 
-      if (error) {
-        console.log(
-          "Retrying insertion without extra columns if schema mismatch",
-        );
-        const { error: retryError } = await supabase
-          .from("finance_installments")
-          .insert([
-            {
-              user_id: user.id,
-              name: instName,
-              total_amount_cents: totalCents,
-              total_installments: totalInst,
-              paid_installments: 0,
-              installment_amount_cents: instAmountCents,
-              account_id: instAccountId ? Number(instAccountId) : null,
-              category_id: catIdNum,
-              start_date: startDate,
-              status: "ACTIVE",
-            },
-          ]);
-        error = retryError;
+      if (catIdNum) {
+        payload.category_id = catIdNum;
+      }
+      if (startMonth) {
+        payload.start_month = startMonth;
+      }
+      if (pDay) {
+        payload.payment_day = pDay;
+      }
+
+      let { error } = await supabase.from("finance_installments").insert([payload]);
+
+      // If schema mismatch (column doesn't exist in Supabase schema cache), dynamically remove offending column and retry
+      while (error && error.message) {
+        const match =
+          error.message.match(/could not find the '([^']+)' column/i) ||
+          error.message.match(/column "?([^" ]+)"? does not exist/i);
+        if (match && match[1] && match[1] in payload) {
+          const badCol = match[1];
+          console.warn(`Column '${badCol}' not found in finance_installments schema, retrying without it.`);
+          delete payload[badCol];
+          const retryRes = await supabase.from("finance_installments").insert([payload]);
+          error = retryRes.error;
+        } else {
+          // If error didn't match standard regex, attempt safe fallback without optional columns
+          const hadOptional =
+            "category_id" in payload ||
+            "start_month" in payload ||
+            "payment_day" in payload;
+          if (hadOptional) {
+            delete payload.category_id;
+            delete payload.start_month;
+            delete payload.payment_day;
+            const fallbackRes = await supabase
+              .from("finance_installments")
+              .insert([payload]);
+            error = fallbackRes.error;
+          }
+          break;
+        }
       }
 
       if (error) {
@@ -13175,40 +13189,97 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         )}
       </AnimatePresence>
 
-      {/* Contribute Modal */}
+      {/* Contribute Modal - Desplegable desde abajo */}
       <AnimatePresence>
         {showContributeModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
             onClick={() => setShowContributeModal(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
             >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">Aportar a Meta</h3>
+              {/* Mobile Drag Handle */}
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Aportar a Meta de Ahorro
+                  </h3>
+                </div>
                 <button
+                  type="button"
                   onClick={() => setShowContributeModal(null)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
                 >
-                  <XIcon className="w-5 h-5" />
+                  <XIcon className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Resumen de la meta */}
+              {(() => {
+                const goal = savingsGoals.find((g) => g.id === showContributeModal);
+                if (!goal) return null;
+                const progress = Math.min(
+                  100,
+                  Math.round(
+                    (goal.current_amount_cents / (goal.target_amount_cents || 1)) * 100,
+                  ),
+                );
+                const remaining = Math.max(0, goal.target_amount_cents - goal.current_amount_cents);
+
+                return (
+                  <div className="p-3.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                        {goal.name}
+                      </span>
+                      <span className="text-xs font-semibold text-gray-900 dark:text-white shrink-0 ml-2">
+                        {progress}%
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500 dark:text-zinc-400">
+                      <div>
+                        <span>Acumulado: </span>
+                        <strong className="text-gray-900 dark:text-white font-semibold">
+                          {formatCurrency(goal.current_amount_cents)}
+                        </strong>
+                      </div>
+                      <div className="text-right">
+                        <span>Faltan: </span>
+                        <strong className="text-gray-900 dark:text-white font-semibold">
+                          {formatCurrency(remaining)}
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+
               <form onSubmit={handleContribute} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Monto a aportar
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Monto a aportar *
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-lg">$</span>
-                    </div>
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                      $
+                    </span>
                     <input
                       type="number"
                       step="0.01"
@@ -13220,14 +13291,15 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       onChange={(e) =>
                         setContributeAmount(e.target.value.replace(/-/g, ""))
                       }
-                      className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary text-lg"
+                      className="w-full pl-8 pr-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
                       placeholder="0.00"
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Descontar de la Cuenta
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Descontar de la cuenta *
                   </label>
                   <select
                     required
@@ -13237,25 +13309,35 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         e.target.value ? Number(e.target.value) : "",
                       )
                     }
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-gray-900 dark:text-white outline-none focus:border-gray-900 dark:focus:border-white transition-colors"
                   >
-                    <option value="">Selecciona cuenta de origen</option>
+                    <option value="">Seleccionar cuenta de origen...</option>
                     {accounts
                       .filter((a) => a.type !== "credit")
                       .map((acc) => (
                         <option key={acc.id} value={acc.id}>
-                          {acc.name} (Saldo: {formatCurrency(acc.balance_cents)}
-                          )
+                          {acc.name} ({formatCurrency(acc.balance_cents)})
                         </option>
                       ))}
                   </select>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
-                >
-                  Confirmar Aporte
-                </button>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowContributeModal(null)}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 rounded-xl text-xs font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Confirmar Aporte</span>
+                  </button>
+                </div>
               </form>
             </motion.div>
           </motion.div>
