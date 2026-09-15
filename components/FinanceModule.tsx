@@ -1021,6 +1021,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         };
       case "installments":
         return () => {
+          setInstName("");
+          setInstTotalAmount("");
+          setInstTotalInstallments("12");
+          setInstAccountId(accounts.length > 0 ? accounts[0].id : "");
+          setInstCategoryId("");
+          setInstInterestPercent("");
+          setInstStartDate(getTodayStr());
+          setInstPaymentDay(new Date().getDate().toString());
           setShowInstallmentModal(true);
         };
       case "savings":
@@ -5690,7 +5698,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                 >
                   {/* Mobile Hierarchical Back Header: Planificar */}
                   {isMobile && mobileMainTab === "planning" && mobilePlanSubView && (
-                    <div className="mb-6 space-y-2">
+                    <div className={!["subscriptions", "budgets", "installments"].includes(mobilePlanSubView) ? "mb-6 space-y-2" : "mb-3"}>
                       <div className="flex items-center justify-between">
                         <button
                           type="button"
@@ -5712,7 +5720,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                           </button>
                         )}
                       </div>
-                      {mobilePlanSubView !== "subscriptions" && (
+                      {!["subscriptions", "budgets", "installments"].includes(mobilePlanSubView) && (
                         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                           {getPlanSubViewTitle(mobilePlanSubView)}
                         </h2>
@@ -7435,8 +7443,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                           <div className="space-y-5 max-w-5xl mx-auto">
                             {/* Header */}
                             <div className="pb-2 border-b border-gray-150 dark:border-zinc-800">
-                              <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                <Calendar className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                              <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
                                 Suscripciones
                               </h3>
                             </div>
@@ -7579,22 +7586,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                         return (
                           <div className="space-y-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                              <div>
-                                <h3 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                  Cuotas Financiadas
-                                </h3>
-                                <p className="text-xs text-gray-500">
-                                  Compras diferidas en cuotas mensuales y su progreso de amortización
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => setShowInstallmentModal(true)}
-                                className="inline-flex items-center justify-center gap-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2.5 rounded-xl font-semibold text-xs shadow-2xs hover:opacity-90 transition-all self-start sm:self-auto"
-                              >
-                                <PlusIcon className="w-4 h-4" />
-                                <span>Nueva Compra a Cuotas</span>
-                              </button>
+                            <div className="pb-2 border-b border-gray-150 dark:border-zinc-800">
+                              <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
+                                Cuotas Financiadas
+                              </h3>
                             </div>
 
                             {/* Summary Metrics */}
@@ -7635,23 +7630,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             </div>
 
                             {installments.length === 0 ? (
-                              <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-3xl p-10 text-center space-y-3">
+                              <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-3xl p-8 text-center space-y-2">
                                 <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-zinc-900 flex items-center justify-center mx-auto text-gray-400">
                                   <Layers className="w-6 h-6" />
                                 </div>
                                 <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
                                   No tienes compras a cuotas registradas
                                 </p>
-                                <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                                  Registra tus compras diferidas (ej. electrodomésticos, tecnología, viajes) para controlar tus pagos mensuales.
-                                </p>
-                                <button
-                                  onClick={() => setShowInstallmentModal(true)}
-                                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-all shadow-2xs"
-                                >
-                                  <PlusIcon className="w-3.5 h-3.5" />
-                                  <span>Crear Primera Cuota</span>
-                                </button>
                               </div>
                             ) : (
                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -12940,28 +12925,41 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowInstallmentModal(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl"
             >
-              <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-3">
-                <h3 className="text-lg font-bold">Registrar Compra a Cuotas</h3>
+              {/* Drag Handle for Mobile */}
+              <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Registrar Compra a Cuotas
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">
+                    Financia compras en plazos mensuales
+                  </p>
+                </div>
                 <button
+                  type="button"
                   onClick={() => setShowInstallmentModal(false)}
-                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"
+                  className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
                 >
-                  <XIcon className="w-5 h-5" />
+                  <XIcon className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateInstallment} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1">
+              <form onSubmit={handleCreateInstallment} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                     Nombre / Producto
                   </label>
                   <input
@@ -12970,13 +12968,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     value={instName}
                     onChange={(e) => setInstName(e.target.value)}
                     placeholder="Ej. Smart TV, Laptop, Sofá..."
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                   />
                 </div>
 
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold mb-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                       Monto Total ($)
                     </label>
                     <input
@@ -12990,11 +12988,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         setInstTotalAmount(e.target.value.replace(/-/g, ""))
                       }
                       placeholder="1200.00"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                     />
                   </div>
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold mb-1">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                       Cant. Cuotas
                     </label>
                     <input
@@ -13010,13 +13008,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         )
                       }
                       placeholder="12"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold mb-1">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                     Asociar Tarjeta / Cuenta
                   </label>
                   <select
@@ -13026,7 +13024,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         e.target.value ? Number(e.target.value) : "",
                       )
                     }
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                   >
                     <option value="">Ninguna</option>
                     {accounts.map((a) => (
@@ -13041,9 +13039,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold mb-1">
-                    Categoría de Gasto / Presupuesto
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                    Categoría de Gasto (Opcional)
                   </label>
                   <select
                     value={instCategoryId}
@@ -13052,7 +13050,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         e.target.value ? Number(e.target.value) : "",
                       )
                     }
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                   >
                     <option value="">Sin categoría asignada</option>
                     {categories
@@ -13076,8 +13074,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                 {instAccountId &&
                   accounts.find((a) => a.id === Number(instAccountId))?.type ===
                     "credit" && (
-                    <div>
-                      <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                         Interés (%){" "}
                         <span className="text-gray-400 font-normal">
                           (Opcional, dejar vacío si no tiene interés)
@@ -13096,7 +13094,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                               e.target.value.replace(/-/g, ""),
                             )
                           }
-                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                          className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                         />
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-gray-400 font-bold">
                           %
@@ -13106,7 +13104,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   )}
 
                 {instTotalAmount && parseFloat(instTotalAmount) > 0 && (
-                  <div className="text-[11px] bg-gray-50 dark:bg-[#121212] p-2.5 rounded-xl border border-gray-200 dark:border-zinc-800 space-y-1">
+                  <div className="text-[11px] bg-gray-50 dark:bg-[#121212] p-3 rounded-xl border border-gray-200 dark:border-zinc-800 space-y-1.5 text-gray-600 dark:text-zinc-400">
                     {(() => {
                       const base = parseFloat(instTotalAmount) || 0;
                       const interestRate = parseFloat(instInterestPercent) || 0;
@@ -13116,23 +13114,23 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       const monthly = finalTotal / count;
                       return (
                         <>
-                          <div className="flex justify-between text-gray-500">
+                          <div className="flex justify-between">
                             <span>Monto base compra:</span>
-                            <span>${base.toFixed(2)}</span>
+                            <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(Math.round(base * 100))}</span>
                           </div>
                           {interestAmount > 0 && (
-                            <div className="flex justify-between text-amber-600 dark:text-amber-400 font-medium">
+                            <div className="flex justify-between">
                               <span>Interés ({interestRate}%):</span>
-                              <span>+${interestAmount.toFixed(2)}</span>
+                              <span className="font-semibold text-gray-900 dark:text-white">+{formatCurrency(Math.round(interestAmount * 100))}</span>
                             </div>
                           )}
-                          <div className="flex justify-between font-bold text-gray-800 dark:text-gray-200 border-t border-gray-200 dark:border-zinc-800 pt-1">
-                            <span>Total a pagar/descontar del crédito:</span>
-                            <span>${finalTotal.toFixed(2)}</span>
+                          <div className="flex justify-between font-bold text-gray-900 dark:text-white border-t border-gray-200 dark:border-zinc-800 pt-1.5">
+                            <span>Total diferido:</span>
+                            <span>{formatCurrency(Math.round(finalTotal * 100))}</span>
                           </div>
-                          <div className="flex justify-between font-semibold text-emerald-600 dark:text-emerald-400">
+                          <div className="flex justify-between font-semibold text-gray-900 dark:text-white">
                             <span>{count} cuotas mensuales de:</span>
-                            <span>${monthly.toFixed(2)} / mes</span>
+                            <span className="font-bold">{formatCurrency(Math.round(monthly * 100))} / mes</span>
                           </div>
                         </>
                       );
@@ -13140,9 +13138,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold mb-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                       Fecha de Inicio
                     </label>
                     <input
@@ -13156,11 +13154,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                           if (d) setInstPaymentDay(parseInt(d).toString());
                         }
                       }}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                     />
                   </div>
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold mb-1">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
                       Día de Cobro (1-31)
                     </label>
                     <input
@@ -13174,17 +13172,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         setInstPaymentDay(e.target.value.replace(/-/g, ""))
                       }
                       placeholder="Ej. 15"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                     />
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-3 rounded-xl font-semibold hover:opacity-90 transition-opacity"
-                >
-                  Crear Plan de Cuotas
-                </button>
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowInstallmentModal(false)}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
+                  >
+                    Crear Plan de Cuotas
+                  </button>
+                </div>
               </form>
             </motion.div>
           </motion.div>
