@@ -15558,7 +15558,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
           </motion.div>
         )}
       </AnimatePresence>
-${closingFragment}
+
 
       
       
