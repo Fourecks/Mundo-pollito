@@ -2358,49 +2358,29 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
       );
       const catIdNum = instCategoryId ? Number(instCategoryId) : null;
 
-      // CRITICAL CREDIT CARD LIMIT RETENTION CHECK
+      // Retain credit purchase in card balance if it's a credit card (without blocking if limit is low)
       if (instAccountId) {
         const targetAcc = accounts.find((a) => a.id === Number(instAccountId));
-        if (targetAcc) {
-          if (targetAcc.type === "credit") {
-            const limit = targetAcc.credit_limit_cents || 0;
-            const used = targetAcc.balance_cents;
-            const available = limit - used;
+        if (targetAcc && targetAcc.type === "credit") {
+          const used = targetAcc.balance_cents || 0;
+          const newDebt = used + totalCents;
+          await supabase
+            .from("finance_accounts")
+            .update({ balance_cents: newDebt })
+            .eq("id", targetAcc.id);
 
-            // Check if total purchase price (including interest) exceeds available limit
-            if (limit > 0 && totalCents > available) {
-              alert(
-                `❌ Cupo Insuficiente: La compra a cuotas por un total de $${(totalCents / 100).toFixed(2)}${interestPct > 0 ? ` (incluyendo ${interestPct}% de interés)` : ""} excede tu cupo disponible en la tarjeta '${targetAcc.name}' ($${(available / 100).toFixed(2)}). En tarjetas de crédito, el cupo debe cubrir el total de la compra más intereses.`,
-              );
-              return;
-            }
-
-            // Retain total purchase amount (with interest) in credit card debt immediately
-            const newDebt = used + totalCents;
-            await supabase
-              .from("finance_accounts")
-              .update({ balance_cents: newDebt })
-              .eq("id", targetAcc.id);
-
-            // Register expense transaction on card for total purchase with interest
-            await supabase.from("finance_transactions").insert([
-              {
-                user_id: user.id,
-                account_id: targetAcc.id,
-                type: "EXPENSE",
-                amount_cents: totalCents,
-                date: startDate,
-                category_id: catIdNum,
-                description: `Compra a cuotas retenida en límite: ${instName} (${totalInst} cuotas${interestPct > 0 ? `, ${interestPct}% interés` : ""})`,
-              },
-            ]);
-          } else {
-            if (targetAcc.balance_cents < instAmountCents) {
-              alert(
-                `⚠️ Advertencia de Fondos: La cuenta '${targetAcc.name}' tiene $${(targetAcc.balance_cents / 100).toFixed(2)} y la cuota mensual es de $${(instAmountCents / 100).toFixed(2)}.`,
-              );
-            }
-          }
+          // Register expense transaction on card
+          await supabase.from("finance_transactions").insert([
+            {
+              user_id: user.id,
+              account_id: targetAcc.id,
+              type: "EXPENSE",
+              amount_cents: totalCents,
+              date: startDate,
+              category_id: catIdNum,
+              description: `Compra a cuotas: ${instName} (${totalInst} cuotas${interestPct > 0 ? `, ${interestPct}% interés` : ""})`,
+            },
+          ]);
         }
       }
 
@@ -2426,36 +2406,38 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         payload.payment_day = pDay;
       }
 
-      let { error } = await supabase.from("finance_installments").insert([payload]);
+      let insertRes = await supabase.from("finance_installments").insert([payload]);
+      let error = insertRes.error;
 
-      // If schema mismatch (column doesn't exist in Supabase schema cache), dynamically remove offending column and retry
-      while (error && error.message) {
-        const match =
-          error.message.match(/could not find the '([^']+)' column/i) ||
-          error.message.match(/column "?([^" ]+)"? does not exist/i);
-        if (match && match[1] && match[1] in payload) {
-          const badCol = match[1];
-          console.warn(`Column '${badCol}' not found in finance_installments schema, retrying without it.`);
-          delete payload[badCol];
-          const retryRes = await supabase.from("finance_installments").insert([payload]);
-          error = retryRes.error;
-        } else {
-          // If error didn't match standard regex, attempt safe fallback without optional columns
-          const hadOptional =
-            "category_id" in payload ||
-            "start_month" in payload ||
-            "payment_day" in payload;
-          if (hadOptional) {
-            delete payload.category_id;
-            delete payload.start_month;
-            delete payload.payment_day;
-            const fallbackRes = await supabase
-              .from("finance_installments")
-              .insert([payload]);
-            error = fallbackRes.error;
-          }
-          break;
-        }
+      // Robust fallback if column 'category_id' or others don't exist in Supabase schema
+      if (error && (error.message.includes("category_id") || error.code === "PGRST204" || error.code === "42703")) {
+        delete payload.category_id;
+        const retryRes = await supabase.from("finance_installments").insert([payload]);
+        error = retryRes.error;
+      }
+
+      if (error && (error.message.includes("start_month") || error.message.includes("payment_day"))) {
+        delete payload.start_month;
+        delete payload.payment_day;
+        const retryRes = await supabase.from("finance_installments").insert([payload]);
+        error = retryRes.error;
+      }
+
+      if (error) {
+        // Ultimate fallback to bare minimum core columns
+        const corePayload = {
+          user_id: user.id,
+          name: instName,
+          total_amount_cents: totalCents,
+          total_installments: totalInst,
+          paid_installments: 0,
+          installment_amount_cents: instAmountCents,
+          account_id: instAccountId ? Number(instAccountId) : null,
+          start_date: startDate,
+          status: "ACTIVE",
+        };
+        const finalTry = await supabase.from("finance_installments").insert([corePayload]);
+        error = finalTry.error;
       }
 
       if (error) {
@@ -6068,7 +6050,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             { id: "accounts", label: "Cuentas", icon: Wallet },
                             { id: "categories", label: "Categorías", icon: ListOrdered },
                             { id: "security", label: "Seguridad", icon: ShieldCheck },
-                            { id: "settings", label: "Ajustes", icon: Settings },
                           ].map((item) => (
                             <button
                               key={item.id}
@@ -7570,13 +7551,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                             <Receipt className="w-4 h-4" />
                                           </div>
                                           <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                               <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
                                                 {r.description}
                                               </p>
                                               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 uppercase tracking-wider shrink-0">
                                                 {freqLabel}
                                               </span>
+                                              {r.next_date < getTodayStr() && (
+                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/40 shrink-0">
+                                                  Atrasado
+                                                </span>
+                                              )}
                                             </div>
                                             <p className="text-xs text-gray-400 truncate mt-0.5">
                                               Próximo: {r.next_date}
@@ -7686,6 +7672,23 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                 const targetCat = categories.find(
                                   (c) => c.id === inst.category_id,
                                 );
+                                const today = new Date();
+                                const start = new Date(inst.start_date);
+                                const payDay = inst.payment_day || start.getDate() || 15;
+                                let totalMonthsElapsed =
+                                  (today.getFullYear() - start.getFullYear()) * 12 +
+                                  (today.getMonth() - start.getMonth());
+                                if (today.getDate() >= payDay) {
+                                  totalMonthsElapsed += 1;
+                                }
+                                const expectedPaid = Math.min(
+                                  Math.max(0, totalMonthsElapsed),
+                                  inst.total_installments,
+                                );
+                                const overdueCuotas =
+                                  inst.status === "ACTIVE"
+                                    ? Math.max(0, expectedPaid - inst.paid_installments)
+                                    : 0;
 
                                 return (
                                   <div
@@ -7694,7 +7697,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   >
                                     <div className="flex justify-between items-start">
                                       <div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                           <h4 className="font-bold text-base">
                                             {inst.name}
                                           </h4>
@@ -7705,6 +7708,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                               ? "Completado"
                                               : "Activo"}
                                           </span>
+                                          {overdueCuotas > 0 && (
+                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/40">
+                                              Atrasado: {overdueCuotas} {overdueCuotas === 1 ? "cuota" : "cuotas"}
+                                            </span>
+                                          )}
                                         </div>
                                         <p className="text-xs text-gray-500 mt-0.5">
                                           {targetAcc
@@ -8525,6 +8533,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         Math.round((debtBalance / limit) * 100),
                                       )
                                     : 0;
+                                const currentDay = new Date().getDate();
+                                const isCardOverdue =
+                                  isCredit &&
+                                  debtBalance > 0 &&
+                                  card.due_day &&
+                                  currentDay > card.due_day;
 
                                 return (
                                   <div
@@ -8533,11 +8547,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   >
                                     <div className="flex justify-between items-start">
                                       <div>
-                                        <span className="text-[10px] tracking-wider font-semibold uppercase text-gray-400 block">
-                                          {isCredit
-                                            ? "Tarjeta de Crédito"
-                                            : "Tarjeta de Débito"}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-[10px] tracking-wider font-semibold uppercase text-gray-400 block">
+                                            {isCredit
+                                              ? "Tarjeta de Crédito"
+                                              : "Tarjeta de Débito"}
+                                          </span>
+                                          {isCardOverdue && (
+                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/40">
+                                              Pago atrasado
+                                            </span>
+                                          )}
+                                        </div>
                                         <h3 className="text-base font-bold text-gray-900 dark:text-white mt-0.5">
                                           {card.name}
                                         </h3>
@@ -8648,6 +8669,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                       100,
                                   ),
                                 );
+                                const isDebtOverdue = !!(
+                                  debt.due_date &&
+                                  debt.due_date < getTodayStr() &&
+                                  debt.remaining_cents > 0
+                                );
 
                                 return (
                                   <div
@@ -8665,6 +8691,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                           <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">
                                             {debt.name}
                                           </h3>
+                                          {isDebtOverdue && (
+                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/40">
+                                              Atrasado
+                                            </span>
+                                          )}
                                         </div>
                                         {debt.due_date && (
                                           <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
@@ -9609,14 +9640,56 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                       return (
                         <div className="space-y-8 max-w-5xl mx-auto">
-                          <div className="border-b border-gray-200 dark:border-zinc-800 pb-4">
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                              Análisis Financiero
-                            </h2>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Métricas clave, proyecciones y patrones de gasto
-                              consolidados
-                            </p>
+                          <div className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-gray-150 dark:border-zinc-800 w-full">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
+                                Análisis Financiero
+                              </h2>
+                            </div>
+
+                            {/* Month Selector with 'Actual' Tag on exact same line */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="flex items-center gap-0.5 sm:gap-1 bg-white dark:bg-[#0a0a0a] p-1 rounded-xl border border-gray-200 dark:border-zinc-800 shadow-2xs">
+                                <button
+                                  onClick={handlePrevMonth}
+                                  className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
+                                  title="Mes anterior"
+                                >
+                                  <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </button>
+                                <input
+                                  type="month"
+                                  value={selectedBudgetMonth}
+                                  onChange={(e) =>
+                                    e.target.value &&
+                                    setSelectedBudgetMonth(e.target.value)
+                                  }
+                                  className="px-1 py-0.5 text-xs font-semibold bg-transparent text-gray-900 dark:text-white outline-none cursor-pointer max-w-[105px] sm:max-w-none"
+                                />
+                                <button
+                                  onClick={handleNextMonth}
+                                  className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-600 dark:text-gray-400"
+                                  title="Mes siguiente"
+                                >
+                                  <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </button>
+                              </div>
+
+                              {selectedBudgetMonth === currentMonthPrefix ? (
+                                <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-md shrink-0">
+                                  Actual
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    setSelectedBudgetMonth(currentMonthPrefix)
+                                  }
+                                  className="px-2 py-1 text-[11px] font-medium text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
+                                >
+                                  Hoy
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {/* KPI Metrics Grid */}
@@ -10315,9 +10388,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         ) : (
                           // 7.1 MAIN SCREEN OF CLOSING (Mes actual + Historial)
                           <div className="space-y-6">
-                            <p className="text-xs text-gray-500 dark:text-zinc-400 -mt-2">
-                              Gestiona tu cierre mensual y consulta historiales de flujo.
-                            </p>
 
                             {/* MES ACTUAL */}
                             <div className="space-y-3">
@@ -10504,22 +10574,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             {/* Cerrar Mes Confirmation Dialog */}
                             <AnimatePresence>
                               {showConfirmCloseMonth && (
-                                <>
+                                <motion.div
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+                                  onClick={() => setShowConfirmCloseMonth(false)}
+                                >
                                   <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    onClick={() => setShowConfirmCloseMonth(false)}
-                                    className="fixed inset-0 bg-black/50 z-50 transition-opacity"
-                                  />
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                                    transition={{ duration: 0.2, ease: "easeOut" }}
-                                    className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 p-6 rounded-2xl shadow-xl z-50 text-center space-y-4"
+                                    initial={{ y: "100%" }}
+                                    animate={{ y: 0 }}
+                                    exit={{ y: "100%" }}
+                                    transition={{ type: "spring", damping: 25, stiffness: 280 }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-sm border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 shadow-2xl text-center"
                                   >
-                                    <div className="space-y-1">
+                                    {/* Mobile Drag Handle */}
+                                    <div className="w-10 h-1 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto sm:hidden mb-1" />
+
+                                    <div className="space-y-1.5">
                                       <h3 className="text-base font-bold text-gray-900 dark:text-white">
                                         Cerrar {(() => {
                                           const monthsList = [
@@ -10535,11 +10608,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                       </p>
                                     </div>
 
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2.5 pt-2">
                                       <button
                                         type="button"
                                         onClick={() => setShowConfirmCloseMonth(false)}
-                                        className="flex-1 py-3 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all"
+                                        className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
                                       >
                                         Cancelar
                                       </button>
@@ -10550,13 +10623,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                           setMonthIsClosedStatus(prev => ({ ...prev, [currentMonthPrefix]: true }));
                                           setShowConfirmCloseMonth(false);
                                         }}
-                                        className="flex-1 py-3 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 rounded-xl text-xs font-bold transition-all"
+                                        className="flex-1 py-2.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors shadow-2xs"
                                       >
                                         Cerrar mes
                                       </button>
                                     </div>
                                   </motion.div>
-                                </>
+                                </motion.div>
                               )}
                             </AnimatePresence>
                           </div>
@@ -10565,14 +10638,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     ) : (
                       // Original Desktop View of CLOSING tab (perfectly kept for desktop as requested!)
                       <div className="space-y-6 max-w-4xl mx-auto">
-                        <div className="flex justify-between items-center border-b border-gray-200 dark:border-zinc-800 pb-3">
-                          <div>
-                            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                              Cierre de Mes y Reportes
+                        <div className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-gray-150 dark:border-zinc-800 w-full">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
+                              Cierres y Reportes
                             </h2>
-                            <p className="text-xs text-gray-500">
-                              Resumen mensual de flujos y exportación de datos
-                            </p>
                           </div>
                         </div>
 
