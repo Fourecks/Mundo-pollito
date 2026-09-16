@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   PlusIcon,
   XIcon,
-  ArrowRightLeft,
+  ArrowRightLeft, ArrowRight,
   ArrowDownRight,
   ArrowUpRight,
   MoreHorizontal,
@@ -5853,60 +5853,77 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         </h3>
                       </div>
                       
-                      <div className="space-y-4">
+                      <div className="space-y-6">
                         {overdueItems.length === 0 ? (
                           <div className="text-center py-8 text-sm text-gray-500">
                             No hay pagos atrasados.
                           </div>
                         ) : (
-                          <div className="grid gap-3">
-                            {overdueItems.map((item, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => {
-                                  if (isMobile) {
-                                    if (item.route.tab === "more_menu") {
-                                      setMobileMainTab("more");
-                                      setMobileMoreSubView(item.route.subTab);
-                                    } else {
-                                      setMobileMainTab(item.route.tab);
-                                      if (item.route.tab === "planning") setMobilePlanSubView(item.route.subTab);
-                                    }
-                                  } else {
-                                    if (item.route.tab === "more_menu") {
-                                      setActiveTab("debts");
-                                    } else {
-                                      setActiveTab(item.route.tab);
-                                      if (item.route.tab === "planning") setPlanningSubTab(item.route.subTab);
-                                    }
-                                  }
-                                }}
-                                className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-red-200 dark:border-red-900/40 hover:border-red-300 dark:hover:border-red-800 rounded-xl shadow-xs transition-colors text-left"
-                              >
-                                <div>
-                                  <div className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-0.5">
-                                    {item.type}
-                                  </div>
-                                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                                    {item.title}
-                                  </div>
-                                  {item.cuotas && item.cuotas > 0 ? (
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                      {item.cuotas} {item.cuotas === 1 ? "cuota atrasada" : "cuotas atrasadas"}
-                                    </div>
-                                  ) : null}
+                          ["Tarjeta", "Préstamo", "Suscripción", "Cuota"].map((groupType) => {
+                            const itemsInGroup = overdueItems.filter((i) => i.type === groupType);
+                            if (itemsInGroup.length === 0) return null;
+                            
+                            return (
+                              <div key={groupType} className="space-y-3">
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider pl-1">
+                                  {groupType}s
+                                </h4>
+                                <div className="grid gap-3">
+                                  {itemsInGroup.map((item, idx) => (
+                                    <button
+                                      key={idx}
+                                      onClick={() => {
+                                        if (isMobile) {
+                                          if (item.route.tab === "more_menu") {
+                                            setMobileMainTab("more");
+                                            setMobileMoreSubView(item.route.subTab);
+                                          } else {
+                                            setMobileMainTab(item.route.tab as any);
+                                            if (item.route.tab === "planning") setMobilePlanSubView(item.route.subTab as any);
+                                          }
+                                        } else {
+                                          if (item.route.tab === "more_menu") {
+                                            setActiveTab("debts");
+                                          } else {
+                                            setActiveTab(item.route.tab as any);
+                                            if (item.route.tab === "planning") setPlanningSubTab(item.route.subTab as any);
+                                          }
+                                        }
+                                      }}
+                                      className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-red-200 dark:border-red-900/40 hover:border-red-300 dark:hover:border-red-800 rounded-xl shadow-xs transition-colors text-left group"
+                                    >
+                                      <div>
+                                        <div className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-red-700 dark:group-hover:text-red-400 transition-colors">
+                                          {item.title}
+                                        </div>
+                                        {item.cuotas && item.cuotas > 0 ? (
+                                          <div className="text-xs font-medium text-red-600 dark:text-red-400 mt-1">
+                                            {item.cuotas} {item.cuotas === 1 ? "cuota atrasada" : "cuotas atrasadas"}
+                                          </div>
+                                        ) : (
+                                          <div className="text-xs font-medium text-red-600 dark:text-red-400 mt-1">
+                                            Pago pendiente
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                          {formatCurrency(item.amount)}
+                                        </div>
+                                        <div className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-600 dark:text-red-400 group-hover:bg-red-100 dark:group-hover:bg-red-900/50 transition-colors">
+                                          <ArrowRight className="w-4 h-4" />
+                                        </div>
+                                      </div>
+                                    </button>
+                                  ))}
                                 </div>
-                                <div className="text-sm font-bold text-gray-900 dark:text-white">
-                                  {formatCurrency(item.amount)}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
+                              </div>
+                            );
+                          })
                         )}
                       </div>
                     </div>
                   )}
-
                   {effectiveTab === "overview" && (
                     isMobile ? (
                       renderMobileOverview()
