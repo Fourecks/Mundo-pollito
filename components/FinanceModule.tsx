@@ -1124,6 +1124,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
   // Collapsible Savings Goals State
   const [expandedGoalIds, setExpandedGoalIds] = useState<number[]>([]);
+  const [expandedInstallmentIds, setExpandedInstallmentIds] = useState<number[]>([]);
+  const [expandedDebtIds, setExpandedDebtIds] = useState<number[]>([]);
 
   const getPlanSubViewOnPlus = (sub: string | null) => {
     switch (sub) {
@@ -4949,68 +4951,51 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
     return (
       <div className="space-y-6 pb-32 animate-in fade-in duration-200 max-w-5xl mx-auto">
-        {/* Header */}
+        {/* Header - Sin descripción ni botón de registrar préstamo */}
         <div className="flex justify-between items-center pb-2 border-b border-gray-150 dark:border-zinc-800">
           <div>
             <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
               Préstamos
             </h3>
-            <p className="text-xs text-gray-500 dark:text-zinc-400">
-              Control de deudas personales y préstamos
-            </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setDebtType("OWE");
-              setDebtName("");
-              setDebtAmount("");
-              setDebtDueDate("");
-              setShowAddDebtModal(true);
-            }}
-            className="text-xs font-semibold bg-gray-950 hover:bg-black dark:bg-white dark:hover:bg-gray-100 dark:text-gray-950 text-white px-3 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Registrar Préstamo
-          </button>
         </div>
 
-        {/* Summary Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl">
-            <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
-              Yo Debo (Por Pagar)
-            </span>
-            <span className="text-lg font-bold text-gray-900 dark:text-white mt-1 block">
-              {formatCurrency(totalOwe)}
-            </span>
-            <span className="text-[11px] text-gray-400 block mt-0.5">
-              {activeDebts.filter((d) => d.type === "OWE").length} compromisos
-            </span>
-          </div>
-
-          <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl">
-            <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
-              Me Deben (Por Cobrar)
-            </span>
-            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1 block">
-              {formatCurrency(totalOwed)}
-            </span>
-            <span className="text-[11px] text-gray-400 block mt-0.5">
-              {activeDebts.filter((d) => d.type === "OWED").length} cuentas
-            </span>
-          </div>
-
-          <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl col-span-2 sm:col-span-1">
-            <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
-              Total Préstamos
-            </span>
-            <span className="text-lg font-bold text-gray-900 dark:text-white mt-1 block">
-              {activeDebts.length}
-            </span>
-            <span className="text-[11px] text-gray-400 block mt-0.5">
-              registros activos
-            </span>
+        {/* Summary Metrics: 1 sola tarjeta horizontal en 3 columnas */}
+        <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-2xs">
+          <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-zinc-800/80 text-center">
+            <div className="px-2">
+              <span className="text-[10px] sm:text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                Yo Debo
+              </span>
+              <span className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white mt-1 block truncate">
+                {formatCurrency(totalOwe)}
+              </span>
+              <span className="text-[10px] text-gray-400 block mt-0.5">
+                {activeDebts.filter((d) => d.type === "OWE").length} compromisos
+              </span>
+            </div>
+            <div className="px-2">
+              <span className="text-[10px] sm:text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                Me Deben
+              </span>
+              <span className="text-sm sm:text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1 block truncate">
+                {formatCurrency(totalOwed)}
+              </span>
+              <span className="text-[10px] text-gray-400 block mt-0.5">
+                {activeDebts.filter((d) => d.type === "OWED").length} cuentas
+              </span>
+            </div>
+            <div className="px-2">
+              <span className="text-[10px] sm:text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                Total Préstamos
+              </span>
+              <span className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white mt-1 block truncate">
+                {activeDebts.length}
+              </span>
+              <span className="text-[10px] text-gray-400 block mt-0.5">
+                registros activos
+              </span>
+            </div>
           </div>
         </div>
 
@@ -5071,16 +5056,18 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     )
                   : 0;
               const isOverdue = debt.remaining_cents > 0 && debt.due_date && debt.due_date < getTodayStr();
+              const isExpanded = expandedDebtIds.includes(debt.id);
 
               return (
                 <div
                   key={debt.id}
-                  className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-3.5 hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
+                  className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-2.5 hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                  {/* Fila Principal: Siempre visible sin desplegar */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1 pr-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
                           {debt.name}
                         </h4>
                         <span
@@ -5098,62 +5085,108 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {debt.due_date ? `Vence: ${debt.due_date}` : "Sin fecha de vencimiento"}
-                      </p>
+                      <div className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5 flex items-center gap-2">
+                        <span>Restante: <strong className="text-gray-900 dark:text-white">{formatCurrency(debt.remaining_cents)}</strong></span>
+                        <span className="text-gray-300 dark:text-zinc-700">•</span>
+                        <span className="text-[10px] text-gray-400">Total: {formatCurrency(debt.amount_cents)}</span>
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteDebt(debt.id)}
-                      className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-                      title="Eliminar préstamo"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Amounts */}
-                  <div className="flex justify-between items-end pt-1">
-                    <div>
-                      <span className="text-[11px] text-gray-400 block">Restante</span>
-                      <span className="text-base font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(debt.remaining_cents)}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[11px] text-gray-400 block">Monto Total</span>
-                      <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
-                        {formatCurrency(debt.amount_cents)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="space-y-1">
-                    <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-500"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-gray-400 pt-0.5">
-                      <span>{progress}% pagado</span>
+                    {/* Botón Abonar (mismo diseño que metas de ahorro) + Flechita */}
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {debt.remaining_cents > 0 && (
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setShowPayDebtModal(debt);
                             setPayDebtAmount("");
                             setPayDebtAccountId("");
                           }}
-                          className="text-[11px] font-semibold text-gray-900 dark:text-white hover:underline"
+                          className="text-xs font-semibold bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 px-3 py-1.5 rounded-xl transition-all shadow-2xs active:scale-95"
                         >
-                          Abonar {isOwe ? "Pago" : "Cobro"} →
+                          Abonar
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExpandedDebtIds((prev) =>
+                            prev.includes(debt.id)
+                              ? prev.filter((id) => id !== debt.id)
+                              : [...prev, debt.id]
+                          );
+                        }}
+                        className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                        title={isExpanded ? "Contraer detalles" : "Desplegar detalles"}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
+
+                  {/* Barra de Progreso: Siempre visible */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-medium shrink-0">
+                      {progress}%
+                    </span>
+                  </div>
+
+                  {/* Desplegable con Flechita */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="space-y-3 pt-2.5 border-t border-gray-100 dark:border-zinc-800/80 overflow-hidden"
+                      >
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
+                            <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">
+                              Fecha Vencimiento
+                            </span>
+                            <span className="font-bold text-gray-900 dark:text-white">
+                              {debt.due_date ? debt.due_date : "Sin fecha asignada"}
+                            </span>
+                          </div>
+                          <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
+                            <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">
+                              Monto Total Inicial
+                            </span>
+                            <span className="font-bold text-gray-900 dark:text-white">
+                              {formatCurrency(debt.amount_cents)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-1 text-xs">
+                          <span className="text-gray-400 text-[11px]">
+                            {isOwe ? "Préstamo otorgado a ti" : "Préstamo concedido por ti"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDebt(debt.id)}
+                            className="text-red-500 hover:text-red-600 text-xs font-semibold flex items-center gap-1 hover:underline p-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Eliminar préstamo
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
@@ -7534,20 +7567,26 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   inst.status === "ACTIVE"
                                     ? Math.max(0, expectedPaid - inst.paid_installments)
                                     : 0;
+                                const isExpanded = expandedInstallmentIds.includes(inst.id);
 
                                 return (
                                   <div
                                     key={inst.id}
-                                    className="bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4 hover:border-gray-200 dark:hover:border-zinc-700 transition-all"
+                                    className="bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-2.5 hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
                                   >
-                                    <div className="flex justify-between items-start">
-                                      <div>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <h4 className="font-bold text-base">
+                                    {/* Fila Principal: Nombre, Estado, Cuota x/y, Botón Pagar Cuota + Flechita */}
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="min-w-0 flex-1 pr-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
                                             {inst.name}
                                           </h4>
                                           <span
-                                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${inst.status === "COMPLETED" ? "bg-gray-200 text-gray-800 dark:bg-zinc-800 dark:text-gray-200" : "bg-gray-100 text-gray-900 dark:bg-zinc-800 dark:text-white"}`}
+                                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                                              inst.status === "COMPLETED"
+                                                ? "bg-gray-200 text-gray-800 dark:bg-zinc-800 dark:text-gray-200"
+                                                : "bg-gray-100 text-gray-900 dark:bg-zinc-800 dark:text-white"
+                                            }`}
                                           >
                                             {inst.status === "COMPLETED"
                                               ? "Completado"
@@ -7559,91 +7598,125 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                             </span>
                                           )}
                                         </div>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                          {targetAcc
-                                            ? `Tarjeta/Cuenta: ${targetAcc.name}`
-                                            : "Sin cuenta asignada"}
-                                          {targetCat
-                                            ? ` • ${targetCat.emoji || "🏷️"} ${targetCat.name}`
-                                            : ""}{" "}
-                                          • Día de cobro:{" "}
-                                          {inst.payment_day || 15} • Inicio:{" "}
-                                          {inst.start_date}
-                                        </p>
+                                        <div className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5 flex items-center gap-2">
+                                          <span>Cuota <strong className="text-gray-900 dark:text-white">{inst.paid_installments}/{inst.total_installments}</strong></span>
+                                          <span className="text-gray-300 dark:text-zinc-700">•</span>
+                                          <span>{formatCurrency(inst.installment_amount_cents)} / mes</span>
+                                        </div>
                                       </div>
-                                      <button
-                                        onClick={() =>
-                                          handleDeleteInstallment(inst.id)
-                                        }
-                                        className="text-gray-400 hover:text-red-500 p-1"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
 
-                                    <div className="grid grid-cols-3 gap-1 p-2.5 bg-gray-50/70 dark:bg-zinc-900/40 border border-gray-100 dark:border-zinc-800/50 rounded-xl text-center">
-                                      <div className="min-w-0">
-                                        <p className="text-[10px] text-gray-400 font-medium truncate">
-                                          Monto Total
-                                        </p>
-                                        <p className="font-bold text-xs text-gray-950 dark:text-white truncate">
-                                          {formatCurrency(
-                                            inst.total_amount_cents,
+                                      {/* Botones de acción y Flechita */}
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {inst.status === "ACTIVE" && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handlePayInstallment(inst)}
+                                            className="text-xs font-semibold bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 px-3 py-1.5 rounded-xl transition-all shadow-2xs active:scale-95"
+                                          >
+                                            Pagar Cuota
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setExpandedInstallmentIds((prev) =>
+                                              prev.includes(inst.id)
+                                                ? prev.filter((id) => id !== inst.id)
+                                                : [...prev, inst.id],
+                                            );
+                                          }}
+                                          className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                                          title={isExpanded ? "Contraer detalles" : "Desplegar detalles"}
+                                        >
+                                          {isExpanded ? (
+                                            <ChevronUp className="w-4 h-4" />
+                                          ) : (
+                                            <ChevronDown className="w-4 h-4" />
                                           )}
-                                        </p>
-                                      </div>
-                                      <div className="min-w-0 border-x border-gray-100 dark:border-zinc-800">
-                                        <p className="text-[10px] text-gray-400 font-medium truncate">
-                                          Valor Cuota
-                                        </p>
-                                        <p className="font-bold text-xs text-gray-900 dark:text-white truncate">
-                                          {formatCurrency(
-                                            inst.installment_amount_cents,
-                                          )}
-                                        </p>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="text-[10px] text-gray-400 font-medium truncate">
-                                          Cuotas
-                                        </p>
-                                        <p className="font-bold text-xs text-gray-950 dark:text-white truncate">
-                                          {inst.paid_installments}/
-                                          {inst.total_installments}
-                                        </p>
+                                        </button>
                                       </div>
                                     </div>
 
-                                    <div>
-                                      <div className="flex justify-between text-[11px] font-semibold mb-1 text-gray-400">
-                                        <span>Progreso ({pct}%)</span>
-                                        <span>
-                                          Restan{" "}
-                                          {inst.total_installments -
-                                            inst.paid_installments}{" "}
-                                          meses
-                                        </span>
-                                      </div>
-                                      <div className="h-1 bg-gray-100 dark:bg-zinc-800/80 rounded-full overflow-hidden">
+                                    {/* Barra de Progreso: Siempre visible */}
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                         <div
-                                          className="h-full bg-zinc-800 dark:bg-white rounded-full transition-all duration-500"
+                                          className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-300"
                                           style={{ width: `${pct}%` }}
                                         />
                                       </div>
+                                      <span className="text-[10px] text-gray-400 font-medium shrink-0">
+                                        {pct}%
+                                      </span>
                                     </div>
 
-                                    {inst.status === "ACTIVE" ? (
-                                      <div className="bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 text-gray-500 text-[11px] p-2 rounded-xl text-center flex items-center justify-center gap-1.5 font-medium">
-                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
-                                        <span>
-                                          Descuento automático el día{" "}
-                                          {inst.payment_day || 15} de cada mes
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <div className="bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-[11px] p-2 rounded-xl text-center font-medium">
-                                        ✅ Todas las cuotas han sido pagadas
-                                      </div>
-                                    )}
+                                    {/* Desplegable con Flechita */}
+                                    <AnimatePresence>
+                                      {isExpanded && (
+                                        <motion.div
+                                          initial={{ opacity: 0, height: 0 }}
+                                          animate={{ opacity: 1, height: "auto" }}
+                                          exit={{ opacity: 0, height: 0 }}
+                                          transition={{ duration: 0.2 }}
+                                          className="space-y-3 pt-2.5 border-t border-gray-100 dark:border-zinc-800/80 overflow-hidden"
+                                        >
+                                          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                            <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
+                                              <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">
+                                                Monto Total
+                                              </span>
+                                              <span className="font-bold text-gray-900 dark:text-white">
+                                                {formatCurrency(inst.total_amount_cents)}
+                                              </span>
+                                            </div>
+                                            <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
+                                              <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">
+                                                Valor Cuota
+                                              </span>
+                                              <span className="font-bold text-gray-900 dark:text-white">
+                                                {formatCurrency(inst.installment_amount_cents)}
+                                              </span>
+                                            </div>
+                                            <div className="p-2.5 bg-gray-50 dark:bg-[#121212] rounded-xl border border-gray-200 dark:border-zinc-800">
+                                              <span className="text-[10px] font-semibold text-gray-400 block uppercase tracking-wider">
+                                                Pagado
+                                              </span>
+                                              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                {formatCurrency(inst.paid_installments * inst.installment_amount_cents)}
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          <div className="text-xs text-gray-500 dark:text-zinc-400 space-y-1 bg-gray-50 dark:bg-[#121212] p-3 rounded-xl border border-gray-200 dark:border-zinc-800">
+                                            <p>
+                                              <strong>Cuenta / Tarjeta:</strong> {targetAcc ? targetAcc.name : "Sin cuenta asignada"}
+                                            </p>
+                                            {targetCat && (
+                                              <p>
+                                                <strong>Categoría:</strong> {targetCat.emoji || "🏷️"} {targetCat.name}
+                                              </p>
+                                            )}
+                                            <p>
+                                              <strong>Día de cobro:</strong> Día {inst.payment_day || 15} de cada mes
+                                            </p>
+                                            <p>
+                                              <strong>Fecha inicio:</strong> {inst.start_date}
+                                            </p>
+                                          </div>
+
+                                          <div className="flex justify-end pt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteInstallment(inst.id)}
+                                              className="text-red-500 hover:text-red-600 text-xs font-semibold flex items-center gap-1 hover:underline p-1"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                              Eliminar cuota
+                                            </button>
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
                                   </div>
                                 );
                               })}
@@ -13204,81 +13277,89 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         )}
       </AnimatePresence>
 
-      {/* Pay/Abonar Debt Modal */}
+      {/* Pay/Abonar Debt Bottom Sheet Drawer */}
       <AnimatePresence>
         {showPayDebtModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowPayDebtModal(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar"
             >
-              <div className="flex justify-between items-center mb-4">
+              {/* Barra superior de agarre para móvil */}
+              <div className="w-12 h-1 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto mb-1 sm:hidden" />
+
+              <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-3">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                   Abonar Préstamo / Deuda
                 </h3>
                 <button
+                  type="button"
                   onClick={() => setShowPayDebtModal(null)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-500 transition-colors"
                 >
                   <XIcon className="w-5 h-5" />
                 </button>
               </div>
+
               <form onSubmit={handlePayDebtConfirm} className="space-y-4">
-                <div>
-                  <div className="text-xs text-gray-500 space-y-1 bg-gray-50 dark:bg-zinc-900 p-3 rounded-xl border border-gray-100 dark:border-zinc-800">
-                    <div>
-                      Préstamo:{" "}
-                      <strong className="text-gray-900 dark:text-white">
-                        {showPayDebtModal.name}
-                      </strong>
-                    </div>
-                    <div>
-                      Monto total:{" "}
-                      <strong className="text-gray-900 dark:text-white">
-                        {formatCurrency(showPayDebtModal.amount_cents)}
-                      </strong>
-                    </div>
-                    <div>
-                      Monto restante:{" "}
-                      <strong className="text-red-500">
-                        {formatCurrency(showPayDebtModal.remaining_cents)}
-                      </strong>
-                    </div>
+                <div className="text-xs text-gray-500 space-y-1.5 bg-gray-50 dark:bg-[#121212] p-3.5 rounded-xl border border-gray-200/80 dark:border-zinc-800">
+                  <div className="flex justify-between items-center">
+                    <span>Préstamo:</span>
+                    <strong className="text-gray-900 dark:text-white font-semibold">
+                      {showPayDebtModal.name}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Monto total:</span>
+                    <strong className="text-gray-900 dark:text-white font-semibold">
+                      {formatCurrency(showPayDebtModal.amount_cents)}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Monto restante:</span>
+                    <strong className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      {formatCurrency(showPayDebtModal.remaining_cents)}
+                    </strong>
                   </div>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold mb-1 text-gray-500">
-                    Monto del abono
+                  <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">
+                    Monto a abonar ($)
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-400 text-sm">$</span>
-                    </div>
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                      $
+                    </span>
                     <input
                       required
                       type="number"
                       step="0.01"
                       min="0.01"
+                      max={(showPayDebtModal.remaining_cents / 100).toFixed(2)}
                       onKeyDown={blockNegativeKeys}
                       value={payDebtAmount}
                       onChange={(e) =>
                         setPayDebtAmount(e.target.value.replace(/-/g, ""))
                       }
-                      className="w-full pl-7 pr-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                      className="w-full pl-8 pr-3 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white transition-all text-gray-900 dark:text-white"
                       placeholder="0.00"
                     />
                   </div>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold mb-1 text-gray-500">
+                  <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">
                     {showPayDebtModal.type === "OWED"
                       ? "Cuenta donde se deposita el cobro"
                       : "Cuenta de donde se descuenta el pago"}
@@ -13291,7 +13372,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         e.target.value ? Number(e.target.value) : "",
                       )
                     }
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white transition-all text-gray-900 dark:text-white"
                   >
                     <option value="">Selecciona cuenta...</option>
                     {accounts
@@ -13303,9 +13384,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       ))}
                   </select>
                 </div>
+
                 <button
                   type="submit"
-                  className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+                  className="w-full bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-[0.98]"
                 >
                   Confirmar Abono
                 </button>
