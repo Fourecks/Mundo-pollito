@@ -11172,193 +11172,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   </div>
                                 </button>
                               ))}
-                            </div>
-
-                            {/* Account Bottom Options Sheet */}
-                            <AnimatePresence>
-                              {showAccountOptionsSheet && selectedMobileAccount && (
-                                <>
-                                  <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    onClick={() => {
-                                      setShowAccountOptionsSheet(false);
-                                      setSelectedMobileAccount(null);
-                                    }}
-                                    className="fixed inset-0 bg-black/45 z-50 transition-opacity"
-                                  />
-                                  <motion.div
-                                    initial={{ y: "100%" }}
-                                    animate={{ y: 0 }}
-                                    exit={{ y: "100%" }}
-                                    transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                                    className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0d0d0d] border-t border-gray-200 dark:border-zinc-800 rounded-t-[28px] z-50 overflow-hidden pb-6"
-                                  >
-                                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
-                                    
-                                    <div className="p-4 border-b border-gray-100 dark:border-zinc-900 text-center">
-                                      <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                        {selectedMobileAccount.name}
-                                      </h3>
-                                      <span className="text-[11px] text-gray-400 dark:text-zinc-500 block mt-0.5">
-                                        Balance actual: {formatCurrency(selectedMobileAccount.balance_cents)}
-                                      </span>
-                                    </div>
-
-                                    <div className="p-4 space-y-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setShowAccountOptionsSheet(false);
-                                          setShowAccountTxList(true);
-                                        }}
-                                        className="w-full py-4 px-5 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 text-left rounded-xl transition-colors flex items-center gap-3"
-                                      >
-                                        <ListOrdered className="w-4 h-4 text-gray-500" />
-                                        <span>Ver movimientos de esta cuenta</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const acc = selectedMobileAccount;
-                                          setShowAccountOptionsSheet(false);
-                                          setSelectedMobileAccount(null);
-                                          
-                                          // Set all account edit states as in original
-                                          setEditingAccount(acc);
-                                          setEditAccountName(acc.name);
-                                          setEditAccountType(acc.type);
-                                          setEditAccountBalance((acc.balance_cents / 100).toString());
-                                          setEditAccountCardColor(acc.card_color || "slate");
-                                          setEditAccountCreditLimit(((acc.credit_limit_cents || 0) / 100).toString());
-                                          setEditAccountCutoffDay((acc.cutoff_day || "").toString());
-                                          setEditAccountDueDay((acc.due_day || "").toString());
-                                          setEditAccountCardNumberLast4(acc.card_number_last4 || "");
-                                          setEditAccountMaintFeeType(acc.maintenance_fee_type || "none");
-                                          setEditAccountMaintFeeValue((acc.maintenance_fee_value || 0).toString());
-                                          setEditAccountMaintFeeFreq(acc.maintenance_fee_freq || "monthly");
-                                          setEditAccountTransferFeeType(acc.transfer_fee_type || "none");
-                                          setEditAccountTransferFeeValue((acc.transfer_fee_value || 0).toString());
-                                          setShowEditAccountExtras(
-                                            (acc.maintenance_fee_type && acc.maintenance_fee_type !== "none") ||
-                                            (acc.transfer_fee_type && acc.transfer_fee_type !== "none")
-                                          );
-                                        }}
-                                        className="w-full py-4 px-5 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 text-left rounded-xl transition-colors flex items-center gap-3"
-                                      >
-                                        <Pencil className="w-4 h-4 text-gray-500" />
-                                        <span>Editar cuenta</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const accId = selectedMobileAccount.id;
-                                          setShowAccountOptionsSheet(false);
-                                          setSelectedMobileAccount(null);
-                                          handleDeleteAccount(accId);
-                                        }}
-                                        className="w-full py-4 px-5 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-left rounded-xl transition-colors flex items-center gap-3"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                        <span>Eliminar cuenta</span>
-                                      </button>
-                                      
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setShowAccountOptionsSheet(false);
-                                          setSelectedMobileAccount(null);
-                                        }}
-                                        className="w-full py-3.5 text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 rounded-xl transition-colors shrink-0"
-                                      >
-                                        Cancelar
-                                      </button>
-                                    </div>
-                                  </motion.div>
-                                </>
-                              )}
-                            </AnimatePresence>
-
-                            {/* Account Transactions Bottom Sheet */}
-                            <AnimatePresence>
-                              {showAccountTxList && selectedMobileAccount && (
-                                <>
-                                  <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    onClick={() => {
-                                      setShowAccountTxList(false);
-                                      setSelectedMobileAccount(null);
-                                    }}
-                                    className="fixed inset-0 bg-black/50 z-50 transition-opacity"
-                                  />
-                                  <motion.div
-                                    initial={{ y: "100%" }}
-                                    animate={{ y: 0 }}
-                                    exit={{ y: "100%" }}
-                                    transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                                    className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-200 dark:border-zinc-800 rounded-t-[28px] max-h-[80vh] z-50 flex flex-col overflow-hidden pb-safe animate-fade-in"
-                                  >
-                                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
-                                    
-                                    <div className="px-5 pb-3 border-b border-gray-100 dark:border-zinc-900 flex justify-between items-center shrink-0">
-                                      <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                                        Movimientos: {selectedMobileAccount.name}
-                                      </h3>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setShowAccountTxList(false);
-                                          setSelectedMobileAccount(null);
-                                        }}
-                                        className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400"
-                                      >
-                                        Cerrar
-                                      </button>
-                                    </div>
-
-                                    <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                                      {(() => {
-                                        const accTx = transactions.filter(t => t.account_id === selectedMobileAccount.id);
-                                        if (accTx.length === 0) {
-                                          return (
-                                            <p className="text-center text-xs text-gray-400 my-8">
-                                              No hay movimientos registrados en esta cuenta.
-                                            </p>
-                                          );
-                                        }
-                                        return accTx.map(tx => {
-                                          const cat = categories.find(c => c.id === tx.category_id);
-                                          return (
-                                            <div key={tx.id} className="flex items-center justify-between p-3.5 bg-gray-50/50 dark:bg-zinc-900/40 rounded-xl border border-gray-100/60 dark:border-zinc-800/40">
-                                              <div className="flex items-center gap-3">
-                                                <span className="text-lg">{cat?.emoji || "🏷️"}</span>
-                                                <div>
-                                                  <span className="text-xs font-semibold text-gray-900 dark:text-white block">
-                                                    {tx.description || cat?.name || "Sin descripción"}
-                                                  </span>
-                                                  <span className="text-[10px] text-gray-400 dark:text-zinc-500 block">
-                                                    {tx.date}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                              <span className={`text-xs font-bold ${tx.type === "INCOME" ? "text-emerald-600 dark:text-emerald-500" : "text-gray-900 dark:text-white"}`}>
-                                                {tx.type === "INCOME" ? "+" : "-"}
-                                                {formatCurrency(tx.amount_cents)}
-                                              </span>
-                                            </div>
-                                          );
-                                        });
-                                      })()}
-                                    </div>
-                                  </motion.div>
-                                </>
-                              )}
-                            </AnimatePresence>
+                             </div>
                           </div>
                         )}
 
@@ -11440,76 +11254,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                 </div>
                               );
                             })()}
-
-                            {/* Category Bottom Sheet (•••) */}
-                            <AnimatePresence>
-                              {selectedMobileCategory && (
-                                <>
-                                  <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    onClick={() => setSelectedMobileCategory(null)}
-                                    className="fixed inset-0 bg-black/45 z-50 transition-opacity"
-                                  />
-                                  <motion.div
-                                    initial={{ y: "100%" }}
-                                    animate={{ y: 0 }}
-                                    exit={{ y: "100%" }}
-                                    transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                                    className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#0d0d0d] border-t border-gray-200 dark:border-zinc-800 rounded-t-[28px] z-50 overflow-hidden pb-6"
-                                  >
-                                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
-                                    
-                                    <div className="p-4 border-b border-gray-100 dark:border-zinc-900 text-center">
-                                      <span className="text-lg block mb-1">{selectedMobileCategory.emoji}</span>
-                                      <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                        {selectedMobileCategory.name}
-                                      </h3>
-                                      <span className="text-[11px] text-gray-400 dark:text-zinc-500 uppercase block tracking-wider mt-0.5">
-                                        Categoría de {activeCategoryTab === "EXPENSE" ? "Gasto" : "Ingreso"}
-                                      </span>
-                                    </div>
-
-                                    <div className="p-4 space-y-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const cat = selectedMobileCategory;
-                                          setSelectedMobileCategory(null);
-                                          openEditCategoryModal(cat);
-                                        }}
-                                        className="w-full py-4 px-5 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 text-left rounded-xl transition-colors flex items-center gap-3"
-                                      >
-                                        <Pencil className="w-4 h-4 text-gray-500" />
-                                        <span>Editar categoría</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const catId = selectedMobileCategory.id;
-                                          setSelectedMobileCategory(null);
-                                          handleDeleteCategory(catId);
-                                        }}
-                                        className="w-full py-4 px-5 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-left rounded-xl transition-colors flex items-center gap-3"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                        <span>Eliminar categoría</span>
-                                      </button>
-                                      
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectedMobileCategory(null)}
-                                        className="w-full py-3.5 text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-zinc-900 rounded-xl transition-colors shrink-0"
-                                      >
-                                        Cancelar
-                                      </button>
-                                    </div>
-                                  </motion.div>
-                                </>
-                              )}
-                            </AnimatePresence>
                           </div>
                         )}
 
@@ -16271,6 +16015,272 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   className="w-full py-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-semibold text-sm rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                 >
                   Cancelar Suscripción
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Account Options Bottom Sheet (Portal - Screen Root) */}
+      <AnimatePresence>
+        {showAccountOptionsSheet && selectedMobileAccount && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+            onClick={() => {
+              setShowAccountOptionsSheet(false);
+              setSelectedMobileAccount(null);
+            }}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-[28px] sm:rounded-3xl p-6 w-full max-w-full sm:max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 shadow-2xl overflow-hidden"
+            >
+              <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-2 cursor-grab shrink-0" />
+              
+              <div className="pb-3 border-b border-gray-100 dark:border-zinc-900 text-center">
+                <div className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white flex items-center justify-center mx-auto mb-2 border border-gray-200/60 dark:border-zinc-700/60">
+                  {getAccountIcon(selectedMobileAccount.type)}
+                </div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  {selectedMobileAccount.name}
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-zinc-400 block mt-0.5">
+                  Balance actual: <strong className="text-gray-900 dark:text-white font-bold">{formatCurrency(selectedMobileAccount.balance_cents)}</strong>
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAccountOptionsSheet(false);
+                    setShowAccountTxList(true);
+                  }}
+                  className="w-full py-3.5 px-4 text-xs font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-[#121212] hover:bg-gray-100 dark:hover:bg-zinc-800/80 border border-gray-200/60 dark:border-zinc-800/60 rounded-xl transition-all flex items-center gap-3 cursor-pointer"
+                >
+                  <ListOrdered className="w-4 h-4 text-gray-500" />
+                  <span>Ver movimientos de esta cuenta</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const acc = selectedMobileAccount;
+                    setShowAccountOptionsSheet(false);
+                    setSelectedMobileAccount(null);
+                    
+                    setEditingAccount(acc);
+                    setEditAccountName(acc.name);
+                    setEditAccountType(acc.type);
+                    setEditAccountBalance((acc.balance_cents / 100).toString());
+                    setEditAccountCardColor(acc.card_color || "slate");
+                    setEditAccountCreditLimit(((acc.credit_limit_cents || 0) / 100).toString());
+                    setEditAccountCutoffDay((acc.cutoff_day || "").toString());
+                    setEditAccountDueDay((acc.due_day || "").toString());
+                    setEditAccountCardNumberLast4(acc.card_number_last4 || "");
+                    setEditAccountMaintFeeType(acc.maintenance_fee_type || "none");
+                    setEditAccountMaintFeeValue((acc.maintenance_fee_value || 0).toString());
+                    setEditAccountMaintFeeFreq(acc.maintenance_fee_freq || "monthly");
+                    setEditAccountTransferFeeType(acc.transfer_fee_type || "none");
+                    setEditAccountTransferFeeValue((acc.transfer_fee_value || 0).toString());
+                    setShowEditAccountExtras(
+                      (acc.maintenance_fee_type && acc.maintenance_fee_type !== "none") ||
+                      (acc.transfer_fee_type && acc.transfer_fee_type !== "none")
+                    );
+                  }}
+                  className="w-full py-3.5 px-4 text-xs font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-[#121212] hover:bg-gray-100 dark:hover:bg-zinc-800/80 border border-gray-200/60 dark:border-zinc-800/60 rounded-xl transition-all flex items-center gap-3 cursor-pointer"
+                >
+                  <Pencil className="w-4 h-4 text-gray-500" />
+                  <span>Editar cuenta</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const accId = selectedMobileAccount.id;
+                    setShowAccountOptionsSheet(false);
+                    setSelectedMobileAccount(null);
+                    handleDeleteAccount(accId);
+                  }}
+                  className="w-full py-3.5 px-4 text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50/60 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-950/40 border border-rose-200/50 dark:border-rose-900/30 rounded-xl transition-all flex items-center gap-3 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Eliminar cuenta</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAccountOptionsSheet(false);
+                    setSelectedMobileAccount(null);
+                  }}
+                  className="w-full py-3 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors text-center cursor-pointer mt-1"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Account Transactions Bottom Sheet (Portal - Screen Root) */}
+      <AnimatePresence>
+        {showAccountTxList && selectedMobileAccount && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+            onClick={() => {
+              setShowAccountTxList(false);
+              setSelectedMobileAccount(null);
+            }}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-[28px] sm:rounded-3xl p-6 w-full max-w-full sm:max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+            >
+              <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-2 cursor-grab shrink-0" />
+              
+              <div className="pb-3 border-b border-gray-100 dark:border-zinc-900 flex justify-between items-center shrink-0">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Movimientos de Cuenta
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">
+                    {selectedMobileAccount.name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAccountTxList(false);
+                    setSelectedMobileAccount(null);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+                >
+                  <XIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-1">
+                {(() => {
+                  const accTx = transactions.filter(t => t.account_id === selectedMobileAccount.id);
+                  if (accTx.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-xs text-gray-400 my-4 space-y-1">
+                        <p className="font-semibold text-gray-700 dark:text-zinc-300">No hay movimientos registrados</p>
+                        <p>Esta cuenta aún no tiene ingresos o gastos registrados.</p>
+                      </div>
+                    );
+                  }
+                  return accTx.map(tx => {
+                    const cat = categories.find(c => c.id === tx.category_id);
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between p-3.5 bg-gray-50/80 dark:bg-[#121212] rounded-xl border border-gray-200/60 dark:border-zinc-800/60 shadow-2xs">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg w-9 h-9 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center border border-gray-200/60 dark:border-zinc-700/60 shrink-0">
+                            {cat?.emoji || "🏷️"}
+                          </span>
+                          <div>
+                            <span className="text-xs font-bold text-gray-900 dark:text-white block">
+                              {tx.description || cat?.name || "Sin descripción"}
+                            </span>
+                            <span className="text-[10px] text-gray-400 dark:text-zinc-500 block mt-0.5">
+                              {tx.date}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-bold ${tx.type === "INCOME" ? "text-emerald-600 dark:text-emerald-500" : "text-gray-900 dark:text-white"}`}>
+                          {tx.type === "INCOME" ? "+" : "-"}
+                          {formatCurrency(tx.amount_cents)}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Category Options Bottom Sheet (Portal - Screen Root) */}
+      <AnimatePresence>
+        {selectedMobileCategory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedMobileCategory(null)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-[28px] sm:rounded-3xl p-6 w-full max-w-full sm:max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 shadow-2xl overflow-hidden"
+            >
+              <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-2 cursor-grab shrink-0" />
+              
+              <div className="pb-3 border-b border-gray-100 dark:border-zinc-900 text-center">
+                <span className="text-3xl block mb-2">{selectedMobileCategory.emoji || "🏷️"}</span>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  {selectedMobileCategory.name}
+                </h3>
+                <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase block tracking-wider mt-0.5">
+                  Categoría de {selectedMobileCategory.type === "INCOME" ? "Ingreso" : "Gasto"}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cat = selectedMobileCategory;
+                    setSelectedMobileCategory(null);
+                    openEditCategoryModal(cat);
+                  }}
+                  className="w-full py-3.5 px-4 text-xs font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-[#121212] hover:bg-gray-100 dark:hover:bg-zinc-800/80 border border-gray-200/60 dark:border-zinc-800/60 rounded-xl transition-all flex items-center gap-3 cursor-pointer"
+                >
+                  <Pencil className="w-4 h-4 text-gray-500" />
+                  <span>Editar categoría</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const catId = selectedMobileCategory.id;
+                    setSelectedMobileCategory(null);
+                    handleDeleteCategory(catId);
+                  }}
+                  className="w-full py-3.5 px-4 text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50/60 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-950/40 border border-rose-200/50 dark:border-rose-900/30 rounded-xl transition-all flex items-center gap-3 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Eliminar categoría</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setSelectedMobileCategory(null)}
+                  className="w-full py-3 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors text-center cursor-pointer mt-1"
+                >
+                  Cancelar
                 </button>
               </div>
             </motion.div>
