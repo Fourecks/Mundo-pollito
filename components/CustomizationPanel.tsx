@@ -9,7 +9,8 @@ import {
   CloudRain, Stars, Circle, Zap, TreePine, Coffee, Waves, 
   VolumeX, LogOut, Palette, Sparkles, Smile, Battery, 
   ChevronRight, Bell, Clock, Send, Users, AtSign, CheckCircle2, AlertCircle, Radio,
-  Keyboard, Laptop, Monitor, Command, Search, Check, HelpCircle
+  Keyboard, Laptop, Monitor, Command, Search, Check, HelpCircle, CreditCard, FolderKanban,
+  BarChart3, Moon, Sun, SlidersHorizontal, Calendar, ShieldCheck, BellRing
 } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import { UnsplashGallery } from './UnsplashGallery';
@@ -67,7 +68,8 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
     onUpdatePushPreferences,
     isSubscribed = false,
     isPermissionBlocked = false,
-    onToggleSubscription
+    onToggleSubscription,
+    onSendTestNotification
   } = props;
   
   const [activeTab, setActiveTab] = useState<'account' | 'colors' | 'shortcuts' | 'notifications' | 'backgrounds' | 'ambience' | 'emoji'>('account');
@@ -511,113 +513,394 @@ const CustomizationPanel: React.FC<CustomizationPanelProps> = (props) => {
         );
       }
 
-      case 'notifications':
+      case 'notifications': {
         const hours = Array.from({ length: 24 }, (_, i) => i);
-        return (
-          <div className="flex flex-col h-full animate-in fade-in duration-200 space-y-6 overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Notificaciones</h3>
+        const currentPrefs = { ...DEFAULT_PUSH_PREFERENCES, ...pushPreferences };
 
-            {/* OneSignal Subscription Banner */}
-            <div className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+        const updatePrefField = (field: keyof PushNotificationPreferences, value: any) => {
+          if (onUpdatePushPreferences) {
+            const updated = { ...currentPrefs, [field]: value };
+            onUpdatePushPreferences(updated);
+            syncPreferencesToOneSignal(updated).catch(() => {});
+          }
+        };
+
+        const handleTestEvent = async (eventType: NotificationEventType) => {
+          if (onSendTestNotification) {
+            onSendTestNotification(eventType);
+          } else {
+            const res = await sendSampleNotificationForEvent(eventType, currentPrefs);
+            if (!res.sent && res.reason) {
+              alert(res.reason);
+            }
+          }
+        };
+
+        const eventCategories: {
+          key: keyof PushNotificationPreferences;
+          eventType: NotificationEventType;
+          label: string;
+          desc: string;
+          icon: React.ElementType;
+          badgeColor: string;
+        }[] = [
+          {
+            key: 'taskReminders',
+            eventType: 'taskReminders',
+            label: 'Tareas Pendientes y Vencimientos',
+            desc: 'Alertas automáticas al aproximarse fechas u horas límite de tareas.',
+            icon: Clock,
+            badgeColor: 'text-amber-500 bg-amber-500/10 dark:bg-amber-500/20',
+          },
+          {
+            key: 'pendingPayments',
+            eventType: 'pendingPayments',
+            label: 'Pagos Pendientes y Cuotas',
+            desc: 'Notificaciones sobre vencimientos de préstamos, deudas, tarjetas y facturas.',
+            icon: CreditCard,
+            badgeColor: 'text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20',
+          },
+          {
+            key: 'projects',
+            eventType: 'projects',
+            label: 'Proyectos, Hitos y Entregas',
+            desc: 'Actualizaciones de sprint, hitos alcanzados y asignaciones de proyecto.',
+            icon: FolderKanban,
+            badgeColor: 'text-blue-500 bg-blue-500/10 dark:bg-blue-500/20',
+          },
+          {
+            key: 'habits',
+            eventType: 'habits',
+            label: 'Hábitos y Rutinas Diarias',
+            desc: 'Recordatorios estratégicos para completar tus hábitos y mantener la racha.',
+            icon: Zap,
+            badgeColor: 'text-purple-500 bg-purple-500/10 dark:bg-purple-500/20',
+          },
+          {
+            key: 'dailySummary',
+            eventType: 'dailySummary',
+            label: 'Resumen Diario General',
+            desc: 'Síntesis condensada de tus tareas, pagos y metas al iniciar o finalizar el día.',
+            icon: BarChart3,
+            badgeColor: 'text-rose-500 bg-rose-500/10 dark:bg-rose-500/20',
+          },
+          {
+            key: 'channelMentions',
+            eventType: 'channelMentions',
+            label: 'Menciones y Chat de Equipo',
+            desc: 'Alertas cuando te mencionen (@usuario) en chats y canales colaborativos.',
+            icon: AtSign,
+            badgeColor: 'text-indigo-500 bg-indigo-500/10 dark:bg-indigo-500/20',
+          },
+          {
+            key: 'projectMembers',
+            eventType: 'projectMembers',
+            label: 'Nuevos Integrantes y Colaboradores',
+            desc: 'Avisos cuando otros usuarios acepten invitaciones o ingresen a tu proyecto.',
+            icon: Users,
+            badgeColor: 'text-teal-500 bg-teal-500/10 dark:bg-teal-500/20',
+          },
+        ];
+
+        return (
+          <div className="flex flex-col h-full animate-in fade-in duration-200 space-y-6 overflow-y-auto custom-scrollbar pr-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-primary" />
+                  Notificaciones Push y OneSignal
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Configura la frecuencia, tipos de alerta y horarios de descanso para OneSignal Push.
+                </p>
+              </div>
+            </div>
+
+            {/* Banner de Estado OneSignal */}
+            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs ${
                 isPermissionBlocked
-                    ? 'bg-red-50 dark:bg-red-950/30 border-red-200 text-red-900 dark:text-red-200'
+                    ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200/80 dark:border-rose-900/50 text-rose-900 dark:text-rose-200'
+                    : isSubscribed
+                    ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200/80 dark:border-emerald-900/40 text-emerald-950 dark:text-emerald-200'
                     : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200'
             }`}>
                 <div className="flex items-center gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${isSubscribed ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                    <div className="relative">
+                      <div className={`w-3 h-3 rounded-full ${isSubscribed ? 'bg-emerald-500 animate-pulse' : isPermissionBlocked ? 'bg-rose-500' : 'bg-gray-400'}`} />
+                      {isSubscribed && <div className="absolute inset-0 w-3 h-3 rounded-full bg-emerald-400 animate-ping opacity-75" />}
+                    </div>
                     <div>
-                        <p className="font-bold text-[13px]">OneSignal Push: {isSubscribed ? 'Activo' : 'Inactivo'}</p>
-                        <p className="text-[11px] text-gray-500">
-                            {isSubscribed ? 'Recibiendo notificaciones reales en producción' : 'Activa para recibir alertas instantáneas'}
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-[13px]">
+                            Servicio Push: {isPermissionBlocked ? 'Bloqueado en Navegador' : isSubscribed ? 'Activo (OneSignal Online)' : 'Inactivo'}
+                          </p>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/80 dark:bg-gray-800 border border-gray-200/60 dark:border-gray-700 text-gray-600 dark:text-gray-300">
+                            OneSignal SDK v16
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                            {isPermissionBlocked 
+                              ? 'Habilita los permisos de notificaciones en la barra de dirección de tu navegador.' 
+                              : isSubscribed 
+                              ? 'Tu dispositivo está sincronizado para recibir alertas de tareas, pagos y proyectos.' 
+                              : 'Suscríbete para mantenerte informado sin necesidad de tener la app abierta.'}
                         </p>
                     </div>
                 </div>
-                {onToggleSubscription && !isPermissionBlocked && (
+
+                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  {onToggleSubscription && !isPermissionBlocked && (
+                      <button
+                          type="button"
+                          onClick={onToggleSubscription}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 ${
+                            isSubscribed 
+                              ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+                              : 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 hover:opacity-90'
+                          }`}
+                      >
+                          <BellRing className="w-3.5 h-3.5" />
+                          {isSubscribed ? 'Pausar Notificaciones' : 'Activar Notificaciones'}
+                      </button>
+                  )}
+                  {isSubscribed && (
                     <button
-                        onClick={onToggleSubscription}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-900 text-white dark:bg-white dark:text-gray-900 hover:opacity-90 transition-opacity"
+                      type="button"
+                      onClick={() => handleTestEvent('general')}
+                      className="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs flex items-center gap-1"
+                      title="Enviar prueba instantánea"
                     >
-                        {isSubscribed ? 'Pausar' : 'Activar'}
+                      <Send className="w-3 h-3" />
+                      Probar
                     </button>
+                  )}
+                </div>
+            </div>
+
+            {/* BLOQUE 1: Frecuencia y Horarios */}
+            <div className="space-y-4 pt-1">
+              <div className="flex items-center gap-2 pb-1 border-b border-gray-100 dark:border-gray-800">
+                <SlidersHorizontal className="w-4 h-4 text-primary" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Frecuencia y Programación
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Frecuencia Principal */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200/80 dark:border-gray-800 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-500" />
+                      Frecuencia General
+                    </label>
+                  </div>
+                  <select
+                    value={currentPrefs.frequency || 'instant'}
+                    onChange={(e) => updatePrefField('frequency', e.target.value)}
+                    className="w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+                  >
+                    <option value="instant">⚡ Inmediata (Al ocurrir el evento)</option>
+                    <option value="daily_digest">🌅 Resumen Diario (Condensado a una hora fija)</option>
+                    <option value="weekly_digest">📅 Resumen Semanal (Lunes por la mañana)</option>
+                    <option value="urgent_only">🚨 Solo Urgentes (Vencimientos inmediatos o deudas)</option>
+                  </select>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Define la agresividad de las alertas Push en tu dispositivo.
+                  </p>
+                </div>
+
+                {/* Anticipación para Recordatorios */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200/80 dark:border-gray-800 space-y-2">
+                  <label className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-500" />
+                    Anticipación de Alertas
+                  </label>
+                  <select
+                    value={currentPrefs.leadTimeMinutes || 30}
+                    onChange={(e) => updatePrefField('leadTimeMinutes', Number(e.target.value))}
+                    className="w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+                  >
+                    <option value={15}>15 minutos antes</option>
+                    <option value={30}>30 minutos antes</option>
+                    <option value={60}>1 hora antes</option>
+                    <option value={1440}>1 día antes (24 horas)</option>
+                  </select>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Tiempo previo de aviso para tareas agendadas y facturas/pagos por vencer.
+                  </p>
+                </div>
+
+                {/* Hora del Resumen Diario */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200/80 dark:border-gray-800 space-y-2">
+                  <label className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                    <Sun className="w-3.5 h-3.5 text-amber-500" />
+                    Hora del Resumen Diario
+                  </label>
+                  <select
+                    value={currentPrefs.dailyDigestHour ?? 9}
+                    onChange={(e) => updatePrefField('dailyDigestHour', Number(e.target.value))}
+                    className="w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+                  >
+                    {hours.map((h) => (
+                      <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}`}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Hora a la que se envía el informe diario consolidado.
+                  </p>
+                </div>
+
+                {/* Notificaciones Fin de Semana */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200/80 dark:border-gray-800 flex items-center justify-between gap-3">
+                  <div>
+                    <h5 className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+                      Alertas en Fines de Semana
+                    </h5>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                      Permite recibir notificaciones los sábados y domingos.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updatePrefField('weekendNotifications', !currentPrefs.weekendNotifications)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      currentPrefs.weekendNotifications !== false ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'
+                    }`}
+                    role="switch"
+                    aria-checked={currentPrefs.weekendNotifications !== false}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-900 shadow ring-0 transition duration-200 ease-in-out ${currentPrefs.weekendNotifications !== false ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modo No Molestar (Quiet Hours) */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200/80 dark:border-gray-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-500 rounded-lg">
+                      <Moon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-xs text-gray-900 dark:text-white">Horario de Silencio (No Molestar)</h5>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">Pausa la entrada de alertas push durante tu descanso.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updatePrefField('quietHoursEnabled', !currentPrefs.quietHoursEnabled)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      currentPrefs.quietHoursEnabled ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'
+                    }`}
+                    role="switch"
+                    aria-checked={currentPrefs.quietHoursEnabled}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-900 shadow ring-0 transition duration-200 ease-in-out ${currentPrefs.quietHoursEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                {currentPrefs.quietHoursEnabled && (
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">Desde (Inicio):</label>
+                      <input
+                        type="time"
+                        value={currentPrefs.quietHoursStart || '22:00'}
+                        onChange={(e) => updatePrefField('quietHoursStart', e.target.value)}
+                        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-3 py-1.5 text-xs font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">Hasta (Fin):</label>
+                      <input
+                        type="time"
+                        value={currentPrefs.quietHoursEnd || '07:00'}
+                        onChange={(e) => updatePrefField('quietHoursEnd', e.target.value)}
+                        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-3 py-1.5 text-xs font-medium"
+                      />
+                    </div>
+                  </div>
                 )}
+              </div>
             </div>
 
-            {/* Routines & Daily Hours */}
-            <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Rutinas Diarias</h4>
-
-                <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200/80 dark:border-gray-800 flex items-center justify-between gap-4">
-                    <div>
-                        <h5 className="font-medium text-sm text-gray-900 dark:text-white">Dosis de Ánimo Matutina</h5>
-                        <p className="text-xs text-gray-500">Saludo motivacional diario para empezar tu jornada.</p>
-                    </div>
-                    <select
-                        value={dailyEncouragementHour === null || dailyEncouragementHour === undefined ? '' : dailyEncouragementHour}
-                        onChange={e => onSetDailyEncouragement?.(e.target.value === '' ? null : Number(e.target.value))}
-                        className="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none"
-                    >
-                        <option value="">Desactivado</option>
-                        {hours.filter(h => h >= 5 && h <= 11).map(h => (
-                            <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00`}</option>
-                        ))}
-                    </select>
+            {/* BLOQUE 2: Categorías y Tipos de Notificaciones */}
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between pb-1 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    Tipos de Notificación Push
+                  </h4>
                 </div>
+                <span className="text-[11px] text-gray-400">
+                  Sincronizado con OneSignal User Tags
+                </span>
+              </div>
 
-                <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200/80 dark:border-gray-800 flex items-center justify-between gap-4">
-                    <div>
-                        <h5 className="font-medium text-sm text-gray-900 dark:text-white">Resumen Diario de Tareas</h5>
-                        <p className="text-xs text-gray-500">Recibe una síntesis de tus tareas pendientes y progreso.</p>
-                    </div>
-                    <select
-                        value={dailySummaryHour === null || dailySummaryHour === undefined ? '' : dailySummaryHour}
-                        onChange={e => onSetDailySummary?.(e.target.value === '' ? null : Number(e.target.value))}
-                        className="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none"
+              <div className="space-y-2.5">
+                {eventCategories.map((cat) => {
+                  const IconComp = cat.icon;
+                  const active = currentPrefs[cat.key] !== false;
+
+                  return (
+                    <div
+                      key={cat.key}
+                      className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200/80 dark:border-gray-800 flex items-start justify-between gap-3 transition-all hover:border-gray-300 dark:hover:border-gray-700"
                     >
-                        <option value="">Desactivado</option>
-                        {hours.map(h => (
-                            <option key={h} value={h}>{`${String(h).padStart(2, '0')}:00`}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
-            {/* Event Preferences */}
-            <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Preferencias de Alertas</h4>
-                {[
-                    { key: 'projectMembers', label: 'Nuevos miembros en proyectos', desc: 'Avisar cuando se invite o ingrese un colaborador' },
-                    { key: 'taskReminders', label: 'Recordatorios de tareas', desc: 'Notificaciones automáticas al aproximarse fechas límite' },
-                    { key: 'channelMentions', label: 'Menciones en canales', desc: 'Alertas cuando alguien te mencione en debates y chats' }
-                ].map(pref => {
-                    const active = pushPreferences?.[pref.key as keyof PushNotificationPreferences] ?? true;
-                    return (
-                        <div key={pref.key} className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200/80 dark:border-gray-800 flex items-center justify-between gap-4">
-                            <div>
-                                <h5 className="font-medium text-sm text-gray-900 dark:text-white">{pref.label}</h5>
-                                <p className="text-xs text-gray-500">{pref.desc}</p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    if (onUpdatePushPreferences && pushPreferences) {
-                                        const updated = { ...pushPreferences, [pref.key]: !active };
-                                        onUpdatePushPreferences(updated);
-                                        syncPreferencesToOneSignal(updated).catch(() => {});
-                                    }
-                                }}
-                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                    active ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'
-                                }`}
-                                role="switch"
-                                aria-checked={active}
-                            >
-                                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-900 shadow ring-0 transition duration-200 ease-in-out ${active ? 'translate-x-4' : 'translate-x-0'}`} />
-                            </button>
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2.5 rounded-xl ${cat.badgeColor} shrink-0 mt-0.5`}>
+                          <IconComp className="w-4 h-4" />
                         </div>
-                    );
+                        <div>
+                          <h5 className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-2">
+                            {cat.label}
+                          </h5>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                            {cat.desc}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-center">
+                        {isSubscribed && (
+                          <button
+                            type="button"
+                            onClick={() => handleTestEvent(cat.eventType)}
+                            className="px-2.5 py-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white text-[11px] font-medium rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                            title="Probar este tipo de alerta"
+                          >
+                            <Send className="w-3 h-3 text-primary" />
+                            <span className="hidden sm:inline">Probar</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => updatePrefField(cat.key, !active)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            active ? 'bg-gray-900 dark:bg-white' : 'bg-gray-200 dark:bg-gray-700'
+                          }`}
+                          role="switch"
+                          aria-checked={active}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-900 shadow ring-0 transition duration-200 ease-in-out ${
+                              active ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  );
                 })}
+              </div>
             </div>
           </div>
         );
+      }
 
       case 'backgrounds':
         const filteredBackgrounds = view === 'favorites' ? userBackgrounds.filter(bg => bg.is_favorite) : userBackgrounds;

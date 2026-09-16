@@ -16032,7 +16032,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   onClick={() => {
                     const id = selectedSubscriptionDetail.id;
                     setSelectedSubscriptionDetail(null);
-                    handleDeleteSubscription(id);
+                    handleDeleteRecurring(id);
                   }}
                   className="w-full py-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-semibold text-sm rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                 >

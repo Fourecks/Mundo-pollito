@@ -476,12 +476,35 @@ export interface ThemeColors {
 }
 
 export interface PushNotificationPreferences {
-  projectMembers: boolean;    // Nuevos miembros en proyectos e invitaciones
-  taskReminders: boolean;     // Recordatorios de tareas y alertas de vencimiento
-  channelMentions: boolean;   // Menciones en canales (@nombre, @todos) y chats
+  // Categorías de Notificaciones
+  taskReminders: boolean;      // Tareas pendientes y alertas de vencimiento
+  pendingPayments: boolean;    // Pagos pendientes, cuotas, deudas y tarjetas de crédito
+  projects: boolean;           // Proyectos, entregas, hitos y actividades
+  habits: boolean;             // Hábitos diarios y rutinas
+  dailySummary: boolean;       // Resumen diario y avance general
+  channelMentions: boolean;    // Menciones en canales y chats
+  projectMembers: boolean;     // Nuevos miembros e invitaciones a proyectos
+
+  // Frecuencia y Horarios de Notificación
+  frequency: 'instant' | 'daily_digest' | 'weekly_digest' | 'urgent_only';
+  dailyDigestHour: number;     // Hora preferida para el resumen diario (0-23)
+  leadTimeMinutes: number;     // Minutos de anticipación para avisos (15, 30, 60, 1440)
+  quietHoursEnabled: boolean;  // Activar horario "No Molestar"
+  quietHoursStart: string;     // Hora de inicio "No Molestar" ("22:00")
+  quietHoursEnd: string;       // Hora de fin "No Molestar" ("07:00")
+  weekendNotifications: boolean; // Notificaciones durante el fin de semana
 }
 
-export type NotificationEventType = 'projectMembers' | 'taskReminders' | 'channelMentions' | 'test';
+export type NotificationEventType = 
+  | 'taskReminders' 
+  | 'pendingPayments' 
+  | 'projects' 
+  | 'habits' 
+  | 'dailySummary' 
+  | 'channelMentions' 
+  | 'projectMembers' 
+  | 'general' 
+  | 'test';
 
 export interface UiSettings {
   themeColors: ThemeColors;
