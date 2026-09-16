@@ -1136,15 +1136,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const getPlanSubViewOnPlus = (sub: string | null) => {
     switch (sub) {
       case "budgets":
-        return () => {
-          setEditingBudgetItem(null);
-          setBudgetItemName("");
-          setBudgetItemAmount("");
-          setBudgetItemIcon("🏷️");
-          setBudgetItemColor("#27272a");
-          setBudgetItemCategoryId("");
-          setShowBudgetItemModal(true);
-        };
+        return handleOpenNewBudgetItemModal;
       case "subscriptions":
         return () => {
           setRecDesc("");
@@ -3127,6 +3119,36 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     fetchFinanceData(true);
   };
 
+  const checkCanCreateBudgetItem = (month: string) => {
+    const currentSelectedMonthBudget = budgets.find((b) => b.month === month);
+    if (!currentSelectedMonthBudget || currentSelectedMonthBudget.total_amount_cents <= 0) {
+      return { canCreate: true, remainingCents: 0, totalGlobalCents: 0 };
+    }
+    const monthBudgetItems = budgetItems.filter((b) => b.month === month);
+    const totalAllocatedInItems = monthBudgetItems.reduce((acc, item) => acc + item.allocated_cents, 0);
+    const remainingCents = currentSelectedMonthBudget.total_amount_cents - totalAllocatedInItems;
+    return {
+      canCreate: remainingCents > 0,
+      remainingCents,
+      totalGlobalCents: currentSelectedMonthBudget.total_amount_cents,
+    };
+  };
+
+  const handleOpenNewBudgetItemModal = () => {
+    const { canCreate, remainingCents, totalGlobalCents } = checkCanCreateBudgetItem(selectedBudgetMonth);
+    if (!canCreate) {
+      alert(`Has alcanzado el límite de tu presupuesto global mensual (${formatCurrency(totalGlobalCents)}). No puedes crear más desgloses para este mes.`);
+      return;
+    }
+    setEditingBudgetItem(null);
+    setBudgetItemName("");
+    setBudgetItemAmount("");
+    setBudgetItemIcon("🏷️");
+    setBudgetItemColor("#27272a");
+    setBudgetItemCategoryId("");
+    setShowBudgetItemModal(true);
+  };
+
   const handleSaveBudgetItem = async (e: React.FormEvent) => {
     e.preventDefault();
     const {
@@ -3138,6 +3160,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     if (isNaN(amountCents) || amountCents <= 0) {
       alert("Por favor introduce un monto válido mayor a 0.");
       return;
+    }
+
+    const currentSelectedMonthBudget = budgets.find((b) => b.month === selectedBudgetMonth);
+    if (currentSelectedMonthBudget && currentSelectedMonthBudget.total_amount_cents > 0) {
+      const otherAllocated = budgetItems
+        .filter((b) => b.month === selectedBudgetMonth && b.id !== editingBudgetItem?.id)
+        .reduce((sum, b) => sum + b.allocated_cents, 0);
+      const maxAllowedCents = currentSelectedMonthBudget.total_amount_cents - otherAllocated;
+      if (amountCents > maxAllowedCents) {
+        alert(`El monto supera el presupuesto global disponible. El máximo permitido para este desglose es de ${formatCurrency(maxAllowedCents)}. El valor se ha ajustado automáticamente.`);
+        setBudgetItemAmount((Math.max(0, maxAllowedCents) / 100).toFixed(2));
+        return;
+      }
     }
 
     if (editingBudgetItem) {
@@ -4792,6 +4827,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     list.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
     return list[0];
   }, [installments, debts, accounts]);
+
+  const modalMaxAllowedInfo = useMemo(() => {
+    const currentSelectedMonthBudget = budgets.find((b) => b.month === selectedBudgetMonth);
+    if (!currentSelectedMonthBudget || currentSelectedMonthBudget.total_amount_cents <= 0) return null;
+    const otherAllocated = budgetItems
+      .filter((b) => b.month === selectedBudgetMonth && b.id !== editingBudgetItem?.id)
+      .reduce((sum, b) => sum + b.allocated_cents, 0);
+    const maxAllowedCents = currentSelectedMonthBudget.total_amount_cents - otherAllocated;
+    return {
+      totalGlobalCents: currentSelectedMonthBudget.total_amount_cents,
+      maxAllowedCents: Math.max(0, maxAllowedCents),
+    };
+  }, [budgets, budgetItems, selectedBudgetMonth, editingBudgetItem]);
 
   const renderMobileCards = () => {
     const creditAccounts = accounts.filter((a) => a.type === "credit" && !a.is_archived);
@@ -6842,15 +6890,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                               {/* Desktop Add Breakdown Action */}
                               <button
-                                onClick={() => {
-                                  setEditingBudgetItem(null);
-                                  setBudgetItemName("");
-                                  setBudgetItemAmount("");
-                                  setBudgetItemIcon("🏷️");
-                                  setBudgetItemColor("#27272a");
-                                  setBudgetItemCategoryId("");
-                                  setShowBudgetItemModal(true);
-                                }}
+                                onClick={handleOpenNewBudgetItemModal}
                                 className="hidden sm:flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3 py-1.5 rounded-xl font-medium text-xs shadow-xs transition-all shrink-0 ml-2"
                               >
                                 <PlusIcon className="w-3.5 h-3.5" />
@@ -6991,7 +7031,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             </div>
                           </div>
 
-                          {/* Presupuestos y Desgloses - FRONT AND CENTER */}
+                           {/* Presupuestos y Desgloses - FRONT AND CENTER */}
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
                               <div>
@@ -7009,21 +7049,27 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                               </div>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setEditingBudgetItem(null);
-                                  setBudgetItemName("");
-                                  setBudgetItemAmount("");
-                                  setBudgetItemIcon("🏷️");
-                                  setBudgetItemColor("#27272a");
-                                  setBudgetItemCategoryId("");
-                                  setShowBudgetItemModal(true);
-                                }}
+                                onClick={handleOpenNewBudgetItemModal}
                                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-all shadow-2xs"
                               >
                                 <PlusIcon className="w-3.5 h-3.5" />
                                 <span>Nuevo Desglose</span>
                               </button>
                             </div>
+
+                            {currentSelectedMonthBudget && currentSelectedMonthBudget.total_amount_cents > 0 && totalAllocatedInItems >= currentSelectedMonthBudget.total_amount_cents && (
+                              <div className="bg-amber-50/60 dark:bg-amber-950/10 border border-amber-200/60 dark:border-amber-900/30 p-3 rounded-2xl flex items-center gap-3">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                <div className="text-left">
+                                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+                                    Límite de Presupuesto Alcanzado
+                                  </p>
+                                  <p className="text-[11px] text-amber-600/90 dark:text-amber-400/90 mt-0.5">
+                                    Has asignado el 100% de tu presupuesto global ({formatCurrency(currentSelectedMonthBudget.total_amount_cents)}). No puedes crear más desgloses para este mes.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
 
                             {monthBudgetItems.length === 0 ? (
                               <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center">
@@ -10737,7 +10783,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                               onClick={() => setSelectedHistoricalMonth(item.monthKey)}
                                               className="flex-1 py-2 px-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-900 dark:text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                                             >
-                                              <Eye className="w-3.5 h-3.5 text-gray-500" />
+                                              <EyeIcon className="w-3.5 h-3.5 text-gray-500" />
                                               <span>Ver Reporte</span>
                                             </button>
                                             <button
@@ -14839,6 +14885,21 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                     className="w-full px-3.5 py-2 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-sm font-semibold outline-none text-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-white transition-colors"
                   />
                 </div>
+
+                {modalMaxAllowedInfo && (
+                  <div className="bg-amber-50/60 dark:bg-amber-950/10 border border-amber-200/60 dark:border-amber-900/30 rounded-xl p-3 text-[11px] text-amber-800 dark:text-amber-200 space-y-1">
+                    <p className="font-semibold flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      Límite de Presupuesto Global Activo
+                    </p>
+                    <p>
+                      Monto máximo disponible para este desglose:{" "}
+                      <span className="font-bold text-xs text-amber-900 dark:text-amber-100 bg-amber-100/70 dark:bg-amber-900/40 px-1.5 py-0.5 rounded-md">
+                        {formatCurrency(modalMaxAllowedInfo.maxAllowedCents)}
+                      </span>
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold text-gray-700 dark:text-zinc-300">
