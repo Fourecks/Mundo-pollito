@@ -851,6 +851,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const [payCardFromAccountId, setPayCardFromAccountId] = useState<number | "">(
     "",
   );
+  const [expandedCardIds, setExpandedCardIds] = useState<number[]>([]);
 
   // --- Installment Modal ---
   const [showInstallmentModal, setShowInstallmentModal] = useState(false);
@@ -4761,69 +4762,53 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
     return (
       <div className="space-y-6 pb-32 animate-in fade-in duration-200">
-        {/* Header matching planning subtabs */}
+        {/* Header */}
         <div className="flex justify-between items-center pb-2 border-b border-gray-150 dark:border-zinc-800">
-          <div>
-            <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
-              Mis Tarjetas
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-zinc-400">
-              Tarjetas de crédito y débito registradas
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setNewAccountType("credit");
-              setShowCreateAccountModal(true);
-            }}
-            className="text-xs font-semibold bg-gray-950 hover:bg-black dark:bg-white dark:hover:bg-gray-100 dark:text-gray-950 text-white px-3 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Nueva Tarjeta
-          </button>
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+            Mis Tarjetas
+          </h3>
         </div>
 
-        {/* Summary Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl">
-            <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
-              Deuda de Tarjetas
+        {/* Summary Metrics - Compact design */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="p-3 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-xl">
+            <span className="text-[10px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block truncate">
+              Deuda
             </span>
-            <span className="text-lg font-bold text-gray-900 dark:text-white mt-1 block">
+            <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white mt-0.5 block truncate">
               {formatCurrency(totalCreditDebt)}
             </span>
-            <span className="text-[11px] text-gray-400 block mt-0.5">
-              en {creditAccounts.length} {creditAccounts.length === 1 ? "tarjeta" : "tarjetas"}
+            <span className="text-[10px] text-gray-400 block mt-0.5 truncate">
+              {creditAccounts.length} {creditAccounts.length === 1 ? "tarjeta" : "tarjetas"}
             </span>
           </div>
 
-          <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl">
-            <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
-              Límite Total
+          <div className="p-3 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-xl">
+            <span className="text-[10px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block truncate">
+              Límite
             </span>
-            <span className="text-lg font-bold text-gray-900 dark:text-white mt-1 block">
+            <span className="text-sm sm:text-base font-bold text-gray-900 dark:text-white mt-0.5 block truncate">
               {formatCurrency(totalCreditLimit)}
             </span>
-            <span className="text-[11px] text-gray-400 block mt-0.5">
-              línea combinada
+            <span className="text-[10px] text-gray-400 block mt-0.5 truncate">
+              combinado
             </span>
           </div>
 
-          <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-2xl col-span-2 sm:col-span-1">
-            <span className="text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
-              Crédito Disponible
+          <div className="p-3 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800/80 rounded-xl">
+            <span className="text-[10px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block truncate">
+              Disponible
             </span>
-            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1 block">
+            <span className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block truncate">
               {formatCurrency(totalAvailable)}
             </span>
-            <span className="text-[11px] text-gray-400 block mt-0.5">
-              para compras y uso
+            <span className="text-[10px] text-gray-400 block mt-0.5 truncate">
+              disponible
             </span>
           </div>
         </div>
 
-        {/* Cards List */}
+        {/* Cards Accordion List */}
         {allCards.length === 0 ? (
           <div className="bg-white dark:bg-[#0a0a0a] border border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-2">
             <CreditCard className="w-8 h-8 text-gray-400 mx-auto" />
@@ -4832,7 +4817,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {allCards.map((card) => {
               const isCredit = card.type === "credit";
               const limit = card.credit_limit_cents || 0;
@@ -4840,20 +4825,31 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
               const available = Math.max(0, limit - used);
               const usedPct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
               const isOverdue = isCredit && used > 0 && card.due_day && todayDay > card.due_day;
+              const isExpanded = expandedCardIds.includes(card.id);
 
               return (
                 <div
                   key={card.id}
-                  className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-4 hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
+                  className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all space-y-3"
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white flex items-center justify-center">
-                        <CreditCard className="w-5 h-5" />
+                  {/* Closed Header Bar */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div 
+                      onClick={() => {
+                        setExpandedCardIds((prev) =>
+                          prev.includes(card.id)
+                            ? prev.filter((id) => id !== card.id)
+                            : [...prev, card.id]
+                        );
+                      }}
+                      className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white flex items-center justify-center shrink-0">
+                        <CreditCard className="w-4 h-4" />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                          <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
                             {card.name}
                           </h4>
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 uppercase tracking-wider">
@@ -4867,66 +4863,101 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                         </div>
                         <p className="text-xs text-gray-400 mt-0.5">
                           •••• {card.card_number_last4 || "0000"}
-                          {isCredit && card.cutoff_day ? ` • Corte: día ${card.cutoff_day}` : ""}
-                          {isCredit && card.due_day ? ` • Límite pago: día ${card.due_day}` : ""}
                         </p>
                       </div>
                     </div>
 
-                    {isCredit && used > 0 && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isCredit && used > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowPayCardModal(card);
+                            setPayCardAmount((used / 100).toString());
+                            setPayCardFromAccountId("");
+                          }}
+                          className="text-xs font-semibold bg-gray-950 hover:bg-black dark:bg-white dark:hover:bg-gray-100 dark:text-gray-950 text-white px-3 py-1.5 rounded-xl transition-colors shadow-2xs active:scale-95"
+                        >
+                          Abonar
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
-                          setShowPayCardModal(card);
-                          setPayCardAmount((used / 100).toString());
-                          setPayCardFromAccountId("");
+                          setExpandedCardIds((prev) =>
+                            prev.includes(card.id)
+                              ? prev.filter((id) => id !== card.id)
+                              : [...prev, card.id]
+                          );
                         }}
-                        className="text-xs font-semibold bg-gray-950 hover:bg-black dark:bg-white dark:hover:bg-gray-100 dark:text-gray-950 text-white px-3 py-1.5 rounded-lg transition-colors shadow-2xs"
+                        className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+                        title={isExpanded ? "Contraer detalles" : "Desplegar detalles"}
                       >
-                        Pagar
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
                       </button>
-                    )}
+                    </div>
                   </div>
 
-                  {/* Metrics */}
-                  {isCredit ? (
-                    <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-zinc-850">
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div>
-                          <span className="text-gray-400 block text-[11px]">Saldo utilizado</span>
-                          <span className="font-bold text-gray-900 dark:text-white">
-                            {formatCurrency(used)}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-gray-400 block text-[11px]">Disponible</span>
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(available)}
-                          </span>
-                        </div>
-                      </div>
+                  {/* Expanded Accordion Details */}
+                  {isExpanded && (
+                    <div className="pt-3 border-t border-gray-100 dark:border-zinc-850 space-y-3 animate-fade-in">
+                      {isCredit ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-gray-50/70 dark:bg-zinc-900/40 p-3 rounded-xl border border-gray-100/60 dark:border-zinc-800/40">
+                            <div>
+                              <span className="text-gray-400 block text-[10px]">Saldo Utilizado</span>
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(used)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 block text-[10px]">Disponible</span>
+                              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                {formatCurrency(available)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 block text-[10px]">Día de Corte</span>
+                              <span className="font-medium text-gray-700 dark:text-zinc-300">
+                                {card.cutoff_day ? `Día ${card.cutoff_day}` : "Sin definir"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 block text-[10px]">Límite de Pago</span>
+                              <span className="font-medium text-gray-700 dark:text-zinc-300">
+                                {card.due_day ? `Día ${card.due_day}` : "Sin definir"}
+                              </span>
+                            </div>
+                          </div>
 
-                      {limit > 0 && (
-                        <div className="space-y-1 pt-1">
-                          <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gray-900 dark:bg-white rounded-full transition-all duration-500"
-                              style={{ width: `${usedPct}%` }}
-                            />
-                          </div>
-                          <div className="flex justify-between text-[10px] text-gray-400">
-                            <span>Límite: {formatCurrency(limit)}</span>
-                            <span>{usedPct}% utilizado</span>
-                          </div>
+                          {limit > 0 && (
+                            <div className="space-y-1">
+                              <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${usedPct > 90 ? "bg-red-500" : "bg-gray-900 dark:bg-white"}`}
+                                  style={{ width: `${usedPct}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-[10px] text-gray-400">
+                                <span>Límite total: {formatCurrency(limit)}</span>
+                                <span>{usedPct}% utilizado</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-gray-50/70 dark:bg-zinc-900/40 rounded-xl border border-gray-100/60 dark:border-zinc-800/40 flex justify-between items-center">
+                          <span className="text-xs text-gray-500">Saldo Disponible en Débito</span>
+                          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                            {formatCurrency(card.balance_cents)}
+                          </span>
                         </div>
                       )}
-                    </div>
-                  ) : (
-                    <div className="pt-2 border-t border-gray-100 dark:border-zinc-850 flex justify-between items-center">
-                      <span className="text-xs text-gray-400">Saldo Disponible</span>
-                      <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        {formatCurrency(card.balance_cents)}
-                      </span>
                     </div>
                   )}
                 </div>
@@ -7605,16 +7636,12 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         </div>
                                       </div>
 
-                                      {/* Botones de acción y Flechita */}
+                                      {/* Estado automático y Flechita */}
                                       <div className="flex items-center gap-1.5 shrink-0">
                                         {inst.status === "ACTIVE" && (
-                                          <button
-                                            type="button"
-                                            onClick={() => handlePayInstallment(inst)}
-                                            className="text-xs font-semibold bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 px-3 py-1.5 rounded-xl transition-all shadow-2xs active:scale-95"
-                                          >
-                                            Pagar Cuota
-                                          </button>
+                                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/40 hidden sm:inline-flex items-center gap-1">
+                                            Cobro Automático
+                                          </span>
                                         )}
                                         <button
                                           type="button"
@@ -11549,11 +11576,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             </div>
 
                             {/* Expenses Section */}
-                            <div className="space-y-2.5">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                            <div className="space-y-3">
+                              <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
                                 Categorías de Gasto / Presupuesto
                               </span>
-                              <div className="flex flex-wrap gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 {categories
                                   .filter(
                                     (c) =>
@@ -11564,42 +11591,44 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   .map((cat) => (
                                     <div
                                       key={cat.id}
-                                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#121212] border border-gray-200 dark:border-zinc-800 rounded-xl text-xs text-gray-900 dark:text-gray-100"
+                                      className="flex items-center justify-between p-3 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
                                     >
-                                      <span>{cat.emoji || "🛒"}</span>
-                                      <span className="font-medium">
-                                        {cat.name}
-                                      </span>
-                                      {cat.budget_limit_cents &&
-                                      cat.budget_limit_cents > 0 ? (
-                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-md">
-                                          $
-                                          {(cat.budget_limit_cents / 100).toFixed(
-                                            2,
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-8 h-8 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-sm shrink-0">
+                                          {cat.emoji || "🛒"}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <span className="font-bold text-xs text-gray-900 dark:text-white block truncate">
+                                            {cat.name}
+                                          </span>
+                                          {cat.budget_limit_cents && cat.budget_limit_cents > 0 ? (
+                                            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 block">
+                                              Presupuesto: {formatCurrency(cat.budget_limit_cents)}
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] text-gray-400 block">
+                                              Sin tope mensual
+                                            </span>
                                           )}
-                                          /mes
-                                        </span>
-                                      ) : null}
-                                      <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-1 shrink-0 ml-2">
                                         <button
                                           type="button"
-                                          onClick={() =>
-                                            openEditCategoryModal(cat)
-                                          }
-                                          className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-0.5 rounded transition-colors"
+                                          onClick={() => openEditCategoryModal(cat)}
+                                          className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                                           title="Editar"
                                         >
-                                          <Pencil className="w-3 h-3" />
+                                          <Pencil className="w-3.5 h-3.5" />
                                         </button>
                                         <button
                                           type="button"
-                                          onClick={() =>
-                                            handleDeleteCategory(cat.id)
-                                          }
-                                          className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
+                                          onClick={() => handleDeleteCategory(cat.id)}
+                                          className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
                                           title="Eliminar"
                                         >
-                                          <Trash2 className="w-3 h-3" />
+                                          <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
                                     </div>
@@ -11608,11 +11637,11 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                             </div>
 
                             {/* Income Section */}
-                            <div className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-zinc-800/80">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                            <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-zinc-800/80">
+                              <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
                                 Categorías de Ingreso
                               </span>
-                              <div className="flex flex-wrap gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 {categories
                                   .filter(
                                     (c) =>
@@ -11623,32 +11652,33 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   .map((cat) => (
                                     <div
                                       key={cat.id}
-                                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100/70 dark:bg-zinc-800/60 border border-gray-200 dark:border-zinc-700/80 rounded-xl text-xs text-gray-900 dark:text-gray-100"
+                                      className="flex items-center justify-between p-3 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
                                     >
-                                      <span>{cat.emoji || "💼"}</span>
-                                      <span className="font-medium">
-                                        {cat.name}
-                                      </span>
-                                      <div className="flex items-center gap-1 ml-1 pl-1 border-l border-gray-200 dark:border-zinc-700">
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-8 h-8 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-sm shrink-0">
+                                          {cat.emoji || "💼"}
+                                        </div>
+                                        <span className="font-bold text-xs text-gray-900 dark:text-white truncate">
+                                          {cat.name}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-1 shrink-0 ml-2">
                                         <button
                                           type="button"
-                                          onClick={() =>
-                                            openEditCategoryModal(cat)
-                                          }
-                                          className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-0.5 rounded transition-colors"
+                                          onClick={() => openEditCategoryModal(cat)}
+                                          className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                                           title="Editar"
                                         >
-                                          <Pencil className="w-3 h-3" />
+                                          <Pencil className="w-3.5 h-3.5" />
                                         </button>
                                         <button
                                           type="button"
-                                          onClick={() =>
-                                            handleDeleteCategory(cat.id)
-                                          }
-                                          className="text-gray-400 hover:text-red-500 p-0.5 rounded transition-colors"
+                                          onClick={() => handleDeleteCategory(cat.id)}
+                                          className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
                                           title="Eliminar"
                                         >
-                                          <Trash2 className="w-3 h-3" />
+                                          <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
                                     </div>
@@ -12743,29 +12773,33 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         )}
       </AnimatePresence>
 
-      {/* Pay Credit Card Modal */}
+      {/* Pay Credit Card Bottom Sheet Drawer */}
       <AnimatePresence>
         {showPayCardModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowPayCardModal(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-[28px] sm:rounded-3xl p-6 w-full max-w-md shadow-2xl border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
+              <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-1 mb-2 shrink-0 sm:hidden" />
               <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-800 pb-3">
-                <h3 className="text-lg font-bold">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                   Abonar a Tarjeta de Crédito
                 </h3>
                 <button
+                  type="button"
                   onClick={() => setShowPayCardModal(null)}
-                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-500"
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-500 transition-colors"
                 >
                   <XIcon className="w-5 h-5" />
                 </button>
@@ -14446,22 +14480,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         )}
       </AnimatePresence>
 
-      {/* Set / Change Security PIN Modal */}
+      {/* Set / Change Security PIN Bottom Sheet */}
       <AnimatePresence>
         {showSetPinModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowSetPinModal(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-[28px] sm:rounded-3xl p-6 w-full max-w-sm shadow-2xl border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4"
             >
+              <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-1 mb-2 shrink-0 sm:hidden" />
               <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">
@@ -14549,25 +14586,28 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         )}
       </AnimatePresence>
 
-      {/* Confirm Account Delete with PIN Modal */}
+      {/* Confirm Account Delete with PIN Bottom Sheet */}
       <AnimatePresence>
         {showDeletePinModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => {
               setShowDeletePinModal(false);
               setDeleteTargetAccountId(null);
             }}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 text-center"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-[28px] sm:rounded-3xl p-6 w-full max-w-sm shadow-2xl border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 text-center"
             >
+              <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-1 mb-2 shrink-0 sm:hidden" />
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                   Confirmación de Seguridad
@@ -14628,22 +14668,25 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
         )}
       </AnimatePresence>
 
-      {/* Disable PIN Modal */}
+      {/* Disable PIN Bottom Sheet */}
       <AnimatePresence>
         {showDisablePinModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100010] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
             onClick={() => setShowDisablePinModal(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#0a0a0a] rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-200 dark:border-zinc-800 space-y-4 text-center"
+              className="bg-white dark:bg-[#0a0a0a] rounded-t-[28px] sm:rounded-3xl p-6 w-full max-w-sm shadow-2xl border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 text-center"
             >
+              <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-1 mb-2 shrink-0 sm:hidden" />
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                   Desactivar PIN
