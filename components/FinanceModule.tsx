@@ -5671,7 +5671,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                   {/* Mobile Hierarchical Back Header: Más */}
                   {isMobile && mobileMainTab === "more" && mobileMoreSubView && (
-                    <div className={!["debts", "stats", "closing"].includes(mobileMoreSubView) ? "mb-6 space-y-2" : "mb-3"}>
+                    <div className={!["debts", "stats", "closing", "upcoming_payments", "overdue_payments"].includes(mobileMoreSubView) ? "mb-6 space-y-2" : "mb-3"}>
                       <div className="flex items-center justify-between">
                         <button
                           type="button"
@@ -5716,7 +5716,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                           </button>
                         ) : null}
                       </div>
-                      {!["debts", "stats", "closing"].includes(mobileMoreSubView) && (
+                      {!["debts", "stats", "closing", "upcoming_payments", "overdue_payments"].includes(mobileMoreSubView) && (
                         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                           {mobileMoreSubView === "closing" && selectedHistoricalMonth
                             ? (() => {
