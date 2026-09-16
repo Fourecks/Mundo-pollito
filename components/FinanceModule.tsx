@@ -11532,6 +11532,21 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                       </button>
                                       <button
                                         type="button"
+                                        onClick={() => {
+                                          setTxFilterAccount(acc.id);
+                                          setTxFilterDateRange("ALL");
+                                          setMobileMainTab("transactions");
+                                          setActiveTab("transactions");
+                                          setMobilePlanSubView(null);
+                                          setMobileMoreSubView(null);
+                                        }}
+                                        className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
+                                        title="Ver movimientos de esta cuenta"
+                                      >
+                                        <ListOrdered className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
                                         onClick={() =>
                                           handleDeleteAccount(acc.id)
                                         }
@@ -16061,8 +16076,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                 <button
                   type="button"
                   onClick={() => {
+                    setTxFilterAccount(selectedMobileAccount.id);
+                    setTxFilterDateRange("ALL");
+                    setMobileMainTab("transactions");
+                    setActiveTab("transactions");
+                    setMobilePlanSubView(null);
+                    setMobileMoreSubView(null);
                     setShowAccountOptionsSheet(false);
-                    setShowAccountTxList(true);
+                    setSelectedMobileAccount(null);
                   }}
                   className="w-full py-3.5 px-4 text-xs font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-[#121212] hover:bg-gray-100 dark:hover:bg-zinc-800/80 border border-gray-200/60 dark:border-zinc-800/60 rounded-xl transition-all flex items-center gap-3 cursor-pointer"
                 >
