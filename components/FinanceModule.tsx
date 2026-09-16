@@ -15726,13 +15726,13 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
       {/* Subscription Details Bottom Sheet */}
       <AnimatePresence>
-        {selectedMobileSub && (
+        {selectedSubscriptionDetail && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100010] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
-            onClick={() => setSelectedMobileSub(null)}
+            onClick={() => setSelectedSubscriptionDetail(null)}
           >
             <motion.div
               initial={{ y: "100%" }}
@@ -15749,7 +15749,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setSelectedMobileSub(null)}
+                  onClick={() => setSelectedSubscriptionDetail(null)}
                   className="p-1 text-gray-400 hover:text-gray-900 dark:text-zinc-500 dark:hover:text-white rounded-lg transition-colors"
                 >
                   <XIcon className="w-4 h-4" />
@@ -15759,10 +15759,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
               <div className="space-y-4">
                 <div className="text-center p-4 bg-gray-50 dark:bg-[#121212] rounded-2xl border border-gray-100 dark:border-zinc-800/80">
                   <div className="text-sm font-semibold text-gray-600 dark:text-zinc-400 mb-1">
-                    {selectedMobileSub.name}
+                    {selectedSubscriptionDetail.name}
                   </div>
                   <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(selectedMobileSub.amount_cents)}
+                    {formatCurrency(selectedSubscriptionDetail.amount_cents)}
                   </div>
                 </div>
 
@@ -15770,20 +15770,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   <div className="flex justify-between items-center p-3 border border-gray-100 dark:border-zinc-800/80 rounded-xl">
                     <span className="text-xs text-gray-500 dark:text-zinc-400 font-medium">Ciclo de facturación</span>
                     <span className="text-sm font-semibold text-gray-900 dark:text-white uppercase">
-                      {selectedMobileSub.billing_cycle === "MONTHLY" ? "Mensual" : "Anual"}
+                      {selectedSubscriptionDetail.billing_cycle === "MONTHLY" ? "Mensual" : "Anual"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 border border-gray-100 dark:border-zinc-800/80 rounded-xl">
                     <span className="text-xs text-gray-500 dark:text-zinc-400 font-medium">Día de facturación</span>
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Día {selectedMobileSub.billing_day}
+                      Día {selectedSubscriptionDetail.billing_day}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 border border-gray-100 dark:border-zinc-800/80 rounded-xl">
                     <span className="text-xs text-gray-500 dark:text-zinc-400 font-medium">Categoría</span>
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">
                       {(() => {
-                        const cat = categories.find((c) => c.id === selectedMobileSub.category_id);
+                        const cat = categories.find((c) => c.id === selectedSubscriptionDetail.category_id);
                         return cat ? `${cat.emoji} ${cat.name}` : "Sin Categoría";
                       })()}
                     </span>
@@ -15793,8 +15793,8 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                 <button
                   type="button"
                   onClick={() => {
-                    const id = selectedMobileSub.id;
-                    setSelectedMobileSub(null);
+                    const id = selectedSubscriptionDetail.id;
+                    setSelectedSubscriptionDetail(null);
                     handleDeleteSubscription(id);
                   }}
                   className="w-full py-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-semibold text-sm rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
