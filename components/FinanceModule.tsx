@@ -6926,40 +6926,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                 </button>
                               </div>
 
-                              {selectedBudgetMonth === currentMonthPrefix ? (
-                                <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 rounded-md shrink-0 flex items-center gap-1.5 border border-emerald-200/50 dark:border-emerald-800/40">
+                              <button
+                                onClick={() => setSelectedBudgetMonth(currentMonthPrefix)}
+                                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shrink-0 flex items-center gap-1 border transition-all active:scale-95 cursor-pointer ${
+                                  selectedBudgetMonth === currentMonthPrefix
+                                    ? "bg-emerald-100/80 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/30"
+                                    : "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-800/30 hover:bg-blue-100/70 dark:hover:bg-blue-900/30"
+                                }`}
+                              >
+                                {selectedBudgetMonth === currentMonthPrefix && (
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  Mes Activo
-                                </span>
-                              ) : selectedBudgetMonth < currentMonthPrefix ? (
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-gray-100 dark:bg-zinc-800/80 text-gray-600 dark:text-zinc-400 rounded-md border border-gray-200/60 dark:border-zinc-700/50">
-                                    Cerrado Automáticamente
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      setSelectedBudgetMonth(currentMonthPrefix)
-                                    }
-                                    className="px-2 py-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline rounded-lg transition-colors cursor-pointer"
-                                  >
-                                    Ir al actual
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-md border border-blue-200/40 dark:border-blue-800/40">
-                                    Mes Futuro
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      setSelectedBudgetMonth(currentMonthPrefix)
-                                    }
-                                    className="px-2 py-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline rounded-lg transition-colors cursor-pointer"
-                                  >
-                                    Ir al actual
-                                  </button>
-                                </div>
-                              )}
+                                )}
+                                Mes Actual
+                              </button>
                             </div>
                           </div>
 
@@ -9820,40 +9799,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                 </button>
                               </div>
 
-                              {selectedBudgetMonth === currentMonthPrefix ? (
-                                <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 rounded-md shrink-0 flex items-center gap-1.5 border border-emerald-200/50 dark:border-emerald-800/40">
+                              <button
+                                onClick={() => setSelectedBudgetMonth(currentMonthPrefix)}
+                                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shrink-0 flex items-center gap-1 border transition-all active:scale-95 cursor-pointer ${
+                                  selectedBudgetMonth === currentMonthPrefix
+                                    ? "bg-emerald-100/80 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/30"
+                                    : "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-800/30 hover:bg-blue-100/70 dark:hover:bg-blue-900/30"
+                                }`}
+                              >
+                                {selectedBudgetMonth === currentMonthPrefix && (
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  Mes Activo
-                                </span>
-                              ) : selectedBudgetMonth < currentMonthPrefix ? (
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-gray-100 dark:bg-zinc-800/80 text-gray-600 dark:text-zinc-400 rounded-md border border-gray-200/60 dark:border-zinc-700/50">
-                                    Cerrado Automáticamente
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      setSelectedBudgetMonth(currentMonthPrefix)
-                                    }
-                                    className="px-2 py-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline rounded-lg transition-colors cursor-pointer"
-                                  >
-                                    Ir al actual
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-md border border-blue-200/40 dark:border-blue-800/40">
-                                    Mes Futuro
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      setSelectedBudgetMonth(currentMonthPrefix)
-                                    }
-                                    className="px-2 py-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline rounded-lg transition-colors cursor-pointer"
-                                  >
-                                    Ir al actual
-                                  </button>
-                                </div>
-                              )}
+                                )}
+                                Mes Actual
+                              </button>
                             </div>
                           </div>
 
