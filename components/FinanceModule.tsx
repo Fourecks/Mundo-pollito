@@ -11340,7 +11340,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                               }
 
                               return (
-                                <div className="divide-y divide-gray-100 dark:divide-zinc-900 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                                <div className="space-y-2">
                                   {filteredCats.map((cat) => (
                                     <button
                                       key={cat.id}
@@ -11348,7 +11348,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                       onClick={() => {
                                         setSelectedMobileCategory(cat);
                                       }}
-                                      className="w-full flex items-center justify-between p-4.5 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40 text-left transition-all"
+                                      className="w-full flex items-center justify-between p-3.5 bg-gray-50/80 dark:bg-[#121212] hover:bg-gray-100 dark:hover:bg-zinc-800/80 border border-gray-200/60 dark:border-zinc-800/60 rounded-xl text-left transition-all cursor-pointer shadow-2xs"
                                     >
                                       <div className="flex items-center gap-3">
                                         <span className="text-xl w-8 h-8 rounded-lg bg-gray-50 dark:bg-zinc-900 flex items-center justify-center border border-gray-100 dark:border-zinc-800 shrink-0">
@@ -11765,7 +11765,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                               <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
                                 Categorías de Gasto / Presupuesto
                               </span>
-                              <div className="divide-y divide-gray-100 dark:divide-zinc-800/80 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                              <div className="space-y-2">
                                 {categories
                                   .filter(
                                     (c) =>
@@ -11776,10 +11776,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   .map((cat) => (
                                     <div
                                       key={cat.id}
-                                      className="flex items-center justify-between p-3.5 hover:bg-gray-50/60 dark:hover:bg-zinc-900/40 transition-all"
+                                      className="flex items-center justify-between p-3 bg-gray-50/80 dark:bg-[#121212] hover:bg-gray-100/80 dark:hover:bg-zinc-800/60 border border-gray-200/60 dark:border-zinc-800/60 rounded-xl transition-all shadow-2xs"
                                     >
                                       <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-base shrink-0 border border-gray-200/50 dark:border-zinc-700/50">
+                                        <div className="w-9 h-9 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center text-base shrink-0 border border-gray-200/60 dark:border-zinc-700/60 shadow-2xs">
                                           {cat.emoji || "🛒"}
                                         </div>
                                         <div className="min-w-0">
@@ -11802,7 +11802,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         <button
                                           type="button"
                                           onClick={() => openEditCategoryModal(cat)}
-                                          className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                                          className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-zinc-600"
                                           title="Editar"
                                         >
                                           <Pencil className="w-3.5 h-3.5" />
@@ -11810,7 +11810,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         <button
                                           type="button"
                                           onClick={() => handleDeleteCategory(cat.id)}
-                                          className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer"
+                                          className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-200 dark:hover:border-rose-900/40"
                                           title="Eliminar"
                                         >
                                           <Trash2 className="w-3.5 h-3.5" />
@@ -11826,7 +11826,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                               <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
                                 Categorías de Ingreso
                               </span>
-                              <div className="divide-y divide-gray-100 dark:divide-zinc-800/80 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                              <div className="space-y-2">
                                 {categories
                                   .filter(
                                     (c) =>
@@ -11837,10 +11837,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   .map((cat) => (
                                     <div
                                       key={cat.id}
-                                      className="flex items-center justify-between p-3.5 hover:bg-gray-50/60 dark:hover:bg-zinc-900/40 transition-all"
+                                      className="flex items-center justify-between p-3 bg-gray-50/80 dark:bg-[#121212] hover:bg-gray-100/80 dark:hover:bg-zinc-800/60 border border-gray-200/60 dark:border-zinc-800/60 rounded-xl transition-all shadow-2xs"
                                     >
                                       <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-base shrink-0 border border-gray-200/50 dark:border-zinc-700/50">
+                                        <div className="w-9 h-9 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center text-base shrink-0 border border-gray-200/60 dark:border-zinc-700/60 shadow-2xs">
                                           {cat.emoji || "💼"}
                                         </div>
                                         <span className="font-bold text-xs text-gray-900 dark:text-white truncate">
@@ -11852,7 +11852,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         <button
                                           type="button"
                                           onClick={() => openEditCategoryModal(cat)}
-                                          className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                                          className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-zinc-600"
                                           title="Editar"
                                         >
                                           <Pencil className="w-3.5 h-3.5" />
@@ -11860,7 +11860,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         <button
                                           type="button"
                                           onClick={() => handleDeleteCategory(cat.id)}
-                                          className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer"
+                                          className="p-1.5 text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-200 dark:hover:border-rose-900/40"
                                           title="Eliminar"
                                         >
                                           <Trash2 className="w-3.5 h-3.5" />
