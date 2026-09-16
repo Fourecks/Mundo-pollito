@@ -10386,15 +10386,44 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         
                                         <div className="px-5 pb-3 border-b border-gray-100 dark:border-zinc-900 flex justify-between items-center shrink-0">
                                           <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                                            Movimientos: {monthName}
+                                            Reporte: {monthName}
                                           </h3>
-                                          <button
-                                            type="button"
-                                            onClick={() => setShowHistoricalTxList(false)}
-                                            className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white"
-                                          >
-                                            Cerrar
-                                          </button>
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const rows = monthTx.map((tx) => {
+                                                  const catName = categories.find((c) => c.id === tx.category_id)?.name || "";
+                                                  const accName = accounts.find((a) => a.id === tx.account_id)?.name || "";
+                                                  const amount = (tx.amount_cents / 100).toFixed(2);
+                                                  return [tx.date, tx.type, amount, tx.description || "", catName, accName];
+                                                });
+                                                const csvContent = [
+                                                  ["Fecha", "Tipo", "Monto", "Descripción", "Categoría", "Cuenta"].join(","),
+                                                  ...rows.map((row) => row.map((field) => `"${field}"`).join(",")),
+                                                ].join("\n");
+                                                const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                                                const link = document.createElement("a");
+                                                link.setAttribute("href", URL.createObjectURL(blob));
+                                                link.setAttribute("download", `reporte_finanzas_${monthKey}.csv`);
+                                                link.style.visibility = "hidden";
+                                                document.body.appendChild(link);
+                                                link.click();
+                                                document.body.removeChild(link);
+                                              }}
+                                              className="px-2.5 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-xs font-semibold hover:opacity-90 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                            >
+                                              <Download className="w-3.5 h-3.5" />
+                                              <span>Descargar CSV</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setShowHistoricalTxList(false)}
+                                              className="px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white"
+                                            >
+                                              Cerrar
+                                            </button>
+                                          </div>
                                         </div>
 
                                         <div className="flex-1 overflow-y-auto p-5 space-y-3">
@@ -10530,7 +10559,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                 MES ACTUAL
                               </span>
                               
-                              <div className="p-5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl space-y-4">
+                              <div className="p-5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl space-y-4 shadow-2xs">
                                 <div className="flex justify-between items-center">
                                   <div>
                                     <h3 className="text-base font-bold text-gray-900 dark:text-white">
@@ -10543,18 +10572,20 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                         return `${monthsList[parseInt(mn) - 1]} ${yr}`;
                                       })()}
                                     </h3>
-                                    <span className="text-[10px] font-semibold py-0.5 px-2 bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 rounded-full mt-1 inline-block">
-                                      {monthIsClosedStatus[currentMonthPrefix] ? "Mes cerrado" : "En curso"}
+                                    <span className="text-[10px] font-bold py-0.5 px-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/40 rounded-full mt-1 inline-flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                      Mes Activo en Curso
                                     </span>
                                   </div>
                                   
                                   <button
                                     type="button"
                                     onClick={exportToCSV}
-                                    className="p-2 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-gray-200/60 dark:border-zinc-800 rounded-xl text-gray-700 dark:text-zinc-300 transition-colors"
-                                    title="Exportar CSV"
+                                    className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                    title="Descargar Reporte CSV"
                                   >
-                                    <Download className="w-4 h-4" />
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>Descargar Reporte</span>
                                   </button>
                                 </div>
 
@@ -10594,39 +10625,17 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                   </div>
                                 </div>
 
-                                <div className="pt-2 border-t border-gray-100 dark:border-zinc-900">
-                                  {monthIsClosedStatus[currentMonthPrefix] ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => setMonthIsClosedStatus(prev => ({ ...prev, [currentMonthPrefix]: false }))}
-                                      className="w-full py-3 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-gray-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all"
-                                    >
-                                      Reabrir mes para movimientos
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowConfirmCloseMonth(true)}
-                                      className="w-full py-3 bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 rounded-xl text-xs font-bold transition-all text-center"
-                                    >
-                                      Cerrar {(() => {
-                                        const monthsList = [
-                                          "enero", "febrero", "marzo", "abril", "mayo", "junio",
-                                          "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
-                                        ];
-                                        const [, mn] = currentMonthPrefix.split("-");
-                                        return monthsList[parseInt(mn) - 1];
-                                      })()}
-                                    </button>
-                                  )}
+                                <div className="pt-2 border-t border-gray-100 dark:border-zinc-900/80 flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                  <span>El mes se cerrará automáticamente al finalizar el último día de este mes e iniciará el nuevo mes.</span>
                                 </div>
                               </div>
                             </div>
 
-                            {/* HISTORIAL */}
+                            {/* HISTORIAL DE MESES CERRADOS */}
                             <div className="space-y-3">
                               <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 font-bold px-1">
-                                HISTORIAL DE MESES
+                                HISTORIAL DE MESES CERRADOS
                               </span>
 
                               {(() => {
@@ -10665,40 +10674,97 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                                 if (historicalList.length === 0) {
                                   return (
-                                    <div className="p-8 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl text-center text-xs text-gray-400 dark:text-zinc-500">
-                                      No hay meses cerrados ni datos históricos anteriores.
+                                    <div className="p-8 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-zinc-800 rounded-2xl text-center text-xs text-gray-400 dark:text-zinc-500 space-y-1">
+                                      <p className="font-semibold text-gray-700 dark:text-zinc-300">No hay cierres de meses anteriores aún.</p>
+                                      <p>Cuando concluya el mes actual, se cerrará automáticamente y aparecerá su reporte aquí.</p>
                                     </div>
                                   );
                                 }
 
                                 return (
-                                  <div className="divide-y divide-gray-100 dark:divide-zinc-900 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                                  <div className="space-y-2.5">
                                     {historicalList.map((item) => {
                                       const net = item.income - item.expenses;
+
+                                      const handleExportMonthCSV = (e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        const rows = item.txs.map((tx) => {
+                                          const catName = categories.find((c) => c.id === tx.category_id)?.name || "";
+                                          const accName = accounts.find((a) => a.id === tx.account_id)?.name || "";
+                                          const amount = (tx.amount_cents / 100).toFixed(2);
+                                          return [tx.date, tx.type, amount, tx.description || "", catName, accName];
+                                        });
+                                        const csvContent = [
+                                          ["Fecha", "Tipo", "Monto", "Descripción", "Categoría", "Cuenta"].join(","),
+                                          ...rows.map((row) => row.map((field) => `"${field}"`).join(",")),
+                                        ].join("\n");
+                                        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                                        const link = document.createElement("a");
+                                        link.setAttribute("href", URL.createObjectURL(blob));
+                                        link.setAttribute("download", `reporte_finanzas_${item.monthKey}.csv`);
+                                        link.style.visibility = "hidden";
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      };
+
                                       return (
-                                        <button
+                                        <div
                                           key={item.monthKey}
-                                          type="button"
-                                          onClick={() => setSelectedHistoricalMonth(item.monthKey)}
-                                          className="w-full flex items-center justify-between p-4 hover:bg-gray-50/50 dark:hover:bg-zinc-900/40 text-left transition-all"
+                                          className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl space-y-3 shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
                                         >
-                                          <div>
-                                            <span className="text-sm font-semibold text-gray-900 dark:text-white block">
-                                              {item.monthName}
-                                            </span>
-                                            <span className="text-[10px] text-gray-400 dark:text-zinc-500">
-                                              Ingresos {formatCurrency(item.income)} · Gastos {formatCurrency(item.expenses)}
-                                            </span>
+                                          <div className="flex items-center justify-between">
+                                            <div>
+                                              <span className="text-sm font-bold text-gray-900 dark:text-white block">
+                                                {item.monthName}
+                                              </span>
+                                              <span className="text-[10px] font-semibold px-2 py-0.5 bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 rounded-md inline-block mt-0.5">
+                                                Cerrado Automáticamente
+                                              </span>
+                                            </div>
+
+                                            <div className="text-right">
+                                              <span className={`text-xs font-bold block ${net >= 0 ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
+                                                {net >= 0 ? "+" : ""}
+                                                {formatCurrency(net)}
+                                              </span>
+                                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-medium">
+                                                Flujo Neto
+                                              </span>
+                                            </div>
                                           </div>
-                                          
-                                          <div className="flex items-center gap-1.5">
-                                            <span className={`text-xs font-semibold ${net >= 0 ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
-                                              {net >= 0 ? "+" : ""}
-                                              {formatCurrency(net)}
-                                            </span>
-                                            <ChevronRight className="w-4 h-4 text-gray-400" />
+
+                                          <div className="grid grid-cols-2 gap-2 text-xs border-t border-gray-100 dark:border-zinc-900 pt-2.5">
+                                            <div>
+                                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 block">Ingresos</span>
+                                              <span className="font-semibold text-emerald-600 dark:text-emerald-500">{formatCurrency(item.income)}</span>
+                                            </div>
+                                            <div>
+                                              <span className="text-[10px] text-gray-400 dark:text-zinc-500 block">Gastos</span>
+                                              <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(item.expenses)}</span>
+                                            </div>
                                           </div>
-                                        </button>
+
+                                          <div className="flex items-center gap-2 pt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => setSelectedHistoricalMonth(item.monthKey)}
+                                              className="flex-1 py-2 px-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-900 dark:text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                            >
+                                              <Eye className="w-3.5 h-3.5 text-gray-500" />
+                                              <span>Ver Reporte</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={handleExportMonthCSV}
+                                              className="py-2 px-3 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
+                                              title="Descargar CSV"
+                                            >
+                                              <Download className="w-3.5 h-3.5" />
+                                              <span>Descargar CSV</span>
+                                            </button>
+                                          </div>
+                                        </div>
                                       );
                                     })}
                                   </div>
