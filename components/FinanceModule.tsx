@@ -949,37 +949,24 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     return items;
   }, [accounts, debts, recurring, installments, isMobile]);
 
-  const handleOverdueBannerClick = () => {
-    if (overdueItems.length === 1) {
-      const route = overdueItems[0].route;
-      if (isMobile) {
-        if (route.tab === "more_menu") {
-          setMobileMainTab("more");
-          setMobileMoreSubView(route.subTab);
-        } else {
-          setMobileMainTab(route.tab as any);
-          if (route.tab === "planning") setMobilePlanSubView(route.subTab as any);
-        }
-      } else {
-        if (route.tab === "more_menu") {
-          setActiveTab("debts");
-        } else {
-          setActiveTab(route.tab as any);
-          if (route.tab === "planning") setPlanningSubTab(route.subTab as any);
-        }
-      }
-    } else if (overdueItems.length > 1) {
-      if (isMobile) {
-        setMobileMainTab("more");
-        setMobileMoreSubView("overdue_payments");
-      } else {
-        setActiveTab("overdue_payments" as any);
-      }
+    const handleOverdueBannerClick = () => {
+    if (isMobile) {
+      setMobileMainTab("more");
+      setMobileMoreSubView("overdue_payments");
+    } else {
+      setActiveTab("overdue_payments" as any);
     }
   };
 
 
   // --- Planning Sub-tab & Calendar ---
+  
+  useEffect(() => {
+    if (isMobile && (mobilePlanSubView === "calendar" || mobilePlanSubView === "subscriptions" || mobilePlanSubView === "installments" || mobilePlanSubView === "loans")) {
+      setPlanningSubTab(mobilePlanSubView);
+    }
+  }, [isMobile, mobilePlanSubView]);
+
   const [planningSubTab, setPlanningSubTab] = useState<
     "calendar" | "subscriptions" | "installments"
   >("calendar");
