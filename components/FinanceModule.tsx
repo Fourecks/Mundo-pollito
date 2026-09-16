@@ -568,6 +568,7 @@ type TabType =
   | "debts"
   | "stats"
   | "closing"
+  | "overdue_payments"
   | "settings";
 type TransactionType = "EXPENSE" | "INCOME" | "TRANSFER_OUT" | "TRANSFER_IN";
 
@@ -593,7 +594,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   // --- Mobile Navigation State (Fase 1: Resumen | Movimientos | Planificar | Más) ---
   const [mobileMainTab, setMobileMainTab] = useState<"overview" | "transactions" | "planning" | "more">("overview");
   const [mobilePlanSubView, setMobilePlanSubView] = useState<null | "budgets" | "calendar" | "subscriptions" | "installments" | "loans" | "savings" | "shopping">(null);
-  const [mobileMoreSubView, setMobileMoreSubView] = useState<null | "debts" | "stats" | "closing" | "accounts" | "categories" | "security" | "settings">(null);
+  const [mobileMoreSubView, setMobileMoreSubView] = useState<null | "debts" | "stats" | "closing" | "accounts" | "categories" | "security" | "settings" | "overdue_payments">(null);
 
   const getPlanSubViewTitle = (sub: string | null) => {
     switch (sub) {
@@ -654,6 +655,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
     }
     if (mobileMainTab === "more") {
       if (mobileMoreSubView === null) return "more_menu";
+      if (mobileMoreSubView === "overdue_payments") return "overdue_payments";
       if (["accounts", "categories", "security", "settings"].includes(mobileMoreSubView)) {
         return "settings";
       }
@@ -865,8 +867,117 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
   // --- Create Account Modal & System Alerts ---
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
-  const [financialAlerts, setFinancialAlerts] = useState<string[]>([]);
   const [showCreditInfoModal, setShowCreditInfoModal] = useState(false);
+
+  const getOverdueCuotas = (inst: FinanceInstallment) => {
+    const today = new Date();
+    const start = new Date(inst.start_date);
+    const payDay = inst.payment_day || start.getDate() || 15;
+    let totalMonthsElapsed =
+      (today.getFullYear() - start.getFullYear()) * 12 +
+      (today.getMonth() - start.getMonth());
+    if (today.getDate() >= payDay) {
+      totalMonthsElapsed += 1;
+    }
+    const expectedPaid = Math.min(
+      Math.max(0, totalMonthsElapsed),
+      inst.total_installments,
+    );
+    return inst.status === "ACTIVE"
+      ? Math.max(0, expectedPaid - inst.paid_installments)
+      : 0;
+  };
+
+  const overdueItems = useMemo(() => {
+    const items: Array<{ id: string; type: string; title: string; amount: number; cuotas?: number; route: { tab: string; subTab?: string } }> = [];
+    const todayStr = getTodayStr();
+
+    // 1. Tarjetas
+    accounts.forEach((acc) => {
+      if (acc.type === "credit" && acc.payment_due_date && acc.payment_due_date < todayStr && (acc.balance_cents || 0) > 0) {
+        items.push({
+          id: `acc_${acc.id}`,
+          type: "Tarjeta",
+          title: acc.name,
+          amount: acc.balance_cents,
+          route: { tab: isMobile ? "more_menu" : "debts", subTab: "debts" }
+        });
+      }
+    });
+
+    // 2. Préstamos
+    debts.forEach((d) => {
+      if (!d.is_archived && d.type === "OWE" && d.due_date && d.due_date < todayStr && d.remaining_cents > 0) {
+        items.push({
+          id: `debt_${d.id}`,
+          type: "Préstamo",
+          title: d.name,
+          amount: d.remaining_cents,
+          route: { tab: "planning", subTab: "loans" }
+        });
+      }
+    });
+
+    // 3. Suscripciones
+    recurring.forEach((rec) => {
+      if (rec.next_date && rec.next_date < todayStr) {
+        items.push({
+          id: `sub_${rec.id}`,
+          type: "Suscripción",
+          title: rec.description || rec.name || "Suscripción",
+          amount: rec.amount_cents,
+          route: { tab: "planning", subTab: "subscriptions" }
+        });
+      }
+    });
+
+    // 4. Cuotas
+    installments.forEach((inst) => {
+      const cuotas = getOverdueCuotas(inst);
+      if (cuotas > 0) {
+        items.push({
+          id: `inst_${inst.id}`,
+          type: "Cuota",
+          title: inst.name,
+          amount: inst.installment_amount_cents * cuotas,
+          cuotas: cuotas,
+          route: { tab: "planning", subTab: "installments" }
+        });
+      }
+    });
+
+    return items;
+  }, [accounts, debts, recurring, installments, isMobile]);
+
+  const handleOverdueBannerClick = () => {
+    if (overdueItems.length === 1) {
+      const route = overdueItems[0].route;
+      if (isMobile) {
+        if (route.tab === "more_menu") {
+          setMobileMainTab("more");
+          setMobileMoreSubView(route.subTab);
+        } else {
+          setMobileMainTab(route.tab as any);
+          if (route.tab === "planning") setMobilePlanSubView(route.subTab as any);
+        }
+      } else {
+        if (route.tab === "more_menu") {
+          setActiveTab("debts");
+        } else {
+          setActiveTab(route.tab as any);
+          if (route.tab === "planning") setPlanningSubTab(route.subTab as any);
+        }
+      }
+    } else if (overdueItems.length > 1) {
+      if (isMobile) {
+        setMobileMainTab("more");
+        setMobileMoreSubView("overdue_payments");
+      } else {
+        setActiveTab("overdue_payments" as any);
+      }
+    }
+  };
+
 
   // --- Planning Sub-tab & Calendar ---
   const [planningSubTab, setPlanningSubTab] = useState<
@@ -1266,11 +1377,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
       dataChanged = true;
     }
 
-    if (alertsAdded.length > 0) {
-      setFinancialAlerts((prev) =>
-        Array.from(new Set([...prev, ...alertsAdded])),
-      );
-    }
+
 
     if (dataChanged) {
       const [accRes, txRes, recRes] = await Promise.all([
@@ -1398,11 +1505,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
       }
     }
 
-    if (alertsAdded.length > 0) {
-      setFinancialAlerts((prev) =>
-        Array.from(new Set([...prev, ...alertsAdded])),
-      );
-    }
+
 
     if (dataChanged) {
       setAccounts([...accountsList]);
@@ -5406,32 +5509,16 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
             <>
               {isMobile ? renderMobileTopNav() : renderTabs()}
 
-              {financialAlerts.length > 0 && (
-                <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl shadow-sm space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                      Avisos de Fondos y Crédito ({financialAlerts.length})
-                    </div>
-                    <button
-                      onClick={() => setFinancialAlerts([])}
-                      className="text-xs text-amber-700 dark:text-amber-400 hover:underline font-semibold"
-                    >
-                      Entendido / Limpiar
-                    </button>
-                  </div>
-                  <ul className="space-y-1.5 pl-1">
-                    {financialAlerts.map((alert, idx) => (
-                      <li
-                        key={idx}
-                        className="text-xs text-amber-900 dark:text-amber-200 font-medium flex items-start gap-1.5"
-                      >
-                        <span className="shrink-0 text-amber-600">•</span>
-                        <span>{alert}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {overdueItems.length > 0 && (
+                <button
+                  onClick={handleOverdueBannerClick}
+                  className="-mx-4 sm:-mx-6 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)] bg-red-600 hover:bg-red-700 text-white font-semibold text-xs py-1.5 flex items-center justify-center gap-1.5 transition-colors mb-5"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  {overdueItems.length === 1
+                    ? "Tienes 1 pago atrasado"
+                    : `Tienes ${overdueItems.length} pagos atrasados`}
+                </button>
               )}
 
               <AnimatePresence mode="wait">
@@ -5756,6 +5843,70 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   )}
 
                   {/* OVERVIEW TAB */}
+                  {/* OVERDUE PAYMENTS HIDDEN SECTION */}
+                  {effectiveTab === "overdue_payments" && (
+                    <div className="space-y-6">
+                      <div className="flex justify-between items-center pb-2 border-b border-gray-150 dark:border-zinc-800">
+                        <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-red-500" />
+                          Pagos Atrasados
+                        </h3>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {overdueItems.length === 0 ? (
+                          <div className="text-center py-8 text-sm text-gray-500">
+                            No hay pagos atrasados.
+                          </div>
+                        ) : (
+                          <div className="grid gap-3">
+                            {overdueItems.map((item, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  if (isMobile) {
+                                    if (item.route.tab === "more_menu") {
+                                      setMobileMainTab("more");
+                                      setMobileMoreSubView(item.route.subTab);
+                                    } else {
+                                      setMobileMainTab(item.route.tab);
+                                      if (item.route.tab === "planning") setMobilePlanSubView(item.route.subTab);
+                                    }
+                                  } else {
+                                    if (item.route.tab === "more_menu") {
+                                      setActiveTab("debts");
+                                    } else {
+                                      setActiveTab(item.route.tab);
+                                      if (item.route.tab === "planning") setPlanningSubTab(item.route.subTab);
+                                    }
+                                  }
+                                }}
+                                className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-red-200 dark:border-red-900/40 hover:border-red-300 dark:hover:border-red-800 rounded-xl shadow-xs transition-colors text-left"
+                              >
+                                <div>
+                                  <div className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-0.5">
+                                    {item.type}
+                                  </div>
+                                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    {item.title}
+                                  </div>
+                                  {item.cuotas && item.cuotas > 0 ? (
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                      {item.cuotas} {item.cuotas === 1 ? "cuota atrasada" : "cuotas atrasadas"}
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                  {formatCurrency(item.amount)}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {effectiveTab === "overview" && (
                     isMobile ? (
                       renderMobileOverview()
