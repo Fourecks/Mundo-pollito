@@ -6026,16 +6026,10 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                   {/* UPCOMING PAYMENTS HIDDEN SECTION */}
                   {effectiveTab === "upcoming_payments" && (
                     <div className="space-y-6 pb-24 animate-in fade-in duration-200">
-                      <div className="flex justify-between items-center pb-2 border-b border-gray-150 dark:border-zinc-800">
-                        <div>
-                          <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <Calendar className="w-5 h-5 text-gray-700 dark:text-zinc-300" />
-                            Próximos Pagos
-                          </h3>
-                          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-                            Compromisos ordenados cronológicamente por vencimiento
-                          </p>
-                        </div>
+                      <div className="pb-2 border-b border-gray-150 dark:border-zinc-800">
+                        <h3 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
+                          Próximos Pagos
+                        </h3>
                       </div>
 
                       {allUpcomingPayments.length === 0 ? (
@@ -6051,20 +6045,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {allUpcomingPayments.map((item) => {
-                            const getSourceIcon = () => {
-                              switch (item.source) {
-                                case "subscription":
-                                  return <Receipt className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
-                                case "installment":
-                                  return <Layers className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
-                                case "debt":
-                                  return <HandCoins className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
-                                case "card":
-                                  return <CreditCard className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
-                                default:
-                                  return <Calendar className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
-                              }
-                            };
+                            const dateInfo = formatPaymentDateBadge(item.dateStr);
 
                             return (
                               <button
@@ -6095,9 +6076,14 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                 }}
                                 className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all text-left group cursor-pointer w-full"
                               >
-                                <div className="flex items-center gap-3 min-w-0 pr-2">
-                                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 flex items-center justify-center shrink-0">
-                                    {getSourceIcon()}
+                                <div className="flex items-center gap-3.5 min-w-0 pr-2">
+                                  <div className="flex flex-col items-center justify-center w-11 h-11 rounded-xl bg-gray-100 dark:bg-zinc-800 shrink-0 border border-gray-200/50 dark:border-zinc-700/50">
+                                    <span className="text-[10px] font-bold uppercase text-gray-500 dark:text-zinc-400">
+                                      {dateInfo.month}
+                                    </span>
+                                    <span className="text-sm font-extrabold text-gray-900 dark:text-white leading-none">
+                                      {dateInfo.day}
+                                    </span>
                                   </div>
                                   <div className="min-w-0">
                                     <p className="font-bold text-sm text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
