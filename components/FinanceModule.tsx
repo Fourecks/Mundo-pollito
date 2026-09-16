@@ -6879,7 +6879,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                       return (
                         <div className="space-y-6 max-w-5xl mx-auto">
                           {/* Native Header Bar */}
-                          <div className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-gray-150 dark:border-zinc-800 w-full">
+                          <div className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-gray-150 dark:border-zinc-800 w-full flex-nowrap overflow-x-auto scrollbar-none">
                             <div className="flex items-center gap-2 min-w-0">
                               <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
                                 Presupuestos
@@ -6928,16 +6928,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                               <button
                                 onClick={() => setSelectedBudgetMonth(currentMonthPrefix)}
-                                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shrink-0 flex items-center gap-1 border transition-all active:scale-95 cursor-pointer ${
-                                  selectedBudgetMonth === currentMonthPrefix
-                                    ? "bg-emerald-100/80 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/30"
-                                    : "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-800/30 hover:bg-blue-100/70 dark:hover:bg-blue-900/30"
-                                }`}
+                                className="px-2 py-1 text-xs font-semibold bg-black hover:bg-zinc-900 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white rounded-lg shrink-0 transition-all active:scale-95 cursor-pointer shadow-sm border border-transparent"
                               >
-                                {selectedBudgetMonth === currentMonthPrefix && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                )}
-                                Mes Actual
+                                actual
                               </button>
                             </div>
                           </div>
@@ -9764,7 +9757,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                       return (
                         <div className="space-y-8 max-w-5xl mx-auto">
-                          <div className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-gray-150 dark:border-zinc-800 w-full">
+                          <div className="flex flex-row items-center justify-between gap-2 pb-3 border-b border-gray-150 dark:border-zinc-800 w-full flex-nowrap overflow-x-auto scrollbar-none">
                             <div className="flex items-center gap-2 min-w-0">
                               <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
                                 Análisis Financiero
@@ -9801,16 +9794,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
                               <button
                                 onClick={() => setSelectedBudgetMonth(currentMonthPrefix)}
-                                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg shrink-0 flex items-center gap-1 border transition-all active:scale-95 cursor-pointer ${
-                                  selectedBudgetMonth === currentMonthPrefix
-                                    ? "bg-emerald-100/80 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/30"
-                                    : "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200/50 dark:border-blue-800/30 hover:bg-blue-100/70 dark:hover:bg-blue-900/30"
-                                }`}
+                                className="px-2 py-1 text-xs font-semibold bg-black hover:bg-zinc-900 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white rounded-lg shrink-0 transition-all active:scale-95 cursor-pointer shadow-sm border border-transparent"
                               >
-                                {selectedBudgetMonth === currentMonthPrefix && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                )}
-                                Mes Actual
+                                actual
                               </button>
                             </div>
                           </div>
