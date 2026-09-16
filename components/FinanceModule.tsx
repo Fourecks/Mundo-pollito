@@ -6049,9 +6049,23 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                           </p>
                         </div>
                       ) : (
-                        <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-2xs overflow-hidden">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {allUpcomingPayments.map((item) => {
-                            const dateInfo = formatPaymentDateBadge(item.dateStr);
+                            const getSourceIcon = () => {
+                              switch (item.source) {
+                                case "subscription":
+                                  return <Receipt className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
+                                case "installment":
+                                  return <Layers className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
+                                case "debt":
+                                  return <HandCoins className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
+                                case "card":
+                                  return <CreditCard className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
+                                default:
+                                  return <Calendar className="w-4 h-4 text-gray-500 dark:text-zinc-400" />;
+                              }
+                            };
+
                             return (
                               <button
                                 key={item.id}
@@ -6079,35 +6093,21 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
                                     setDebtSubTab("cards");
                                   }
                                 }}
-                                className="w-full p-4 flex items-center justify-between hover:bg-gray-50/80 dark:hover:bg-zinc-900/50 transition-colors text-left group cursor-pointer"
+                                className="flex items-center justify-between p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/80 dark:border-zinc-800 rounded-2xl shadow-2xs hover:border-gray-300 dark:hover:border-zinc-700 transition-all text-left group cursor-pointer w-full"
                               >
-                                <div className="flex items-center gap-3.5 min-w-0">
-                                  <div className="flex flex-col items-center justify-center w-11 h-11 rounded-xl bg-gray-100 dark:bg-zinc-800 shrink-0 border border-gray-200/50 dark:border-zinc-700/50">
-                                    <span className="text-[10px] font-bold uppercase text-gray-500 dark:text-zinc-400">
-                                      {dateInfo.month}
-                                    </span>
-                                    <span className="text-sm font-extrabold text-gray-900 dark:text-white leading-none">
-                                      {dateInfo.day}
-                                    </span>
+                                <div className="flex items-center gap-3 min-w-0 pr-2">
+                                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 flex items-center justify-center shrink-0">
+                                    {getSourceIcon()}
                                   </div>
-
                                   <div className="min-w-0">
-                                    <div className="text-sm font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    <p className="font-bold text-sm text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                       {item.name}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300">
-                                        {item.subLabel}
-                                      </span>
-                                      <span className="text-xs text-gray-400">
-                                        Vence: {item.dateStr}
-                                      </span>
-                                    </div>
+                                    </p>
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0 ml-3">
-                                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-bold text-sm text-gray-900 dark:text-white">
                                     {formatCurrency(item.amount_cents)}
                                   </span>
                                   <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
