@@ -20,6 +20,8 @@ export interface Subject {
   emoji?: string;
   description?: string;
   target_grade?: number;
+  grade_scale?: number; // e.g. 10 or 100, default 10
+  status?: 'active' | 'completed' | 'archived'; // default active
   created_at: string;
 }
 
@@ -38,6 +40,7 @@ export interface Unit {
   name: string;
   order_index: number;
   description?: string;
+  status?: 'not_started' | 'in_progress' | 'completed';
 }
 
 export interface Topic {
@@ -125,12 +128,27 @@ export interface Flashcard {
   created_at: string;
 }
 
+export interface GradeCategory {
+  id: string;
+  user_id: string;
+  subject_id: string;
+  name: string; // e.g. "Parciales", "Laboratorios", "Proyecto final"
+  weight: number; // % weight (0-100)
+  created_at: string;
+}
+
 export interface Goal {
   id: string;
   user_id: string;
   period_id?: string;
+  subject_id?: string;
+  project_id?: number;
+  reading_id?: string;
   title: string;
   description?: string;
+  type: 'grade' | 'subject' | 'task' | 'reading' | 'project' | 'personal';
+  target_value?: number;
+  current_value?: number;
   target_date?: string;
   status: 'in_progress' | 'achieved' | 'missed';
   created_at: string;
@@ -140,10 +158,16 @@ export interface Grade {
   id: string;
   user_id: string;
   subject_id: string;
+  category_id?: string;
+  exam_id?: string;
+  unit_id?: string;
   name: string;
-  score: number;
-  max_score: number;
-  weight: number;
+  score?: number | null; // Obtained score (null/undefined if pending)
+  max_score: number; // Default 10 or 100
+  weight?: number;
+  date?: string;
+  notes?: string;
+  status: 'pending' | 'completed';
   created_at: string;
 }
 

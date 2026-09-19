@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Subject, Unit, Exam, Topic, Resource, StudySession, Grade, Attendance, Deck, Flashcard } from './types';
-import { Folder, Note } from '../../types';
+import { Subject, Unit, Exam, Topic, Resource, StudySession, Grade, GradeCategory, Attendance, Deck, Flashcard } from './types';
+import { Folder, Note, Todo, Project } from '../../types';
 import NotesSection from '../NotesSection';
 import { motion, AnimatePresence } from 'framer-motion';
 import { syncableCreate, syncableUpdate, syncableDelete, getAll, ensureDB } from '../../db';
 import { supabase } from '../../supabaseClient';
+import { calculateGradeSummary } from './utils/gradeCalculator';
+import { 
+  ChevronLeft, ChevronRight, Plus, X, FileText, CheckSquare, Calendar, 
+  Paperclip, Award, BookOpen, Clock, Trash2, CheckCircle2, Circle, Sparkles,
+  Link, Play, Presentation, File, Search, FolderKanban, Check, MoreHorizontal,
+  ArrowRight, ExternalLink, Layers, AlertCircle, Percent, Target
+} from 'lucide-react';
 
 interface Props {
   subject: Subject;
@@ -27,11 +34,38 @@ export const SubjectWorkspace: React.FC<Props> = ({
   onAddFolder = async () => null,
   onUpdateFolder = async () => {},
   onDeleteFolder = async () => {},
-  onAddNote = async () => null,
+  onAddNote = async (_folderId?: number | null, _projectId?: number, _subjectId?: string) => null,
   onUpdateNote = async () => {},
   onDeleteNote = async () => {},
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'units' | 'notes' | 'tasks' | 'exams' | 'resources' | 'study' | 'grades' | 'flashcards'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'units' | 'notes' | 'tasks' | 'exams' | 'resources' | 'projects' | 'study' | 'grades' | 'flashcards'>('overview');
+  
+  // Mobile Navigation & View States
+  const [mobileSubView, setMobileSubView] = useState<'main' | 'units' | 'notes' | 'tasks' | 'exams' | 'resources' | 'projects' | 'grades' | 'study' | 'flashcards'>('main');
+  const [activeUnit, setActiveUnit] = useState<Unit | null>(null);
+  const [showMobileActionSheet, setShowMobileActionSheet] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // Global Tasks (Todos) State
+  const [tasks, setTasks] = useState<Todo[]>([]);
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [newTaskText, setNewTaskText] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+  const [newTaskUnitId, setNewTaskUnitId] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [newTaskNotes, setNewTaskNotes] = useState('');
+  const [showTaskMoreOptions, setShowTaskMoreOptions] = useState(false);
+
+  // Global Projects State
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isAddingProject, setIsAddingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDesc, setNewProjectDesc] = useState('');
   
   // Flashcards State
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -56,6 +90,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
   const [isAddingExam, setIsAddingExam] = useState(false);
   const [newExamTitle, setNewExamTitle] = useState('');
   const [newExamDate, setNewExamDate] = useState('');
+  const [newExamTime, setNewExamTime] = useState('');
+  const [newExamLocation, setNewExamLocation] = useState('');
+  const [newExamUnitId, setNewExamUnitId] = useState('');
+  const [newExamType, setNewExamType] = useState<Exam['type']>('midterm');
+  const [newExamNotes, setNewExamNotes] = useState('');
   
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
@@ -63,6 +102,8 @@ export const SubjectWorkspace: React.FC<Props> = ({
   const [newResourceTitle, setNewResourceTitle] = useState('');
   const [newResourceUrl, setNewResourceUrl] = useState('');
   const [newResourceType, setNewResourceType] = useState<'link' | 'pdf' | 'video' | 'document' | 'other'>('link');
+  const [newResourceUnitId, setNewResourceUnitId] = useState('');
+  const [newResourceDesc, setNewResourceDesc] = useState('');
   
   // Study State
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
@@ -70,14 +111,29 @@ export const SubjectWorkspace: React.FC<Props> = ({
   const [studySeconds, setStudySeconds] = useState(0);
   const [studyObjective, setStudyObjective] = useState('');
 
-  // Grades & Attendance State
+  // Grades & Categories & Attendance State
+  const [categories, setCategories] = useState<GradeCategory[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
+  
+  // Category Modal
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryWeight, setNewCategoryWeight] = useState('');
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+
+  // Grade/Evaluation Form Modal
   const [isAddingGrade, setIsAddingGrade] = useState(false);
   const [newGradeName, setNewGradeName] = useState('');
+  const [newGradeCategoryId, setNewGradeCategoryId] = useState('');
+  const [newGradeExamId, setNewGradeExamId] = useState('');
+  const [newGradeUnitId, setNewGradeUnitId] = useState('');
   const [newGradeScore, setNewGradeScore] = useState('');
-  const [newGradeMaxScore, setNewGradeMaxScore] = useState('10');
+  const [newGradeMaxScore, setNewGradeMaxScore] = useState(subject.grade_scale === 100 ? '100' : '10');
   const [newGradeWeight, setNewGradeWeight] = useState('');
+  const [newGradeDate, setNewGradeDate] = useState('');
+  const [newGradeNotes, setNewGradeNotes] = useState('');
+  const [showGradeMoreOptions, setShowGradeMoreOptions] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -112,29 +168,38 @@ export const SubjectWorkspace: React.FC<Props> = ({
         allExams,
         allResources,
         allSessions,
+        allCategories,
         allGrades,
         allAttendances,
         allDecks,
-        allCards
+        allCards,
+        allTodos,
+        allProjects
       ] = await Promise.all([
         getAll<Unit>('student_units'),
         getAll<Exam>('student_exams'),
         getAll<Resource>('student_resources'),
         getAll<StudySession>('student_study_sessions'),
+        getAll<GradeCategory>('student_grade_categories'),
         getAll<Grade>('student_grades'),
         getAll<Attendance>('student_attendance'),
         getAll<Deck>('student_decks'),
         getAll<Flashcard>('student_flashcards'),
+        getAll<Todo>('todos'),
+        getAll<Project>('projects')
       ]);
 
       setUnits(allUnits.filter(u => u.subject_id === subject.id));
       setExams(allExams.filter(e => e.subject_id === subject.id));
       setResources(allResources.filter(r => r.subject_id === subject.id));
       setStudySessions(allSessions.filter(s => s.subject_id === subject.id));
+      setCategories(allCategories.filter(c => c.subject_id === subject.id));
       setGrades(allGrades.filter(g => g.subject_id === subject.id));
       setAttendances(allAttendances.filter(a => a.subject_id === subject.id));
       setDecks(allDecks.filter(d => d.subject_id === subject.id));
       setFlashcards(allCards);
+      setTasks(allTodos.filter(t => t.subject_id === subject.id));
+      setProjects(allProjects.filter(p => p.subject_id === subject.id));
 
       // Background Supabase Sync if online
       try {
@@ -266,6 +331,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
     setUnits(prev => [...prev, newUnit]);
     setIsAddingUnit(false);
     setNewUnitName('');
+    showToast('Unidad creada');
 
     try {
       await syncableCreate('student_units', newUnit);
@@ -277,8 +343,124 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
   const handleDeleteUnit = async (unitId: string) => {
     setUnits(prev => prev.filter(u => u.id !== unitId));
+    if (activeUnit?.id === unitId) setActiveUnit(null);
     try {
       await syncableDelete('student_units', unitId);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleToggleUnitStatus = async (unitToToggle: Unit, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nextStatus: 'not_started' | 'in_progress' | 'completed' = 
+      !unitToToggle.status || unitToToggle.status === 'not_started' ? 'in_progress' :
+      unitToToggle.status === 'in_progress' ? 'completed' : 'not_started';
+      
+    const updated = { ...unitToToggle, status: nextStatus };
+    setUnits(prev => prev.map(u => u.id === unitToToggle.id ? updated : u));
+    if (activeUnit?.id === unitToToggle.id) {
+      setActiveUnit(updated);
+    }
+    showToast('Estado de unidad actualizado');
+    try {
+      await syncableUpdate('student_units', updated);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Task Handlers
+  const handleToggleTask = async (task: Todo) => {
+    const updated = { ...task, completed: !task.completed };
+    setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
+    try {
+      await syncableUpdate('todos', updated);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSaveTask = async () => {
+    if (!newTaskText.trim()) return;
+    const userId = await getUserId();
+    const newTodo: Todo = {
+      id: Date.now(),
+      user_id: userId,
+      text: newTaskText.trim(),
+      completed: false,
+      priority: newTaskPriority,
+      due_date: newTaskDueDate || null,
+      subject_id: subject.id,
+      unit_id: newTaskUnitId || activeUnit?.id || undefined,
+      academic_type: 'homework',
+      notes: newTaskNotes.trim() || undefined,
+      created_at: new Date().toISOString()
+    };
+
+    setTasks(prev => [newTodo, ...prev]);
+    setIsAddingTask(false);
+    setNewTaskText('');
+    setNewTaskDueDate('');
+    setNewTaskUnitId('');
+    setNewTaskPriority('medium');
+    setNewTaskNotes('');
+    setShowTaskMoreOptions(false);
+    showToast('Tarea creada');
+
+    try {
+      await syncableCreate('todos', newTodo);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteTask = async (taskId: number) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    try {
+      await syncableDelete('todos', taskId);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  // Project Handlers
+  const handleSaveProject = async () => {
+    if (!newProjectName.trim()) return;
+    const userId = await getUserId();
+    const newProj: Project = {
+      id: Date.now(),
+      user_id: userId,
+      name: newProjectName.trim(),
+      description: newProjectDesc.trim() || null,
+      color: subject.color,
+      emoji: '📚',
+      subject_id: subject.id,
+      created_at: new Date().toISOString(),
+      status: 'active'
+    };
+
+    setProjects(prev => [newProj, ...prev]);
+    setIsAddingProject(false);
+    setNewProjectName('');
+    setNewProjectDesc('');
+    showToast('Proyecto académico creado');
+
+    try {
+      await syncableCreate('projects', newProj);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteProject = async (projectId: number) => {
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    try {
+      await syncableDelete('projects', projectId);
     } catch (err) {
       console.error(err);
     }
@@ -292,9 +474,13 @@ export const SubjectWorkspace: React.FC<Props> = ({
       id: generateUUID(),
       user_id: userId,
       subject_id: subject.id,
+      unit_id: newExamUnitId || activeUnit?.id || undefined,
       title: newExamTitle.trim(),
-      type: 'quiz',
+      type: newExamType || 'midterm',
       date: newExamDate,
+      time: newExamTime || undefined,
+      location: newExamLocation || undefined,
+      notes: newExamNotes || undefined,
       status: 'pending',
       created_at: new Date().toISOString()
     };
@@ -303,6 +489,12 @@ export const SubjectWorkspace: React.FC<Props> = ({
     setIsAddingExam(false);
     setNewExamTitle('');
     setNewExamDate('');
+    setNewExamTime('');
+    setNewExamLocation('');
+    setNewExamUnitId('');
+    setNewExamType('midterm');
+    setNewExamNotes('');
+    showToast('Examen guardado');
 
     try {
       await syncableCreate('student_exams', newExam);
@@ -329,9 +521,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
       id: generateUUID(),
       user_id: userId,
       subject_id: subject.id,
+      unit_id: newResourceUnitId || activeUnit?.id || undefined,
       title: newResourceTitle.trim(),
       url: newResourceUrl.trim() || undefined,
       type: newResourceType,
+      description: newResourceDesc.trim() || undefined,
       created_at: new Date().toISOString()
     };
 
@@ -340,6 +534,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
     setNewResourceTitle('');
     setNewResourceUrl('');
     setNewResourceType('link');
+    setNewResourceUnitId('');
+    setNewResourceDesc('');
+    showToast('Recurso guardado');
 
     try {
       await syncableCreate('student_resources', newResource);
@@ -406,30 +603,111 @@ export const SubjectWorkspace: React.FC<Props> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleSaveGrade = async () => {
-    if (!newGradeName.trim() || !newGradeScore || !newGradeMaxScore || !newGradeWeight) return;
+  const handleSaveCategory = async () => {
+    if (!newCategoryName.trim() || !newCategoryWeight) return;
+    setCategoryError(null);
+
+    const weightVal = parseFloat(newCategoryWeight);
+    if (isNaN(weightVal) || weightVal <= 0) {
+      setCategoryError('El peso debe ser un número positivo.');
+      return;
+    }
+
+    const currentTotalWeight = categories.reduce((sum, c) => sum + (c.weight || 0), 0);
+    if (currentTotalWeight + weightVal > 100) {
+      setCategoryError('El peso total de las categorías no puede superar el 100%.');
+      return;
+    }
 
     const userId = await getUserId();
+    const newCategory: GradeCategory = {
+      id: generateUUID(),
+      user_id: userId,
+      subject_id: subject.id,
+      name: newCategoryName.trim(),
+      weight: weightVal,
+      created_at: new Date().toISOString()
+    };
+
+    setCategories(prev => [...prev, newCategory]);
+    setIsAddingCategory(false);
+    setNewCategoryName('');
+    setNewCategoryWeight('');
+    showToast('Categoría guardada');
+
+    try {
+      await syncableCreate('student_grade_categories', newCategory);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    setCategories(prev => prev.filter(c => c.id !== categoryId));
+    try {
+      await syncableDelete('student_grade_categories', categoryId);
+    } catch (err) {
+      console.error(err);
+    }
+    loadData();
+  };
+
+  const handleSaveGrade = async () => {
+    if (!newGradeName.trim()) return;
+
+    const userId = await getUserId();
+    const scoreVal = newGradeScore.trim() !== '' ? parseFloat(newGradeScore) : null;
+    const maxScoreVal = parseFloat(newGradeMaxScore) || (subject.grade_scale || 10);
+    const weightVal = newGradeWeight ? parseFloat(newGradeWeight) : 0;
+    const isPending = scoreVal === null || isNaN(scoreVal);
+
     const newGrade: Grade = {
       id: generateUUID(),
       user_id: userId,
       subject_id: subject.id,
+      category_id: newGradeCategoryId || undefined,
+      exam_id: newGradeExamId || undefined,
+      unit_id: newGradeUnitId || undefined,
       name: newGradeName.trim(),
-      score: parseFloat(newGradeScore),
-      max_score: parseFloat(newGradeMaxScore),
-      weight: parseFloat(newGradeWeight),
+      score: isPending ? null : scoreVal,
+      max_score: maxScoreVal,
+      weight: weightVal,
+      date: newGradeDate || undefined,
+      notes: newGradeNotes.trim() || undefined,
+      status: isPending ? 'pending' : 'completed',
       created_at: new Date().toISOString()
     };
     
     setGrades(prev => [newGrade, ...prev]);
     setIsAddingGrade(false);
     setNewGradeName('');
+    setNewGradeCategoryId('');
+    setNewGradeExamId('');
+    setNewGradeUnitId('');
     setNewGradeScore('');
-    setNewGradeMaxScore('10');
+    setNewGradeMaxScore(subject.grade_scale === 100 ? '100' : '10');
     setNewGradeWeight('');
+    setNewGradeDate('');
+    setNewGradeNotes('');
+    setShowGradeMoreOptions(false);
+    showToast(isPending ? 'Evaluación pendiente guardada' : 'Calificación guardada');
 
     try {
       await syncableCreate('student_grades', newGrade);
+
+      if (newGradeExamId) {
+        const linkedExam = exams.find(e => e.id === newGradeExamId);
+        if (linkedExam) {
+          const updatedExam: Exam = {
+            ...linkedExam,
+            grade: isPending ? undefined : scoreVal!,
+            status: isPending ? 'pending' : 'completed'
+          };
+          setExams(prev => prev.map(e => e.id === linkedExam.id ? updatedExam : e));
+          await syncableUpdate('student_exams', updatedExam);
+        }
+      }
     } catch (err) {
       console.error(err);
     }
@@ -497,11 +775,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
   return (
     <div className="w-full h-full flex flex-col bg-white dark:bg-[#111] text-gray-900 dark:text-gray-100 overflow-hidden font-sans">
       
-      {/* Header */}
-      <header className="px-8 py-6 border-b border-gray-100 dark:border-white/5 flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 gap-4" style={{ borderBottomColor: `${subject.color}30` }}>
+      {/* DESKTOP HEADER */}
+      <header className="hidden md:flex px-8 py-6 border-b border-gray-100 dark:border-white/5 items-center justify-between flex-shrink-0 gap-4" style={{ borderBottomColor: `${subject.color}30` }}>
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer">
+            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
           <div>
             <div className="flex items-center gap-3">
@@ -513,13 +791,13 @@ export const SubjectWorkspace: React.FC<Props> = ({
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="px-8 pt-4 border-b border-gray-100 dark:border-white/5 flex gap-6 overflow-x-auto">
+      {/* DESKTOP TABS */}
+      <div className="hidden md:flex px-8 pt-4 border-b border-gray-100 dark:border-white/5 gap-6 overflow-x-auto shrink-0">
         {(['overview', 'units', 'notes', 'tasks', 'exams', 'resources', 'study', 'grades', 'flashcards'] as const).map(tab => (
           <button 
             key={tab} 
             onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap ${activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap cursor-pointer ${activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
           >
             {tab === 'notes' ? 'Notas' : tab === 'study' ? 'Sesiones' : tab === 'resources' ? 'Recursos' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             {activeTab === tab && (
@@ -529,25 +807,328 @@ export const SubjectWorkspace: React.FC<Props> = ({
         ))}
       </div>
 
+      {/* MOBILE HEADER */}
+      <div className="block md:hidden border-b border-gray-100 dark:border-white/5 bg-white dark:bg-[#111] px-4 pt-4 pb-3 shrink-0">
+        {activeUnit ? (
+          <div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setActiveUnit(null)}
+                className="flex items-center gap-1 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>{subject.name}</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => handleToggleUnitStatus(activeUnit, e)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 ${
+                  activeUnit.status === 'completed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' :
+                  activeUnit.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300' :
+                  'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                }`}
+              >
+                {activeUnit.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Circle className="w-3.5 h-3.5 text-gray-400" />}
+                <span>
+                  {activeUnit.status === 'completed' ? 'Completada' : activeUnit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}
+                </span>
+              </button>
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-2">
+              Unidad {activeUnit.order_index + 1}: {activeUnit.name}
+            </h2>
+            {activeUnit.description && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{activeUnit.description}</p>
+            )}
+          </div>
+        ) : mobileSubView === 'main' ? (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <button
+                onClick={onBack}
+                className="flex items-center gap-1 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Materias</span>
+              </button>
+              <button
+                onClick={() => setShowMobileActionSheet(true)}
+                className="w-8 h-8 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full flex items-center justify-center shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl">{subject.emoji || '💻'}</span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{subject.name}</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{subject.professor || 'Sin profesor asignado'}</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setMobileSubView('main')}
+                className="flex items-center gap-1 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>{subject.name}</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (mobileSubView === 'notes') onAddNote(null, undefined, subject.id);
+                  else if (mobileSubView === 'exams') setIsAddingExam(true);
+                  else if (mobileSubView === 'resources') setIsAddingResource(true);
+                  else if (mobileSubView === 'flashcards') setIsAddingDeck(true);
+                  else if (mobileSubView === 'study') setIsStudying(true);
+                  else if (mobileSubView === 'grades') setIsAddingGrade(true);
+                }}
+                className="w-8 h-8 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full flex items-center justify-center shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-2 capitalize">
+              {mobileSubView === 'notes' ? 'Apuntes' : 
+               mobileSubView === 'tasks' ? 'Tareas' : 
+               mobileSubView === 'exams' ? 'Exámenes' : 
+               mobileSubView === 'resources' ? 'Recursos' : 
+               mobileSubView === 'grades' ? 'Calificaciones' : 
+               mobileSubView === 'flashcards' ? 'Flashcards' : 
+               mobileSubView === 'study' ? 'Sesiones de estudio' : mobileSubView}
+            </h2>
+          </div>
+        )}
+      </div>
+
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50 dark:bg-[#0A0A0A]">
         <div className="max-w-6xl mx-auto h-full">
           {activeTab === 'overview' && (
-            <div className="space-y-8">
-              <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
-                  <span className="text-sm text-gray-500">Progreso</span>
-                  <div className="text-3xl font-light mt-2">0%</div>
+            <div className="space-y-6">
+              {/* Upcoming Item Card */}
+              {exams.some(e => e.status !== 'completed') || tasks.some(t => !t.completed) ? (
+                <div className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 dark:from-blue-500/10 dark:to-purple-500/10 p-4 sm:p-5 rounded-3xl border border-blue-200/50 dark:border-blue-500/20 shadow-sm flex items-center justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-md">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600 dark:text-blue-400">
+                        Próximo evento / entrega
+                      </span>
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-tight mt-0.5">
+                        {exams.find(e => e.status !== 'completed')?.title || tasks.find(t => !t.completed)?.text}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {exams.find(e => e.status !== 'completed')?.date || tasks.find(t => !t.completed)?.due_date || 'Sin fecha asignada'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
-                  <span className="text-sm text-gray-500">Próxima Clase</span>
-                  <div className="text-xl font-medium mt-2">-</div>
+              ) : null}
+
+              {/* UNIDADES SECTION */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-blue-500" />
+                    <span>Unidades del temario</span>
+                  </h3>
+                  <button
+                    onClick={() => setIsAddingUnit(true)}
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Añadir</span>
+                  </button>
                 </div>
-                <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
-                  <span className="text-sm text-gray-500">Tareas Pendientes</span>
-                  <div className="text-3xl font-light mt-2">0</div>
+
+                {units.length === 0 ? (
+                  <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">No hay unidades agregadas a esta materia todavía.</p>
+                    <button
+                      onClick={() => setIsAddingUnit(true)}
+                      className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300 rounded-xl text-xs font-semibold inline-flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Crear primera unidad</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {units.map((unit, index) => {
+                      const unitTaskCount = tasks.filter(t => t.unit_id === unit.id && !t.completed).length;
+                      const unitNoteCount = notes.filter(n => (n as any).unit_id === unit.id).length;
+                      return (
+                        <div
+                          key={unit.id}
+                          onClick={() => setActiveUnit(unit)}
+                          className="bg-white dark:bg-[#151515] p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-blue-500/30 dark:hover:border-blue-500/30 transition-all shadow-sm cursor-pointer flex flex-col justify-between group"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500">
+                                Unidad {index + 1}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleUnitStatus(unit, e)}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 ${
+                                  unit.status === 'completed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' :
+                                  unit.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300' :
+                                  'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                                }`}
+                              >
+                                {unit.status === 'completed' ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <Circle className="w-3 h-3 text-gray-400" />}
+                                <span>{unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}</span>
+                              </button>
+                            </div>
+                            <h4 className="font-bold text-sm text-gray-900 dark:text-white line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              {unit.name}
+                            </h4>
+                            {unit.description && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{unit.description}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-50 dark:border-white/5 text-[11px] text-gray-400">
+                            <span className="flex items-center gap-2">
+                              {unitTaskCount > 0 && <span>{unitTaskCount} tareas</span>}
+                              {unitNoteCount > 0 && <span>{unitNoteCount} apuntes</span>}
+                              {unitTaskCount === 0 && unitNoteCount === 0 && <span>Explorar unidad</span>}
+                            </span>
+                            <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* CONTENIDO QUICK HUB */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-purple-500" />
+                  <span>Contenido académico</span>
+                </h3>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <button
+                    onClick={() => { setActiveTab('tasks'); setMobileSubView('tasks'); }}
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
+                        <CheckSquare className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
+                        {tasks.filter(t => !t.completed).length}
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Tareas</span>
+                      <span className="text-[10px] text-gray-400">
+                        {tasks.filter(t => !t.completed).length === 1 ? '1 pendiente' : `${tasks.filter(t => !t.completed).length} pendientes`}
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('exams'); setMobileSubView('exams'); }}
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400">
+                        {exams.filter(e => e.status !== 'completed').length}
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Exámenes</span>
+                      <span className="text-[10px] text-gray-400">
+                        {exams.filter(e => e.status !== 'completed').length === 1 ? '1 próximo' : `${exams.filter(e => e.status !== 'completed').length} próximos`}
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('notes'); setMobileSubView('notes'); }}
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-extrabold text-purple-600 dark:text-purple-400">
+                        {notes.length}
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Apuntes</span>
+                      <span className="text-[10px] text-gray-400">{notes.length} notas globales</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('resources'); setMobileSubView('resources'); }}
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+                        <Paperclip className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                        {resources.length}
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Recursos</span>
+                      <span className="text-[10px] text-gray-400">{resources.length} archivos o links</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('projects'); setMobileSubView('projects'); }}
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
+                        <FolderKanban className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
+                        {projects.length}
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Proyectos</span>
+                      <span className="text-[10px] text-gray-400">{projects.length} proyectos vinc.</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('grades'); setMobileSubView('grades'); }}
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-xs">
+                        <Award className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
+                        {grades.length > 0 ? currentGrade.toFixed(1) : '-'}
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Notas</span>
+                      <span className="text-[10px] text-gray-400">Promedio actual</span>
+                    </div>
+                  </button>
                 </div>
-              </section>
+              </div>
             </div>
           )}
 
@@ -570,7 +1151,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
           {activeTab === 'units' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium">Unidades</h3>
+                <h3 className="text-lg font-medium">Unidades ({units.length})</h3>
                 <button onClick={() => setIsAddingUnit(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
                   + Nueva Unidad
                 </button>
@@ -583,20 +1164,41 @@ export const SubjectWorkspace: React.FC<Props> = ({
               ) : (
                 <div className="space-y-3">
                   {units.map((unit, i) => (
-                    <div key={unit.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center justify-between group">
+                    <div
+                      key={unit.id}
+                      onClick={() => setActiveUnit(unit)}
+                      className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center justify-between group cursor-pointer hover:border-blue-500/30 transition-all"
+                    >
                       <div className="flex items-center gap-4">
-                        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center text-sm font-medium text-gray-500">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold">
                           {i + 1}
                         </div>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{unit.name}</span>
+                        <div>
+                          <span className="font-medium text-gray-900 dark:text-gray-100 block">{unit.name}</span>
+                          {unit.description && <p className="text-xs text-gray-500 mt-0.5">{unit.description}</p>}
+                        </div>
                       </div>
-                      <button 
-                        onClick={() => handleDeleteUnit(unit.id)}
-                        className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
-                        title="Eliminar unidad"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleUnitStatus(unit, e)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
+                            unit.status === 'completed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' :
+                            unit.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                          }`}
+                        >
+                          {unit.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Circle className="w-3.5 h-3.5 text-gray-400" />}
+                          <span>{unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}</span>
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteUnit(unit.id); }}
+                          className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                          title="Eliminar unidad"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -605,8 +1207,191 @@ export const SubjectWorkspace: React.FC<Props> = ({
           )}
 
           {activeTab === 'tasks' && (
-            <div className="text-center py-20 text-gray-500">
-              <p>No hay tareas académicas. La integración con Tasks se realiza desde el módulo global.</p>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Tareas Académicas</h3>
+                  <p className="text-xs text-gray-500">Filtradas por esta materia ({subject.name})</p>
+                </div>
+                <button
+                  onClick={() => setIsAddingTask(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nueva tarea</span>
+                </button>
+              </div>
+
+              {tasks.length === 0 ? (
+                <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
+                  <CheckSquare className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No hay tareas asociadas a esta materia.</p>
+                  <p className="text-xs text-gray-400 mt-1">Crea una tarea desde aquí o asígnala desde el módulo general de Tasks.</p>
+                  <button
+                    onClick={() => setIsAddingTask(true)}
+                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Crear tarea</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* PENDIENTES */}
+                  <div>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
+                      Pendientes ({tasks.filter(t => !t.completed).length})
+                    </h4>
+                    <div className="space-y-2">
+                      {tasks.filter(t => !t.completed).map(task => {
+                        const taskUnit = units.find(u => u.id === task.unit_id);
+                        return (
+                          <div
+                            key={task.id}
+                            className="bg-white dark:bg-[#151515] p-3.5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => handleToggleTask(task)}
+                                className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-blue-500 transition-colors"
+                              >
+                                {task.completed && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                              </button>
+                              <div>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                                  {task.text}
+                                </span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  {taskUnit && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300 rounded-md">
+                                      {taskUnit.name}
+                                    </span>
+                                  )}
+                                  {task.due_date && (
+                                    <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                      <Calendar className="w-3 h-3" />
+                                      {task.due_date}
+                                    </span>
+                                  )}
+                                  {task.priority && (
+                                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded ${
+                                      task.priority === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-300' :
+                                      task.priority === 'medium' ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300' :
+                                      'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                    }`}>
+                                      {task.priority}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-opacity"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* COMPLETADAS */}
+                  {tasks.some(t => t.completed) && (
+                    <div className="pt-4 border-t border-gray-100 dark:border-white/5">
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
+                        Completadas ({tasks.filter(t => t.completed).length})
+                      </h4>
+                      <div className="space-y-2 opacity-60">
+                        {tasks.filter(t => t.completed).map(task => (
+                          <div
+                            key={task.id}
+                            className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-3">
+                              <button onClick={() => handleToggleTask(task)}>
+                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                              </button>
+                              <span className="text-sm font-medium text-gray-500 line-through">
+                                {task.text}
+                              </span>
+                            </div>
+                            <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-500">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'projects' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Proyectos Académicos</h3>
+                  <p className="text-xs text-gray-500">Proyectos de la materia vinc. con el sistema global</p>
+                </div>
+                <button
+                  onClick={() => setIsAddingProject(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nuevo proyecto</span>
+                </button>
+              </div>
+
+              {projects.length === 0 ? (
+                <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
+                  <FolderKanban className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No hay proyectos asignados a esta materia.</p>
+                  <p className="text-xs text-gray-400 mt-1">Crea trabajos prácticos o investigaciones en grupo.</p>
+                  <button
+                    onClick={() => setIsAddingProject(true)}
+                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Crear proyecto</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {projects.map(proj => (
+                    <div
+                      key={proj.id}
+                      className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col justify-between group"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-2xl">{proj.emoji || '📚'}</span>
+                          <button
+                            onClick={() => handleDeleteProject(proj.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-opacity"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <h4 className="font-bold text-base text-gray-900 dark:text-white">{proj.name}</h4>
+                        {proj.description && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{proj.description}</p>
+                        )}
+                      </div>
+                      <div className="pt-4 mt-4 border-t border-gray-50 dark:border-white/5 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                          {proj.status || 'Activo'}
+                        </span>
+                        <span className="text-xs text-gray-400">Ver detalles →</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -625,53 +1410,73 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {exams.map(exam => (
-                    <div key={exam.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
-                      <div>
-                        <h4 className="font-semibold text-lg text-gray-900 dark:text-gray-100">{exam.title}</h4>
-                        <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                          <span className="capitalize">{exam.type}</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                            {exam.date}
-                          </span>
+                  {exams.map(exam => {
+                    const examUnit = units.find(u => u.id === exam.unit_id);
+                    return (
+                      <div key={exam.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-lg text-gray-900 dark:text-gray-100">{exam.title}</h4>
+                            {examUnit && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300 rounded-md">
+                                {examUnit.name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                            <span className="capitalize">{exam.type}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5" />
+                              {exam.date} {exam.time && `a las ${exam.time}`}
+                            </span>
+                            {exam.location && (
+                              <>
+                                <span>•</span>
+                                <span>{exam.location}</span>
+                              </>
+                            )}
+                          </div>
+                          {exam.notes && (
+                            <p className="text-xs text-gray-400 mt-1 line-clamp-1">{exam.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={async () => {
+                              const newStatus = exam.status === 'completed' ? 'pending' : 'completed';
+                              const updated = { ...exam, status: newStatus as any };
+                              setExams(prev => prev.map(e => e.id === exam.id ? updated : e));
+                              try {
+                                await syncableUpdate('student_exams', updated);
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }}
+                            className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${exam.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}
+                          >
+                            {exam.status === 'completed' ? '✓ Completado' : '⏳ Pendiente'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteExam(exam.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                            title="Eliminar examen"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={async () => {
-                            const newStatus = exam.status === 'completed' ? 'pending' : 'completed';
-                            const updated = { ...exam, status: newStatus as any };
-                            setExams(prev => prev.map(e => e.id === exam.id ? updated : e));
-                            try {
-                              await syncableUpdate('student_exams', updated);
-                            } catch (err) {
-                              console.error(err);
-                            }
-                          }}
-                          className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${exam.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}
-                        >
-                          {exam.status === 'completed' ? '✓ Completado' : '⏳ Pendiente'}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteExam(exam.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
-                          title="Eliminar examen"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
-        {activeTab === 'resources' && (
+
+          {activeTab === 'resources' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium">Recursos (Fase 3)</h3>
+                <h3 className="text-lg font-medium">Recursos y Documentos</h3>
                 <button onClick={() => setIsAddingResource(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
                   + Agregar Recurso
                 </button>
@@ -679,34 +1484,45 @@ export const SubjectWorkspace: React.FC<Props> = ({
               
               {resources.length === 0 ? (
                 <div className="text-center py-20 text-gray-500">
-                  <p>Módulo de Conocimiento. Aquí podrás guardar enlaces, documentos y relacionarlos con tus notas globales.</p>
+                  <p>Guarda enlaces, PDFs, videos y materiales de estudio para esta materia.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {resources.map(resource => (
-                    <div key={resource.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-xl">
-                            {resource.type === 'link' ? '🔗' : resource.type === 'pdf' ? '📄' : resource.type === 'video' ? '▶️' : '📁'}
+                  {resources.map(resource => {
+                    const resUnit = units.find(u => u.id === resource.unit_id);
+                    return (
+                      <div key={resource.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-xl">
+                              {resource.type === 'link' ? '🔗' : resource.type === 'pdf' ? '📄' : resource.type === 'video' ? '▶️' : '📁'}
+                            </div>
+                            <button
+                              onClick={() => handleDeleteResource(resource.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                              title="Eliminar recurso"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => handleDeleteResource(resource.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
-                            title="Eliminar recurso"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                          </button>
+                          <h4 className="font-medium text-gray-900 dark:text-white truncate">{resource.title}</h4>
+                          {resUnit && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded mt-1 inline-block">
+                              {resUnit.name}
+                            </span>
+                          )}
+                          {resource.description && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{resource.description}</p>
+                          )}
+                          {resource.url && (
+                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate block mt-2">
+                              {resource.url} ↗
+                            </a>
+                          )}
                         </div>
-                        <h4 className="font-medium text-gray-900 dark:text-white truncate">{resource.title}</h4>
-                        {resource.url && (
-                          <a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate block mt-1">
-                            {resource.url} ↗
-                          </a>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -762,93 +1578,192 @@ export const SubjectWorkspace: React.FC<Props> = ({
             </div>
           )}
 
-          {activeTab === 'grades' && (
-            <div className="space-y-8">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Calificaciones y Asistencia (Fase 6)</h3>
-                <button onClick={() => setIsAddingGrade(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
-                  + Agregar Calificación
-                </button>
-              </div>
+          {activeTab === 'grades' && (() => {
+            const summary = calculateGradeSummary(subject, categories, grades);
+            const usedWeight = categories.reduce((sum, c) => sum + (c.weight || 0), 0);
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                  {/* Grades List */}
-                  <div className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm">
-                    <h4 className="text-sm font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase mb-4">Registro de Notas</h4>
-                    {grades.length === 0 ? (
-                      <p className="text-sm text-gray-500 py-4 text-center">No hay calificaciones registradas.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {grades.map(grade => (
-                          <div key={grade.id} className="flex justify-between items-center p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5">
+            return (
+              <div className="space-y-6">
+                {/* Grade Summary & Target Projection Banner */}
+                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-white/5">
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1">
+                        Promedio Actual del Curso
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                          {summary.currentAverage !== null ? summary.currentAverage : 'S/N'}
+                        </span>
+                        <span className="text-sm text-gray-400 font-medium">/ {summary.gradeScale}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="px-3 py-1.5 rounded-2xl bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 text-xs font-bold">
+                        {summary.evaluatedPercentage}% Evaluado
+                      </div>
+                      <button
+                        onClick={() => setIsAddingCategory(true)}
+                        className="px-3.5 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-800 dark:text-white rounded-2xl text-xs font-semibold transition-colors"
+                      >
+                        + Categoría
+                      </button>
+                      <button
+                        onClick={() => setIsAddingGrade(true)}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-semibold transition-colors shadow-sm"
+                      >
+                        + Evaluación
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Projection Feedback */}
+                  {summary.targetProjection && (
+                    <div className={`p-3.5 rounded-2xl text-xs font-medium flex items-start gap-2.5 ${
+                      summary.targetProjection.isImpossible
+                        ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50 dark:border-amber-500/20'
+                        : summary.targetProjection.isAchieved
+                        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-500/20'
+                        : 'bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/50 dark:border-blue-500/20'
+                    }`}>
+                      <Target className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold uppercase tracking-wider block text-[10px] mb-0.5">Proyección para tu Meta:</span>
+                        <p className="leading-relaxed">{summary.targetProjection.message}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Categorías de Evaluación */}
+                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white">Categorías y Ponderaciones</h4>
+                      <p className="text-xs text-gray-400 mt-0.5">Ponderación asignada: {usedWeight}% / 100%</p>
+                    </div>
+                    <button
+                      onClick={() => setIsAddingCategory(true)}
+                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      + Nueva
+                    </button>
+                  </div>
+
+                  {categories.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-3 text-center">No has creado categorías todavía (ej. Parciales 40%, Tareas 30%, Examen Final 30%).</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {categories.map(cat => {
+                        const catSummary = summary.categorySummaries.find(cs => cs.category.id === cat.id);
+                        return (
+                          <div key={cat.id} className="p-3.5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 flex items-center justify-between">
                             <div>
-                              <p className="font-medium">{grade.name}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">Peso: {grade.weight}%</p>
+                              <span className="font-bold text-xs text-gray-900 dark:text-white block">{cat.name}</span>
+                              <span className="text-[10px] text-gray-400 font-medium">Peso: {cat.weight}%</span>
                             </div>
-                            <div className="text-right">
-                              <p className="font-semibold text-lg text-gray-900 dark:text-white">{grade.score} <span className="text-sm text-gray-400 font-normal">/ {grade.max_score}</span></p>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400">
+                                {catSummary?.average !== null && catSummary?.average !== undefined ? catSummary.average.toFixed(1) : 'S/N'}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteCategory(cat.id)}
+                                className="text-gray-400 hover:text-red-500 p-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Attendance */}
-                  <div className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm">
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-sm font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase">Asistencia de Hoy</h4>
-                      <div className="text-sm font-medium text-gray-500">{new Date().toLocaleDateString()}</div>
+                        );
+                      })}
                     </div>
-                    <div className="flex gap-3">
-                      <button onClick={() => handleRecordAttendance('present')} className="flex-1 py-3 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 rounded-xl font-medium hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors">Presente</button>
-                      <button onClick={() => handleRecordAttendance('absent')} className="flex-1 py-3 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 rounded-xl font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">Ausente</button>
-                      <button onClick={() => handleRecordAttendance('excused')} className="flex-1 py-3 bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-xl font-medium hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors">Excusa</button>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5 flex justify-between text-sm">
-                      <span className="text-gray-500">Asistencias totales:</span>
-                      <span className="font-medium">{attendances.filter(a => a.status === 'present').length}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="space-y-6">
-                  {/* Summary & Calculator */}
-                  <div className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm">
-                    <h4 className="text-sm font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase mb-4">Resumen</h4>
-                    <div className="mb-6">
-                      <p className="text-xs text-gray-500 mb-1">Nota Acumulada (sobre {totalWeight}%)</p>
-                      <p className="text-4xl font-light">{currentGrade.toFixed(2)}</p>
-                    </div>
-                    
-                    <div className="pt-6 border-t border-gray-100 dark:border-white/5">
-                      <h5 className="font-medium mb-3">Calculadora de Meta</h5>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs text-gray-500 block mb-1">Nota deseada al final</label>
-                          <input type="number" step="0.1" value={targetGrade} onChange={e => setTargetGrade(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] rounded-lg border border-gray-200 dark:border-white/10" />
-                        </div>
-                        {totalWeight < 100 ? (
-                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                            <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Necesitas sacar:</p>
-                            <p className="text-xl font-medium text-blue-700 dark:text-blue-300">
-                              {requiredGradeForTarget > 10 ? '¡Inalcanzable!' : requiredGradeForTarget < 0 ? '0.00' : requiredGradeForTarget.toFixed(2)} <span className="text-sm font-normal">/ 10</span>
-                            </p>
-                            <p className="text-xs text-blue-500/70 mt-1">en el {100 - totalWeight}% restante</p>
+                {/* Registro de Evaluaciones */}
+                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">Evaluaciones Registradas</h4>
+                    <button
+                      onClick={() => setIsAddingGrade(true)}
+                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      + Añadir
+                    </button>
+                  </div>
+
+                  {grades.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-6 text-center">No hay evaluaciones registradas en esta materia.</p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {grades.map(grade => {
+                        const cat = categories.find(c => c.id === grade.category_id);
+                        const isPending = grade.score === null || grade.status === 'pending';
+                        return (
+                          <div key={grade.id} className="p-3.5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-gray-900 dark:text-white truncate">{grade.name}</span>
+                                {cat && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 shrink-0">
+                                    {cat.name} ({cat.weight}%)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-[10px] text-gray-400 mt-1">
+                                {grade.date && <span>📅 {grade.date}</span>}
+                                {grade.notes && <span className="truncate">💬 {grade.notes}</span>}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0">
+                              {isPending ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300">
+                                  ⏳ Pendiente
+                                </span>
+                              ) : (
+                                <div className="text-right">
+                                  <span className="font-extrabold text-sm text-gray-900 dark:text-white block">
+                                    {grade.score} <span className="text-xs text-gray-400 font-normal">/ {grade.max_score}</span>
+                                  </span>
+                                </div>
+                              )}
+                              <button
+                                onClick={() => handleDeleteGrade(grade.id)}
+                                className="text-gray-400 hover:text-red-500 p-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg text-sm text-gray-500">
-                            Ya tienes el 100% de tus notas registradas.
-                          </div>
-                        )}
-                      </div>
+                        );
+                      })}
                     </div>
+                  )}
+                </div>
+
+                {/* Attendance Record */}
+                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white">Asistencia de Hoy</h4>
+                    <span className="text-xs font-medium text-gray-400">{new Date().toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex gap-2.5">
+                    <button onClick={() => handleRecordAttendance('present')} className="flex-1 py-2.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 rounded-2xl text-xs font-bold hover:bg-emerald-100 transition-colors">
+                      Presente
+                    </button>
+                    <button onClick={() => handleRecordAttendance('absent')} className="flex-1 py-2.5 bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 rounded-2xl text-xs font-bold hover:bg-rose-100 transition-colors">
+                      Ausente
+                    </button>
+                    <button onClick={() => handleRecordAttendance('excused')} className="flex-1 py-2.5 bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 rounded-2xl text-xs font-bold hover:bg-amber-100 transition-colors">
+                      Justificado
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           {activeTab === 'flashcards' && (
             <div className="space-y-6">
               {/* If inspecting or practicing a deck */}
@@ -1245,6 +2160,471 @@ export const SubjectWorkspace: React.FC<Props> = ({
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Task Modal */}
+      <AnimatePresence>
+        {isAddingTask && (
+          <div className="fixed inset-0 z-[75] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              className="bg-white dark:bg-[#1A1A1A] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 dark:border-white/10"
+            >
+              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Tarea Académica</h3>
+                <button onClick={() => setIsAddingTask(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg">
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Nombre / Tarea</label>
+                  <input
+                    type="text"
+                    value={newTaskText}
+                    onChange={e => setNewTaskText(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="Ej: Entregar reporte de laboratorio"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Fecha límite</label>
+                    <input
+                      type="date"
+                      value={newTaskDueDate}
+                      onChange={e => setNewTaskDueDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Prioridad</label>
+                    <select
+                      value={newTaskPriority}
+                      onChange={e => setNewTaskPriority(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                    >
+                      <option value="low">Baja</option>
+                      <option value="medium">Media</option>
+                      <option value="high">Alta</option>
+                    </select>
+                  </div>
+                </div>
+
+                {units.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Asociar a Unidad (Opcional)</label>
+                    <select
+                      value={newTaskUnitId}
+                      onChange={e => setNewTaskUnitId(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                    >
+                      <option value="">Sin unidad específica</option>
+                      {units.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTaskMoreOptions(!showTaskMoreOptions)}
+                    className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <span>{showTaskMoreOptions ? 'Ocultar notas' : '+ Añadir notas/instrucciones'}</span>
+                  </button>
+                  {showTaskMoreOptions && (
+                    <textarea
+                      value={newTaskNotes}
+                      onChange={e => setNewTaskNotes(e.target.value)}
+                      rows={2}
+                      className="w-full mt-2 px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Instrucciones del profesor o detalles adicionales..."
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
+                <button onClick={() => setIsAddingTask(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl">Cancelar</button>
+                <button onClick={handleSaveTask} disabled={!newTaskText.trim()} className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">Guardar Tarea</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Project Modal */}
+      <AnimatePresence>
+        {isAddingProject && (
+          <div className="fixed inset-0 z-[75] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              className="bg-white dark:bg-[#1A1A1A] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 dark:border-white/10"
+            >
+              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nuevo Proyecto Académico</h3>
+                <button onClick={() => setIsAddingProject(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg">
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Nombre del proyecto</label>
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={e => setNewProjectName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="Ej: Trabajo de Investigación Semestral"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Descripción</label>
+                  <textarea
+                    value={newProjectDesc}
+                    onChange={e => setNewProjectDesc(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Objetivos, integrantes del equipo o entregables..."
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
+                <button onClick={() => setIsAddingProject(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl">Cancelar</button>
+                <button onClick={handleSaveProject} disabled={!newProjectName.trim()} className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">Guardar Proyecto</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Quick Action Sheet */}
+      <AnimatePresence>
+        {showMobileActionSheet && (
+          <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white dark:bg-[#181818] w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-white/10"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-white/10 mb-4">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Añadir a {subject.name}</h3>
+                <button
+                  onClick={() => setShowMobileActionSheet(false)}
+                  className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => { setShowMobileActionSheet(false); setIsAddingTask(true); }}
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    <CheckSquare className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Tarea</span>
+                    <span className="text-[10px] text-gray-500">Pendiente</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setShowMobileActionSheet(false); setIsAddingExam(true); }}
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Examen</span>
+                    <span className="text-[10px] text-gray-500">Evaluación</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setShowMobileActionSheet(false); onAddNote(null, undefined, subject.id); }}
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Apunte</span>
+                    <span className="text-[10px] text-gray-500">Nota de clase</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setShowMobileActionSheet(false); setIsAddingResource(true); }}
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    <Paperclip className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Recurso</span>
+                    <span className="text-[10px] text-gray-500">Link o archivo</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setShowMobileActionSheet(false); setIsAddingUnit(true); }}
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Unidad</span>
+                    <span className="text-[10px] text-gray-500">Temario</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setShowMobileActionSheet(false); setIsAddingProject(true); }}
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    <FolderKanban className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Proyecto</span>
+                    <span className="text-[10px] text-gray-500">Trabajo indiv/grupo</span>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Category Modal */}
+      <AnimatePresence>
+        {isAddingCategory && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+            >
+              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Categoría de Evaluación</h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Disponible: {100 - categories.reduce((sum, c) => sum + (c.weight || 0), 0)}%
+                </p>
+              </div>
+              <div className="p-6 space-y-4">
+                {categoryError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 rounded-xl text-xs font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{categoryError}</span>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nombre (ej. Parciales, Tareas)</label>
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ej: Exámenes Parciales"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Ponderación / Peso (%)</label>
+                  <input
+                    type="number"
+                    value={newCategoryWeight}
+                    onChange={e => { setNewCategoryWeight(e.target.value); setCategoryError(null); }}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ej: 30"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-2 bg-gray-50 dark:bg-[#111]/50">
+                <button onClick={() => { setIsAddingCategory(false); setCategoryError(null); }} className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
+                <button onClick={handleSaveCategory} disabled={!newCategoryName.trim() || !newCategoryWeight} className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Grade/Evaluation Modal */}
+      <AnimatePresence>
+        {isAddingGrade && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5 max-h-[90vh] flex flex-col"
+            >
+              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Evaluación / Calificación</h3>
+                <button onClick={() => setIsAddingGrade(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4 overflow-y-auto">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nombre de la evaluación *</label>
+                  <input
+                    type="text"
+                    value={newGradeName}
+                    onChange={e => setNewGradeName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ej: Parcial 1"
+                    autoFocus
+                  />
+                </div>
+
+                {categories.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Categoría</label>
+                    <select
+                      value={newGradeCategoryId}
+                      onChange={e => setNewGradeCategoryId(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Sin categoría específica</option>
+                      {categories.map(c => (
+                        <option key={c.id} value={c.id}>{c.name} ({c.weight}%)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Calificación Obtenida</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={newGradeScore}
+                      onChange={e => setNewGradeScore(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Dejar vacío si es pendiente"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Puntaje Máximo</label>
+                    <input
+                      type="number"
+                      value={newGradeMaxScore}
+                      onChange={e => setNewGradeMaxScore(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="10 o 100"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowGradeMoreOptions(!showGradeMoreOptions)}
+                  className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline block pt-1"
+                >
+                  {showGradeMoreOptions ? '- Menos opciones' : '+ Más opciones (Examen, Fecha, Unidad)'}
+                </button>
+
+                {showGradeMoreOptions && (
+                  <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-white/5">
+                    {exams.length > 0 && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Vincular a Examen</label>
+                        <select
+                          value={newGradeExamId}
+                          onChange={e => setNewGradeExamId(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Sin vinculación a examen</option>
+                          {exams.map(e => (
+                            <option key={e.id} value={e.id}>{e.title} ({e.date || 'Sin fecha'})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {units.length > 0 && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Unidad del Temario</label>
+                        <select
+                          value={newGradeUnitId}
+                          onChange={e => setNewGradeUnitId(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Sin unidad específica</option>
+                          {units.map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Fecha de la Evaluación</label>
+                      <input
+                        type="date"
+                        value={newGradeDate}
+                        onChange={e => setNewGradeDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Notas / Observaciones</label>
+                      <input
+                        type="text"
+                        value={newGradeNotes}
+                        onChange={e => setNewGradeNotes(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ej: Incluyó bonus de asistencia"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-2 bg-gray-50 dark:bg-[#111]/50">
+                <button onClick={() => setIsAddingGrade(false)} className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
+                <button onClick={handleSaveGrade} disabled={!newGradeName.trim()} className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Feedback */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 right-6 z-[100] bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 pointer-events-none"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+            <span>{toastMessage}</span>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

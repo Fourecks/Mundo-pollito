@@ -7,7 +7,7 @@ import { Folder, Note, Playlist, QuickNote, Todo } from './types';
 let db: IDBDatabase;
 const DB_NAME_PREFIX = 'PollitoProductivoDB';
 const DB_VERSION = 12; // Incremented version to ensure note_versions and all stores exist
-const STORES = ['todos', 'folders', 'notes', 'note_versions', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'projects', 'habits', 'habit_records', 'student_academic_periods', 'student_subjects', 'student_subject_schedules', 'student_units', 'student_topics', 'student_exams', 'student_resources', 'student_study_sessions', 'student_readings', 'student_grades', 'student_attendance', 'student_decks', 'student_flashcards', 'student_goals', 'student_study_targets'];
+const STORES = ['todos', 'folders', 'notes', 'note_versions', 'playlists', 'quick_notes', 'settings', 'sync_queue', 'projects', 'habits', 'habit_records', 'student_academic_periods', 'student_subjects', 'student_subject_schedules', 'student_units', 'student_topics', 'student_exams', 'student_resources', 'student_study_sessions', 'student_readings', 'student_grades', 'student_grade_categories', 'student_attendance', 'student_decks', 'student_flashcards', 'student_goals', 'student_study_targets'];
 
 // --- Types for Sync Queue ---
 interface SyncOperation {
@@ -88,7 +88,7 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'kanban_columns', 'sprints', 'milestones', 'docs', 'inbox', 'activities', 
         'members', 'template_type', 'goal_id', 'channels', 'chat_messages', 'polls',
         'huddles', 'expenses', 'time_entries', 'doc_folders', 'quarterly_priorities',
-        'lists', 'todos', 'owner_email', 'owner_name', 'project_mode', 'is_pinned_home'
+        'lists', 'todos', 'owner_email', 'owner_name', 'project_mode', 'is_pinned_home', 'subject_id'
     ]),
     project_invitations: new Set([
         'id', 'project_id', 'project_name', 'project_emoji', 'project_color',
@@ -132,13 +132,13 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'id', 'user_id', 'name', 'start_date', 'end_date', 'is_active', 'created_at'
     ]),
     student_subjects: new Set([
-        'id', 'user_id', 'period_id', 'name', 'code', 'professor', 'room', 'color', 'emoji', 'description', 'target_grade', 'created_at'
+        'id', 'user_id', 'period_id', 'name', 'code', 'professor', 'room', 'color', 'emoji', 'description', 'target_grade', 'grade_scale', 'status', 'created_at'
     ]),
     student_subject_schedules: new Set([
         'id', 'subject_id', 'day_of_week', 'start_time', 'end_time', 'room'
     ]),
     student_units: new Set([
-        'id', 'subject_id', 'name', 'order_index', 'description'
+        'id', 'subject_id', 'name', 'order_index', 'description', 'status'
     ]),
     student_topics: new Set([
         'id', 'unit_id', 'name', 'status', 'order_index'
@@ -153,10 +153,13 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'id', 'user_id', 'subject_id', 'unit_id', 'topic_id', 'duration_minutes', 'start_time', 'end_time', 'objective', 'notes', 'status', 'created_at'
     ]),
     student_readings: new Set([
-        'id', 'user_id', 'subject_id', 'title', 'author', 'type', 'status', 'total_pages', 'current_page', 'link', 'created_at'
+        'id', 'user_id', 'subject_id', 'unit_id', 'title', 'author', 'type', 'status', 'total_pages', 'current_page', 'link', 'notes', 'created_at'
+    ]),
+    student_grade_categories: new Set([
+        'id', 'user_id', 'subject_id', 'name', 'weight', 'created_at'
     ]),
     student_grades: new Set([
-        'id', 'user_id', 'subject_id', 'name', 'score', 'max_score', 'weight', 'created_at'
+        'id', 'user_id', 'subject_id', 'category_id', 'exam_id', 'unit_id', 'name', 'score', 'max_score', 'weight', 'date', 'notes', 'status', 'created_at'
     ]),
     student_attendance: new Set([
         'id', 'user_id', 'subject_id', 'date', 'status', 'created_at'
@@ -168,7 +171,7 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'id', 'deck_id', 'front', 'back', 'status', 'next_review', 'created_at'
     ]),
     student_goals: new Set([
-        'id', 'user_id', 'period_id', 'title', 'description', 'target_date', 'status', 'created_at'
+        'id', 'user_id', 'period_id', 'subject_id', 'project_id', 'reading_id', 'title', 'description', 'type', 'target_value', 'current_value', 'target_date', 'status', 'created_at'
     ]),
     student_study_targets: new Set([
         'id', 'user_id', 'period_id', 'weekly_hours_target', 'min_attendance_rate', 'target_gpa', 'updated_at'
