@@ -818,6 +818,19 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
   const [showMobileTxFilters, setShowMobileTxFilters] = useState(false);
 
   // --- Modal & Bottom Sheet States ---
+  // --- Mobile Pinned Modules ---
+  const [pinnedModules, setPinnedModules] = useState<string[]>(() => {
+    try {
+      const cached = localStorage.getItem("finance_pinned_mobile_modules");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return ["balance", "this_month", "upcoming_payments", "recent_transactions"];
+  });
+  const [showPinConfigModal, setShowPinConfigModal] = useState(false);
+
   const [showTxModal, setShowTxModal] = useState(false);
   const [txType, setTxType] = useState<TransactionType>("EXPENSE");
   const [showAdvancedTx, setShowAdvancedTx] = useState(false);
@@ -5324,271 +5337,580 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
 
   const renderMobileDebts = () => renderMobileCards();
 
+  const renderBudgetsProgressWidget = () => {
+    const curBudget = budgets.find((b) => b.month === currentMonthPrefix);
+    return (
+      <div className="space-y-1.5" key="budgets_progress">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+            Presupuesto mensual
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMainTab("planning");
+              setMobilePlanSubView("budgets");
+              setActiveTab("planning");
+            }}
+            className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
+          >
+            Ver presupuesto
+          </button>
+        </div>
+
+        <div 
+          onClick={() => {
+            setMobileMainTab("planning");
+            setMobilePlanSubView("budgets");
+            setActiveTab("planning");
+          }}
+          className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-sm cursor-pointer hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
+        >
+          {!curBudget || curBudget.total_amount_cents <= 0 ? (
+            <div className="text-center py-2">
+              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                Sin presupuesto global para este mes.
+              </p>
+              <span className="inline-block mt-2 text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                Configurar ahora
+              </span>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-gray-700 dark:text-zinc-300">
+                  Límite: {formatCurrency(curBudget.total_amount_cents)}
+                </span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {budgetProgress}% usado
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 rounded-full ${
+                    budgetProgress >= 100
+                      ? "bg-red-500"
+                      : budgetProgress >= 85
+                      ? "bg-amber-500"
+                      : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${budgetProgress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-gray-500 dark:text-zinc-400">
+                <span>Gastado: {formatCurrency(expensesThisMonth)}</span>
+                <span>Disponible: {formatCurrency(Math.max(0, curBudget.total_amount_cents - expensesThisMonth))}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMyAccountsWidget = () => {
+    return (
+      <div className="space-y-1.5" key="my_accounts">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+            Mis cuentas
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreateAccountModal(true);
+            }}
+            className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
+          >
+            Nueva cuenta
+          </button>
+        </div>
+
+        {accounts.length === 0 ? (
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 text-center">
+            <p className="text-xs text-gray-500 dark:text-zinc-400">
+              No tienes cuentas configuradas.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-sm overflow-hidden">
+            {accounts.slice(0, 4).map((acc) => {
+              const isCredit = acc.type === "credit";
+              const limit = acc.credit_limit_cents || 0;
+              const used = Math.max(0, acc.balance_cents);
+              const available = isCredit ? Math.max(0, limit - used) : acc.balance_cents;
+              return (
+                <div
+                  key={acc.id}
+                  onClick={() => {
+                    setSelectedMobileAccount(acc);
+                    setShowAccountTxList(true);
+                  }}
+                  className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer min-h-[44px]"
+                >
+                  <div className="min-w-0 pr-2">
+                    <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                      {acc.name}
+                    </p>
+                    <p className="text-[10px] text-gray-400 dark:text-zinc-500 uppercase font-semibold">
+                      {acc.type === "cash" ? "Efectivo" : acc.type === "credit" ? "Tarjeta de crédito" : "Cuenta bancaria"}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-bold text-gray-900 dark:text-white">
+                      {formatCurrency(available)}
+                    </p>
+                    {isCredit && (
+                      <p className="text-[9px] text-gray-400 dark:text-zinc-500">
+                        Límite: {formatCurrency(limit)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSavingsGoalsWidget = () => {
+    return (
+      <div className="space-y-1.5" key="savings_goals">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+            Metas de ahorro
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMainTab("planning");
+              setMobilePlanSubView("savings");
+              setActiveTab("planning");
+            }}
+            className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
+          >
+            Ver todas
+          </button>
+        </div>
+
+        {savingsGoals.length === 0 ? (
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 text-center">
+            <p className="text-xs text-gray-500 dark:text-zinc-400">
+              No tienes metas de ahorro activas.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-3.5 shadow-sm space-y-3">
+            {savingsGoals.slice(0, 3).map((goal) => {
+              const progress = Math.min(
+                100,
+                Math.round((goal.current_amount_cents / goal.target_amount_cents) * 100)
+              );
+              return (
+                <div key={goal.id} className="space-y-1">
+                  <div className="flex justify-between items-center text-[11px] font-semibold text-gray-700 dark:text-zinc-300">
+                    <span className="truncate">{goal.emoji || "🎯"} {goal.name}</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 rounded-full" 
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-gray-400 dark:text-zinc-500">
+                    <span>{formatCurrency(goal.current_amount_cents)}</span>
+                    <span>Meta: {formatCurrency(goal.target_amount_cents)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderActiveLoansWidget = () => {
+    return (
+      <div className="space-y-1.5" key="active_loans">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+            Préstamos y Créditos
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMainTab("more");
+              setMobileMoreSubView("debts");
+              setActiveTab("debts");
+            }}
+            className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
+          >
+            Ver todos
+          </button>
+        </div>
+
+        {debts.length === 0 ? (
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 text-center">
+            <p className="text-xs text-gray-500 dark:text-zinc-400">
+              No tienes préstamos ni créditos registrados.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-sm overflow-hidden">
+            {debts.slice(0, 3).map((debt) => {
+              const isOwed = debt.type === "OWED";
+              const progress = Math.min(
+                100,
+                Math.round(((debt.amount_cents - debt.remaining_cents) / debt.amount_cents) * 100)
+              );
+              return (
+                <div
+                  key={debt.id}
+                  className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer"
+                  onClick={() => {
+                    setMobileMainTab("more");
+                    setMobileMoreSubView("debts");
+                    setActiveTab("debts");
+                  }}
+                >
+                  <div className="min-w-0 pr-2">
+                    <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                      {debt.name}
+                    </p>
+                    <p className={`text-[10px] font-semibold ${isOwed ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                      {isOwed ? "Me deben" : "Debo"} · {progress}% pagado
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-bold text-gray-900 dark:text-white">
+                      {formatCurrency(debt.remaining_cents)}
+                    </p>
+                    <p className="text-[9px] text-gray-400 dark:text-zinc-500">
+                      Total: {formatCurrency(debt.amount_cents)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderMobileOverview = () => {
     const netMonthCents = incomeThisMonth - expensesThisMonth;
 
     return (
       <div className="space-y-4 pb-32 animate-in fade-in duration-200">
-        {/* 1. BALANCE PRINCIPAL */}
-        <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
-                Balance total
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsPrivacyMode(!isPrivacyMode)}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg transition-colors cursor-pointer"
-                title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
-                aria-label={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
-              >
-                {isPrivacyMode ? (
-                  <EyeOffIcon className="w-3.5 h-3.5" />
-                ) : (
-                  <EyeIcon className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-1 truncate">
-              {formatCurrency(totalBalanceCents)}
-            </div>
-            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-              Disponible entre tus cuentas
-            </p>
-          </div>
+        {pinnedModules.map((moduleId) => {
+          if (moduleId === "balance") {
+            return (
+              <div key="balance" className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+                      Balance total
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsPrivacyMode(!isPrivacyMode)}
+                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg transition-colors cursor-pointer"
+                      title={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+                      aria-label={isPrivacyMode ? "Mostrar montos" : "Ocultar montos"}
+                    >
+                      {isPrivacyMode ? (
+                        <EyeOffIcon className="w-3.5 h-3.5" />
+                      ) : (
+                        <EyeIcon className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-1 truncate">
+                    {formatCurrency(totalBalanceCents)}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                    Disponible entre tus cuentas
+                  </p>
+                </div>
 
-          <button
-            type="button"
-            onClick={() => setShowNewTxTypeSheet(true)}
-            className="shrink-0 flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2.5 rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
-            aria-label="Nuevo movimiento"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo</span>
-          </button>
-        </div>
-
-        {/* 2. RESUMEN DEL MES (3 COLUMNAS: INGRESOS, GASTOS, DISPONIBLE) */}
-        <div className="space-y-1.5">
-          <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400 px-1">
-            Este mes
-          </span>
-          <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-3.5 shadow-sm">
-            <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-zinc-800/80">
-              {/* Ingresos */}
-              <div className="space-y-1 pr-2.5">
-                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
-                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span className="truncate">Ingresos</span>
-                </div>
-                <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white tracking-tight truncate">
-                  {formatCurrency(incomeThisMonth)}
-                </div>
-              </div>
-
-              {/* Gastos */}
-              <div className="space-y-1 px-2.5">
-                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
-                  <ArrowDownRight className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                  <span className="truncate">Gastos</span>
-                </div>
-                <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white tracking-tight truncate">
-                  {formatCurrency(expensesThisMonth)}
-                </div>
-              </div>
-
-              {/* Disponible */}
-              <div className="space-y-1 pl-2.5">
-                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
-                  <span className="truncate">Disponible</span>
-                </div>
-                <div
-                  className={`text-xs sm:text-sm font-bold tracking-tight truncate ${
-                    netMonthCents >= 0
-                      ? "text-gray-900 dark:text-white"
-                      : "text-red-500 dark:text-red-400"
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => setShowNewTxTypeSheet(true)}
+                  className="shrink-0 flex items-center gap-1.5 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2.5 rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  aria-label="Nuevo movimiento"
                 >
-                  {formatCurrency(netMonthCents)}
+                  <Plus className="w-4 h-4" />
+                  <span>Nuevo</span>
+                </button>
+              </div>
+            );
+          }
+
+          if (moduleId === "this_month") {
+            return (
+              <div key="this_month" className="space-y-1.5 animate-in fade-in duration-200">
+                <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400 px-1">
+                  Este mes
+                </span>
+                <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl p-3.5 shadow-sm">
+                  <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-zinc-800/80">
+                    {/* Ingresos */}
+                    <div className="space-y-1 pr-2.5">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
+                        <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="truncate">Ingresos</span>
+                      </div>
+                      <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white tracking-tight truncate">
+                        {formatCurrency(incomeThisMonth)}
+                      </div>
+                    </div>
+
+                    {/* Gastos */}
+                    <div className="space-y-1 px-2.5">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
+                        <ArrowDownRight className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                        <span className="truncate">Gastos</span>
+                      </div>
+                      <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white tracking-tight truncate">
+                        {formatCurrency(expensesThisMonth)}
+                      </div>
+                    </div>
+
+                    {/* Disponible */}
+                    <div className="space-y-1 pl-2.5">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-zinc-400 font-medium">
+                        <span className="truncate">Disponible</span>
+                      </div>
+                      <div
+                        className={`text-xs sm:text-sm font-bold tracking-tight truncate ${
+                          netMonthCents >= 0
+                            ? "text-gray-900 dark:text-white"
+                            : "text-red-500 dark:text-red-400"
+                        }`}
+                      >
+                        {formatCurrency(netMonthCents)}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
+            );
+          }
 
-        {/* 4. PRÓXIMOS PAGOS */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
-              Próximos pagos
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMainTab("more");
-                setMobileMoreSubView("upcoming_payments");
-                setActiveTab("upcoming_payments" as any);
-              }}
-              className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
-            >
-              Ver todos
-            </button>
-          </div>
-
-          {upcomingPayments.length === 0 ? (
-            <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl text-center">
-              <p className="text-xs text-gray-500 dark:text-zinc-400">
-                No tienes pagos próximos.
-              </p>
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-sm overflow-hidden">
-              {upcomingPayments.map((item) => {
-                const dateInfo = formatPaymentDateBadge(item.dateStr);
-                return (
+          if (moduleId === "upcoming_payments") {
+            return (
+              <div key="upcoming_payments" className="space-y-1.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+                    Próximos pagos
+                  </span>
                   <button
-                    key={item.id}
                     type="button"
                     onClick={() => {
-                      if (item.source === "subscription") {
-                        setMobileMainTab("planning");
-                        setMobilePlanSubView("subscriptions");
-                        setActiveTab("planning");
-                      } else if (item.source === "installment") {
-                        setMobileMainTab("planning");
-                        setMobilePlanSubView("installments");
-                        setActiveTab("planning");
-                      } else if (item.source === "debt") {
-                        setMobileMainTab("more");
-                        setMobileMoreSubView("debts");
-                        setActiveTab("debts");
-                      } else {
-                        setMobileMainTab("planning");
-                        setMobilePlanSubView("calendar");
-                        setActiveTab("planning");
-                      }
+                      setMobileMainTab("more");
+                      setMobileMoreSubView("upcoming_payments");
+                      setActiveTab("upcoming_payments" as any);
                     }}
-                    className="w-full flex items-center justify-between p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors text-left cursor-pointer min-h-[48px]"
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
                   >
-                    <div className="flex items-center gap-3 min-w-0 pr-2">
-                      <div className="w-10 text-center shrink-0">
-                        <div className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
-                          {dateInfo.day}
-                        </div>
-                        <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase leading-tight tracking-wider">
-                          {dateInfo.month}
-                        </div>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                          {item.name}
-                        </div>
-                        {item.subLabel && (
-                          <div className="text-[11px] text-gray-400 dark:text-zinc-500 truncate">
-                            {item.subLabel}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {formatCurrency(item.amount_cents)}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0" />
-                    </div>
+                    Ver todos
                   </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                </div>
 
-        {/* 5. MOVIMIENTOS RECIENTES */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
-              Movimientos recientes
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMainTab("transactions");
-                setActiveTab("transactions");
-              }}
-              className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
-            >
-              Ver todos
-            </button>
-          </div>
+                {upcomingPayments.length === 0 ? (
+                  <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl text-center">
+                    <p className="text-xs text-gray-500 dark:text-zinc-400">
+                      No tienes pagos próximos.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-sm overflow-hidden">
+                    {upcomingPayments.map((item) => {
+                      const dateInfo = formatPaymentDateBadge(item.dateStr);
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            if (item.source === "subscription") {
+                              setMobileMainTab("planning");
+                              setMobilePlanSubView("subscriptions");
+                              setActiveTab("planning");
+                            } else if (item.source === "installment") {
+                              setMobileMainTab("planning");
+                              setMobilePlanSubView("installments");
+                              setActiveTab("planning");
+                            } else if (item.source === "debt") {
+                              setMobileMainTab("more");
+                              setMobileMoreSubView("debts");
+                              setActiveTab("debts");
+                            } else {
+                              setMobileMainTab("planning");
+                              setMobilePlanSubView("calendar");
+                              setActiveTab("planning");
+                            }
+                          }}
+                          className="w-full flex items-center justify-between p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors text-left cursor-pointer min-h-[48px]"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 pr-2">
+                            <div className="w-10 text-center shrink-0">
+                              <div className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
+                                {dateInfo.day}
+                              </div>
+                              <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase leading-tight tracking-wider">
+                                {dateInfo.month}
+                              </div>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                {item.name}
+                              </div>
+                              {item.subLabel && (
+                                <div className="text-[11px] text-gray-400 dark:text-zinc-500 truncate">
+                                  {item.subLabel}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                              {formatCurrency(item.amount_cents)}
+                            </span>
+                            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-zinc-500 shrink-0" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
 
-          {transactions.length === 0 ? (
-            <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl text-center space-y-2">
-              <p className="text-xs text-gray-500 dark:text-zinc-400">
-                Aún no tienes movimientos.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setTxType("EXPENSE");
-                  setShowTxModal(true);
-                }}
-                className="text-xs font-semibold text-gray-900 dark:text-white underline hover:opacity-80 cursor-pointer"
-              >
-                Registrar movimiento
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-sm overflow-hidden">
-              {transactions.slice(0, 4).map((tx) => {
-                const isExpense = tx.type === "EXPENSE" || tx.type === "TRANSFER_OUT";
-                const cat = categories.find((c) => c.id === tx.category_id);
-                const acc = accounts.find((a) => a.id === tx.account_id);
-                const title = tx.description || cat?.name || "Movimiento";
-                const dateShort = formatTxDateShort(tx.date);
-                const accName = acc?.name || "Cuenta";
-
-                return (
-                  <div
-                    key={tx.id}
+          if (moduleId === "recent_transactions") {
+            return (
+              <div key="recent_transactions" className="space-y-1.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">
+                    Movimientos recientes
+                  </span>
+                  <button
+                    type="button"
                     onClick={() => {
                       setMobileMainTab("transactions");
                       setActiveTab("transactions");
                     }}
-                    className="flex items-center justify-between p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer min-h-[48px]"
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer py-1"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                      <span className="text-xs font-bold shrink-0">
-                        {isExpense ? (
-                          <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />
-                        ) : (
-                          <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
-                        )}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                          {title}
-                        </div>
-                        <div className="text-[11px] text-gray-400 dark:text-zinc-500 truncate">
-                          {accName} · {dateShort}
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      className={`text-sm font-semibold shrink-0 ${
-                        isExpense
-                          ? "text-gray-900 dark:text-white"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }`}
+                    Ver todos
+                  </button>
+                </div>
+
+                {transactions.length === 0 ? (
+                  <div className="p-4 bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl text-center space-y-2">
+                    <p className="text-xs text-gray-500 dark:text-zinc-400">
+                      Aún no tienes movimientos.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTxType("EXPENSE");
+                        setShowTxModal(true);
+                      }}
+                      className="text-xs font-semibold text-gray-900 dark:text-white underline hover:opacity-80 cursor-pointer"
                     >
-                      {isExpense ? "-" : "+"}
-                      {formatCurrency(tx.amount_cents)}
-                    </div>
+                      Registrar movimiento
+                    </button>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ) : (
+                  <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200/90 dark:border-zinc-800 rounded-2xl divide-y divide-gray-100 dark:divide-zinc-800/70 shadow-sm overflow-hidden">
+                    {transactions.slice(0, 4).map((tx) => {
+                      const isExpense = tx.type === "EXPENSE" || tx.type === "TRANSFER_OUT";
+                      const cat = categories.find((c) => c.id === tx.category_id);
+                      const acc = accounts.find((a) => a.id === tx.account_id);
+                      const title = tx.description || cat?.name || "Movimiento";
+                      const dateShort = formatTxDateShort(tx.date);
+                      const accName = acc?.name || "Cuenta";
+
+                      return (
+                        <div
+                          key={tx.id}
+                          onClick={() => {
+                            setMobileMainTab("transactions");
+                            setActiveTab("transactions");
+                          }}
+                          className="flex items-center justify-between p-3.5 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer min-h-[48px]"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <span className="text-xs font-bold shrink-0">
+                              {isExpense ? (
+                                <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />
+                              ) : (
+                                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
+                              )}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                {title}
+                              </div>
+                              <div className="text-[11px] text-gray-400 dark:text-zinc-500 truncate">
+                                {accName} · {dateShort}
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            className={`text-sm font-semibold shrink-0 ${
+                              isExpense
+                                ? "text-gray-900 dark:text-white"
+                                : "text-emerald-600 dark:text-emerald-500"
+                            }`}
+                          >
+                            {isExpense ? "-" : "+"}
+                            {formatCurrency(tx.amount_cents)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          if (moduleId === "budgets_progress") {
+            return renderBudgetsProgressWidget();
+          }
+
+          if (moduleId === "my_accounts") {
+            return renderMyAccountsWidget();
+          }
+
+          if (moduleId === "savings_goals") {
+            return renderSavingsGoalsWidget();
+          }
+
+          if (moduleId === "active_loans") {
+            return renderActiveLoansWidget();
+          }
+
+          return null;
+        })}
+
+        {/* CUSTOMIZE HOME SCREEN BUTTON */}
+        <div className="pt-2 pb-6">
+          <button
+            type="button"
+            onClick={() => setShowPinConfigModal(true)}
+            className="w-full py-3.5 px-4 bg-gray-50 hover:bg-gray-100 dark:bg-zinc-900/60 dark:hover:bg-zinc-900 border border-gray-200/80 dark:border-zinc-800 rounded-2xl text-xs font-semibold text-gray-700 dark:text-zinc-300 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <Settings className="w-4 h-4 text-gray-400" />
+            <span>Personalizar Pantalla de Inicio</span>
+          </button>
         </div>
       </div>
     );
@@ -16298,6 +16620,216 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ onClose, isMobile:
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* Customizable Home Screen Modules Modal */}
+      <AnimatePresence>
+        {showPinConfigModal && (() => {
+          const allModules = [
+            { id: "balance", name: "Balance Total", emoji: "💰", desc: "Balance general y botón para nuevo movimiento" },
+            { id: "this_month", name: "Resumen del Mes", emoji: "📊", desc: "Ingresos, gastos y saldo neto disponible" },
+            { id: "upcoming_payments", name: "Próximos Pagos", emoji: "📅", desc: "Cuotas, suscripciones y deudas por pagar" },
+            { id: "recent_transactions", name: "Movimientos Recientes", emoji: "🔄", desc: "Lista de transacciones más recientes" },
+            { id: "budgets_progress", name: "Presupuesto Mensual", emoji: "📈", desc: "Progreso y límites del presupuesto mensual" },
+            { id: "my_accounts", name: "Mis Cuentas", emoji: "💳", desc: "Balances individuales de tus cuentas activas" },
+            { id: "savings_goals", name: "Metas de Ahorro", emoji: "🎯", desc: "Progreso acumulado de tus metas de ahorro" },
+            { id: "active_loans", name: "Préstamos y Créditos", emoji: "🤝", desc: "Deudas personales y préstamos por cobrar" },
+          ];
+
+          const unpinnedModules = allModules.filter(m => !pinnedModules.includes(m.id));
+
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPinConfigModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100020] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+            >
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 280 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-[#0a0a0a] rounded-t-[28px] sm:rounded-3xl p-6 w-full max-w-full sm:max-w-md border-t sm:border border-gray-200 dark:border-zinc-800 space-y-4 shadow-2xl flex flex-col max-h-[85vh]"
+              >
+                <div className="w-12 h-1.5 bg-gray-300 dark:bg-zinc-700 rounded-full mx-auto -mt-2 mb-1 cursor-grab shrink-0" />
+
+                <div className="flex justify-between items-center border-b border-gray-100 dark:border-zinc-900 pb-3 shrink-0">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                      Personalizar Inicio Móvil
+                    </h3>
+                    <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-0.5">
+                      Fija y reordena las tarjetas a tu gusto
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPinConfigModal(false)}
+                    className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+                  >
+                    <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+                  {/* Seccion 1: Modulos activos */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                      Tarjetas Activas (Orden de aparición)
+                    </span>
+                    {pinnedModules.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-3 text-center bg-gray-50 dark:bg-zinc-900/50 rounded-xl border border-dashed border-gray-200 dark:border-zinc-800">
+                        No hay tarjetas fijadas. Agrega algunas abajo.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {pinnedModules.map((id, index) => {
+                          const m = allModules.find(item => item.id === id);
+                          if (!m) return null;
+                          return (
+                            <div
+                              key={id}
+                              className="flex items-center justify-between p-3 bg-gray-50/70 dark:bg-zinc-900/40 rounded-xl border border-gray-200/50 dark:border-zinc-800/50"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                <span className="text-lg shrink-0">{m.emoji}</span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                                    {m.name}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={index === 0}
+                                  onClick={() => {
+                                    const nextIndex = index - 1;
+                                    const updated = [...pinnedModules];
+                                    const temp = updated[index];
+                                    updated[index] = updated[nextIndex];
+                                    updated[nextIndex] = temp;
+                                    setPinnedModules(updated);
+                                    localStorage.setItem("finance_pinned_mobile_modules", JSON.stringify(updated));
+                                  }}
+                                  className={`p-1.5 rounded-lg border border-gray-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer ${
+                                    index === 0 ? "opacity-30 pointer-events-none" : ""
+                                  }`}
+                                >
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={index === pinnedModules.length - 1}
+                                  onClick={() => {
+                                    const nextIndex = index + 1;
+                                    const updated = [...pinnedModules];
+                                    const temp = updated[index];
+                                    updated[index] = updated[nextIndex];
+                                    updated[nextIndex] = temp;
+                                    setPinnedModules(updated);
+                                    localStorage.setItem("finance_pinned_mobile_modules", JSON.stringify(updated));
+                                  }}
+                                  className={`p-1.5 rounded-lg border border-gray-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer ${
+                                    index === pinnedModules.length - 1 ? "opacity-30 pointer-events-none" : ""
+                                  }`}
+                                >
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = pinnedModules.filter(item => item !== id);
+                                    setPinnedModules(updated);
+                                    localStorage.setItem("finance_pinned_mobile_modules", JSON.stringify(updated));
+                                  }}
+                                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg border border-red-100 dark:border-red-950/30 transition-all cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Seccion 2: Modulos disponibles */}
+                  <div className="space-y-2 pt-2">
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                      Módulos Disponibles para Fijar
+                    </span>
+                    {unpinnedModules.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-3 text-center">
+                        Has fijado todos los módulos disponibles.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {unpinnedModules.map((m) => (
+                          <div
+                            key={m.id}
+                            className="flex items-center justify-between p-3 bg-white dark:bg-[#0b0b0b] rounded-xl border border-gray-150 dark:border-zinc-850 hover:border-gray-300 dark:hover:border-zinc-700 transition-all"
+                          >
+                            <div className="flex items-start gap-2.5 min-w-0 pr-3">
+                              <span className="text-lg shrink-0 mt-0.5">{m.emoji}</span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                                  {m.name}
+                                </p>
+                                <p className="text-[10px] text-gray-400 dark:text-zinc-500 line-clamp-1 mt-0.5 leading-tight">
+                                  {m.desc}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...pinnedModules, m.id];
+                                setPinnedModules(updated);
+                                localStorage.setItem("finance_pinned_mobile_modules", JSON.stringify(updated));
+                              }}
+                              className="shrink-0 flex items-center gap-1 py-1 px-2.5 text-[10px] font-bold text-white dark:text-gray-900 bg-gray-900 dark:bg-white hover:bg-black dark:hover:bg-gray-100 rounded-full cursor-pointer transition-all active:scale-95 shadow-2xs"
+                            >
+                              <span>+ Fijar</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Acciones del bottom */}
+                <div className="flex gap-2.5 pt-3 border-t border-gray-100 dark:border-zinc-900 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const defaults = ["balance", "this_month", "upcoming_payments", "recent_transactions"];
+                      setPinnedModules(defaults);
+                      localStorage.setItem("finance_pinned_mobile_modules", JSON.stringify(defaults));
+                    }}
+                    className="flex-1 py-2.5 px-4 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:text-zinc-400 dark:hover:text-white bg-gray-50 dark:bg-zinc-900 rounded-xl transition-all border border-gray-200/60 dark:border-zinc-800 text-center cursor-pointer"
+                  >
+                    Restablecer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPinConfigModal(false)}
+                    className="flex-1 py-2.5 px-4 text-xs font-bold text-white dark:text-gray-900 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 rounded-xl transition-all text-center cursor-pointer"
+                  >
+                    Listo
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
 
       </FinancePortal>
