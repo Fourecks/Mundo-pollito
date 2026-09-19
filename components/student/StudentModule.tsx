@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SubjectWorkspace } from './SubjectWorkspace';
 import { AcademicAnalytics } from './AcademicAnalytics';
 import { computeGoalProgress } from './utils/goalProgress';
+import { calculateGradeSummary } from './utils/gradeCalculator';
 import { ChevronLeft, ChevronRight, Plus, X, Calendar, BookOpen, Target, BarChart2, CheckCircle2, Trash2 } from 'lucide-react';
 
 interface StudentModuleProps {
