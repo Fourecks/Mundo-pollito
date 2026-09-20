@@ -1199,7 +1199,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                         className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shrink-0">
+                          <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center text-sm font-bold shrink-0">
                             <Calendar className="w-4 h-4" />
                           </div>
                           <div>
@@ -1215,7 +1215,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                         className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold shrink-0">
+                          <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center text-sm font-bold shrink-0">
                             <Target className="w-4 h-4" />
                           </div>
                           <div>
@@ -1238,7 +1238,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 flex items-center justify-center text-sm font-bold shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center text-sm font-bold shrink-0">
                           <BookOpen className="w-4 h-4" />
                         </div>
                         <div>
@@ -1260,7 +1260,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm font-bold shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center text-sm font-bold shrink-0">
                           <BarChart2 className="w-4 h-4" />
                         </div>
                         <div>
@@ -1278,98 +1278,102 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
         </div>
       </div>
       
-      {/* Add Subject Modal */}
+      {/* Add Subject Bottom Sheet */}
       <AnimatePresence>
         {isAddingSubject && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl pb-safe"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Nueva Materia</h3>
-                <button onClick={() => setIsAddingSubject(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-white/20 rounded-full mx-auto my-1 shrink-0 sm:hidden" />
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/10">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Materia</h3>
+                <button onClick={() => setIsAddingSubject(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre de la materia *</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Nombre de la materia *</label>
                   <input 
                     type="text" 
                     value={newSubjectName} 
                     onChange={e => setNewSubjectName(e.target.value)} 
                     onKeyDown={e => { if (e.key === 'Enter' && newSubjectName.trim()) handleSaveSubject(); }}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
                     placeholder="Ej: Matemáticas Discretas" 
                     autoFocus 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Profesor (Opcional)</label>
-                  <input type="text" value={newSubjectProfessor} onChange={e => setNewSubjectProfessor(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Carlos Pérez" />
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Profesor (Opcional)</label>
+                  <input type="text" value={newSubjectProfessor} onChange={e => setNewSubjectProfessor(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" placeholder="Ej: Carlos Pérez" />
                 </div>
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Color</label>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Color de materia</label>
                     <div className="flex items-center gap-2">
                       <input type="color" value={newSubjectColor} onChange={e => setNewSubjectColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer bg-transparent border-0 p-0" />
-                      <span className="text-xs text-gray-500">{newSubjectColor}</span>
+                      <span className="text-xs font-mono text-gray-500">{newSubjectColor}</span>
                     </div>
                   </div>
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Emoji</label>
-                    <input type="text" value={newSubjectEmoji} onChange={e => setNewSubjectEmoji(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-lg" placeholder="💻" maxLength={2} />
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Icono / Emoji</label>
+                    <input type="text" value={newSubjectEmoji} onChange={e => setNewSubjectEmoji(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-center text-lg" placeholder="💻" maxLength={2} />
                   </div>
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingSubject(false)} className="px-4 py-2 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
-                <button onClick={handleSaveSubject} disabled={!newSubjectName.trim()} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer">Guardar Materia</button>
+              <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
+                <button onClick={() => setIsAddingSubject(false)} className="px-4 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
+                <button onClick={handleSaveSubject} disabled={!newSubjectName.trim()} className="px-5 py-2.5 text-xs font-bold bg-black text-white dark:bg-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer">Guardar Materia</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Reading Modal */}
+      {/* Add Reading Bottom Sheet */}
       <AnimatePresence>
         {isAddingReading && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl pb-safe"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Guardar Lectura / Libro</h3>
-                <button onClick={() => setIsAddingReading(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-white/20 rounded-full mx-auto my-1 shrink-0 sm:hidden" />
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/10">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Guardar Lectura / Libro</h3>
+                <button onClick={() => setIsAddingReading(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Título *</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Título *</label>
                   <input 
                     type="text" 
                     value={newReadingTitle} 
                     onChange={e => setNewReadingTitle(e.target.value)} 
                     onKeyDown={e => { if (e.key === 'Enter' && newReadingTitle.trim()) handleSaveReading(); }}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
                     placeholder="Ej: Clean Code" 
                     autoFocus 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autor (Opcional)</label>
-                  <input type="text" value={newReadingAuthor} onChange={e => setNewReadingAuthor(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Robert C. Martin" />
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Autor (Opcional)</label>
+                  <input type="text" value={newReadingAuthor} onChange={e => setNewReadingAuthor(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" placeholder="Ej: Robert C. Martin" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Materia relacionada (Opcional)</label>
-                  <select value={newReadingSubjectId} onChange={e => setNewReadingSubjectId(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Materia relacionada (Opcional)</label>
+                  <select value={newReadingSubjectId} onChange={e => setNewReadingSubjectId(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm">
                     <option value="">Ninguna</option>
                     {subjects.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -1377,39 +1381,41 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                   </select>
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingReading(false)} className="px-4 py-2 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
-                <button onClick={handleSaveReading} disabled={!newReadingTitle.trim()} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer">Guardar</button>
+              <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
+                <button onClick={() => setIsAddingReading(false)} className="px-4 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
+                <button onClick={handleSaveReading} disabled={!newReadingTitle.trim()} className="px-5 py-2.5 text-xs font-bold bg-black text-white dark:bg-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer">Guardar</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Goal Modal */}
+      {/* Add Goal Bottom Sheet */}
       <AnimatePresence>
         {isAddingGoal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl pb-safe"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
-                <h3 className="text-base font-bold">Nueva Meta Académica</h3>
-                <button onClick={() => setIsAddingGoal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                  <X className="w-4 h-4" />
+              <div className="w-12 h-1 bg-gray-300 dark:bg-white/20 rounded-full mx-auto my-1 shrink-0 sm:hidden" />
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/10">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Meta Académica</h3>
+                <button onClick={() => setIsAddingGoal(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Título de la meta *</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Título de la meta *</label>
                   <input 
                     type="text" 
                     value={newGoalTitle} 
                     onChange={e => setNewGoalTitle(e.target.value)} 
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white" 
                     placeholder="Ej: Mantener promedio mínimo de 9.0" 
                     autoFocus 
                   />
@@ -1417,11 +1423,11 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Tipo de Meta</label>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Tipo de Meta</label>
                     <select
                       value={newGoalType}
                       onChange={e => setNewGoalType(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                     >
                       <option value="grade">Promedio / Nota</option>
                       <option value="subject">Materia completa</option>
@@ -1433,13 +1439,13 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Valor Objetivo</label>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Valor Objetivo</label>
                     <input
                       type="number"
                       step="0.1"
                       value={newGoalTargetValue}
                       onChange={e => setNewGoalTargetValue(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                       placeholder="Ej: 9.0 o 5"
                     />
                   </div>
@@ -1447,11 +1453,11 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
 
                 {subjects.length > 0 && (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Materia Asociada (Opcional)</label>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Materia Asociada (Opcional)</label>
                     <select
                       value={newGoalSubjectId}
                       onChange={e => setNewGoalSubjectId(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                     >
                       <option value="">Todas las materias / Global</option>
                       {subjects.map(s => (
@@ -1462,18 +1468,18 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Fecha Límite (Opcional)</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Fecha Límite (Opcional)</label>
                   <input
                     type="date"
                     value={newGoalTargetDate}
                     onChange={e => setNewGoalTargetDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                   />
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-2 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingGoal(false)} className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveGoal} disabled={!newGoalTitle.trim()} className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar Meta</button>
+              <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex justify-end gap-2">
+                <button onClick={() => setIsAddingGoal(false)} className="px-4 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
+                <button onClick={handleSaveGoal} disabled={!newGoalTitle.trim()} className="px-5 py-2.5 text-xs font-bold bg-black text-white dark:bg-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 transition-colors">Guardar Meta</button>
               </div>
             </motion.div>
           </div>

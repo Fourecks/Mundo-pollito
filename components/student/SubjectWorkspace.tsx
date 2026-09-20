@@ -1940,89 +1940,104 @@ export const SubjectWorkspace: React.FC<Props> = ({
         </div>
       </div>
       
-      {/* Add Unit Modal */}
+      {/* Add Unit Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingUnit && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5">
-                <h3 className="text-lg font-semibold">Nueva Unidad</h3>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Unidad</h3>
+                <button onClick={() => setIsAddingUnit(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <div className="p-6">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre de la unidad</label>
-                <input type="text" value={newUnitName} onChange={e => setNewUnitName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Fundamentos" autoFocus />
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Nombre de la unidad</label>
+                <input type="text" value={newUnitName} onChange={e => setNewUnitName(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-sm" placeholder="Ej: Fundamentos" autoFocus />
               </div>
               <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingUnit(false)} className="px-4 py-2 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveUnit} disabled={!newUnitName.trim()} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar</button>
+                <button onClick={() => setIsAddingUnit(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
+                <button onClick={handleSaveUnit} disabled={!newUnitName.trim()} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">Guardar</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Exam Modal */}
+      {/* Add Exam Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingExam && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5">
-                <h3 className="text-lg font-semibold">Programar Examen</h3>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Programar Examen</h3>
+                <button onClick={() => setIsAddingExam(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Título</label>
-                  <input type="text" value={newExamTitle} onChange={e => setNewExamTitle(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Parcial 1" autoFocus />
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Título</label>
+                  <input type="text" value={newExamTitle} onChange={e => setNewExamTitle(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-sm" placeholder="Ej: Parcial 1" autoFocus />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha</label>
-                  <input type="date" value={newExamDate} onChange={e => setNewExamDate(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Fecha</label>
+                  <input type="date" value={newExamDate} onChange={e => setNewExamDate(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs" />
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingExam(false)} className="px-4 py-2 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveExam} disabled={!newExamTitle.trim() || !newExamDate} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar</button>
+                <button onClick={() => setIsAddingExam(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
+                <button onClick={handleSaveExam} disabled={!newExamTitle.trim() || !newExamDate} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">Guardar</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Resource Modal */}
+      {/* Add Resource Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingResource && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5">
-                <h3 className="text-lg font-semibold">Guardar Recurso</h3>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Guardar Recurso</h3>
+                <button onClick={() => setIsAddingResource(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Título</label>
-                  <input type="text" value={newResourceTitle} onChange={e => setNewResourceTitle(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Diapositivas Clase 1" autoFocus />
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Título</label>
+                  <input type="text" value={newResourceTitle} onChange={e => setNewResourceTitle(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-sm" placeholder="Ej: Diapositivas Clase 1" autoFocus />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL / Enlace</label>
-                  <input type="url" value={newResourceUrl} onChange={e => setNewResourceUrl(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://" />
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">URL / Enlace</label>
+                  <input type="url" value={newResourceUrl} onChange={e => setNewResourceUrl(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs" placeholder="https://" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
-                  <select value={newResourceType} onChange={e => setNewResourceType(e.target.value as any)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Tipo</label>
+                  <select value={newResourceType} onChange={e => setNewResourceType(e.target.value as any)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs">
                     <option value="link">Enlace (Web)</option>
                     <option value="pdf">Documento PDF</option>
                     <option value="video">Video</option>
@@ -2032,150 +2047,110 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingResource(false)} className="px-4 py-2 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveResource} disabled={!newResourceTitle.trim()} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar</button>
+                <button onClick={() => setIsAddingResource(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
+                <button onClick={handleSaveResource} disabled={!newResourceTitle.trim()} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">Guardar</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Grade Modal */}
-      <AnimatePresence>
-        {isAddingGrade && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
-            >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Registrar Calificación</h3>
-                <button onClick={() => setIsAddingGrade(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre de la Evaluación</label>
-                  <input type="text" value={newGradeName} onChange={e => setNewGradeName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Parcial 1, Trabajo Final..." autoFocus />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nota Obtenida</label>
-                    <input type="number" step="0.1" value={newGradeScore} onChange={e => setNewGradeScore(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: 8.5" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nota Máxima</label>
-                    <input type="number" step="0.1" value={newGradeMaxScore} onChange={e => setNewGradeMaxScore(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: 10" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Peso (%)</label>
-                  <div className="relative">
-                    <input type="number" step="0.1" max="100" value={newGradeWeight} onChange={e => setNewGradeWeight(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8" placeholder="Ej: 30" />
-                    <span className="absolute right-3 top-2.5 text-gray-400">%</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">El porcentaje que vale sobre la nota final.</p>
-                </div>
-              </div>
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingGrade(false)} className="px-4 py-2 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveGrade} disabled={!newGradeName.trim() || !newGradeScore || !newGradeMaxScore || !newGradeWeight} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar Calificación</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Add Deck Modal */}
+      {/* Add Deck Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingDeck && (
-          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5">
-                <h3 className="text-lg font-semibold">Nuevo Mazo</h3>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nuevo Mazo</h3>
+                <button onClick={() => setIsAddingDeck(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <div className="p-6">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Título del mazo</label>
-                <input type="text" value={newDeckTitle} onChange={e => setNewDeckTitle(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Fórmulas de Integrales" autoFocus />
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Título del mazo</label>
+                <input type="text" value={newDeckTitle} onChange={e => setNewDeckTitle(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-sm" placeholder="Ej: Fórmulas de Integrales" autoFocus />
               </div>
               <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingDeck(false)} className="px-4 py-2 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveDeck} disabled={!newDeckTitle.trim()} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar</button>
+                <button onClick={() => setIsAddingDeck(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
+                <button onClick={handleSaveDeck} disabled={!newDeckTitle.trim()} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">Guardar</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Card Modal */}
+      {/* Add Card Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingCard && (
-          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Nueva Tarjeta</h3>
-                <button onClick={() => setIsAddingCard(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Tarjeta</h3>
+                <button onClick={() => setIsAddingCard(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Anverso (Pregunta / Concepto)</label>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Anverso (Pregunta / Concepto)</label>
                   <textarea
                     value={newCardFront}
                     onChange={e => setNewCardFront(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
                     placeholder="Ej: ¿Qué es el modelo OSI y cuántas capas tiene?"
                     autoFocus
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reverso (Respuesta / Definición)</label>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Reverso (Respuesta / Definición)</label>
                   <textarea
                     value={newCardBack}
                     onChange={e => setNewCardBack(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Ej: Es un marco conceptual de 7 capas que describe las funciones de red..."
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
+                    placeholder="Ej: Es un marco conceptual de 7 capas..."
                   />
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
-                <button onClick={() => setIsAddingCard(false)} className="px-4 py-2 text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveFlashcard} disabled={!newCardFront.trim() || !newCardBack.trim()} className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar Tarjeta</button>
+                <button onClick={() => setIsAddingCard(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
+                <button onClick={handleSaveFlashcard} disabled={!newCardFront.trim() || !newCardBack.trim()} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">Guardar Tarjeta</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Task Modal */}
+      {/* Add Task Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingTask && (
-          <div className="fixed inset-0 z-[75] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 dark:border-white/10"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Tarea Académica</h3>
-                <button onClick={() => setIsAddingTask(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg">
+                <button onClick={() => setIsAddingTask(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                   <X className="w-5 h-5 text-gray-400" />
                 </button>
               </div>
@@ -2186,7 +2161,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     type="text"
                     value={newTaskText}
                     onChange={e => setNewTaskText(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-sm"
                     placeholder="Ej: Entregar reporte de laboratorio"
                     autoFocus
                   />
@@ -2199,7 +2174,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       type="date"
                       value={newTaskDueDate}
                       onChange={e => setNewTaskDueDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
                     />
                   </div>
 
@@ -2208,7 +2183,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     <select
                       value={newTaskPriority}
                       onChange={e => setNewTaskPriority(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
                     >
                       <option value="low">Baja</option>
                       <option value="medium">Media</option>
@@ -2223,7 +2198,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     <select
                       value={newTaskUnitId}
                       onChange={e => setNewTaskUnitId(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-xs"
                     >
                       <option value="">Sin unidad específica</option>
                       {units.map(u => (
@@ -2237,7 +2212,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setShowTaskMoreOptions(!showTaskMoreOptions)}
-                    className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                    className="text-xs font-bold text-gray-900 dark:text-white hover:underline flex items-center gap-1"
                   >
                     <span>{showTaskMoreOptions ? 'Ocultar notas' : '+ Añadir notas/instrucciones'}</span>
                   </button>
@@ -2246,7 +2221,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       value={newTaskNotes}
                       onChange={e => setNewTaskNotes(e.target.value)}
                       rows={2}
-                      className="w-full mt-2 px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full mt-2 px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                       placeholder="Instrucciones del profesor o detalles adicionales..."
                     />
                   )}
@@ -2255,26 +2230,28 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
               <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
                 <button onClick={() => setIsAddingTask(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl">Cancelar</button>
-                <button onClick={handleSaveTask} disabled={!newTaskText.trim()} className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">Guardar Tarea</button>
+                <button onClick={handleSaveTask} disabled={!newTaskText.trim()} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50">Guardar Tarea</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Project Modal */}
+      {/* Add Project Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingProject && (
-          <div className="fixed inset-0 z-[75] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 dark:border-white/10"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">Nuevo Proyecto Académico</h3>
-                <button onClick={() => setIsAddingProject(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg">
+                <button onClick={() => setIsAddingProject(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                   <X className="w-5 h-5 text-gray-400" />
                 </button>
               </div>
@@ -2285,7 +2262,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     type="text"
                     value={newProjectName}
                     onChange={e => setNewProjectName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white text-sm"
                     placeholder="Ej: Trabajo de Investigación Semestral"
                     autoFocus
                   />
@@ -2296,14 +2273,14 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     value={newProjectDesc}
                     onChange={e => setNewProjectDesc(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                     placeholder="Objetivos, integrantes del equipo o entregables..."
                   />
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-3 bg-gray-50 dark:bg-[#111]/50">
                 <button onClick={() => setIsAddingProject(false)} className="px-4 py-2 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl">Cancelar</button>
-                <button onClick={handleSaveProject} disabled={!newProjectName.trim()} className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">Guardar Proyecto</button>
+                <button onClick={handleSaveProject} disabled={!newProjectName.trim()} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50">Guardar Proyecto</button>
               </div>
             </motion.div>
           </div>
@@ -2313,14 +2290,15 @@ export const SubjectWorkspace: React.FC<Props> = ({
       {/* Mobile Quick Action Sheet */}
       <AnimatePresence>
         {showMobileActionSheet && (
-          <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
+          <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="bg-white dark:bg-[#181818] w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-white/10"
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl border-t sm:border border-gray-200 dark:border-white/10"
             >
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-3 sm:hidden" />
               <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-white/10 mb-4">
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">Añadir a {subject.name}</h3>
                 <button
@@ -2333,9 +2311,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingTask(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
                     <CheckSquare className="w-4 h-4" />
                   </div>
                   <div>
@@ -2346,9 +2324,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingExam(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
                     <Calendar className="w-4 h-4" />
                   </div>
                   <div>
@@ -2359,9 +2337,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); onAddNote(null, undefined, subject.id); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
                     <FileText className="w-4 h-4" />
                   </div>
                   <div>
@@ -2372,9 +2350,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingResource(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
                     <Paperclip className="w-4 h-4" />
                   </div>
                   <div>
@@ -2385,9 +2363,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingUnit(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
                     <BookOpen className="w-4 h-4" />
                   </div>
                   <div>
@@ -2398,9 +2376,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingProject(true); }}
-                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-xs shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
                     <FolderKanban className="w-4 h-4" />
                   </div>
                   <div>
@@ -2414,21 +2392,28 @@ export const SubjectWorkspace: React.FC<Props> = ({
         )}
       </AnimatePresence>
 
-      {/* Add Category Modal */}
+      {/* Add Category Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingCategory && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-sm shadow-xl overflow-hidden border border-gray-100 dark:border-white/5"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Categoría de Evaluación</h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Disponible: {100 - categories.reduce((sum, c) => sum + (c.weight || 0), 0)}%
-                </p>
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Categoría de Evaluación</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Disponible: {100 - categories.reduce((sum, c) => sum + (c.weight || 0), 0)}%
+                  </p>
+                </div>
+                <button onClick={() => { setIsAddingCategory(false); setCategoryError(null); }} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <div className="p-6 space-y-4">
                 {categoryError && (
@@ -2438,61 +2423,63 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nombre (ej. Parciales, Tareas)</label>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Nombre (ej. Parciales, Tareas)</label>
                   <input
                     type="text"
                     value={newCategoryName}
                     onChange={e => setNewCategoryName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                     placeholder="Ej: Exámenes Parciales"
                     autoFocus
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Ponderación / Peso (%)</label>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Ponderación / Peso (%)</label>
                   <input
                     type="number"
                     value={newCategoryWeight}
                     onChange={e => { setNewCategoryWeight(e.target.value); setCategoryError(null); }}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                     placeholder="Ej: 30"
                   />
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-2 bg-gray-50 dark:bg-[#111]/50">
                 <button onClick={() => { setIsAddingCategory(false); setCategoryError(null); }} className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveCategory} disabled={!newCategoryName.trim() || !newCategoryWeight} className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar</button>
+                <button onClick={handleSaveCategory} disabled={!newCategoryName.trim() || !newCategoryWeight} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">Guardar</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Add Grade/Evaluation Modal */}
+      {/* Add Grade/Evaluation Modal / Bottom Sheet */}
       <AnimatePresence>
         {isAddingGrade && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#1A1A1A] rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 dark:border-white/5 max-h-[90vh] flex flex-col"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border-t sm:border border-gray-200 dark:border-white/10 max-h-[90vh] flex flex-col"
             >
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/5 flex justify-between items-center">
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto my-2.5 sm:hidden shrink-0" />
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-white/5 flex justify-between items-center shrink-0">
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Evaluación / Calificación</h3>
-                <button onClick={() => setIsAddingGrade(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-4 h-4" />
+                <button onClick={() => setIsAddingGrade(false)} className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="p-6 space-y-4 overflow-y-auto">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nombre de la evaluación *</label>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Nombre de la evaluación *</label>
                   <input
                     type="text"
                     value={newGradeName}
                     onChange={e => setNewGradeName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                     placeholder="Ej: Parcial 1"
                     autoFocus
                   />
@@ -2500,11 +2487,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                 {categories.length > 0 && (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Categoría</label>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Categoría</label>
                     <select
                       value={newGradeCategoryId}
                       onChange={e => setNewGradeCategoryId(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                     >
                       <option value="">Sin categoría específica</option>
                       {categories.map(c => (
@@ -2516,23 +2503,23 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Calificación Obtenida</label>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Calificación Obtenida</label>
                     <input
                       type="number"
                       step="0.1"
                       value={newGradeScore}
                       onChange={e => setNewGradeScore(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                       placeholder="Dejar vacío si es pendiente"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Puntaje Máximo</label>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Puntaje Máximo</label>
                     <input
                       type="number"
                       value={newGradeMaxScore}
                       onChange={e => setNewGradeMaxScore(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                       placeholder="10 o 100"
                     />
                   </div>
@@ -2541,7 +2528,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setShowGradeMoreOptions(!showGradeMoreOptions)}
-                  className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline block pt-1"
+                  className="text-xs text-gray-900 dark:text-white font-bold hover:underline block pt-1"
                 >
                   {showGradeMoreOptions ? '- Menos opciones' : '+ Más opciones (Examen, Fecha, Unidad)'}
                 </button>
@@ -2550,11 +2537,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-white/5">
                     {exams.length > 0 && (
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Vincular a Examen</label>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Vincular a Examen</label>
                         <select
                           value={newGradeExamId}
                           onChange={e => setNewGradeExamId(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                         >
                           <option value="">Sin vinculación a examen</option>
                           {exams.map(e => (
@@ -2566,11 +2553,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                     {units.length > 0 && (
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Unidad del Temario</label>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Unidad del Temario</label>
                         <select
                           value={newGradeUnitId}
                           onChange={e => setNewGradeUnitId(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                         >
                           <option value="">Sin unidad específica</option>
                           {units.map(u => (
@@ -2581,22 +2568,22 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     )}
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Fecha de la Evaluación</label>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Fecha de la Evaluación</label>
                       <input
                         type="date"
                         value={newGradeDate}
                         onChange={e => setNewGradeDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Notas / Observaciones</label>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Notas / Observaciones</label>
                       <input
                         type="text"
                         value={newGradeNotes}
                         onChange={e => setNewGradeNotes(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white"
                         placeholder="Ej: Incluyó bonus de asistencia"
                       />
                     </div>
@@ -2604,9 +2591,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 )}
               </div>
 
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-2 bg-gray-50 dark:bg-[#111]/50">
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex justify-end gap-2 bg-gray-50 dark:bg-[#111]/50 shrink-0">
                 <button onClick={() => setIsAddingGrade(false)} className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/5 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveGrade} disabled={!newGradeName.trim()} className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">Guardar</button>
+                <button onClick={handleSaveGrade} disabled={!newGradeName.trim()} className="px-4 py-2 text-xs font-bold bg-gray-900 text-white dark:bg-white dark:text-black rounded-xl hover:bg-black dark:hover:bg-gray-100 disabled:opacity-50 transition-colors">Guardar</button>
               </div>
             </motion.div>
           </div>
