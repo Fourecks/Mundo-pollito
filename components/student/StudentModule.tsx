@@ -974,14 +974,9 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       }
 
                       return (
-                        <div className="bg-white dark:bg-[#151515] rounded-2xl p-3.5 border border-gray-150 dark:border-white/5 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
-                            ✓
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">Todo al día</h4>
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400">No tienes entregas ni exámenes para hoy.</p>
-                          </div>
+                        <div className="bg-white dark:bg-[#151515] rounded-2xl p-5 border border-gray-150 dark:border-white/5 text-center">
+                          <h4 className="text-xs font-bold text-gray-900 dark:text-white">Todo al día</h4>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">No tienes entregas ni exámenes para hoy.</p>
                         </div>
                       );
                     })()}
@@ -1013,7 +1008,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                                       <p className="text-[11px] text-gray-500 truncate">{subj?.name || item.type}</p>
                                     </div>
                                   </div>
-                                  <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                                  <span className="text-[11px] font-bold text-gray-900 dark:text-white shrink-0">
                                     {item.date}
                                   </span>
                                 </div>
@@ -1024,14 +1019,9 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       }
 
                       return (
-                        <div className="bg-white dark:bg-[#151515] rounded-2xl p-3.5 border border-gray-150 dark:border-white/5 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
-                            <Calendar className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">Sin eventos próximos</h4>
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400">Los exámenes y entregas aparecerán aquí.</p>
-                          </div>
+                        <div className="bg-white dark:bg-[#151515] rounded-2xl p-5 border border-gray-150 dark:border-white/5 text-center">
+                          <h4 className="text-xs font-bold text-gray-900 dark:text-white">Sin eventos próximos</h4>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Los exámenes y entregas aparecerán aquí.</p>
                         </div>
                       );
                     })()}
@@ -1081,7 +1071,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
 
                         <button 
                           onClick={() => setMobileTab('materias')}
-                          className="w-full py-2.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-xl transition-colors flex items-center justify-center gap-1 cursor-pointer mt-1"
+                          className="w-full py-2.5 text-xs font-semibold text-gray-900 dark:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition-colors flex items-center justify-center gap-1 cursor-pointer mt-1"
                         >
                           <span>Ver todas las materias ({subjects.length})</span>
                           <ChevronRight className="w-3.5 h-3.5" />
@@ -1102,12 +1092,12 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                         <div className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 space-y-2">
                           <div className="flex items-center justify-between">
                             <h4 className="font-bold text-xs text-gray-900 dark:text-white truncate">{activeGoal.title}</h4>
-                            <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">{Math.round(prog.progressPercent)}%</span>
+                            <span className="text-xs font-extrabold text-gray-900 dark:text-white">{Math.round(prog.progressPercent)}%</span>
                           </div>
                           <p className="text-[11px] text-gray-500">{prog.subtitle}</p>
                           <div className="w-full bg-gray-100 dark:bg-white/5 h-2 rounded-full overflow-hidden">
                             <div 
-                              className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                              className="bg-black dark:bg-white h-full rounded-full transition-all duration-300"
                               style={{ width: `${Math.min(100, Math.max(0, prog.progressPercent))}%` }}
                             />
                           </div>
