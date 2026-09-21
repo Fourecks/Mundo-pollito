@@ -262,7 +262,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   const handleSaveFlashcard = async () => {
@@ -296,7 +295,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   const handleRateFlashcard = async (cardId: string, newStatus: 'new' | 'learning' | 'reviewing' | 'known') => {
@@ -352,7 +350,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   const handleToggleUnitStatus = async (unitToToggle: Unit, e?: React.MouseEvent) => {
@@ -427,7 +424,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   // Project Handlers
@@ -467,7 +463,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   const handleSaveExam = async () => {
@@ -514,7 +509,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   const handleSaveResource = async () => {
@@ -556,7 +550,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   useEffect(() => {
@@ -781,8 +774,21 @@ export const SubjectWorkspace: React.FC<Props> = ({
       {/* DESKTOP HEADER */}
       <header className="hidden md:flex px-8 py-6 border-b border-gray-100 dark:border-white/5 items-center justify-between flex-shrink-0 gap-4" style={{ borderBottomColor: `${subject.color}30` }}>
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-bold text-gray-700 dark:text-gray-300">
-            ← Volver
+          <button 
+            onClick={() => {
+              if (activeUnit) {
+                setActiveUnit(null);
+              } else if (activeTab !== 'overview') {
+                setActiveTab('overview');
+                setMobileSubView('main');
+              } else {
+                onBack();
+              }
+            }} 
+            className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>{activeUnit ? `Volver a ${subject.name}` : activeTab !== 'overview' ? subject.name : 'Volver a Materias'}</span>
           </button>
           <div>
             <div className="flex items-center gap-2.5">
@@ -799,7 +805,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
         {(['overview', 'units', 'notes', 'tasks', 'exams', 'resources', 'study', 'grades', 'flashcards'] as const).map(tab => (
           <button 
             key={tab} 
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab);
+              setMobileSubView(tab === 'overview' ? 'main' : tab as any);
+              setActiveUnit(null);
+            }}
             className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors relative whitespace-nowrap cursor-pointer ${activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
           >
             {tab === 'notes' ? 'Notas' : tab === 'study' ? 'Sesiones' : tab === 'resources' ? 'Recursos' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab === 'overview' ? 'Resumen' : tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -817,9 +827,10 @@ export const SubjectWorkspace: React.FC<Props> = ({
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setActiveUnit(null)}
-                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
               >
-                ← {subject.name}
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Volver a {subject.name}</span>
               </button>
               <button
                 type="button"
@@ -836,14 +847,55 @@ export const SubjectWorkspace: React.FC<Props> = ({
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{activeUnit.description}</p>
             )}
           </div>
-        ) : mobileSubView === 'main' ? (
+        ) : (activeTab !== 'overview' || mobileSubView !== 'main') ? (
+          <div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => {
+                  setActiveTab('overview');
+                  setMobileSubView('main');
+                }}
+                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>{subject.name}</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (activeTab === 'notes' || mobileSubView === 'notes') onAddNote(null, undefined, subject.id);
+                  else if (activeTab === 'tasks' || mobileSubView === 'tasks') setIsAddingTask(true);
+                  else if (activeTab === 'exams' || mobileSubView === 'exams') setIsAddingExam(true);
+                  else if (activeTab === 'resources' || mobileSubView === 'resources') setIsAddingResource(true);
+                  else if (activeTab === 'flashcards' || mobileSubView === 'flashcards') setIsAddingDeck(true);
+                  else if (activeTab === 'study' || mobileSubView === 'study') setIsStudying(true);
+                  else if (activeTab === 'grades' || mobileSubView === 'grades') setIsAddingGrade(true);
+                  else setShowMobileActionSheet(true);
+                }}
+                className="px-3 py-1 rounded-full bg-black dark:bg-white text-white dark:text-black text-xs font-bold shadow-xs cursor-pointer"
+              >
+                + Añadir
+              </button>
+            </div>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white mt-1.5 capitalize">
+              {activeTab === 'notes' ? 'Apuntes' : 
+               activeTab === 'tasks' ? 'Tareas' : 
+               activeTab === 'exams' ? 'Exámenes' : 
+               activeTab === 'resources' ? 'Recursos' : 
+               activeTab === 'grades' ? 'Calificaciones' : 
+               activeTab === 'flashcards' ? 'Flashcards' : 
+               activeTab === 'study' ? 'Sesiones de estudio' : 
+               activeTab === 'units' ? 'Unidades' : activeTab}
+            </h2>
+          </div>
+        ) : (
           <div>
             <div className="flex items-center justify-between mb-2">
               <button
                 onClick={onBack}
-                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
               >
-                ← Materias
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Materias</span>
               </button>
               <button
                 onClick={() => setShowMobileActionSheet(true)}
@@ -859,39 +911,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 <p className="text-[11px] text-gray-500 dark:text-gray-400">{subject.professor || 'Sin profesor'}</p>
               </div>
             </div>
-          </div>
-        ) : (
-          <div>
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => setMobileSubView('main')}
-                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              >
-                ← {subject.name}
-              </button>
-              <button
-                onClick={() => {
-                  if (mobileSubView === 'notes') onAddNote(null, undefined, subject.id);
-                  else if (mobileSubView === 'exams') setIsAddingExam(true);
-                  else if (mobileSubView === 'resources') setIsAddingResource(true);
-                  else if (mobileSubView === 'flashcards') setIsAddingDeck(true);
-                  else if (mobileSubView === 'study') setIsStudying(true);
-                  else if (mobileSubView === 'grades') setIsAddingGrade(true);
-                }}
-                className="px-3 py-1 rounded-full bg-black dark:bg-white text-white dark:text-black text-xs font-bold shadow-xs cursor-pointer"
-              >
-                + Añadir
-              </button>
-            </div>
-            <h2 className="text-base font-bold text-gray-900 dark:text-white mt-1.5 capitalize">
-              {mobileSubView === 'notes' ? 'Apuntes' : 
-               mobileSubView === 'tasks' ? 'Tareas' : 
-               mobileSubView === 'exams' ? 'Exámenes' : 
-               mobileSubView === 'resources' ? 'Recursos' : 
-               mobileSubView === 'grades' ? 'Calificaciones' : 
-               mobileSubView === 'flashcards' ? 'Flashcards' : 
-               mobileSubView === 'study' ? 'Sesiones de estudio' : mobileSubView}
-            </h2>
           </div>
         )}
       </div>
@@ -1327,16 +1346,17 @@ export const SubjectWorkspace: React.FC<Props> = ({
           
           {activeTab === 'units' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium">Unidades ({units.length})</h3>
-                <button onClick={() => setIsAddingUnit(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
-                  + Nueva Unidad
-                </button>
-              </div>
-              
               {units.length === 0 ? (
-                <div className="text-center py-20 text-gray-500">
-                  <p>No has creado unidades todavía.</p>
+                <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
+                  <FolderKanban className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No has creado unidades todavía.</p>
+                  <button
+                    onClick={() => setIsAddingUnit(true)}
+                    className="mt-4 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Crear unidad</span>
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1385,20 +1405,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
           {activeTab === 'tasks' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Tareas Académicas</h3>
-                  <p className="text-xs text-gray-500">Filtradas por esta materia ({subject.name})</p>
-                </div>
-                <button
-                  onClick={() => setIsAddingTask(true)}
-                  className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:opacity-90 transition-opacity"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Nueva tarea</span>
-                </button>
-              </div>
-
               {tasks.length === 0 ? (
                 <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
                   <CheckSquare className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />

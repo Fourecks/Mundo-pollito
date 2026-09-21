@@ -268,7 +268,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   const handleDeleteGoal = async (goalId: string) => {
@@ -278,7 +277,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   const handleToggleGoalStatus = async (goal: Goal) => {
@@ -299,7 +297,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     } catch (err) {
       console.error(err);
     }
-    loadData();
   };
 
   return (
