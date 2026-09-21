@@ -772,7 +772,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
     <div className="w-full flex flex-col bg-white dark:bg-[#111] text-gray-900 dark:text-gray-100 font-sans">
       
       {/* DESKTOP HEADER */}
-      <header className="hidden md:flex px-8 py-6 border-b border-gray-100 dark:border-white/5 items-center justify-between flex-shrink-0 gap-4" style={{ borderBottomColor: `${subject.color}30` }}>
+      <header className="hidden md:flex px-8 py-5 border-b border-gray-100 dark:border-white/5 items-center justify-between flex-shrink-0 gap-4" style={{ borderBottomColor: `${subject.color}30` }}>
         <div className="flex items-center gap-4">
           <button 
             onClick={() => {
@@ -798,11 +798,37 @@ export const SubjectWorkspace: React.FC<Props> = ({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{subject.professor || 'Sin profesor asignado'}</p>
           </div>
         </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => onAddNote(null, undefined, subject.id)}
+            className="px-3.5 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#18181b] hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>+ Nota</span>
+          </button>
+          <button
+            onClick={() => {
+              if (activeTab === 'notes') onAddNote(null, undefined, subject.id);
+              else if (activeTab === 'tasks') setIsAddingTask(true);
+              else if (activeTab === 'exams') setIsAddingExam(true);
+              else if (activeTab === 'flashcards') setIsAddingDeck(true);
+              else if (activeTab === 'study') setIsStudying(true);
+              else if (activeTab === 'grades') setIsAddingGrade(true);
+              else if (activeTab === 'units') setIsAddingUnit(true);
+              else setIsAddingTask(true);
+            }}
+            className="px-4 py-1.5 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Añadir</span>
+          </button>
+        </div>
       </header>
 
       {/* DESKTOP TABS */}
       <div className="hidden md:flex px-8 pt-4 border-b border-gray-100 dark:border-white/5 gap-6 overflow-x-auto shrink-0 bg-white dark:bg-[#111]">
-        {(['overview', 'units', 'notes', 'tasks', 'exams', 'resources', 'study', 'grades', 'flashcards'] as const).map(tab => (
+        {(['overview', 'units', 'notes', 'tasks', 'exams', 'study', 'grades', 'flashcards'] as const).map(tab => (
           <button 
             key={tab} 
             onClick={() => {
@@ -812,7 +838,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
             }}
             className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors relative whitespace-nowrap cursor-pointer ${activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
           >
-            {tab === 'notes' ? 'Notas' : tab === 'study' ? 'Sesiones' : tab === 'resources' ? 'Recursos' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab === 'overview' ? 'Resumen' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'notes' ? 'Notas' : tab === 'study' ? 'Sesiones' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab === 'overview' ? 'Resumen' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             {activeTab === tab && (
               <motion.div layoutId="subject-tab" className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full bg-black dark:bg-white" />
             )}
@@ -1359,42 +1385,52 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {units.map((unit, i) => (
                     <div
                       key={unit.id}
                       onClick={() => setActiveUnit(unit)}
-                      className="bg-white dark:bg-[#151515] py-2.5 px-3.5 rounded-xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs flex items-center justify-between group cursor-pointer hover:border-gray-400 dark:hover:border-zinc-600 transition-all"
+                      className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-4 group relative"
                     >
-                      <div className="flex items-center gap-3 min-w-0 pr-2">
-                        <div className="w-6 h-6 rounded-md bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white flex items-center justify-center text-xs font-bold shrink-0 border border-gray-200 dark:border-white/10">
-                          {i + 1}
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <span className="px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white text-xs font-bold border border-gray-200 dark:border-white/10">
+                            Unidad {i + 1}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleUnitStatus(unit, e)}
+                              className="px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                            >
+                              {unit.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Circle className="w-3.5 h-3.5 text-gray-400" />}
+                              <span>{unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}</span>
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDeleteUnit(unit.id); }}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all cursor-pointer"
+                              title="Eliminar unidad"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <span className="font-bold text-xs text-gray-900 dark:text-white truncate block">{unit.name}</span>
-                          {unit.description && <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{unit.description}</p>}
-                        </div>
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors leading-snug">
+                          {unit.name}
+                        </h4>
+                        {unit.description && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 line-clamp-2 leading-relaxed">
+                            {unit.description}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => handleToggleUnitStatus(unit, e)}
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border border-gray-200 dark:border-white/10 ${
-                            unit.status === 'completed' ? 'bg-gray-100 text-gray-900 dark:bg-white/15 dark:text-white' :
-                            unit.status === 'in_progress' ? 'bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white' :
-                            'bg-gray-50 text-gray-700 dark:bg-white/5 dark:text-gray-300'
-                          }`}
-                        >
-                          {unit.status === 'completed' ? <CheckCircle2 className="w-3 h-3 text-gray-900 dark:text-white" /> : <Circle className="w-3 h-3 text-gray-400" />}
-                          <span>{unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}</span>
-                        </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteUnit(unit.id); }}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer"
-                          title="Eliminar unidad"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+
+                      <div className="pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>Ver contenido</span>
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
                       </div>
                     </div>
                   ))}
@@ -1423,7 +1459,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {/* PENDIENTES */}
                   <div>
                     <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
-                      Pendientes ({tasks.filter(t => !t.completed).length})
+                      Pendientes
                     </h4>
                     <div className="space-y-2">
                       {tasks.filter(t => !t.completed).map(task => {
@@ -1481,7 +1517,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {tasks.some(t => t.completed) && (
                     <div className="pt-4 border-t border-gray-100 dark:border-white/5">
                       <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-2">
-                        Completadas ({tasks.filter(t => t.completed).length})
+                        Completadas
                       </h4>
                       <div className="space-y-2 opacity-60">
                         {tasks.filter(t => t.completed).map(task => (

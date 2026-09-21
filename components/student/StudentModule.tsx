@@ -8,7 +8,7 @@ import { SubjectWorkspace } from './SubjectWorkspace';
 import { AcademicAnalytics } from './AcademicAnalytics';
 import { computeGoalProgress } from './utils/goalProgress';
 import { calculateGradeSummary } from './utils/gradeCalculator';
-import { ChevronLeft, ChevronRight, Plus, X, Calendar, BookOpen, Target, BarChart2, CheckCircle2, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Calendar, BookOpen, Target, BarChart2, CheckCircle2, Trash2, Clock, MapPin, Video } from 'lucide-react';
 
 interface StudentModuleProps {
   notes?: Note[];
@@ -20,6 +20,216 @@ interface StudentModuleProps {
   onUpdateNote?: (note: Note) => Promise<void>;
   onDeleteNote?: (noteId: number, folderId: number | null) => Promise<void>;
 }
+
+const ScheduleView: React.FC<{
+  subjects: Subject[];
+  onSelectSubject: (subject: Subject) => void;
+  onAddSubjectClick: () => void;
+}> = ({ subjects, onSelectSubject, onAddSubjectClick }) => {
+  const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  
+  const todayIndex = new Date().getDay();
+  const initialDayIndex = todayIndex === 0 ? 6 : todayIndex - 1;
+  const [selectedDay, setSelectedDay] = useState<string>(daysOfWeek[initialDayIndex] || 'Lunes');
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+
+  const daySubjects = subjects.filter(s => {
+    if (!s.days || s.days.length === 0) return false;
+    return s.days.includes(selectedDay);
+  }).sort((a, b) => (a.start_time || '00:00').localeCompare(b.start_time || '00:00'));
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Clock className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            <span>Horario de Clases Semanal</span>
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            Planificación de tus sesiones semanales
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-white/10 p-1 rounded-xl">
+          <button
+            onClick={() => setViewMode('day')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'day' 
+                ? 'bg-white dark:bg-[#18181b] text-gray-900 dark:text-white shadow-xs' 
+                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Vista Diaria
+          </button>
+          <button
+            onClick={() => setViewMode('week')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'week' 
+                ? 'bg-white dark:bg-[#18181b] text-gray-900 dark:text-white shadow-xs' 
+                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Vista Semanal
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'day' && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {daysOfWeek.map((day) => {
+            const hasClasses = subjects.some(s => s.days && s.days.includes(day));
+            const isSelected = selectedDay === day;
+            return (
+              <button
+                key={day}
+                onClick={() => setSelectedDay(day)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+                  isSelected
+                    ? 'bg-black text-white dark:bg-white dark:text-black shadow-sm'
+                    : 'bg-white dark:bg-[#151515] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
+                }`}
+              >
+                <span>{day.substring(0, 3)}</span>
+                {hasClasses && (
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white dark:bg-black' : 'bg-blue-500'}`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {viewMode === 'day' && (
+        <div className="space-y-3">
+          {daySubjects.length === 0 ? (
+            <div className="p-8 bg-white dark:bg-[#151515] border border-gray-150 dark:border-white/5 rounded-2xl text-center space-y-3">
+              <Clock className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto" />
+              <div>
+                <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Sin clases programadas para el {selectedDay}</p>
+                <p className="text-xs text-gray-400 mt-1">Disfruta tu tiempo libre o registra materias con horarios en este día.</p>
+              </div>
+              <button
+                onClick={onAddSubjectClick}
+                className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Agregar Materia</span>
+              </button>
+            </div>
+          ) : (
+            daySubjects.map(subj => (
+              <div
+                key={subj.id}
+                onClick={() => onSelectSubject(subj)}
+                className="p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+              >
+                <div className="flex items-start gap-3.5">
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 font-bold"
+                    style={{ backgroundColor: `${subj.color}20`, color: subj.color }}
+                  >
+                    {subj.emoji || '📚'}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors">
+                        {subj.name}
+                      </h4>
+                      {subj.code && (
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-white/10">
+                          {subj.code}
+                        </span>
+                      )}
+                    </div>
+                    {subj.professor && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        Profesor: {subj.professor}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2 text-xs font-semibold text-gray-600 dark:text-gray-300 flex-wrap">
+                      {subj.is_virtual ? (
+                        <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-lg border border-purple-200 dark:border-purple-500/20">
+                          <Video className="w-3.5 h-3.5" />
+                          <span>{subj.room || 'Clase Virtual'}</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-500/20">
+                          <MapPin className="w-3.5 h-3.5" />
+                          <span>{subj.room || 'Aula Presencial'}</span>
+                        </span>
+                      )}
+                      {subj.has_date_range && subj.start_date && (
+                        <span className="text-gray-400 text-[11px]">
+                          Del {subj.start_date} al {subj.end_date || 'Fin de ciclo'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-white/5">
+                  <div className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-mono text-xs font-bold flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                    <span>{subj.start_time || '08:00'} - {subj.end_time || '10:00'}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {viewMode === 'week' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {daysOfWeek.map((day) => {
+            const classesOnDay = subjects.filter(s => s.days && s.days.includes(day))
+              .sort((a, b) => (a.start_time || '00:00').localeCompare(b.start_time || '00:00'));
+
+            return (
+              <div 
+                key={day} 
+                className="bg-white dark:bg-[#151515] p-4 rounded-2xl border border-gray-150 dark:border-white/5 space-y-3"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-white/5">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-gray-800 dark:text-gray-200">{day}</h4>
+                  <span className="text-[10px] font-mono text-gray-400">
+                    {classesOnDay.length} {classesOnDay.length === 1 ? 'clase' : 'clases'}
+                  </span>
+                </div>
+
+                {classesOnDay.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-3 text-center italic">Sin clases</p>
+                ) : (
+                  <div className="space-y-2">
+                    {classesOnDay.map(s => (
+                      <div
+                        key={s.id}
+                        onClick={() => onSelectSubject(s)}
+                        className="p-2.5 bg-gray-50 dark:bg-[#1a1a1e] rounded-xl border border-gray-200/80 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all cursor-pointer flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-bold text-xs text-gray-900 dark:text-white truncate block">
+                            {s.emoji} {s.name}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-mono block mt-0.5">
+                            {s.start_time} - {s.end_time} · {s.room || (s.is_virtual ? 'Virtual' : 'Aula')}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const StudentModule: React.FC<StudentModuleProps> = ({
   notes = [],
@@ -44,17 +254,27 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   const [attendances, setAttendances] = useState<Attendance[]>([]);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'calendar' | 'library' | 'goals' | 'analytics'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'subjects' | 'calendar' | 'schedule' | 'library' | 'goals' | 'analytics'>('dashboard');
   
   // Mobile navigation states
   const [mobileTab, setMobileTab] = useState<'resumen' | 'materias' | 'mas'>('resumen');
-  const [masSubScreen, setMasSubScreen] = useState<'calendar' | 'library' | 'goals' | 'analytics' | null>(null);
+  const [masSubScreen, setMasSubScreen] = useState<'calendar' | 'schedule' | 'library' | 'goals' | 'analytics' | null>(null);
 
-  // New Subject Form
+  // New Subject Form Extended State
   const [newSubjectName, setNewSubjectName] = useState('');
+  const [newSubjectCode, setNewSubjectCode] = useState('');
+  const [newSubjectDescription, setNewSubjectDescription] = useState('');
   const [newSubjectProfessor, setNewSubjectProfessor] = useState('');
-  const [newSubjectColor, setNewSubjectColor] = useState('#18181b');
-  const [newSubjectEmoji, setNewSubjectEmoji] = useState('');
+  const [newSubjectIsVirtual, setNewSubjectIsVirtual] = useState(false);
+  const [newSubjectRoom, setNewSubjectRoom] = useState('');
+  const [newSubjectDays, setNewSubjectDays] = useState<string[]>([]);
+  const [newSubjectStartTime, setNewSubjectStartTime] = useState('08:00');
+  const [newSubjectEndTime, setNewSubjectEndTime] = useState('10:00');
+  const [newSubjectHasDateRange, setNewSubjectHasDateRange] = useState(false);
+  const [newSubjectStartDate, setNewSubjectStartDate] = useState('');
+  const [newSubjectEndDate, setNewSubjectEndDate] = useState('');
+  const [newSubjectColor, setNewSubjectColor] = useState('#3B82F6');
+  const [newSubjectEmoji, setNewSubjectEmoji] = useState('📚');
   
   // New Reading Form
   const [isAddingReading, setIsAddingReading] = useState(false);
@@ -203,7 +423,17 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       id: generateUUID(),
       user_id: userId,
       name: newSubjectName.trim(),
+      code: newSubjectCode.trim() || undefined,
+      description: newSubjectDescription.trim() || undefined,
       professor: newSubjectProfessor.trim() || undefined,
+      is_virtual: newSubjectIsVirtual,
+      room: newSubjectRoom.trim() || undefined,
+      days: newSubjectDays.length > 0 ? newSubjectDays : undefined,
+      start_time: newSubjectStartTime || undefined,
+      end_time: newSubjectEndTime || undefined,
+      has_date_range: newSubjectHasDateRange,
+      start_date: newSubjectHasDateRange && newSubjectStartDate ? newSubjectStartDate : undefined,
+      end_date: newSubjectHasDateRange && newSubjectEndDate ? newSubjectEndDate : undefined,
       color: newSubjectColor || '#3B82F6',
       emoji: newSubjectEmoji || '📚',
       created_at: new Date().toISOString()
@@ -212,15 +442,26 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     // Optimistic update
     setSubjects(prev => [newSubject, ...prev]);
     setIsAddingSubject(false);
+    
+    // Reset form fields
     setNewSubjectName('');
+    setNewSubjectCode('');
+    setNewSubjectDescription('');
     setNewSubjectProfessor('');
+    setNewSubjectIsVirtual(false);
+    setNewSubjectRoom('');
+    setNewSubjectDays([]);
+    setNewSubjectStartTime('08:00');
+    setNewSubjectEndTime('10:00');
+    setNewSubjectHasDateRange(false);
+    setNewSubjectStartDate('');
+    setNewSubjectEndDate('');
     
     try {
       await syncableCreate('student_subjects', newSubject);
     } catch (err) {
       console.error("Error saving subject:", err);
     }
-    loadData();
   };
 
   const handleSaveReading = async () => {
@@ -309,6 +550,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
           <div className="flex items-center gap-4 mt-1.5">
             <button onClick={() => { setActiveSubject(null); setActiveTab('dashboard'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'dashboard' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
             <button onClick={() => { setActiveSubject(null); setActiveTab('subjects'); }} className={`text-xs font-semibold transition-colors ${activeSubject || activeTab === 'subjects' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Materias</button>
+            <button onClick={() => { setActiveSubject(null); setActiveTab('schedule'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'schedule' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Horario</button>
             <button onClick={() => { setActiveSubject(null); setActiveTab('calendar'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'calendar' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
             <button onClick={() => { setActiveSubject(null); setActiveTab('library'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'library' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
             <button onClick={() => { setActiveSubject(null); setActiveTab('goals'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'goals' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
@@ -564,6 +806,16 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             </div>
           )}
 
+          {activeTab === 'schedule' && (
+            <div className="max-w-6xl mx-auto">
+              <ScheduleView 
+                subjects={subjects} 
+                onSelectSubject={(subj) => setActiveSubject(subj)} 
+                onAddSubjectClick={() => setIsAddingSubject(true)} 
+              />
+            </div>
+          )}
+
           {activeTab === 'calendar' && (
             <div className="max-w-6xl mx-auto">
               <h3 className="text-xl font-medium mb-6">Calendario Académico</h3>
@@ -755,6 +1007,14 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                     </div>
                   )}
                 </div>
+              )}
+
+              {masSubScreen === 'schedule' && (
+                <ScheduleView 
+                  subjects={subjects} 
+                  onSelectSubject={(subj) => setActiveSubject(subj)} 
+                  onAddSubjectClick={() => setIsAddingSubject(true)} 
+                />
               )}
 
               {masSubScreen === 'goals' && (
@@ -1152,6 +1412,22 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                     </h3>
                     <div className="space-y-2">
                       <div 
+                        onClick={() => setMasSubScreen('schedule')}
+                        className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center text-sm font-bold shrink-0">
+                            <Clock className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-gray-900 dark:text-white">Horario semanal de clases</h4>
+                            <p className="text-[11px] text-gray-500">Horas, días y aulas por materia</p>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                      </div>
+
+                      <div 
                         onClick={() => setMasSubScreen('calendar')}
                         className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
                       >
@@ -1246,54 +1522,222 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0 }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="relative w-full max-w-md bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl pb-safe"
+              className="relative w-full max-w-lg bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl pb-safe"
             >
               <div className="w-12 h-1 bg-gray-300 dark:bg-white/20 rounded-full mx-auto my-1 shrink-0 sm:hidden" />
               <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/10">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Materia</h3>
-                <button onClick={() => setIsAddingSubject(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Nueva Materia</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Registra los detalles y horario de tu asignatura</p>
+                </div>
+                <button onClick={() => setIsAddingSubject(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors cursor-pointer">
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Nombre de la materia *</label>
-                  <input 
-                    type="text" 
-                    value={newSubjectName} 
-                    onChange={e => setNewSubjectName(e.target.value)} 
-                    onKeyDown={e => { if (e.key === 'Enter' && newSubjectName.trim()) handleSaveSubject(); }}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
-                    placeholder="Ej: Matemáticas Discretas" 
-                    autoFocus 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Profesor (Opcional)</label>
-                  <input type="text" value={newSubjectProfessor} onChange={e => setNewSubjectProfessor(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" placeholder="Ej: Carlos Pérez" />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">Icono / Emoji (Opcional)</label>
-                    {newSubjectEmoji && (
-                      <button
-                        type="button"
-                        onClick={() => setNewSubjectEmoji('')}
-                        className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
-                      >
-                        Eliminar emoji ✕
-                      </button>
-                    )}
+                {/* Nombre & Código */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Nombre *</label>
+                    <input 
+                      type="text" 
+                      value={newSubjectName} 
+                      onChange={e => setNewSubjectName(e.target.value)} 
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
+                      placeholder="Ej: Matemáticas Discretas" 
+                      autoFocus 
+                    />
                   </div>
-                  <input 
-                    type="text" 
-                    value={newSubjectEmoji} 
-                    onChange={e => setNewSubjectEmoji(e.target.value)} 
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
-                    placeholder="Escribe o elige un emoji con el teclado (opcional)" 
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Código</label>
+                    <input 
+                      type="text" 
+                      value={newSubjectCode} 
+                      onChange={e => setNewSubjectCode(e.target.value)} 
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm font-mono" 
+                      placeholder="MAT-101" 
+                    />
+                  </div>
+                </div>
+
+                {/* Profesor & Descripción */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Profesor</label>
+                    <input 
+                      type="text" 
+                      value={newSubjectProfessor} 
+                      onChange={e => setNewSubjectProfessor(e.target.value)} 
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
+                      placeholder="Ej: Dr. Carlos Pérez" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Emoji e Identificador</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={newSubjectEmoji} 
+                        onChange={e => setNewSubjectEmoji(e.target.value)} 
+                        className="w-16 px-2 text-center py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-base" 
+                        placeholder="📚" 
+                      />
+                      <input 
+                        type="color" 
+                        value={newSubjectColor} 
+                        onChange={e => setNewSubjectColor(e.target.value)} 
+                        className="w-12 h-10 p-1 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
+                  <textarea 
+                    value={newSubjectDescription} 
+                    onChange={e => setNewSubjectDescription(e.target.value)} 
+                    rows={2}
+                    className="w-full px-3.5 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm resize-none" 
+                    placeholder="Breve resumen o temas principales de la asignatura..." 
                   />
+                </div>
+
+                {/* Modalidad & Aula/Link */}
+                <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-3">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">Modalidad de Clase</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewSubjectIsVirtual(false)}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        !newSubjectIsVirtual 
+                          ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs' 
+                          : 'bg-gray-50 dark:bg-[#111] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10'
+                      }`}
+                    >
+                      <MapPin className="w-4 h-4" />
+                      <span>Presencial</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewSubjectIsVirtual(true)}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        newSubjectIsVirtual 
+                          ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs' 
+                          : 'bg-gray-50 dark:bg-[#111] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10'
+                      }`}
+                    >
+                      <Video className="w-4 h-4" />
+                      <span>Virtual</span>
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                      {newSubjectIsVirtual ? 'Enlace Virtual (Meet/Zoom)' : 'Aula / Salón de Clase'}
+                    </label>
+                    <input 
+                      type="text" 
+                      value={newSubjectRoom} 
+                      onChange={e => setNewSubjectRoom(e.target.value)} 
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
+                      placeholder={newSubjectIsVirtual ? 'https://meet.google.com/...' : 'Ej: Edificio A - Aula 302'} 
+                    />
+                  </div>
+                </div>
+
+                {/* Días y Horarios */}
+                <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-3">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">Días de Clase</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((day) => {
+                      const isSelected = newSubjectDays.includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setNewSubjectDays(prev => prev.filter(d => d !== day));
+                            } else {
+                              setNewSubjectDays(prev => [...prev, day]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/15'
+                          }`}
+                        >
+                          {day.substring(0, 3)}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">Hora Inicio</label>
+                      <input 
+                        type="time" 
+                        value={newSubjectStartTime} 
+                        onChange={e => setNewSubjectStartTime(e.target.value)} 
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">Hora Fin</label>
+                      <input 
+                        type="time" 
+                        value={newSubjectEndTime} 
+                        onChange={e => setNewSubjectEndTime(e.target.value)} 
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fechas de inicio y fin */}
+                <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => setNewSubjectHasDateRange(!newSubjectHasDateRange)}>
+                      ¿Definir período / Rango de fechas?
+                    </label>
+                    <input 
+                      type="checkbox" 
+                      checked={newSubjectHasDateRange} 
+                      onChange={e => setNewSubjectHasDateRange(e.target.checked)} 
+                      className="w-4 h-4 rounded text-black dark:text-white cursor-pointer" 
+                    />
+                  </div>
+
+                  {newSubjectHasDateRange && (
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">Fecha Inicio</label>
+                        <input 
+                          type="date" 
+                          value={newSubjectStartDate} 
+                          onChange={e => setNewSubjectStartDate(e.target.value)} 
+                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">Fecha Finalización</label>
+                        <input 
+                          type="date" 
+                          value={newSubjectEndDate} 
+                          onChange={e => setNewSubjectEndDate(e.target.value)} 
+                          className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs" 
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
+
               <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
                 <button onClick={() => setIsAddingSubject(false)} className="px-4 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
                 <button onClick={handleSaveSubject} disabled={!newSubjectName.trim()} className="px-5 py-2.5 text-xs font-bold bg-black text-white dark:bg-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer">Guardar Materia</button>

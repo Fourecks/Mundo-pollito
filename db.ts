@@ -132,7 +132,7 @@ const TABLE_ALLOWED_COLUMNS: Record<string, Set<string>> = {
         'id', 'user_id', 'name', 'start_date', 'end_date', 'is_active', 'created_at'
     ]),
     student_subjects: new Set([
-        'id', 'user_id', 'period_id', 'name', 'code', 'professor', 'room', 'color', 'emoji', 'description', 'target_grade', 'grade_scale', 'status', 'created_at'
+        'id', 'user_id', 'period_id', 'name', 'code', 'professor', 'room', 'color', 'emoji', 'description', 'target_grade', 'grade_scale', 'status', 'is_virtual', 'days', 'start_time', 'end_time', 'has_date_range', 'start_date', 'end_date', 'created_at'
     ]),
     student_subject_schedules: new Set([
         'id', 'subject_id', 'day_of_week', 'start_time', 'end_time', 'room'
@@ -236,10 +236,39 @@ const getStore = (storeName: string, mode: IDBTransactionMode) => {
     return tx.objectStore(storeName);
 };
 
+// --- Tombstone / Deleted IDs Tracking to prevent resurrection ---
+const getDeletedIds = (): Set<string> => {
+    try {
+        const raw = localStorage.getItem('db_deleted_ids');
+        return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+        return new Set();
+    }
+};
+
+const recordDeletedId = (id: string | number): void => {
+    if (!id) return;
+    try {
+        const set = getDeletedIds();
+        set.add(String(id));
+        localStorage.setItem('db_deleted_ids', JSON.stringify(Array.from(set)));
+    } catch {}
+};
+
+const removeDeletedId = (id: string | number): void => {
+    if (!id) return;
+    try {
+        const set = getDeletedIds();
+        set.delete(String(id));
+        localStorage.setItem('db_deleted_ids', JSON.stringify(Array.from(set)));
+    } catch {}
+};
+
 export const getAll = async <T>(storeName: string): Promise<T[]> => {
     try {
         await ensureDB();
-        return await new Promise((resolve) => {
+        const deletedIds = getDeletedIds();
+        const rawItems = await new Promise<T[]>((resolve) => {
             if (!db || !db.objectStoreNames.contains(storeName)) {
                 // Fallback to localStorage if store not in current db version
                 try {
@@ -257,6 +286,7 @@ export const getAll = async <T>(storeName: string): Promise<T[]> => {
                 resolve([]);
             }
         });
+        return rawItems.filter((item: any) => !item || !item.id || !deletedIds.has(String(item.id)));
     } catch {
         return [];
     }
@@ -394,10 +424,12 @@ const clearStore = async (storeName: string): Promise<void> => {
 
 export const clearAndPutAll = async <T>(storeName: string, data: T[]): Promise<void> => {
     await ensureDB();
+    const deletedIds = getDeletedIds();
+    const cleanData = data.filter((item: any) => !item || !item.id || !deletedIds.has(String(item.id)));
     return new Promise((resolve) => {
         if (!db || !db.objectStoreNames.contains(storeName)) {
             try {
-                localStorage.setItem(`db_cache_${storeName}`, JSON.stringify(data));
+                localStorage.setItem(`db_cache_${storeName}`, JSON.stringify(cleanData));
             } catch {}
             return resolve();
         }
@@ -405,7 +437,7 @@ export const clearAndPutAll = async <T>(storeName: string, data: T[]): Promise<v
             const tx = db.transaction(storeName, 'readwrite');
             const store = tx.objectStore(storeName);
             store.clear();
-            data.forEach(item => store.put(item));
+            cleanData.forEach(item => store.put(item));
             tx.oncomplete = () => resolve();
             tx.onerror = () => resolve();
         } catch {
@@ -552,6 +584,7 @@ export const syncableUpdate = async (tableName: string, payload: any): Promise<a
 };
 
 export const syncableDelete = async (tableName: string, key: number | string): Promise<void> => {
+    recordDeletedId(key);
     if (typeof key === 'number' && key < 0) {
         await queueMutation({ type: 'DELETE', tableName, key });
         await remove(tableName, key);
@@ -577,6 +610,7 @@ export const syncableDelete = async (tableName: string, key: number | string): P
 
 export const syncableDeleteMultiple = async (tableName: string, keys: (number | string)[]): Promise<void> => {
     if (keys.length === 0) return;
+    keys.forEach(k => recordDeletedId(k));
     await removeMultiple(tableName, keys); 
 
     if (navigator.onLine) {

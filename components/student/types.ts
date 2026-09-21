@@ -22,6 +22,13 @@ export interface Subject {
   target_grade?: number;
   grade_scale?: number; // e.g. 10 or 100, default 10
   status?: 'active' | 'completed' | 'archived'; // default active
+  is_virtual?: boolean;
+  days?: string[]; // e.g. ["Lunes", "Miércoles"]
+  start_time?: string; // e.g. "08:00"
+  end_time?: string; // e.g. "10:00"
+  has_date_range?: boolean;
+  start_date?: string; // e.g. "2026-02-01"
+  end_date?: string; // e.g. "2026-06-30"
   created_at: string;
 }
 
