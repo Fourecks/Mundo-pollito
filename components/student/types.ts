@@ -34,11 +34,13 @@ export interface Subject {
 
 export interface SubjectSchedule {
   id: string;
+  user_id?: string;
   subject_id: string;
-  day_of_week: number; // 0 = Sunday, 1 = Monday, ...
+  day_of_week: string; // 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
   start_time: string; // "08:00"
   end_time: string; // "10:00"
-  room?: string;
+  repeat_weekly?: boolean;
+  created_at?: string;
 }
 
 export interface Unit {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Todo, Folder, Note, Project } from '../../types';
-import { Subject, AcademicPeriod, Exam, Reading, Goal, Grade, GradeCategory, StudySession, Attendance } from './types';
+import { Subject, AcademicPeriod, Exam, Reading, Goal, Grade, GradeCategory, StudySession, Attendance, SubjectSchedule } from './types';
 import { getAll, syncableCreate, syncableUpdate, syncableDelete, ensureDB } from '../../db';
 import { supabase } from '../../supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,62 +23,113 @@ interface StudentModuleProps {
 
 const ScheduleView: React.FC<{
   subjects: Subject[];
+  schedules: SubjectSchedule[];
+  onAddScheduleSlot: (slot: {
+    subject_id: string;
+    day_of_week: string;
+    start_time: string;
+    end_time: string;
+    repeat_weekly: boolean;
+  }) => void;
+  onDeleteScheduleSlot: (id: string) => void;
   onSelectSubject: (subject: Subject) => void;
   onAddSubjectClick: () => void;
-}> = ({ subjects, onSelectSubject, onAddSubjectClick }) => {
+}> = ({ subjects, schedules, onAddScheduleSlot, onDeleteScheduleSlot, onSelectSubject, onAddSubjectClick }) => {
   const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   
   const todayIndex = new Date().getDay();
   const initialDayIndex = todayIndex === 0 ? 6 : todayIndex - 1;
   const [selectedDay, setSelectedDay] = useState<string>(daysOfWeek[initialDayIndex] || 'Lunes');
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [isAddingSlot, setIsAddingSlot] = useState(false);
 
-  const daySubjects = subjects.filter(s => {
-    if (!s.days || s.days.length === 0) return false;
-    return s.days.includes(selectedDay);
-  }).sort((a, b) => (a.start_time || '00:00').localeCompare(b.start_time || '00:00'));
+  // Form states for schedule slot
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [slotDay, setSlotDay] = useState<string>(selectedDay);
+  const [slotStartTime, setSlotStartTime] = useState<string>('08:00');
+  const [slotEndTime, setSlotEndTime] = useState<string>('10:00');
+  const [slotRepeatWeekly, setSlotRepeatWeekly] = useState<boolean>(true);
+
+  // Set default subject ID when modal opens
+  useEffect(() => {
+    if (subjects.length > 0 && !selectedSubjectId) {
+      setSelectedSubjectId(subjects[0].id);
+    }
+  }, [subjects, selectedSubjectId]);
+
+  const handleCreateSlot = () => {
+    if (!selectedSubjectId) return;
+    onAddScheduleSlot({
+      subject_id: selectedSubjectId,
+      day_of_week: slotDay,
+      start_time: slotStartTime,
+      end_time: slotEndTime,
+      repeat_weekly: slotRepeatWeekly,
+    });
+    setIsAddingSlot(false);
+  };
+
+  const daySlots = schedules.filter(s => s.day_of_week === selectedDay)
+    .sort((a, b) => (a.start_time || '00:00').localeCompare(b.start_time || '00:00'));
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Clock className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             <span>Horario de Clases Semanal</span>
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Planificación de tus sesiones semanales
+            Agrega clases de tus materias creadas y organízalas por día
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-white/10 p-1 rounded-xl">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setViewMode('day')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-              viewMode === 'day' 
-                ? 'bg-white dark:bg-[#18181b] text-gray-900 dark:text-white shadow-xs' 
-                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-            }`}
+            onClick={() => {
+              if (subjects.length === 0) {
+                onAddSubjectClick();
+              } else {
+                setSlotDay(selectedDay);
+                setIsAddingSlot(true);
+              }
+            }}
+            className="px-3.5 py-1.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
           >
-            Vista Diaria
+            <Plus className="w-4 h-4" />
+            <span>+ Añadir a Horario</span>
           </button>
-          <button
-            onClick={() => setViewMode('week')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-              viewMode === 'week' 
-                ? 'bg-white dark:bg-[#18181b] text-gray-900 dark:text-white shadow-xs' 
-                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            Vista Semanal
-          </button>
+
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/10 p-1 rounded-xl">
+            <button
+              onClick={() => setViewMode('day')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'day' 
+                  ? 'bg-white dark:bg-[#18181b] text-gray-900 dark:text-white shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Día
+            </button>
+            <button
+              onClick={() => setViewMode('week')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'week' 
+                  ? 'bg-white dark:bg-[#18181b] text-gray-900 dark:text-white shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Semana
+            </button>
+          </div>
         </div>
       </div>
 
       {viewMode === 'day' && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
           {daysOfWeek.map((day) => {
-            const hasClasses = subjects.some(s => s.days && s.days.includes(day));
+            const hasClasses = schedules.some(s => s.day_of_week === day);
             const isSelected = selectedDay === day;
             return (
               <button
@@ -102,81 +153,101 @@ const ScheduleView: React.FC<{
 
       {viewMode === 'day' && (
         <div className="space-y-3">
-          {daySubjects.length === 0 ? (
+          {daySlots.length === 0 ? (
             <div className="p-8 bg-white dark:bg-[#151515] border border-gray-150 dark:border-white/5 rounded-2xl text-center space-y-3">
               <Clock className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto" />
               <div>
-                <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Sin clases programadas para el {selectedDay}</p>
-                <p className="text-xs text-gray-400 mt-1">Disfruta tu tiempo libre o registra materias con horarios en este día.</p>
+                <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Sin horario de clases para el {selectedDay}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {subjects.length === 0 
+                    ? 'Primero crea una materia para poder agregarla a tu horario.' 
+                    : 'Toca "+ Añadir a Horario" para programar una materia en este día.'}
+                </p>
               </div>
               <button
-                onClick={onAddSubjectClick}
+                onClick={() => {
+                  if (subjects.length === 0) {
+                    onAddSubjectClick();
+                  } else {
+                    setSlotDay(selectedDay);
+                    setIsAddingSlot(true);
+                  }
+                }}
                 className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Agregar Materia</span>
+                <span>{subjects.length === 0 ? '+ Crear Materia' : '+ Añadir a Horario'}</span>
               </button>
             </div>
           ) : (
-            daySubjects.map(subj => (
-              <div
-                key={subj.id}
-                onClick={() => onSelectSubject(subj)}
-                className="p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
-              >
-                <div className="flex items-start gap-3.5">
+            daySlots.map(slot => {
+              const subj = subjects.find(s => s.id === slot.subject_id);
+              if (!subj) return null;
+              return (
+                <div
+                  key={slot.id}
+                  className="p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                >
                   <div 
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 font-bold"
-                    style={{ backgroundColor: `${subj.color}20`, color: subj.color }}
+                    onClick={() => onSelectSubject(subj)}
+                    className="flex items-start gap-3.5 cursor-pointer min-w-0"
                   >
-                    {subj.emoji || '📚'}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors">
-                        {subj.name}
-                      </h4>
-                      {subj.code && (
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-white/10">
-                          {subj.code}
-                        </span>
-                      )}
+                    <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/10 flex items-center justify-center text-xl shrink-0 font-bold">
+                      {subj.emoji || '📚'}
                     </div>
-                    {subj.professor && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        Profesor: {subj.professor}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 mt-2 text-xs font-semibold text-gray-600 dark:text-gray-300 flex-wrap">
-                      {subj.is_virtual ? (
-                        <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-lg border border-purple-200 dark:border-purple-500/20">
-                          <Video className="w-3.5 h-3.5" />
-                          <span>{subj.room || 'Clase Virtual'}</span>
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-500/20">
-                          <MapPin className="w-3.5 h-3.5" />
-                          <span>{subj.room || 'Aula Presencial'}</span>
-                        </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors truncate">
+                          {subj.name}
+                        </h4>
+                        {subj.code && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-white/10">
+                            {subj.code}
+                          </span>
+                        )}
+                      </div>
+                      {subj.professor && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          Profesor: {subj.professor}
+                        </p>
                       )}
-                      {subj.has_date_range && subj.start_date && (
-                        <span className="text-gray-400 text-[11px]">
-                          Del {subj.start_date} al {subj.end_date || 'Fin de ciclo'}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 mt-2 text-xs font-semibold text-gray-600 dark:text-gray-300 flex-wrap">
+                        {subj.is_virtual ? (
+                          <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-lg border border-purple-200 dark:border-purple-500/20">
+                            <Video className="w-3.5 h-3.5" />
+                            <span>Modalidad Virtual</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-500/20">
+                            <MapPin className="w-3.5 h-3.5" />
+                            <span>{subj.room || 'Aula Presencial'}</span>
+                          </span>
+                        )}
+                        {slot.repeat_weekly && (
+                          <span className="text-[10px] text-gray-400 font-mono bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded">
+                            ↻ Repetición semanal
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-white/5">
-                  <div className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-mono text-xs font-bold flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{subj.start_time || '08:00'} - {subj.end_time || '10:00'}</span>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-white/5">
+                    <div className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-mono text-xs font-bold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{slot.start_time || '08:00'} - {slot.end_time || '10:00'}</span>
+                    </div>
+                    <button
+                      onClick={() => onDeleteScheduleSlot(slot.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                      title="Eliminar de horario"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
@@ -184,7 +255,7 @@ const ScheduleView: React.FC<{
       {viewMode === 'week' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {daysOfWeek.map((day) => {
-            const classesOnDay = subjects.filter(s => s.days && s.days.includes(day))
+            const daySlotsList = schedules.filter(s => s.day_of_week === day)
               .sort((a, b) => (a.start_time || '00:00').localeCompare(b.start_time || '00:00'));
 
             return (
@@ -195,31 +266,43 @@ const ScheduleView: React.FC<{
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-white/5">
                   <h4 className="font-bold text-xs uppercase tracking-wider text-gray-800 dark:text-gray-200">{day}</h4>
                   <span className="text-[10px] font-mono text-gray-400">
-                    {classesOnDay.length} {classesOnDay.length === 1 ? 'clase' : 'clases'}
+                    {daySlotsList.length} {daySlotsList.length === 1 ? 'clase' : 'clases'}
                   </span>
                 </div>
 
-                {classesOnDay.length === 0 ? (
+                {daySlotsList.length === 0 ? (
                   <p className="text-xs text-gray-400 py-3 text-center italic">Sin clases</p>
                 ) : (
                   <div className="space-y-2">
-                    {classesOnDay.map(s => (
-                      <div
-                        key={s.id}
-                        onClick={() => onSelectSubject(s)}
-                        className="p-2.5 bg-gray-50 dark:bg-[#1a1a1e] rounded-xl border border-gray-200/80 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all cursor-pointer flex items-center justify-between gap-2"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-bold text-xs text-gray-900 dark:text-white truncate block">
-                            {s.emoji} {s.name}
-                          </span>
-                          <span className="text-[10px] text-gray-500 font-mono block mt-0.5">
-                            {s.start_time} - {s.end_time} · {s.room || (s.is_virtual ? 'Virtual' : 'Aula')}
-                          </span>
+                    {daySlotsList.map(slot => {
+                      const subj = subjects.find(s => s.id === slot.subject_id);
+                      if (!subj) return null;
+                      return (
+                        <div
+                          key={slot.id}
+                          className="p-2.5 bg-gray-50 dark:bg-[#1a1a1e] rounded-xl border border-gray-200/80 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all flex items-center justify-between gap-2"
+                        >
+                          <div 
+                            onClick={() => onSelectSubject(subj)}
+                            className="min-w-0 cursor-pointer flex-1"
+                          >
+                            <span className="font-bold text-xs text-gray-900 dark:text-white truncate block">
+                              {subj.emoji} {subj.name}
+                            </span>
+                            <span className="text-[10px] text-gray-500 font-mono block mt-0.5">
+                              {slot.start_time} - {slot.end_time} · {subj.is_virtual ? 'Virtual' : (subj.room || 'Aula')}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => onDeleteScheduleSlot(slot.id)}
+                            className="p-1 text-gray-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -227,6 +310,119 @@ const ScheduleView: React.FC<{
           })}
         </div>
       )}
+
+      {/* Add Schedule Slot Modal */}
+      <AnimatePresence>
+        {isAddingSlot && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4">
+            <motion.div 
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white dark:bg-[#18181b] rounded-t-3xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-white/10 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl pb-safe"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/10">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Añadir a Horario</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Asigna un horario semanal a una de tus materias</p>
+                </div>
+                <button onClick={() => setIsAddingSlot(false)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Seleccionar Materia */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                    Seleccionar Materia *
+                  </label>
+                  <select
+                    value={selectedSubjectId}
+                    onChange={e => setSelectedSubjectId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-sm font-medium"
+                  >
+                    {subjects.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.emoji || '📚'} {s.name} {s.code ? `(${s.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Día de la semana */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                    Día de la semana *
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {daysOfWeek.map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setSlotDay(d)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          slotDay === d
+                            ? 'bg-black text-white dark:bg-white dark:text-black shadow-2xs'
+                            : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        {d.substring(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Horas */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Hora Inicio</label>
+                    <input 
+                      type="time" 
+                      value={slotStartTime} 
+                      onChange={e => setSlotStartTime(e.target.value)} 
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Hora Fin</label>
+                    <input 
+                      type="time" 
+                      value={slotEndTime} 
+                      onChange={e => setSlotEndTime(e.target.value)} 
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
+                    />
+                  </div>
+                </div>
+
+                {/* Repetición semanal */}
+                <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => setSlotRepeatWeekly(!slotRepeatWeekly)}>
+                      Repetir semanalmente
+                    </label>
+                    <input 
+                      type="checkbox" 
+                      checked={slotRepeatWeekly} 
+                      onChange={e => setSlotRepeatWeekly(e.target.checked)} 
+                      className="w-4 h-4 rounded text-black dark:text-white cursor-pointer" 
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/5 p-2.5 rounded-xl border border-gray-150 dark:border-white/5 leading-relaxed">
+                    💡 Se cargará dinámicamente 1 mes por adelantado cada semana para mantener el rendimiento del dispositivo ligero y veloz.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
+                <button onClick={() => setIsAddingSlot(false)} className="px-4 py-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer">Cancelar</button>
+                <button onClick={handleCreateSlot} disabled={!selectedSubjectId} className="px-5 py-2.5 text-xs font-bold bg-black text-white dark:bg-white dark:text-black rounded-xl hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 transition-colors cursor-pointer">Guardar en Horario</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -252,6 +448,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   const [projects, setProjects] = useState<Project[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [schedules, setSchedules] = useState<SubjectSchedule[]>([]);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'subjects' | 'calendar' | 'schedule' | 'library' | 'goals' | 'analytics'>('dashboard');
@@ -309,7 +506,8 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
         loadedSessions,
         loadedAttendances,
         loadedTodos,
-        loadedProjects
+        loadedProjects,
+        loadedSchedules
       ] = await Promise.all([
         getAll<Subject>('student_subjects'),
         getAll<AcademicPeriod>('student_academic_periods'),
@@ -322,6 +520,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
         getAll<Attendance>('student_attendance'),
         getAll<Todo>('todos'),
         getAll<Project>('projects'),
+        getAll<SubjectSchedule>('student_subject_schedules'),
       ]);
 
       setSubjects(loadedSubjects || []);
@@ -335,6 +534,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       setAttendances(loadedAttendances || []);
       setTodos(loadedTodos || []);
       setProjects(loadedProjects || []);
+      setSchedules(loadedSchedules || []);
 
       // If user is logged in, also try background sync from Supabase
       try {
@@ -427,14 +627,11 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       description: newSubjectDescription.trim() || undefined,
       professor: newSubjectProfessor.trim() || undefined,
       is_virtual: newSubjectIsVirtual,
-      room: newSubjectRoom.trim() || undefined,
-      days: newSubjectDays.length > 0 ? newSubjectDays : undefined,
-      start_time: newSubjectStartTime || undefined,
-      end_time: newSubjectEndTime || undefined,
+      room: !newSubjectIsVirtual && newSubjectRoom.trim() ? newSubjectRoom.trim() : undefined,
       has_date_range: newSubjectHasDateRange,
       start_date: newSubjectHasDateRange && newSubjectStartDate ? newSubjectStartDate : undefined,
       end_date: newSubjectHasDateRange && newSubjectEndDate ? newSubjectEndDate : undefined,
-      color: newSubjectColor || '#3B82F6',
+      color: '#18181b',
       emoji: newSubjectEmoji || '📚',
       created_at: new Date().toISOString()
     };
@@ -450,17 +647,57 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     setNewSubjectProfessor('');
     setNewSubjectIsVirtual(false);
     setNewSubjectRoom('');
-    setNewSubjectDays([]);
-    setNewSubjectStartTime('08:00');
-    setNewSubjectEndTime('10:00');
     setNewSubjectHasDateRange(false);
     setNewSubjectStartDate('');
     setNewSubjectEndDate('');
+    setNewSubjectEmoji('📚');
     
     try {
       await syncableCreate('student_subjects', newSubject);
     } catch (err) {
       console.error("Error saving subject:", err);
+    }
+  };
+
+  const handleSaveScheduleSlot = async (slotData: {
+    subject_id: string;
+    day_of_week: string;
+    start_time: string;
+    end_time: string;
+    repeat_weekly: boolean;
+  }) => {
+    let userId = 'local';
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) userId = user.id;
+    } catch {}
+
+    const newSlot: SubjectSchedule = {
+      id: generateUUID(),
+      user_id: userId,
+      subject_id: slotData.subject_id,
+      day_of_week: slotData.day_of_week,
+      start_time: slotData.start_time,
+      end_time: slotData.end_time,
+      repeat_weekly: slotData.repeat_weekly,
+      created_at: new Date().toISOString()
+    };
+
+    setSchedules(prev => [...prev, newSlot]);
+
+    try {
+      await syncableCreate('student_subject_schedules', newSlot);
+    } catch (err) {
+      console.error("Error saving schedule slot:", err);
+    }
+  };
+
+  const handleDeleteScheduleSlot = async (slotId: string) => {
+    setSchedules(prev => prev.filter(s => s.id !== slotId));
+    try {
+      await syncableDelete('student_subject_schedules', slotId);
+    } catch (err) {
+      console.error("Error deleting schedule slot:", err);
     }
   };
 
@@ -810,6 +1047,9 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             <div className="max-w-6xl mx-auto">
               <ScheduleView 
                 subjects={subjects} 
+                schedules={schedules}
+                onAddScheduleSlot={handleSaveScheduleSlot}
+                onDeleteScheduleSlot={handleDeleteScheduleSlot}
                 onSelectSubject={(subj) => setActiveSubject(subj)} 
                 onAddSubjectClick={() => setIsAddingSubject(true)} 
               />
@@ -1012,6 +1252,9 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
               {masSubScreen === 'schedule' && (
                 <ScheduleView 
                   subjects={subjects} 
+                  schedules={schedules}
+                  onAddScheduleSlot={handleSaveScheduleSlot}
+                  onDeleteScheduleSlot={handleDeleteScheduleSlot}
                   onSelectSubject={(subj) => setActiveSubject(subj)} 
                   onAddSubjectClick={() => setIsAddingSubject(true)} 
                 />
@@ -1536,9 +1779,10 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
               </div>
 
               <div className="space-y-4">
-                {/* Nombre & Código */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2">
+                {/* Campos ordenados en columnas de a 2 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Columna 1: Nombre */}
+                  <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Nombre *</label>
                     <input 
                       type="text" 
@@ -1549,6 +1793,8 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       autoFocus 
                     />
                   </div>
+
+                  {/* Columna 2: Código */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Código</label>
                     <input 
@@ -1559,10 +1805,8 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       placeholder="MAT-101" 
                     />
                   </div>
-                </div>
 
-                {/* Profesor & Descripción */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Columna 3: Profesor */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Profesor</label>
                     <input 
@@ -1573,26 +1817,45 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                       placeholder="Ej: Dr. Carlos Pérez" 
                     />
                   </div>
+
+                  {/* Columna 4: Emoji de la Materia */}
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Emoji e Identificador</label>
-                    <div className="flex gap-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Emoji / Icono</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl p-2 bg-gray-100 dark:bg-white/10 rounded-xl shrink-0">
+                        {newSubjectEmoji || '📚'}
+                      </span>
                       <input 
                         type="text" 
                         value={newSubjectEmoji} 
                         onChange={e => setNewSubjectEmoji(e.target.value)} 
-                        className="w-16 px-2 text-center py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-base" 
-                        placeholder="📚" 
-                      />
-                      <input 
-                        type="color" 
-                        value={newSubjectColor} 
-                        onChange={e => setNewSubjectColor(e.target.value)} 
-                        className="w-12 h-10 p-1 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer" 
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-sm text-center" 
+                        placeholder="Escribe emoji..." 
                       />
                     </div>
                   </div>
                 </div>
 
+                {/* Selección rápida de Emojis */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Elegir de lista rápida de emojis</label>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-gray-50 dark:bg-[#111] rounded-xl border border-gray-150 dark:border-white/5">
+                    {['📚', '📖', '✏️', '📝', '📐', '🧪', '🔬', '💻', '🎨', '🏛️', '🧬', '⚖️', '🩺', '📊', '🌍', '🧠', '🎼', '🗣️', '⚽', '💼', '🤖', '🎓', '🎒', '🖋️', '📌', '🔎', '💡', '🧮', '🛰️', '⭐'].map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setNewSubjectEmoji(emoji)}
+                        className={`w-8 h-8 rounded-lg text-base flex items-center justify-center transition-transform hover:scale-115 cursor-pointer ${
+                          newSubjectEmoji === emoji ? 'bg-black text-white dark:bg-white dark:text-black scale-110 shadow-xs' : 'hover:bg-gray-200 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Descripción (2 columnas ancho completo) */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Descripción</label>
                   <textarea 
@@ -1604,106 +1867,66 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                   />
                 </div>
 
-                {/* Modalidad & Aula/Link */}
-                <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-3">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">Modalidad de Clase</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNewSubjectIsVirtual(false)}
-                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                        !newSubjectIsVirtual 
-                          ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs' 
-                          : 'bg-gray-50 dark:bg-[#111] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10'
-                      }`}
-                    >
-                      <MapPin className="w-4 h-4" />
-                      <span>Presencial</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewSubjectIsVirtual(true)}
-                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                        newSubjectIsVirtual 
-                          ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs' 
-                          : 'bg-gray-50 dark:bg-[#111] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10'
-                      }`}
-                    >
-                      <Video className="w-4 h-4" />
-                      <span>Virtual</span>
-                    </button>
+                {/* Modalidad & Aula */}
+                <div className="pt-2 border-t border-gray-100 dark:border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Modalidad</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewSubjectIsVirtual(false)}
+                        className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          !newSubjectIsVirtual 
+                            ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs' 
+                            : 'bg-gray-50 dark:bg-[#111] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10'
+                        }`}
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>Presencial</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewSubjectIsVirtual(true)}
+                        className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          newSubjectIsVirtual 
+                            ? 'bg-black text-white dark:bg-white dark:text-black border-transparent shadow-xs' 
+                            : 'bg-gray-50 dark:bg-[#111] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10'
+                        }`}
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        <span>Virtual</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-                      {newSubjectIsVirtual ? 'Enlace Virtual (Meet/Zoom)' : 'Aula / Salón de Clase'}
-                    </label>
-                    <input 
-                      type="text" 
-                      value={newSubjectRoom} 
-                      onChange={e => setNewSubjectRoom(e.target.value)} 
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
-                      placeholder={newSubjectIsVirtual ? 'https://meet.google.com/...' : 'Ej: Edificio A - Aula 302'} 
-                    />
+                    {!newSubjectIsVirtual ? (
+                      <>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                          Aula / Salón de Clase
+                        </label>
+                        <input 
+                          type="text" 
+                          value={newSubjectRoom} 
+                          onChange={e => setNewSubjectRoom(e.target.value)} 
+                          className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
+                          placeholder="Ej: Edificio A - Aula 302" 
+                        />
+                      </>
+                    ) : (
+                      <div className="p-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-xl border border-purple-200 dark:border-purple-500/20 text-xs text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                        <Video className="w-4 h-4 shrink-0" />
+                        <span>Modalidad Virtual activada (sin aula física).</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Días y Horarios */}
-                <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-3">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">Días de Clase</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((day) => {
-                      const isSelected = newSubjectDays.includes(day);
-                      return (
-                        <button
-                          key={day}
-                          type="button"
-                          onClick={() => {
-                            if (isSelected) {
-                              setNewSubjectDays(prev => prev.filter(d => d !== day));
-                            } else {
-                              setNewSubjectDays(prev => [...prev, day]);
-                            }
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-blue-600 text-white shadow-2xs'
-                              : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/15'
-                          }`}
-                        >
-                          {day.substring(0, 3)}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">Hora Inicio</label>
-                      <input 
-                        type="time" 
-                        value={newSubjectStartTime} 
-                        onChange={e => setNewSubjectStartTime(e.target.value)} 
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">Hora Fin</label>
-                      <input 
-                        type="time" 
-                        value={newSubjectEndTime} 
-                        onChange={e => setNewSubjectEndTime(e.target.value)} 
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none text-xs font-mono" 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Fechas de inicio y fin */}
+                {/* Fechas opcionales de inicio y fin */}
                 <div className="pt-2 border-t border-gray-100 dark:border-white/5 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => setNewSubjectHasDateRange(!newSubjectHasDateRange)}>
-                      ¿Definir período / Rango de fechas?
+                      ¿Definir fecha de inicio o fin? (Opcional)
                     </label>
                     <input 
                       type="checkbox" 
