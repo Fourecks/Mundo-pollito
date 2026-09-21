@@ -773,7 +773,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
     : 0;
 
   return (
-    <div className="w-full h-full flex flex-col bg-white dark:bg-[#111] text-gray-900 dark:text-gray-100 overflow-hidden font-sans">
+    <div className="w-full flex flex-col bg-white dark:bg-[#111] text-gray-900 dark:text-gray-100 font-sans">
       
       {/* DESKTOP HEADER */}
       <header className="hidden md:flex px-8 py-6 border-b border-gray-100 dark:border-white/5 items-center justify-between flex-shrink-0 gap-4" style={{ borderBottomColor: `${subject.color}30` }}>
@@ -894,7 +894,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50 dark:bg-[#0A0A0A]">
+      <div className="p-4 md:p-6 bg-gray-50/50 dark:bg-[#0A0A0A]">
         <div className="max-w-6xl mx-auto h-full">
           {activeUnit ? (
             <div className="space-y-6">
@@ -1150,7 +1150,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {units.map((unit, index) => {
                       const unitTaskCount = tasks.filter(t => t.unit_id === unit.id && !t.completed).length;
                       const unitNoteCount = notes.filter(n => (n as any).unit_id === unit.id).length;
@@ -1158,11 +1158,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
                         <div
                           key={unit.id}
                           onClick={() => setActiveUnit(unit)}
-                          className="bg-white dark:bg-[#151515] p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all shadow-2xs cursor-pointer flex flex-col justify-between group"
+                          className="bg-white dark:bg-[#151515] p-3 rounded-xl border border-gray-200/80 dark:border-zinc-800 hover:border-gray-400 dark:hover:border-zinc-600 transition-all shadow-2xs cursor-pointer flex flex-col justify-between group"
                         >
                           <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500">
                                 Unidad {index + 1}
                               </span>
                               <button
@@ -1173,20 +1173,20 @@ export const SubjectWorkspace: React.FC<Props> = ({
                                 {unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}
                               </button>
                             </div>
-                            <h4 className="font-bold text-sm text-gray-900 dark:text-white line-clamp-1">
+                            <h4 className="font-bold text-xs text-gray-900 dark:text-white line-clamp-1">
                               {unit.name}
                             </h4>
                             {unit.description && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{unit.description}</p>
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{unit.description}</p>
                             )}
                           </div>
-                          <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100 dark:border-white/5 text-[11px] text-gray-400 font-mono">
+                          <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-100 dark:border-white/5 text-[10px] text-gray-400 font-mono">
                             <span className="flex items-center gap-2">
                               {unitTaskCount > 0 && <span>{unitTaskCount} tareas</span>}
                               {unitNoteCount > 0 && <span>{unitNoteCount} apuntes</span>}
-                              {unitTaskCount === 0 && unitNoteCount === 0 && <span>Explorar →</span>}
+                              {unitTaskCount === 0 && unitNoteCount === 0 && <span>Sin pendientes</span>}
                             </span>
-                            <span>→</span>
+                            <span className="text-gray-900 dark:text-white font-sans font-bold group-hover:underline">Abrir →</span>
                           </div>
                         </div>
                       );
@@ -1336,41 +1336,41 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   <p>No has creado unidades todavía.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {units.map((unit, i) => (
                     <div
                       key={unit.id}
                       onClick={() => setActiveUnit(unit)}
-                      className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center justify-between group cursor-pointer hover:border-blue-500/30 transition-all"
+                      className="bg-white dark:bg-[#151515] py-2.5 px-3.5 rounded-xl border border-gray-200/80 dark:border-zinc-800 shadow-2xs flex items-center justify-between group cursor-pointer hover:border-gray-400 dark:hover:border-zinc-600 transition-all"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold">
+                      <div className="flex items-center gap-3 min-w-0 pr-2">
+                        <div className="w-6 h-6 rounded-md bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white flex items-center justify-center text-xs font-bold shrink-0 border border-gray-200 dark:border-white/10">
                           {i + 1}
                         </div>
-                        <div>
-                          <span className="font-medium text-gray-900 dark:text-gray-100 block">{unit.name}</span>
-                          {unit.description && <p className="text-xs text-gray-500 mt-0.5">{unit.description}</p>}
+                        <div className="min-w-0">
+                          <span className="font-bold text-xs text-gray-900 dark:text-white truncate block">{unit.name}</span>
+                          {unit.description && <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{unit.description}</p>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={(e) => handleToggleUnitStatus(unit, e)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border border-gray-200 dark:border-white/10 ${
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border border-gray-200 dark:border-white/10 ${
                             unit.status === 'completed' ? 'bg-gray-100 text-gray-900 dark:bg-white/15 dark:text-white' :
                             unit.status === 'in_progress' ? 'bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white' :
                             'bg-gray-50 text-gray-700 dark:bg-white/5 dark:text-gray-300'
                           }`}
                         >
-                          {unit.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-gray-900 dark:text-white" /> : <Circle className="w-3.5 h-3.5 text-gray-400" />}
+                          {unit.status === 'completed' ? <CheckCircle2 className="w-3 h-3 text-gray-900 dark:text-white" /> : <Circle className="w-3 h-3 text-gray-400" />}
                           <span>{unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}</span>
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleDeleteUnit(unit.id); }}
-                          className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer"
                           title="Eliminar unidad"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>

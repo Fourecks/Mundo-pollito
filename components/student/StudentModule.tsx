@@ -302,36 +302,20 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     loadData();
   };
 
-  if (activeSubject) {
-    return (
-      <SubjectWorkspace 
-        subject={activeSubject} 
-        onBack={() => { setActiveSubject(null); loadData(); }}
-        notes={notes}
-        folders={folders}
-        onAddFolder={onAddFolder}
-        onUpdateFolder={onUpdateFolder}
-        onDeleteFolder={onDeleteFolder}
-        onAddNote={onAddNote}
-        onUpdateNote={onUpdateNote}
-        onDeleteNote={onDeleteNote}
-      />
-    );
-  }
-
   return (
     <div className="w-full h-full flex flex-col bg-white dark:bg-[#111] text-gray-900 dark:text-gray-100 overflow-hidden font-sans">
       
       {/* DESKTOP HEADER */}
       <header className="hidden md:flex px-6 py-4 border-b border-gray-100 dark:border-white/10 flex-row items-center justify-between shrink-0 gap-4 bg-white dark:bg-[#111] sticky top-0 z-30">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Study Workspace</h2>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Estudio</h2>
           <div className="flex items-center gap-4 mt-1.5">
-            <button onClick={() => setActiveTab('dashboard')} className={`text-xs font-semibold transition-colors ${activeTab === 'dashboard' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
-            <button onClick={() => setActiveTab('calendar')} className={`text-xs font-semibold transition-colors ${activeTab === 'calendar' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
-            <button onClick={() => setActiveTab('library')} className={`text-xs font-semibold transition-colors ${activeTab === 'library' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
-            <button onClick={() => setActiveTab('goals')} className={`text-xs font-semibold transition-colors ${activeTab === 'goals' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
-            <button onClick={() => setActiveTab('analytics')} className={`text-xs font-semibold transition-colors ${activeTab === 'analytics' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Analíticas</button>
+            <button onClick={() => { setActiveSubject(null); setActiveTab('dashboard'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'dashboard' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
+            <button onClick={() => { setActiveSubject(null); setActiveTab('subjects'); }} className={`text-xs font-semibold transition-colors ${activeSubject || activeTab === 'subjects' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Materias</button>
+            <button onClick={() => { setActiveSubject(null); setActiveTab('calendar'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'calendar' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
+            <button onClick={() => { setActiveSubject(null); setActiveTab('library'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'library' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
+            <button onClick={() => { setActiveSubject(null); setActiveTab('goals'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'goals' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
+            <button onClick={() => { setActiveSubject(null); setActiveTab('analytics'); }} className={`text-xs font-semibold transition-colors ${!activeSubject && activeTab === 'analytics' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Analíticas</button>
           </div>
         </div>
         <div className="flex gap-3">
@@ -380,43 +364,49 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             <div className="grid grid-cols-3 gap-1 text-center">
               <button
                 type="button"
-                onClick={() => { setMobileTab('resumen'); setMasSubScreen(null); }}
+                onClick={() => { setActiveSubject(null); setMobileTab('resumen'); setMasSubScreen(null); }}
                 className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
-                  mobileTab === 'resumen' 
+                  !activeSubject && mobileTab === 'resumen' 
                     ? 'text-gray-900 dark:text-white font-bold' 
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
                 }`}
               >
                 Resumen
-                {mobileTab === 'resumen' && (
+                {!activeSubject && mobileTab === 'resumen' && (
                   <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
                 )}
               </button>
               <button
                 type="button"
-                onClick={() => { setMobileTab('materias'); setMasSubScreen(null); }}
+                onClick={() => { 
+                  if (activeSubject) {
+                    setActiveSubject(null);
+                  }
+                  setMobileTab('materias'); 
+                  setMasSubScreen(null); 
+                }}
                 className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
-                  mobileTab === 'materias' 
+                  activeSubject || mobileTab === 'materias' 
                     ? 'text-gray-900 dark:text-white font-bold' 
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
                 }`}
               >
                 Materias
-                {mobileTab === 'materias' && (
+                {(activeSubject || mobileTab === 'materias') && (
                   <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
                 )}
               </button>
               <button
                 type="button"
-                onClick={() => { setMobileTab('mas'); setMasSubScreen(null); }}
+                onClick={() => { setActiveSubject(null); setMobileTab('mas'); setMasSubScreen(null); }}
                 className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
-                  mobileTab === 'mas' 
+                  !activeSubject && mobileTab === 'mas' 
                     ? 'text-gray-900 dark:text-white font-bold' 
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
                 }`}
               >
                 Más
-                {mobileTab === 'mas' && (
+                {!activeSubject && mobileTab === 'mas' && (
                   <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
                 )}
               </button>
@@ -468,11 +458,61 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50 dark:bg-[#0A0A0A] pb-32">
-        
-        {/* DESKTOP CONTENT VIEW */}
+        {activeSubject ? (
+          <SubjectWorkspace 
+            subject={activeSubject} 
+            onBack={() => { setActiveSubject(null); loadData(); }}
+            notes={notes}
+            folders={folders}
+            onAddFolder={onAddFolder}
+            onUpdateFolder={onUpdateFolder}
+            onDeleteFolder={onDeleteFolder}
+            onAddNote={onAddNote}
+            onUpdateNote={onUpdateNote}
+            onDeleteNote={onDeleteNote}
+          />
+        ) : (
+          <>
+            {/* DESKTOP CONTENT VIEW */}
         <div className="hidden md:block">
           {activeTab === 'dashboard' && (
-            <div className="max-w-6xl mx-auto space-y-12">
+            <div className="max-w-6xl mx-auto space-y-8">
+              {/* Metric Summary Cards (Finance Style) */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                <div className="p-4 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Materias Activas</span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{subjects.length}</span>
+                    <span className="text-xs font-semibold text-gray-400">En curso</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Exámenes Próximos</span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{exams.filter(e => e.status !== 'completed').length}</span>
+                    <span className="text-xs font-semibold text-gray-400">Pendientes</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Horas Estudiadas</span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                      {(studySessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0) / 60).toFixed(1)}h
+                    </span>
+                    <span className="text-xs font-semibold text-gray-400">{studySessions.length} sesiones</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Metas Activas</span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{goals.filter(g => g.status !== 'achieved').length}</span>
+                    <span className="text-xs font-semibold text-gray-400">En progreso</span>
+                  </div>
+                </div>
+              </div>
               <section>
                 <h3 className="text-sm font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase mb-4">Hoy</h3>
                 <div className="bg-white dark:bg-[#151515] rounded-3xl p-8 border border-gray-100 dark:border-white/5 shadow-sm">
@@ -880,7 +920,43 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             <>
               {/* RESUMEN TAB */}
               {mobileTab === 'resumen' && (
-                <div className="space-y-5">
+                <div className="space-y-4">
+                  {/* Metric Summary Cards (Finance Style) */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="p-3 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-0.5">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Materias</span>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{subjects.length}</span>
+                        <span className="text-[10px] font-semibold text-gray-400">En curso</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-0.5">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Exámenes</span>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{exams.filter(e => e.status !== 'completed').length}</span>
+                        <span className="text-[10px] font-semibold text-gray-400">Pendientes</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-0.5">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Horas Estudio</span>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                          {(studySessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0) / 60).toFixed(1)}h
+                        </span>
+                        <span className="text-[10px] font-semibold text-gray-400">{studySessions.length} ses.</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-0.5">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Metas</span>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{goals.filter(g => g.status !== 'achieved').length}</span>
+                        <span className="text-[10px] font-semibold text-gray-400">En progreso</span>
+                      </div>
+                    </div>
+                  </div>
                   {/* REGLAS / ALERTAS AUTOMÁTICAS */}
                   {(() => {
                     const todayStr = new Date().toISOString().split('T')[0];
@@ -1266,7 +1342,9 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             </>
           )}
         </div>
-      </div>
+      </>
+    )}
+  </div>
       
       {/* Add Subject Bottom Sheet */}
       <AnimatePresence>
