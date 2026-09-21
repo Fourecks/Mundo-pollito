@@ -136,6 +136,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
   const [showGradeMoreOptions, setShowGradeMoreOptions] = useState(false);
 
   useEffect(() => {
+    setActiveTab('overview');
+    setMobileSubView('main');
+    setActiveUnit(null);
     loadData();
   }, [subject.id]);
 
@@ -201,24 +204,24 @@ export const SubjectWorkspace: React.FC<Props> = ({
       setTasks(allTodos.filter(t => t.subject_id === subject.id));
       setProjects(allProjects.filter(p => p.subject_id === subject.id));
 
-      // Background Supabase Sync if online
+      // Background Supabase Sync if online - ONLY update if non-empty to prevent state wipe
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.id && navigator.onLine) {
           const { data: remoteDecks } = await supabase.from('student_decks').select('*').eq('subject_id', subject.id);
-          if (remoteDecks) setDecks(remoteDecks);
+          if (remoteDecks && remoteDecks.length > 0) setDecks(remoteDecks);
           
           const { data: remoteExams } = await supabase.from('student_exams').select('*').eq('subject_id', subject.id);
-          if (remoteExams) setExams(remoteExams);
+          if (remoteExams && remoteExams.length > 0) setExams(remoteExams);
 
           const { data: remoteGrades } = await supabase.from('student_grades').select('*').eq('subject_id', subject.id);
-          if (remoteGrades) setGrades(remoteGrades);
+          if (remoteGrades && remoteGrades.length > 0) setGrades(remoteGrades);
 
           const { data: remoteResources } = await supabase.from('student_resources').select('*').eq('subject_id', subject.id);
-          if (remoteResources) setResources(remoteResources);
+          if (remoteResources && remoteResources.length > 0) setResources(remoteResources);
 
           const { data: remoteUnits } = await supabase.from('student_units').select('*').eq('subject_id', subject.id);
-          if (remoteUnits) setUnits(remoteUnits);
+          if (remoteUnits && remoteUnits.length > 0) setUnits(remoteUnits);
         }
       } catch (err) {
         console.warn("Supabase fetch in workspace:", err);
@@ -1503,20 +1506,6 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
           {activeTab === 'projects' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Proyectos Académicos</h3>
-                  <p className="text-xs text-gray-500">Proyectos de la materia vinc. con el sistema global</p>
-                </div>
-                <button
-                  onClick={() => setIsAddingProject(true)}
-                  className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:opacity-90 transition-opacity"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Nuevo proyecto</span>
-                </button>
-              </div>
-
               {projects.length === 0 ? (
                 <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
                   <FolderKanban className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
@@ -1567,16 +1556,17 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
           {activeTab === 'exams' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium">Exámenes y Evaluaciones</h3>
-                <button onClick={() => setIsAddingExam(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold shadow-2xs hover:opacity-90 transition-opacity">
-                  + Nuevo Examen
-                </button>
-              </div>
-              
               {exams.length === 0 ? (
-                <div className="text-center py-20 text-gray-500">
-                  <p>No hay exámenes programados.</p>
+                <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
+                  <Calendar className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No hay exámenes programados.</p>
+                  <button
+                    onClick={() => setIsAddingExam(true)}
+                    className="mt-4 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Nuevo examen</span>
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1645,16 +1635,17 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
           {activeTab === 'resources' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium">Recursos y Documentos</h3>
-                <button onClick={() => setIsAddingResource(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold shadow-2xs hover:opacity-90 transition-opacity">
-                  + Agregar Recurso
-                </button>
-              </div>
-              
               {resources.length === 0 ? (
-                <div className="text-center py-20 text-gray-500">
-                  <p>Guarda enlaces, PDFs, videos y materiales de estudio para esta materia.</p>
+                <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
+                  <Paperclip className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Guarda enlaces, PDFs, videos y materiales de estudio para esta materia.</p>
+                  <button
+                    onClick={() => setIsAddingResource(true)}
+                    className="mt-4 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Agregar recurso</span>
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

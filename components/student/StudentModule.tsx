@@ -460,6 +460,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50 dark:bg-[#0A0A0A] pb-32">
         {activeSubject ? (
           <SubjectWorkspace 
+            key={activeSubject.id}
             subject={activeSubject} 
             onBack={() => { setActiveSubject(null); loadData(); }}
             notes={notes}
@@ -477,42 +478,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
         <div className="hidden md:block">
           {activeTab === 'dashboard' && (
             <div className="max-w-6xl mx-auto space-y-8">
-              {/* Metric Summary Cards (Finance Style) */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                <div className="p-4 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Materias Activas</span>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{subjects.length}</span>
-                    <span className="text-xs font-semibold text-gray-400">En curso</span>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Exámenes Próximos</span>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{exams.filter(e => e.status !== 'completed').length}</span>
-                    <span className="text-xs font-semibold text-gray-400">Pendientes</span>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Horas Estudiadas</span>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                      {(studySessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0) / 60).toFixed(1)}h
-                    </span>
-                    <span className="text-xs font-semibold text-gray-400">{studySessions.length} sesiones</span>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Metas Activas</span>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{goals.filter(g => g.status !== 'achieved').length}</span>
-                    <span className="text-xs font-semibold text-gray-400">En progreso</span>
-                  </div>
-                </div>
-              </div>
               <section>
                 <h3 className="text-sm font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase mb-4">Hoy</h3>
                 <div className="bg-white dark:bg-[#151515] rounded-3xl p-8 border border-gray-100 dark:border-white/5 shadow-sm">
@@ -921,77 +886,6 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
               {/* RESUMEN TAB */}
               {mobileTab === 'resumen' && (
                 <div className="space-y-4">
-                  {/* Metric Summary Cards (Finance Style) */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="p-3 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Materias</span>
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{subjects.length}</span>
-                        <span className="text-[10px] font-semibold text-gray-400">En curso</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Exámenes</span>
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{exams.filter(e => e.status !== 'completed').length}</span>
-                        <span className="text-[10px] font-semibold text-gray-400">Pendientes</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Horas Estudio</span>
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-                          {(studySessions.reduce((acc, s) => acc + (s.duration_minutes || 0), 0) / 60).toFixed(1)}h
-                        </span>
-                        <span className="text-[10px] font-semibold text-gray-400">{studySessions.length} ses.</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-white dark:bg-[#151515] border border-gray-200/90 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Metas</span>
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{goals.filter(g => g.status !== 'achieved').length}</span>
-                        <span className="text-[10px] font-semibold text-gray-400">En progreso</span>
-                      </div>
-                    </div>
-                  </div>
-                  {/* REGLAS / ALERTAS AUTOMÁTICAS */}
-                  {(() => {
-                    const todayStr = new Date().toISOString().split('T')[0];
-                    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-                    const in3DaysStr = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
-
-                    const tasksDueTomorrow = todos.filter(t => !t.completed && t.due_date === tomorrowStr);
-                    const upcomingExamsNext3Days = exams.filter(e => e.status === 'pending' && e.date > todayStr && e.date <= in3DaysStr);
-                    const pastExamsWithoutScore = exams.filter(e => e.date < todayStr && !grades.some(g => g.exam_id === e.id && g.score !== null && g.score !== undefined));
-
-                    const alerts = [];
-                    if (tasksDueTomorrow.length > 0) {
-                      alerts.push({ id: 't-tomorrow', text: `${tasksDueTomorrow.length} ${tasksDueTomorrow.length === 1 ? 'tarea vence' : 'tareas vencen'} mañana.` });
-                    }
-                    upcomingExamsNext3Days.forEach(e => {
-                      const subj = subjects.find(s => s.id === e.subject_id);
-                      alerts.push({ id: `e-${e.id}`, text: `Parcial de ${subj?.name || e.title} en 3 días o menos.` });
-                    });
-                    if (pastExamsWithoutScore.length > 0) {
-                      alerts.push({ id: `m-${pastExamsWithoutScore[0].id}`, text: `Falta registrar la nota de "${pastExamsWithoutScore[0].title}".` });
-                    }
-
-                    if (alerts.length === 0) return null;
-
-                    return (
-                      <div className="space-y-1.5">
-                        {alerts.map(a => (
-                          <div key={a.id} className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300 font-semibold">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                            <span>{a.text}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
 
                   {/* HOY */}
                   <section>
