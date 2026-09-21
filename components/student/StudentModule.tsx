@@ -327,11 +327,11 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Study Workspace</h2>
           <div className="flex items-center gap-4 mt-2">
-            <button onClick={() => setActiveTab('dashboard')} className={`text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
-            <button onClick={() => setActiveTab('calendar')} className={`text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
-            <button onClick={() => setActiveTab('library')} className={`text-sm font-medium transition-colors ${activeTab === 'library' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
-            <button onClick={() => setActiveTab('goals')} className={`text-sm font-medium transition-colors ${activeTab === 'goals' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
-            <button onClick={() => setActiveTab('analytics')} className={`text-sm font-medium transition-colors ${activeTab === 'analytics' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Analíticas</button>
+            <button onClick={() => setActiveTab('dashboard')} className={`text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
+            <button onClick={() => setActiveTab('calendar')} className={`text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
+            <button onClick={() => setActiveTab('library')} className={`text-sm font-medium transition-colors ${activeTab === 'library' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
+            <button onClick={() => setActiveTab('goals')} className={`text-sm font-medium transition-colors ${activeTab === 'goals' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
+            <button onClick={() => setActiveTab('analytics')} className={`text-sm font-medium transition-colors ${activeTab === 'analytics' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Analíticas</button>
           </div>
         </div>
         <div className="flex gap-3">
@@ -383,13 +383,13 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                 onClick={() => { setMobileTab('resumen'); setMasSubScreen(null); }}
                 className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
                   mobileTab === 'resumen' 
-                    ? 'text-blue-600 dark:text-blue-400 font-bold' 
+                    ? 'text-gray-900 dark:text-white font-bold' 
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
                 }`}
               >
                 Resumen
                 {mobileTab === 'resumen' && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
                 )}
               </button>
               <button
@@ -397,13 +397,13 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                 onClick={() => { setMobileTab('materias'); setMasSubScreen(null); }}
                 className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
                   mobileTab === 'materias' 
-                    ? 'text-blue-600 dark:text-blue-400 font-bold' 
+                    ? 'text-gray-900 dark:text-white font-bold' 
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
                 }`}
               >
                 Materias
                 {mobileTab === 'materias' && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
                 )}
               </button>
               <button
@@ -411,13 +411,13 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                 onClick={() => { setMobileTab('mas'); setMasSubScreen(null); }}
                 className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
                   mobileTab === 'mas' 
-                    ? 'text-blue-600 dark:text-blue-400 font-bold' 
+                    ? 'text-gray-900 dark:text-white font-bold' 
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
                 }`}
               >
                 Más
                 {mobileTab === 'mas' && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full" />
+                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
                 )}
               </button>
             </div>
@@ -428,7 +428,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
             <button
               type="button"
               onClick={() => setMasSubScreen(null)}
-              className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity cursor-pointer"
+              className="flex items-center gap-1 text-xs font-semibold text-gray-900 dark:text-white hover:opacity-80 transition-opacity cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>Más</span>
