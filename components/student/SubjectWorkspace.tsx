@@ -896,7 +896,217 @@ export const SubjectWorkspace: React.FC<Props> = ({
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50 dark:bg-[#0A0A0A]">
         <div className="max-w-6xl mx-auto h-full">
-          {activeTab === 'overview' && (
+          {activeUnit ? (
+            <div className="space-y-6">
+              {/* UNIT HEADER CARD */}
+              <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-200 dark:border-white/10 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setActiveUnit(null)}
+                    className="text-xs font-bold text-gray-500 hover:text-gray-900 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Volver a {subject.name}</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleUnitStatus(activeUnit, e)}
+                      className="px-3 py-1 rounded-full text-xs font-bold border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white cursor-pointer"
+                    >
+                      {activeUnit.status === 'completed' ? '✓ Completada' : activeUnit.status === 'in_progress' ? '⏳ En progreso' : '⭕ Sin iniciar'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteUnit(activeUnit.id)}
+                      className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+                      title="Eliminar unidad"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                    Unidad {units.findIndex(u => u.id === activeUnit.id) + 1}
+                  </span>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {activeUnit.name}
+                  </h2>
+                  {activeUnit.description && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{activeUnit.description}</p>
+                  )}
+                </div>
+
+                {/* QUICK ACTION BUTTONS */}
+                <div className="pt-2 flex flex-wrap gap-2 border-t border-gray-100 dark:border-white/5">
+                  <button
+                    onClick={() => { setNewTaskUnitId(activeUnit.id); setIsAddingTask(true); }}
+                    className="px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1 hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Añadir Tarea</span>
+                  </button>
+                  <button
+                    onClick={() => { setNewExamUnitId(activeUnit.id); setIsAddingExam(true); }}
+                    className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Añadir Examen</span>
+                  </button>
+                  <button
+                    onClick={() => onAddNote(null, undefined, subject.id)}
+                    className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Añadir Apunte</span>
+                  </button>
+                  <button
+                    onClick={() => { setNewResourceUnitId(activeUnit.id); setIsAddingResource(true); }}
+                    className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Añadir Recurso</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* UNIT CONTENT SECTIONS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* TAREAS DE LA UNIDAD */}
+                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Tareas ({tasks.filter(t => t.unit_id === activeUnit.id).length})
+                    </h3>
+                    <button
+                      onClick={() => { setNewTaskUnitId(activeUnit.id); setIsAddingTask(true); }}
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
+                    >
+                      + Tarea
+                    </button>
+                  </div>
+                  {tasks.filter(t => t.unit_id === activeUnit.id).length === 0 ? (
+                    <p className="text-xs text-gray-400 py-4 text-center">No hay tareas en esta unidad.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {tasks.filter(t => t.unit_id === activeUnit.id).map(task => (
+                        <div key={task.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-between gap-2 border border-gray-100 dark:border-white/5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <button onClick={() => handleToggleTask(task)} className="cursor-pointer shrink-0">
+                              {task.completed ? <CheckCircle2 className="w-4 h-4 text-gray-900 dark:text-white" /> : <Circle className="w-4 h-4 text-gray-400" />}
+                            </button>
+                            <span className={`text-xs font-medium truncate ${task.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                              {task.text}
+                            </span>
+                          </div>
+                          {task.due_date && (
+                            <span className="text-[10px] font-mono text-gray-400 shrink-0">{task.due_date}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* EXÁMENES DE LA UNIDAD */}
+                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Exámenes ({exams.filter(e => e.unit_id === activeUnit.id).length})
+                    </h3>
+                    <button
+                      onClick={() => { setNewExamUnitId(activeUnit.id); setIsAddingExam(true); }}
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
+                    >
+                      + Examen
+                    </button>
+                  </div>
+                  {exams.filter(e => e.unit_id === activeUnit.id).length === 0 ? (
+                    <p className="text-xs text-gray-400 py-4 text-center">No hay exámenes en esta unidad.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {exams.filter(e => e.unit_id === activeUnit.id).map(exam => (
+                        <div key={exam.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-between gap-2 border border-gray-100 dark:border-white/5">
+                          <div>
+                            <span className="text-xs font-bold text-gray-900 dark:text-white block">{exam.title}</span>
+                            <span className="text-[10px] text-gray-400">{exam.date} {exam.time ? `• ${exam.time}` : ''}</span>
+                          </div>
+                          <button onClick={() => handleDeleteExam(exam.id)} className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* APUNTES DE LA UNIDAD */}
+                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Apuntes ({notes.filter(n => (n as any).unit_id === activeUnit.id).length})
+                    </h3>
+                    <button
+                      onClick={() => onAddNote(null, undefined, subject.id)}
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
+                    >
+                      + Apunte
+                    </button>
+                  </div>
+                  {notes.filter(n => (n as any).unit_id === activeUnit.id).length === 0 ? (
+                    <p className="text-xs text-gray-400 py-4 text-center">No hay apuntes en esta unidad.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {notes.filter(n => (n as any).unit_id === activeUnit.id).map(note => (
+                        <div key={note.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-between border border-gray-100 dark:border-white/5">
+                          <span className="text-xs font-medium text-gray-900 dark:text-white truncate">{note.title || 'Sin título'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* RECURSOS DE LA UNIDAD */}
+                <div className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Recursos ({resources.filter(r => r.unit_id === activeUnit.id).length})
+                    </h3>
+                    <button
+                      onClick={() => { setNewResourceUnitId(activeUnit.id); setIsAddingResource(true); }}
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
+                    >
+                      + Recurso
+                    </button>
+                  </div>
+                  {resources.filter(r => r.unit_id === activeUnit.id).length === 0 ? (
+                    <p className="text-xs text-gray-400 py-4 text-center">No hay recursos en esta unidad.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {resources.filter(r => r.unit_id === activeUnit.id).map(res => (
+                        <div key={res.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center justify-between border border-gray-100 dark:border-white/5">
+                          <div>
+                            <span className="text-xs font-bold text-gray-900 dark:text-white block">{res.title}</span>
+                            {res.url && (
+                              <a href={res.url} target="_blank" rel="noreferrer" className="text-[10px] text-gray-400 hover:underline truncate block max-w-[200px]">
+                                {res.url}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeTab === 'overview' && (
             <div className="space-y-4">
               {/* Upcoming Item Card - Compact Height & B&W */}
               {exams.some(e => e.status !== 'completed') || tasks.some(t => !t.completed) ? (
@@ -1146,18 +1356,18 @@ export const SubjectWorkspace: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={(e) => handleToggleUnitStatus(unit, e)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
-                            unit.status === 'completed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' :
-                            unit.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300' :
-                            'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border border-gray-200 dark:border-white/10 ${
+                            unit.status === 'completed' ? 'bg-gray-100 text-gray-900 dark:bg-white/15 dark:text-white' :
+                            unit.status === 'in_progress' ? 'bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white' :
+                            'bg-gray-50 text-gray-700 dark:bg-white/5 dark:text-gray-300'
                           }`}
                         >
-                          {unit.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Circle className="w-3.5 h-3.5 text-gray-400" />}
+                          {unit.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-gray-900 dark:text-white" /> : <Circle className="w-3.5 h-3.5 text-gray-400" />}
                           <span>{unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}</span>
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleDeleteUnit(unit.id); }}
-                          className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                          className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer"
                           title="Eliminar unidad"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1179,7 +1389,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
                 <button
                   onClick={() => setIsAddingTask(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:opacity-90 transition-opacity"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Nueva tarea</span>
@@ -1193,7 +1403,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   <p className="text-xs text-gray-400 mt-1">Crea una tarea desde aquí o asígnala desde el módulo general de Tasks.</p>
                   <button
                     onClick={() => setIsAddingTask(true)}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                    className="mt-4 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Crear tarea</span>
@@ -1212,14 +1422,14 @@ export const SubjectWorkspace: React.FC<Props> = ({
                         return (
                           <div
                             key={task.id}
-                            className="bg-white dark:bg-[#151515] p-3.5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center justify-between group"
+                            className="bg-white dark:bg-[#151515] p-3.5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex items-center justify-between group"
                           >
                             <div className="flex items-center gap-3">
                               <button
                                 onClick={() => handleToggleTask(task)}
-                                className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-blue-500 transition-colors"
+                                className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-gray-900 dark:hover:border-white transition-colors"
                               >
-                                {task.completed && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                                {task.completed && <CheckCircle2 className="w-4 h-4 text-gray-900 dark:text-white" />}
                               </button>
                               <div>
                                 <span className="text-sm font-semibold text-gray-900 dark:text-white block">
@@ -1227,7 +1437,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                                 </span>
                                 <div className="flex items-center gap-2 mt-0.5">
                                   {taskUnit && (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300 rounded-md">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white rounded-md border border-gray-200 dark:border-white/10">
                                       {taskUnit.name}
                                     </span>
                                   )}
@@ -1238,11 +1448,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                                     </span>
                                   )}
                                   {task.priority && (
-                                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded ${
-                                      task.priority === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-300' :
-                                      task.priority === 'medium' ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300' :
-                                      'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                                    }`}>
+                                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.2 rounded border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white`}>
                                       {task.priority}
                                     </span>
                                   )}
@@ -1252,7 +1458,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                             <button
                               onClick={() => handleDeleteTask(task.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-opacity"
+                              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-opacity"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1276,13 +1482,13 @@ export const SubjectWorkspace: React.FC<Props> = ({
                           >
                             <div className="flex items-center gap-3">
                               <button onClick={() => handleToggleTask(task)}>
-                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                <CheckCircle2 className="w-5 h-5 text-gray-900 dark:text-white" />
                               </button>
                               <span className="text-sm font-medium text-gray-500 line-through">
                                 {task.text}
                               </span>
                             </div>
-                            <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-500">
+                            <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-gray-900 dark:hover:text-white">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -1304,7 +1510,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
                 <button
                   onClick={() => setIsAddingProject(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:opacity-90 transition-opacity"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Nuevo proyecto</span>
@@ -1318,7 +1524,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   <p className="text-xs text-gray-400 mt-1">Crea trabajos prácticos o investigaciones en grupo.</p>
                   <button
                     onClick={() => setIsAddingProject(true)}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                    className="mt-4 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Crear proyecto</span>
@@ -1329,14 +1535,14 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {projects.map(proj => (
                     <div
                       key={proj.id}
-                      className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col justify-between group"
+                      className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex flex-col justify-between group"
                     >
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-2xl">{proj.emoji || '📚'}</span>
                           <button
                             onClick={() => handleDeleteProject(proj.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-opacity"
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-opacity"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1347,7 +1553,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                         )}
                       </div>
                       <div className="pt-4 mt-4 border-t border-gray-50 dark:border-white/5 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white">
                           {proj.status || 'Activo'}
                         </span>
                         <span className="text-xs text-gray-400">Ver detalles →</span>
@@ -1363,7 +1569,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-medium">Exámenes y Evaluaciones</h3>
-                <button onClick={() => setIsAddingExam(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
+                <button onClick={() => setIsAddingExam(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold shadow-2xs hover:opacity-90 transition-opacity">
                   + Nuevo Examen
                 </button>
               </div>
@@ -1377,12 +1583,12 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {exams.map(exam => {
                     const examUnit = units.find(u => u.id === exam.unit_id);
                     return (
-                      <div key={exam.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
+                      <div key={exam.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold text-lg text-gray-900 dark:text-gray-100">{exam.title}</h4>
                             {examUnit && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300 rounded-md">
+                              <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-md">
                                 {examUnit.name}
                               </span>
                             )}
@@ -1417,13 +1623,13 @@ export const SubjectWorkspace: React.FC<Props> = ({
                                 console.error(err);
                               }
                             }}
-                            className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${exam.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'}`}
+                            className={`px-3 py-1 rounded-full text-xs font-bold cursor-pointer border border-gray-200 dark:border-white/10 ${exam.status === 'completed' ? 'bg-gray-100 text-gray-900 dark:bg-white/20 dark:text-white' : 'bg-gray-50 text-gray-600 dark:bg-white/5 dark:text-gray-300'}`}
                           >
                             {exam.status === 'completed' ? '✓ Completado' : '⏳ Pendiente'}
                           </button>
                           <button
                             onClick={() => handleDeleteExam(exam.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer"
                             title="Eliminar examen"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1441,7 +1647,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-medium">Recursos y Documentos</h3>
-                <button onClick={() => setIsAddingResource(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
+                <button onClick={() => setIsAddingResource(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold shadow-2xs hover:opacity-90 transition-opacity">
                   + Agregar Recurso
                 </button>
               </div>
@@ -1455,7 +1661,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   {resources.map(resource => {
                     const resUnit = units.find(u => u.id === resource.unit_id);
                     return (
-                      <div key={resource.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
+                      <div key={resource.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs hover:shadow-sm transition-all flex flex-col justify-between group">
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <div className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-xl">
@@ -1463,7 +1669,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                             </div>
                             <button
                               onClick={() => handleDeleteResource(resource.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
+                              className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer"
                               title="Eliminar recurso"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1479,7 +1685,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{resource.description}</p>
                           )}
                           {resource.url && (
-                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate block mt-2">
+                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-900 dark:text-white font-semibold hover:underline truncate block mt-2">
                               {resource.url} ↗
                             </a>
                           )}
@@ -1495,16 +1701,16 @@ export const SubjectWorkspace: React.FC<Props> = ({
           {activeTab === 'study' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium">Sesiones de Estudio (Fase 4)</h3>
+                <h3 className="text-lg font-medium">Sesiones de Estudio</h3>
                 {!isStudying && (
-                  <button onClick={() => setIsStudying(true)} className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-sm font-medium transition-colors">
+                  <button onClick={() => setIsStudying(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold shadow-2xs hover:opacity-90 transition-opacity">
                     Iniciar Temporizador
                   </button>
                 )}
               </div>
               
               {isStudying && (
-                <div className="bg-white dark:bg-[#151515] rounded-3xl p-8 border border-gray-100 dark:border-white/5 shadow-sm text-center">
+                <div className="bg-white dark:bg-[#151515] rounded-3xl p-8 border border-gray-100 dark:border-white/5 shadow-2xs text-center">
                   <div className="text-6xl font-light mb-6 tabular-nums">{formatTime(studySeconds)}</div>
                   <div className="max-w-md mx-auto mb-8">
                     <input 
@@ -1512,10 +1718,10 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       value={studyObjective} 
                       onChange={e => setStudyObjective(e.target.value)} 
                       placeholder="¿Qué estás estudiando ahora? (Opcional)" 
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white text-center text-sm"
                     />
                   </div>
-                  <button onClick={handleFinishStudy} className="px-8 py-3 bg-red-500 hover:bg-red-600 text-white rounded-full font-medium transition-colors">
+                  <button onClick={handleFinishStudy} className="px-8 py-3 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold text-xs hover:opacity-90 transition-opacity">
                     Terminar Sesión
                   </button>
                 </div>
@@ -1533,7 +1739,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                           <p className="font-medium text-gray-900 dark:text-gray-100">{session.objective || 'Sesión de estudio general'}</p>
                           <p className="text-xs text-gray-500 mt-1">{new Date(session.created_at).toLocaleDateString()}</p>
                         </div>
-                        <div className="font-mono text-xl font-light text-blue-600 dark:text-blue-400">{session.duration_minutes}m</div>
+                        <div className="font-mono text-xl font-light text-gray-900 dark:text-white">{session.duration_minutes}m</div>
                       </div>
                     ))}
                   </div>
@@ -1575,7 +1781,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       </button>
                       <button
                         onClick={() => setIsAddingGrade(true)}
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-semibold transition-colors shadow-sm"
+                        className="px-3.5 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-2xl text-xs font-bold transition-opacity hover:opacity-90 shadow-2xs"
                       >
                         + Evaluación
                       </button>
@@ -1584,14 +1790,8 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                   {/* Projection Feedback */}
                   {summary.targetProjection && (
-                    <div className={`p-3.5 rounded-2xl text-xs font-medium flex items-start gap-2.5 ${
-                      summary.targetProjection.isImpossible
-                        ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/50 dark:border-amber-500/20'
-                        : summary.targetProjection.isAchieved
-                        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-500/20'
-                        : 'bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/50 dark:border-blue-500/20'
-                    }`}>
-                      <Target className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div className="p-3.5 rounded-2xl text-xs font-medium flex items-start gap-2.5 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10">
+                      <Target className="w-4 h-4 shrink-0 mt-0.5 text-gray-900 dark:text-white" />
                       <div>
                         <span className="font-bold uppercase tracking-wider block text-[10px] mb-0.5">Proyección para tu Meta:</span>
                         <p className="leading-relaxed">{summary.targetProjection.message}</p>
@@ -1601,7 +1801,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
 
                 {/* Categorías de Evaluación */}
-                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
+                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs space-y-4">
                   <div className="flex justify-between items-center">
                     <div>
                       <h4 className="text-sm font-bold text-gray-900 dark:text-white">Categorías y Ponderaciones</h4>
@@ -1609,7 +1809,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                     </div>
                     <button
                       onClick={() => setIsAddingCategory(true)}
-                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
                     >
                       + Nueva
                     </button>
@@ -1628,12 +1828,12 @@ export const SubjectWorkspace: React.FC<Props> = ({
                               <span className="text-[10px] text-gray-400 font-medium">Peso: {cat.weight}%</span>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400">
+                              <span className="text-sm font-extrabold text-gray-900 dark:text-white">
                                 {catSummary?.average !== null && catSummary?.average !== undefined ? catSummary.average.toFixed(1) : 'S/N'}
                               </span>
                               <button
                                 onClick={() => handleDeleteCategory(cat.id)}
-                                className="text-gray-400 hover:text-red-500 p-1"
+                                className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1646,12 +1846,12 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
 
                 {/* Registro de Evaluaciones */}
-                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
+                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs space-y-4">
                   <div className="flex justify-between items-center">
                     <h4 className="text-sm font-bold text-gray-900 dark:text-white">Evaluaciones Registradas</h4>
                     <button
                       onClick={() => setIsAddingGrade(true)}
-                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
                     >
                       + Añadir
                     </button>
@@ -1670,7 +1870,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-xs text-gray-900 dark:text-white truncate">{grade.name}</span>
                                 {cat && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 shrink-0">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-200 dark:border-white/10 shrink-0">
                                     {cat.name} ({cat.weight}%)
                                   </span>
                                 )}
@@ -1683,7 +1883,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                             <div className="flex items-center gap-3 shrink-0">
                               {isPending ? (
-                                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300">
+                                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300 border border-gray-200 dark:border-white/10">
                                   ⏳ Pendiente
                                 </span>
                               ) : (
@@ -1695,7 +1895,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                               )}
                               <button
                                 onClick={() => handleDeleteGrade(grade.id)}
-                                className="text-gray-400 hover:text-red-500 p-1"
+                                className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1708,19 +1908,19 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
 
                 {/* Attendance Record */}
-                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
+                <div className="bg-white dark:bg-[#151515] p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs space-y-4">
                   <div className="flex justify-between items-center">
                     <h4 className="text-sm font-bold text-gray-900 dark:text-white">Asistencia de Hoy</h4>
                     <span className="text-xs font-medium text-gray-400">{new Date().toLocaleDateString()}</span>
                   </div>
                   <div className="flex gap-2.5">
-                    <button onClick={() => handleRecordAttendance('present')} className="flex-1 py-2.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 rounded-2xl text-xs font-bold hover:bg-emerald-100 transition-colors">
+                    <button onClick={() => handleRecordAttendance('present')} className="flex-1 py-2.5 bg-gray-100 text-gray-900 dark:bg-white/15 dark:text-white rounded-2xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-white/25 transition-colors border border-gray-200 dark:border-white/10">
                       Presente
                     </button>
-                    <button onClick={() => handleRecordAttendance('absent')} className="flex-1 py-2.5 bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 rounded-2xl text-xs font-bold hover:bg-rose-100 transition-colors">
+                    <button onClick={() => handleRecordAttendance('absent')} className="flex-1 py-2.5 bg-gray-50 text-gray-600 dark:bg-white/5 dark:text-gray-400 rounded-2xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-white/10 transition-colors border border-gray-200 dark:border-white/10">
                       Ausente
                     </button>
-                    <button onClick={() => handleRecordAttendance('excused')} className="flex-1 py-2.5 bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 rounded-2xl text-xs font-bold hover:bg-amber-100 transition-colors">
+                    <button onClick={() => handleRecordAttendance('excused')} className="flex-1 py-2.5 bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-300 rounded-2xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-white/20 transition-colors border border-gray-200 dark:border-white/10">
                       Justificado
                     </button>
                   </div>
@@ -1762,7 +1962,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                             setIsCardFlipped(false);
                             setIsReviewing(true);
                           }}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors"
+                          className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold transition-opacity hover:opacity-90"
                         >
                           ▶ Iniciar Repaso
                         </button>
@@ -1772,7 +1972,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                   {/* Active Reviewing Session Overlay / Screen */}
                   {isReviewing ? (
-                    <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm max-w-xl mx-auto text-center space-y-6">
+                    <div className="bg-white dark:bg-[#151515] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs max-w-xl mx-auto text-center space-y-6">
                       <div className="flex justify-between items-center text-xs text-gray-400">
                         <span>Tarjeta {reviewIndex + 1} de {flashcards.filter(c => c.deck_id === selectedDeck.id).length}</span>
                         <button onClick={() => setIsReviewing(false)} className="hover:underline">Finalizar Repaso</button>
@@ -1781,7 +1981,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       {/* Card Canvas with Flip Effect */}
                       <div
                         onClick={() => setIsCardFlipped(!isCardFlipped)}
-                        className="min-h-[220px] p-8 rounded-2xl bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-blue-500"
+                        className="min-h-[220px] p-8 rounded-2xl bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-gray-900 dark:hover:border-white"
                       >
                         <span className="text-xs uppercase font-bold tracking-wider text-gray-400 mb-3">
                           {isCardFlipped ? 'Respuesta (Reverso)' : 'Pregunta (Anverso)'}
@@ -1791,7 +1991,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                             ? flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex]?.back
                             : flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex]?.front}
                         </p>
-                        <span className="text-xs text-blue-500 mt-4">Toca para voltear 🔄</span>
+                        <span className="text-xs text-gray-900 dark:text-white font-medium mt-4">Toca para voltear 🔄</span>
                       </div>
 
                       {/* Review Buttons */}
@@ -1799,19 +1999,19 @@ export const SubjectWorkspace: React.FC<Props> = ({
                         <div className="flex justify-center gap-3 pt-2">
                           <button
                             onClick={() => handleRateFlashcard(flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex].id, 'learning')}
-                            className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/30 rounded-xl text-xs font-semibold"
+                            className="px-4 py-2 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-xl text-xs font-semibold"
                           >
                             Difícil / Repetir
                           </button>
                           <button
                             onClick={() => handleRateFlashcard(flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex].id, 'reviewing')}
-                            className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 rounded-xl text-xs font-semibold"
+                            className="px-4 py-2 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white border border-gray-200 dark:border-white/10 rounded-xl text-xs font-semibold"
                           >
                             Regular
                           </button>
                           <button
                             onClick={() => handleRateFlashcard(flashcards.filter(c => c.deck_id === selectedDeck.id)[reviewIndex].id, 'known')}
-                            className="px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 dark:bg-green-900/20 dark:hover:bg-green-900/30 rounded-xl text-xs font-semibold"
+                            className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-semibold"
                           >
                             Fácil / Dominada
                           </button>
@@ -1824,21 +2024,17 @@ export const SubjectWorkspace: React.FC<Props> = ({
                       {flashcards.filter(c => c.deck_id === selectedDeck.id).length === 0 ? (
                         <div className="text-center py-16 text-gray-500 bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5">
                           <p>Este mazo no contiene tarjetas todavía.</p>
-                          <button onClick={() => setIsAddingCard(true)} className="mt-3 px-4 py-2 text-sm bg-blue-600 text-white rounded-xl">
+                          <button onClick={() => setIsAddingCard(true)} className="mt-3 px-4 py-2 text-sm bg-black dark:bg-white text-white dark:text-black rounded-xl">
                             + Añadir primera tarjeta
                           </button>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {flashcards.filter(c => c.deck_id === selectedDeck.id).map(card => (
-                            <div key={card.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm space-y-3">
+                            <div key={card.id} className="bg-white dark:bg-[#151515] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-2xs space-y-3">
                               <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pregunta</span>
-                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                  card.status === 'known' ? 'bg-green-50 text-green-600 dark:bg-green-900/20' :
-                                  card.status === 'learning' ? 'bg-red-50 text-red-600 dark:bg-red-900/20' :
-                                  'bg-blue-50 text-blue-600 dark:bg-blue-900/20'
-                                }`}>
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white border border-gray-200 dark:border-white/10">
                                   {card.status === 'known' ? 'Dominada' : card.status === 'learning' ? 'Repasar' : 'Nueva'}
                                 </span>
                               </div>
@@ -1858,8 +2054,8 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 /* Deck List Overview */
                 <div>
                   <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-medium">Flashcards y Repaso (Fase 7)</h3>
-                    <button onClick={() => setIsAddingDeck(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
+                    <h3 className="text-lg font-medium">Flashcards y Repaso</h3>
+                    <button onClick={() => setIsAddingDeck(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity">
                       + Crear Mazo
                     </button>
                   </div>
@@ -1876,10 +2072,10 @@ export const SubjectWorkspace: React.FC<Props> = ({
                           <div
                             key={deck.id}
                             onClick={() => setSelectedDeck(deck)}
-                            className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm flex flex-col gap-4 group hover:border-gray-300 dark:hover:border-white/20 transition-all cursor-pointer"
+                            className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xs flex flex-col gap-4 group hover:border-gray-300 dark:hover:border-white/20 transition-all cursor-pointer"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 flex items-center justify-center text-2xl shadow-inner">
+                              <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white flex items-center justify-center text-2xl border border-gray-200 dark:border-white/10">
                                 🗂️
                               </div>
                               <div>
@@ -1900,6 +2096,8 @@ export const SubjectWorkspace: React.FC<Props> = ({
                 </div>
               )}
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

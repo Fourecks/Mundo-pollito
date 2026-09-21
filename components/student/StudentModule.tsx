@@ -323,30 +323,30 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
     <div className="w-full h-full flex flex-col bg-white dark:bg-[#111] text-gray-900 dark:text-gray-100 overflow-hidden font-sans">
       
       {/* DESKTOP HEADER */}
-      <header className="hidden md:flex px-8 py-6 border-b border-gray-100 dark:border-white/5 flex-row items-center justify-between flex-shrink-0 gap-4">
+      <header className="hidden md:flex px-6 py-4 border-b border-gray-100 dark:border-white/10 flex-row items-center justify-between shrink-0 gap-4 bg-white dark:bg-[#111] sticky top-0 z-30">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Study Workspace</h2>
-          <div className="flex items-center gap-4 mt-2">
-            <button onClick={() => setActiveTab('dashboard')} className={`text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
-            <button onClick={() => setActiveTab('calendar')} className={`text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
-            <button onClick={() => setActiveTab('library')} className={`text-sm font-medium transition-colors ${activeTab === 'library' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
-            <button onClick={() => setActiveTab('goals')} className={`text-sm font-medium transition-colors ${activeTab === 'goals' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
-            <button onClick={() => setActiveTab('analytics')} className={`text-sm font-medium transition-colors ${activeTab === 'analytics' ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 hover:text-gray-900 dark:hover:text-gray-200'}`}>Analíticas</button>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Study Workspace</h2>
+          <div className="flex items-center gap-4 mt-1.5">
+            <button onClick={() => setActiveTab('dashboard')} className={`text-xs font-semibold transition-colors ${activeTab === 'dashboard' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Dashboard</button>
+            <button onClick={() => setActiveTab('calendar')} className={`text-xs font-semibold transition-colors ${activeTab === 'calendar' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Calendario</button>
+            <button onClick={() => setActiveTab('library')} className={`text-xs font-semibold transition-colors ${activeTab === 'library' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Biblioteca</button>
+            <button onClick={() => setActiveTab('goals')} className={`text-xs font-semibold transition-colors ${activeTab === 'goals' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Metas</button>
+            <button onClick={() => setActiveTab('analytics')} className={`text-xs font-semibold transition-colors ${activeTab === 'analytics' ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}>Analíticas</button>
           </div>
         </div>
         <div className="flex gap-3">
           {activeTab === 'library' ? (
-            <button onClick={() => setIsAddingReading(true)} className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl hover:opacity-90 transition-opacity font-medium text-sm flex items-center gap-2 cursor-pointer shadow-sm">
+            <button onClick={() => setIsAddingReading(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
               <Plus className="w-4 h-4" />
               Añadir lectura
             </button>
           ) : activeTab === 'goals' ? (
-            <button onClick={() => setIsAddingGoal(true)} className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl hover:opacity-90 transition-opacity font-medium text-sm flex items-center gap-2 cursor-pointer shadow-sm">
+            <button onClick={() => setIsAddingGoal(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
               <Plus className="w-4 h-4" />
               Nueva Meta
             </button>
           ) : (
-            <button onClick={() => setIsAddingSubject(true)} className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl hover:opacity-90 transition-opacity font-medium text-sm flex items-center gap-2 cursor-pointer shadow-sm">
+            <button onClick={() => setIsAddingSubject(true)} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs">
               <Plus className="w-4 h-4" />
               Añadir materia
             </button>
@@ -355,7 +355,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       </header>
 
       {/* MOBILE HEADER */}
-      <div className="block md:hidden border-b border-gray-100 dark:border-white/5 bg-white dark:bg-[#111] px-4 pt-4 pb-2 shrink-0">
+      <div className="block md:hidden border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#111] px-4 pt-3 pb-2 shrink-0 sticky top-0 z-30">
         {!masSubScreen ? (
           <>
             <div className="flex items-center justify-between mb-3">
