@@ -778,63 +778,55 @@ export const SubjectWorkspace: React.FC<Props> = ({
       {/* DESKTOP HEADER */}
       <header className="hidden md:flex px-8 py-6 border-b border-gray-100 dark:border-white/5 items-center justify-between flex-shrink-0 gap-4" style={{ borderBottomColor: `${subject.color}30` }}>
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer">
-            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+          <button onClick={onBack} className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer text-xs font-bold text-gray-700 dark:text-gray-300">
+            ← Volver
           </button>
           <div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{subject.emoji}</span>
-              <h2 className="text-2xl font-bold tracking-tight">{subject.name}</h2>
+            <div className="flex items-center gap-2.5">
+              {subject.emoji ? <span className="text-xl">{subject.emoji}</span> : null}
+              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{subject.name}</h2>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 ml-9">{subject.professor || 'Sin profesor'}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{subject.professor || 'Sin profesor asignado'}</p>
           </div>
         </div>
       </header>
 
       {/* DESKTOP TABS */}
-      <div className="hidden md:flex px-8 pt-4 border-b border-gray-100 dark:border-white/5 gap-6 overflow-x-auto shrink-0">
+      <div className="hidden md:flex px-8 pt-4 border-b border-gray-100 dark:border-white/5 gap-6 overflow-x-auto shrink-0 bg-white dark:bg-[#111]">
         {(['overview', 'units', 'notes', 'tasks', 'exams', 'resources', 'study', 'grades', 'flashcards'] as const).map(tab => (
           <button 
             key={tab} 
             onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap cursor-pointer ${activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors relative whitespace-nowrap cursor-pointer ${activeTab === tab ? 'text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
           >
-            {tab === 'notes' ? 'Notas' : tab === 'study' ? 'Sesiones' : tab === 'resources' ? 'Recursos' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'notes' ? 'Notas' : tab === 'study' ? 'Sesiones' : tab === 'resources' ? 'Recursos' : tab === 'grades' ? 'Calificaciones' : tab === 'flashcards' ? 'Flashcards' : tab === 'overview' ? 'Resumen' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             {activeTab === tab && (
-              <motion.div layoutId="subject-tab" className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full" style={{ backgroundColor: subject.color }} />
+              <motion.div layoutId="subject-tab" className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full bg-black dark:bg-white" />
             )}
           </button>
         ))}
       </div>
 
       {/* MOBILE HEADER */}
-      <div className="block md:hidden border-b border-gray-100 dark:border-white/5 bg-white dark:bg-[#111] px-4 pt-4 pb-3 shrink-0">
+      <div className="block md:hidden border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#111] px-4 pt-3.5 pb-3 shrink-0">
         {activeUnit ? (
           <div>
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setActiveUnit(null)}
-                className="flex items-center gap-1 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               >
-                <ChevronLeft className="w-4 h-4" />
-                <span>{subject.name}</span>
+                ← {subject.name}
               </button>
               <button
                 type="button"
                 onClick={(e) => handleToggleUnitStatus(activeUnit, e)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 ${
-                  activeUnit.status === 'completed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' :
-                  activeUnit.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300' :
-                  'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                }`}
+                className="px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
               >
-                {activeUnit.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Circle className="w-3.5 h-3.5 text-gray-400" />}
-                <span>
-                  {activeUnit.status === 'completed' ? 'Completada' : activeUnit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}
-                </span>
+                {activeUnit.status === 'completed' ? 'Completada' : activeUnit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}
               </button>
             </div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-2">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white mt-1.5">
               Unidad {activeUnit.order_index + 1}: {activeUnit.name}
             </h2>
             {activeUnit.description && (
@@ -846,23 +838,22 @@ export const SubjectWorkspace: React.FC<Props> = ({
             <div className="flex items-center justify-between mb-2">
               <button
                 onClick={onBack}
-                className="flex items-center gap-1 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Materias</span>
+                ← Materias
               </button>
               <button
                 onClick={() => setShowMobileActionSheet(true)}
-                className="w-8 h-8 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full flex items-center justify-center shadow-sm"
+                className="px-3 py-1 rounded-full bg-black dark:bg-white text-white dark:text-black text-xs font-bold shadow-xs cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
+                + Añadir
               </button>
             </div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-2xl">{subject.emoji || '💻'}</span>
+            <div className="flex items-center gap-2">
+              {subject.emoji ? <span className="text-lg">{subject.emoji}</span> : null}
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{subject.name}</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{subject.professor || 'Sin profesor asignado'}</p>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white leading-tight">{subject.name}</h2>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">{subject.professor || 'Sin profesor'}</p>
               </div>
             </div>
           </div>
@@ -871,10 +862,9 @@ export const SubjectWorkspace: React.FC<Props> = ({
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setMobileSubView('main')}
-                className="flex items-center gap-1 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               >
-                <ChevronLeft className="w-4 h-4" />
-                <span>{subject.name}</span>
+                ← {subject.name}
               </button>
               <button
                 onClick={() => {
@@ -885,12 +875,12 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   else if (mobileSubView === 'study') setIsStudying(true);
                   else if (mobileSubView === 'grades') setIsAddingGrade(true);
                 }}
-                className="w-8 h-8 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full flex items-center justify-center shadow-sm"
+                className="px-3 py-1 rounded-full bg-black dark:bg-white text-white dark:text-black text-xs font-bold shadow-xs cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
+                + Añadir
               </button>
             </div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-2 capitalize">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white mt-1.5 capitalize">
               {mobileSubView === 'notes' ? 'Apuntes' : 
                mobileSubView === 'tasks' ? 'Tareas' : 
                mobileSubView === 'exams' ? 'Exámenes' : 
@@ -907,54 +897,46 @@ export const SubjectWorkspace: React.FC<Props> = ({
       <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50/50 dark:bg-[#0A0A0A]">
         <div className="max-w-6xl mx-auto h-full">
           {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Upcoming Item Card */}
+            <div className="space-y-4">
+              {/* Upcoming Item Card - Compact Height & B&W */}
               {exams.some(e => e.status !== 'completed') || tasks.some(t => !t.completed) ? (
-                <div className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 dark:from-blue-500/10 dark:to-purple-500/10 p-4 sm:p-5 rounded-3xl border border-blue-200/50 dark:border-blue-500/20 shadow-sm flex items-center justify-between">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-md">
-                      <Calendar className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600 dark:text-blue-400">
-                        Próximo evento / entrega
-                      </span>
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-white leading-tight mt-0.5">
-                        {exams.find(e => e.status !== 'completed')?.title || tasks.find(t => !t.completed)?.text}
-                      </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {exams.find(e => e.status !== 'completed')?.date || tasks.find(t => !t.completed)?.due_date || 'Sin fecha asignada'}
-                      </p>
-                    </div>
+                <div className="bg-white dark:bg-[#151515] px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 flex items-center justify-between shadow-2xs">
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 shrink-0">
+                      Próximo:
+                    </span>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                      {exams.find(e => e.status !== 'completed')?.title || tasks.find(t => !t.completed)?.text}
+                    </span>
                   </div>
+                  <span className="text-[11px] font-mono font-medium text-gray-500 dark:text-gray-400 shrink-0">
+                    {exams.find(e => e.status !== 'completed')?.date || tasks.find(t => !t.completed)?.due_date || 'Sin fecha'}
+                  </span>
                 </div>
               ) : null}
 
               {/* UNIDADES SECTION */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-blue-500" />
-                    <span>Unidades del temario</span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Unidades del temario
                   </h3>
                   <button
                     onClick={() => setIsAddingUnit(true)}
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                    className="text-xs font-bold text-gray-900 dark:text-white hover:underline"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Añadir</span>
+                    + Añadir
                   </button>
                 </div>
 
                 {units.length === 0 ? (
-                  <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 text-center">
+                  <div className="bg-white dark:bg-[#151515] p-6 rounded-2xl border border-gray-100 dark:border-white/5 text-center">
                     <p className="text-xs text-gray-500 dark:text-gray-400">No hay unidades agregadas a esta materia todavía.</p>
                     <button
                       onClick={() => setIsAddingUnit(true)}
-                      className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300 rounded-xl text-xs font-semibold inline-flex items-center gap-1"
+                      className="mt-3 px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-xs font-bold inline-flex items-center gap-1"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Crear primera unidad</span>
+                      + Crear primera unidad
                     </button>
                   </div>
                 ) : (
@@ -966,7 +948,7 @@ export const SubjectWorkspace: React.FC<Props> = ({
                         <div
                           key={unit.id}
                           onClick={() => setActiveUnit(unit)}
-                          className="bg-white dark:bg-[#151515] p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-blue-500/30 dark:hover:border-blue-500/30 transition-all shadow-sm cursor-pointer flex flex-col justify-between group"
+                          className="bg-white dark:bg-[#151515] p-4 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all shadow-2xs cursor-pointer flex flex-col justify-between group"
                         >
                           <div>
                             <div className="flex items-center justify-between mb-2">
@@ -976,30 +958,25 @@ export const SubjectWorkspace: React.FC<Props> = ({
                               <button
                                 type="button"
                                 onClick={(e) => handleToggleUnitStatus(unit, e)}
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 ${
-                                  unit.status === 'completed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' :
-                                  unit.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300' :
-                                  'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                                }`}
+                                className="px-2 py-0.5 rounded-full text-[10px] font-bold border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white"
                               >
-                                {unit.status === 'completed' ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <Circle className="w-3 h-3 text-gray-400" />}
-                                <span>{unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}</span>
+                                {unit.status === 'completed' ? 'Completada' : unit.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}
                               </button>
                             </div>
-                            <h4 className="font-bold text-sm text-gray-900 dark:text-white line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            <h4 className="font-bold text-sm text-gray-900 dark:text-white line-clamp-1">
                               {unit.name}
                             </h4>
                             {unit.description && (
                               <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{unit.description}</p>
                             )}
                           </div>
-                          <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-50 dark:border-white/5 text-[11px] text-gray-400">
+                          <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100 dark:border-white/5 text-[11px] text-gray-400 font-mono">
                             <span className="flex items-center gap-2">
                               {unitTaskCount > 0 && <span>{unitTaskCount} tareas</span>}
                               {unitNoteCount > 0 && <span>{unitNoteCount} apuntes</span>}
-                              {unitTaskCount === 0 && unitNoteCount === 0 && <span>Explorar unidad</span>}
+                              {unitTaskCount === 0 && unitNoteCount === 0 && <span>Explorar →</span>}
                             </span>
-                            <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+                            <span>→</span>
                           </div>
                         </div>
                       );
@@ -1010,21 +987,18 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
               {/* CONTENIDO QUICK HUB */}
               <div className="space-y-3">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-purple-500" />
-                  <span>Contenido académico</span>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Contenido académico
                 </h3>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <button
                     onClick={() => { setActiveTab('tasks'); setMobileSubView('tasks'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
-                        <CheckSquare className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Tareas</span>
+                      <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
                         {tasks.filter(t => !t.completed).length}
                       </span>
                     </div>
@@ -1038,13 +1012,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                   <button
                     onClick={() => { setActiveTab('exams'); setMobileSubView('exams'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
-                        <Calendar className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Exámenes</span>
+                      <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
                         {exams.filter(e => e.status !== 'completed').length}
                       </span>
                     </div>
@@ -1058,13 +1030,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                   <button
                     onClick={() => { setActiveTab('notes'); setMobileSubView('notes'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-extrabold text-purple-600 dark:text-purple-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Apuntes</span>
+                      <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
                         {notes.length}
                       </span>
                     </div>
@@ -1076,13 +1046,11 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                   <button
                     onClick={() => { setActiveTab('resources'); setMobileSubView('resources'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
-                        <Paperclip className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Recursos</span>
+                      <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
                         {resources.length}
                       </span>
                     </div>
@@ -1094,31 +1062,27 @@ export const SubjectWorkspace: React.FC<Props> = ({
 
                   <button
                     onClick={() => { setActiveTab('projects'); setMobileSubView('projects'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                        <FolderKanban className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Proyectos</span>
+                      <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
                         {projects.length}
                       </span>
                     </div>
                     <div className="mt-3">
                       <span className="text-xs font-bold text-gray-900 dark:text-white block">Proyectos</span>
-                      <span className="text-[10px] text-gray-400">{projects.length} proyectos vinc.</span>
+                      <span className="text-[10px] text-gray-400">{projects.length} vinculados</span>
                     </div>
                   </button>
 
                   <button
                     onClick={() => { setActiveTab('grades'); setMobileSubView('grades'); }}
-                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#181818] transition-all text-left flex flex-col justify-between"
+                    className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/20 transition-all text-left flex flex-col justify-between"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-xs">
-                        <Award className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-extrabold text-rose-600 dark:text-rose-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Notas</span>
+                      <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
                         {grades.length > 0 ? currentGrade.toFixed(1) : '-'}
                       </span>
                     </div>
@@ -2308,83 +2272,53 @@ export const SubjectWorkspace: React.FC<Props> = ({
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingTask(true); }}
-                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    <CheckSquare className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Tarea</span>
-                    <span className="text-[10px] text-gray-500">Pendiente</span>
-                  </div>
+                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Tarea</span>
+                  <span className="text-[10px] text-gray-500">Pendiente de clase</span>
                 </button>
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingExam(true); }}
-                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    <Calendar className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Examen</span>
-                    <span className="text-[10px] text-gray-500">Evaluación</span>
-                  </div>
+                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Examen</span>
+                  <span className="text-[10px] text-gray-500">Evaluación parcial/final</span>
                 </button>
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); onAddNote(null, undefined, subject.id); }}
-                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Apunte</span>
-                    <span className="text-[10px] text-gray-500">Nota de clase</span>
-                  </div>
+                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Apunte</span>
+                  <span className="text-[10px] text-gray-500">Nota de clase</span>
                 </button>
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingResource(true); }}
-                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    <Paperclip className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Recurso</span>
-                    <span className="text-[10px] text-gray-500">Link o archivo</span>
-                  </div>
+                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Recurso</span>
+                  <span className="text-[10px] text-gray-500">Enlace o archivo</span>
                 </button>
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingUnit(true); }}
-                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    <BookOpen className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Unidad</span>
-                    <span className="text-[10px] text-gray-500">Temario</span>
-                  </div>
+                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Unidad</span>
+                  <span className="text-[10px] text-gray-500">Temario oficial</span>
                 </button>
 
                 <button
                   onClick={() => { setShowMobileActionSheet(false); setIsAddingProject(true); }}
-                  className="p-3.5 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-100 dark:border-white/5 flex items-center gap-3 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
+                  className="p-3 bg-gray-50 dark:bg-[#222] rounded-2xl border border-gray-150 dark:border-white/5 text-left hover:bg-gray-100 dark:hover:bg-[#282828] transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    <FolderKanban className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-gray-900 dark:text-white block">Proyecto</span>
-                    <span className="text-[10px] text-gray-500">Trabajo indiv/grupo</span>
-                  </div>
+                  <span className="text-xs font-bold text-gray-900 dark:text-white block">Proyecto</span>
+                  <span className="text-[10px] text-gray-500">Trabajo individual o grupal</span>
                 </button>
               </div>
             </motion.div>

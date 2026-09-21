@@ -53,8 +53,8 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   // New Subject Form
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newSubjectProfessor, setNewSubjectProfessor] = useState('');
-  const [newSubjectColor, setNewSubjectColor] = useState('#3B82F6');
-  const [newSubjectEmoji, setNewSubjectEmoji] = useState('💻');
+  const [newSubjectColor, setNewSubjectColor] = useState('#18181b');
+  const [newSubjectEmoji, setNewSubjectEmoji] = useState('');
   
   // New Reading Form
   const [isAddingReading, setIsAddingReading] = useState(false);
@@ -1054,7 +1054,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                               className="p-3 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
                             >
                               <div className="flex items-center gap-3 min-w-0 pr-2">
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-base shrink-0 shadow-xs" style={{ backgroundColor: subject.color }}>
+                                <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white flex items-center justify-center text-base shrink-0 border border-gray-200 dark:border-white/10">
                                   {subject.emoji || '📚'}
                                 </div>
                                 <div className="min-w-0">
@@ -1120,7 +1120,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                     </div>
                     <button
                       onClick={() => setIsAddingSubject(true)}
-                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      className="text-xs font-bold text-gray-900 dark:text-white hover:underline cursor-pointer"
                     >
                       + Nueva materia
                     </button>
@@ -1147,7 +1147,7 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                             className="p-3.5 bg-white dark:bg-[#151515] rounded-2xl border border-gray-150 dark:border-white/5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
                           >
                             <div className="flex items-center gap-3 min-w-0 pr-2">
-                              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-base shrink-0 shadow-xs" style={{ backgroundColor: subject.color }}>
+                              <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white flex items-center justify-center text-base shrink-0 border border-gray-200 dark:border-white/10">
                                 {subject.emoji || '📚'}
                               </div>
                               <div className="min-w-0">
@@ -1303,18 +1303,26 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Profesor (Opcional)</label>
                   <input type="text" value={newSubjectProfessor} onChange={e => setNewSubjectProfessor(e.target.value)} className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" placeholder="Ej: Carlos Pérez" />
                 </div>
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Color de materia</label>
-                    <div className="flex items-center gap-2">
-                      <input type="color" value={newSubjectColor} onChange={e => setNewSubjectColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer bg-transparent border-0 p-0" />
-                      <span className="text-xs font-mono text-gray-500">{newSubjectColor}</span>
-                    </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">Icono / Emoji (Opcional)</label>
+                    {newSubjectEmoji && (
+                      <button
+                        type="button"
+                        onClick={() => setNewSubjectEmoji('')}
+                        className="text-[11px] font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                      >
+                        Eliminar emoji ✕
+                      </button>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">Icono / Emoji</label>
-                    <input type="text" value={newSubjectEmoji} onChange={e => setNewSubjectEmoji(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-center text-lg" placeholder="💻" maxLength={2} />
-                  </div>
+                  <input 
+                    type="text" 
+                    value={newSubjectEmoji} 
+                    onChange={e => setNewSubjectEmoji(e.target.value)} 
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-sm" 
+                    placeholder="Escribe o elige un emoji con el teclado (opcional)" 
+                  />
                 </div>
               </div>
               <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
