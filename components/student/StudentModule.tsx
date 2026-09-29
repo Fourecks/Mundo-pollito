@@ -19,6 +19,9 @@ interface StudentModuleProps {
   onAddNote?: (folderId: number | null, projectId?: number, subjectId?: string) => Promise<Note | null>;
   onUpdateNote?: (note: Note) => Promise<void>;
   onDeleteNote?: (noteId: number, folderId: number | null) => Promise<void>;
+  mobileTab?: 'resumen' | 'materias' | 'mas';
+  setMobileTab?: (tab: 'resumen' | 'materias' | 'mas') => void;
+  onReturnToDashboard?: () => void;
 }
 
 const ScheduleView: React.FC<{
@@ -407,6 +410,9 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   onAddNote,
   onUpdateNote,
   onDeleteNote,
+  mobileTab: propMobileTab,
+  setMobileTab: propSetMobileTab,
+  onReturnToDashboard,
 }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [periods, setPeriods] = useState<AcademicPeriod[]>([]);
@@ -424,8 +430,13 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'subjects' | 'calendar' | 'schedule' | 'library' | 'goals' | 'analytics'>('dashboard');
   
-  // Mobile navigation states
-  const [mobileTab, setMobileTab] = useState<'resumen' | 'materias' | 'mas'>('resumen');
+  // Mobile navigation states (synced with controlled prop if provided)
+  const [internalMobileTab, setInternalMobileTab] = useState<'resumen' | 'materias' | 'mas'>('resumen');
+  const mobileTab = propMobileTab !== undefined ? propMobileTab : internalMobileTab;
+  const setMobileTab = (tab: 'resumen' | 'materias' | 'mas') => {
+    if (propSetMobileTab) propSetMobileTab(tab);
+    setInternalMobileTab(tab);
+  };
   const [masSubScreen, setMasSubScreen] = useState<'calendar' | 'schedule' | 'library' | 'goals' | 'analytics' | null>(null);
 
   // New Subject Form Extended State
@@ -786,79 +797,33 @@ export const StudentModule: React.FC<StudentModuleProps> = ({
       </header>
 
       {/* MOBILE HEADER */}
-      <div className="block md:hidden border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#111] px-4 pt-3 pb-2 shrink-0 sticky top-0 z-30">
+      <div className="block md:hidden border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#111] px-4 py-2.5 shrink-0 sticky top-0 z-30">
         {!masSubScreen ? (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Estudio</h2>
-              <button
-                type="button"
-                onClick={() => {
-                  if (mobileTab === 'mas') {
-                    setIsAddingSubject(true);
-                  } else {
-                    setIsAddingSubject(true);
-                  }
-                }}
-                className="w-9 h-9 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center font-bold text-lg active:scale-95 transition-transform shadow-xs cursor-pointer"
-                title="Añadir"
-              >
-                +
-              </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {onReturnToDashboard && (
+                <button
+                  type="button"
+                  onClick={onReturnToDashboard}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-zinc-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700 active:scale-95 transition-all cursor-pointer"
+                  title="Volver al Dashboard principal"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Dashboard</span>
+                </button>
+              )}
+              <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">Estudio</h2>
             </div>
 
-            {/* 3 Main Tabs */}
-            <div className="grid grid-cols-3 gap-1 text-center">
-              <button
-                type="button"
-                onClick={() => { setActiveSubject(null); setMobileTab('resumen'); setMasSubScreen(null); }}
-                className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
-                  !activeSubject && mobileTab === 'resumen' 
-                    ? 'text-gray-900 dark:text-white font-bold' 
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
-                }`}
-              >
-                Resumen
-                {!activeSubject && mobileTab === 'resumen' && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => { 
-                  if (activeSubject) {
-                    setActiveSubject(null);
-                  }
-                  setMobileTab('materias'); 
-                  setMasSubScreen(null); 
-                }}
-                className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
-                  activeSubject || mobileTab === 'materias' 
-                    ? 'text-gray-900 dark:text-white font-bold' 
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
-                }`}
-              >
-                Materias
-                {(activeSubject || mobileTab === 'materias') && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveSubject(null); setMobileTab('mas'); setMasSubScreen(null); }}
-                className={`pb-2.5 text-sm transition-all relative cursor-pointer ${
-                  !activeSubject && mobileTab === 'mas' 
-                    ? 'text-gray-900 dark:text-white font-bold' 
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium'
-                }`}
-              >
-                Más
-                {!activeSubject && mobileTab === 'mas' && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-gray-900 dark:bg-white rounded-full" />
-                )}
-              </button>
-            </div>
-          </>
+            <button
+              type="button"
+              onClick={() => setIsAddingSubject(true)}
+              className="w-8 h-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center font-bold text-base active:scale-95 transition-transform shadow-xs cursor-pointer"
+              title="Añadir materia"
+            >
+              +
+            </button>
+          </div>
         ) : masSubScreen !== 'schedule' ? (
           /* Header when inside a sub-screen from "Más" (except schedule which has its integrated bar) */
           <div className="flex items-center justify-between py-1">
